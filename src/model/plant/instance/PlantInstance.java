@@ -1,6 +1,5 @@
 package model.plant.instance;
 
-import model.Cell;
 import model.Placeable;
 import model.enums.PlantState;
 import model.plant.definition.Plant;
