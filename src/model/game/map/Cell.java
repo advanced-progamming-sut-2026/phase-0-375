@@ -1,6 +1,6 @@
 package model.game.map;
 
-import model.Placeable;
+import model.item.placeable.Placeable;
 import model.Zombie;
 import model.enums.GroundType;
 import model.enums.PlacableLayer;

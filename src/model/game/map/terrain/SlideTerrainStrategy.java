@@ -1,6 +1,6 @@
 package model.game.map.terrain;
 
-import model.Placeable;
+import model.item.placeable.Placeable;
 import model.Zombie;
 import model.enums.SlideDirection;
 import model.game.map.Cell;
