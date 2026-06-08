@@ -1,4 +1,4 @@
-package model.game;
+package model.game.map;
 
 public class Point {
     private final int x;

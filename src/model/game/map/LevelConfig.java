@@ -1,4 +1,4 @@
-package model.game;
+package model.game.map;
 
 import model.enums.Chapter;
 import model.enums.SlideDirection;
