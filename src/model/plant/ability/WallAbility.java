@@ -1,10 +1,9 @@
 package model.plant.ability;
 
-import model.Ability;
 import model.enums.PlantCategory;
 import model.plant.instance.PlantInstance;
 
-public class ShooterAbility implements PlantAbility {
+public class WallAbility implements PlantAbility {
     @Override
     public void execute(PlantInstance plant) {
 
