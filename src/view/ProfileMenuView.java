@@ -1,5 +1,7 @@
 package view;
 
+import controller.ProfileMenuController;
+
 public class ProfileMenuView extends BaseMenuView {
     private ProfileMenuController controller;
 
