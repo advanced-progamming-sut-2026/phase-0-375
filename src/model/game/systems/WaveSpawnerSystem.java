@@ -1,7 +1,6 @@
 package model.game.systems;
 
 import model.enums.Chapter;
-import model.zombie.Zombie;
 
 public class WaveSpawnerSystem {
     private int currentWave;
