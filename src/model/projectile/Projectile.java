@@ -1,4 +1,9 @@
 package model.projectile;
 
-public class Projectile {
+import model.game.map.Point;
+
+public abstract class Projectile {
+    protected int damage;
+    protected Point currentPosition;
+    protected float velocity;
 }
