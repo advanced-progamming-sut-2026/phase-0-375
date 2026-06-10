@@ -25,7 +25,7 @@ public class Collection {
     /** Zombie names the user has unlocked. */
     private Set<String> unlockedZombies;
 
-    /** Current level of each plant the user owns (1–4). */
+    /** Current level of each plant the user owns. */
     private final Map<String, Integer> plantLevels = new HashMap<>();
 
     public Collection(Set<String> unlockedPlants, Set<String> unlockedZombies) {
