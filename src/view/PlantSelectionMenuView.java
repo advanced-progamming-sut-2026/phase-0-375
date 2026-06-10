@@ -1,5 +1,7 @@
 package view;
 
+import controller.PlantSelectionMenuController;
+
 public class PlantSelectionMenuView extends BaseMenuView {
     private PlantSelectionMenuController controller;
 

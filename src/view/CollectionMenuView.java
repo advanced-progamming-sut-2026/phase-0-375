@@ -1,5 +1,7 @@
 package view;
 
+import controller.CollectionMenuController;
+
 public class CollectionMenuView extends BaseMenuView {
     private CollectionMenuController controller;
 

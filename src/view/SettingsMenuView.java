@@ -1,7 +1,7 @@
 package view;
 
 public class SettingsMenuView extends BaseMenuView {
-    private SettingsMenuController controller;
+//    private SettingsMenuController controller;
 
     @Override
     public void processInput(String input) {}

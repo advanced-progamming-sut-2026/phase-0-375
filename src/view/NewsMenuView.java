@@ -1,5 +1,7 @@
 package view;
 
+import controller.NewsMenuController;
+
 public class NewsMenuView extends BaseMenuView {
     private NewsMenuController controller;
 
