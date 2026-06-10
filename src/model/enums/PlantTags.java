@@ -17,5 +17,5 @@ public enum PlantTags {
     TRAP,
     MOVE_ZOMBIES,
     SUN,
-    EXPLOSIVE,
+    EXPLOSIVE
 }

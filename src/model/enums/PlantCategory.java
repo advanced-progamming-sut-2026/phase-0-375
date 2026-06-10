@@ -10,5 +10,5 @@ public enum PlantCategory {
     MODIFIER,
     STRIKE_THROUGH,
     HOMING,
-    MINT,
+    MINT
 }
