@@ -7,7 +7,7 @@ import model.game.rule.EndGameCondition;
 import model.item.LootDrop;
 import model.item.Sun;
 import model.projectile.Projectile;
-import model.zombie.Zombie;
+import model.zombie.definition.Zombie;
 
 import java.util.List;
 

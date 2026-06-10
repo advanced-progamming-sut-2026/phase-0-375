@@ -1,5 +1,6 @@
 package model.plant.ability;
 
+import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.plant.instance.PlantInstance;
 
@@ -15,7 +16,7 @@ public class WallAbility implements PlantAbility {
     }
 
     @Override
-    public PlantCategory getType() {
+    public PlantAbilityType getType() {
         return null;
     }
 }

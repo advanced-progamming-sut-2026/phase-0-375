@@ -1,6 +1,6 @@
 package model.enums;
 
-public enum ArmorTypes {
+public enum ArmorType {
     Cone,
     Bucket,
     Helmet,

@@ -1,6 +1,7 @@
 package model.plant.ability;
 
 import model.Ability;
+import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.plant.instance.PlantInstance;
 
@@ -16,7 +17,7 @@ public class MeleeAbility implements PlantAbility {
     }
 
     @Override
-    public PlantCategory getType() {
+    public PlantAbilityType getType() {
         return null;
     }
 }

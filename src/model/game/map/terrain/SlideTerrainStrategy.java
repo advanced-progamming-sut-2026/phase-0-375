@@ -1,7 +1,7 @@
 package model.game.map.terrain;
 
 import model.item.placeable.Placeable;
-import model.zombie.Zombie;
+import model.zombie.definition.Zombie;
 import model.enums.SlideDirection;
 import model.game.map.Cell;
 import model.plant.definition.Plant;

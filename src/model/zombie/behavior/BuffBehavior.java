@@ -3,7 +3,7 @@ package model.zombie.behavior;
 import model.enums.ZombieBehaviorType;
 import model.zombie.instance.ZombieInstance;
 
-public class StealSunBehavior implements ZombieBehavior {
+public class BuffBehavior implements ZombieBehavior {
     @Override
     public void execute(ZombieInstance zombie) {
 
