@@ -17,7 +17,7 @@ public class Zombie {
     private float eatDPS;
     private ZombieSize size;
     private Chapter chapter;        // which chapter this zombie belongs to; null = all chapters
-    private int wavePointCost;      // spawning cost for wave balancing
+    private int wavePointCost;      // spawning cost for model.game.wave balancing
     private int weight;             // spawn probability weight
 
     // --- Structural composition (what the zombie carries) ---

@@ -2,8 +2,10 @@ package model.game;
 
 import model.enums.Chapter;
 import model.enums.GameState;
+import model.game.level.Level;
 import model.game.map.GameMap;
 import model.game.rule.EndGameCondition;
+import model.game.wave.WaveManager;
 import model.item.LootDrop;
 import model.item.Sun;
 import model.projectile.Projectile;
@@ -18,6 +20,9 @@ public class GameModel {
     private int difficultyLevel;
     private GameState gameState;
     private Chapter chapter;
+
+    private Level currentLevel;
+    private WaveManager waveManager;
 
     private EndGameCondition endGameCondition;
 
