@@ -1,5 +1,6 @@
 package model.zombie.instance;
 
+import model.core.Tickable;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
 import model.game.map.Point;
@@ -17,7 +18,7 @@ import java.util.Map;
 /**
  * The runtime representation of a zombie on the game field
  */
-public class ZombieInstance {
+public class ZombieInstance implements Tickable {
     private Zombie definition;
     private ZombieState state;
     private int currentHP;
