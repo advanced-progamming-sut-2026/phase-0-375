@@ -1,9 +1,9 @@
 package model.game.systems;
 
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.event.EventBus;
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.projectile.Projectile;
 import model.projectile.Splash;
 import model.zombie.instance.ZombieInstance;

@@ -1,7 +1,6 @@
-package model.core;
+package model.game.core;
 
 import model.enums.GameState;
-import model.game.GameModel;
 
 public class PvZGameLoop implements GameLoop {
 

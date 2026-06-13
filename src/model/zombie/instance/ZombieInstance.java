@@ -1,8 +1,9 @@
 package model.zombie.instance;
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
+import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.item.equippable.Equippable;
 import model.item.pushable.Pushable;
@@ -22,7 +23,8 @@ public class ZombieInstance implements Tickable {
     private Zombie definition;
     private ZombieState state;
     private int currentHP;
-    private Point position;                                // grid coordinates on the map; null if not yet on field
+    private Point gridPosition;                                // grid coordinates on the map; null if not yet on field
+    private FloatPoint continuousPosition;
     private float currentSpeed;                            // can be modified by chill, buff, etc.
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
@@ -134,9 +136,17 @@ public class ZombieInstance implements Tickable {
         return currentHP;
     }
 
-    public Point getPosition() {
-        return position;
+    public FloatPoint getContinuousPosition() {
+        return continuousPosition;
     }
+
+    public float getContinuousX() { return continuousPosition.getX(); }
+
+    public float getContinuousY() { return continuousPosition.getY(); }
+
+    public Point getGridPosition() { return gridPosition; }
+    public int getGridX() { return gridPosition.getX(); }
+    public int getGridY() { return gridPosition.getY(); }
 
     public float getCurrentSpeed() {
         return currentSpeed;
@@ -176,9 +186,19 @@ public class ZombieInstance implements Tickable {
         this.currentHP = currentHP;
     }
 
-    public void setPosition(Point position) {
-        this.position = position;
+    public void setContinuousPosition(FloatPoint position) {
+        this.continuousPosition = position;
     }
+
+    public void setContinuousX(float x) { this.continuousPosition.setX(x); }
+
+    public void setContinuousY(float x) { this.continuousPosition.setX(x); }
+
+    public void setGridPosition(Point gridPosition) {
+        this.gridPosition = gridPosition;
+    }
+    public void setGridX(int gridX) { this.gridPosition.setX(gridX); }
+    public void setGridY(int gridY) { this.gridPosition.setY(gridY); }
 
     public void setCurrentSpeed(float currentSpeed) {
         this.currentSpeed = currentSpeed;

@@ -1,8 +1,11 @@
-package model.game;
+package model.game.core;
 
+import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
+import model.event.EventBus;
 import model.game.level.Level;
+import model.game.level.LevelConfig;
 import model.game.map.GameMap;
 import model.game.rule.EndGameCondition;
 import model.game.wave.WaveManager;
@@ -10,7 +13,9 @@ import model.item.LootDrop;
 import model.item.Sun;
 import model.projectile.Projectile;
 import model.zombie.definition.Zombie;
+import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class GameModel {
@@ -27,13 +32,36 @@ public class GameModel {
     private EndGameCondition endGameCondition;
 
     private GameMap gameMap;
-    private List<Zombie> activeZombies;
+    private List<ZombieInstance> activeZombies;
     private List<Projectile> activeProjectiles;
     private List<Sun> activeSuns;
     private List<LootDrop> pendingLootDrops;
 
-    // eventBus
+    private EventBus eventBus;
 
+    public GameModel(Level currentLevel) {
+        this.currentTick = 0;
+        this.difficultyLevel = App.getInstance().getCurrentUser().getDifficultyLevel();
+        this.gameState = GameState.RUNNING;
+
+        this.currentLevel = currentLevel;
+        LevelConfig levelConfig = this.currentLevel.getConfig();
+        this.sunAmount = levelConfig.getRules().getInitialSun();
+        this.plantFoodCount = 0;
+        this.chapter = levelConfig.getChapter();
+        this.endGameCondition = levelConfig.getEndGameCondition();
+
+        this.waveManager = new WaveManager(levelConfig.getWaves());
+
+        this.activeZombies = new ArrayList<>();
+        this.activeProjectiles = new ArrayList<>();
+        this.activeSuns = new ArrayList<>();
+        this.pendingLootDrops = new ArrayList<>();
+
+        this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
+
+        this.eventBus = null;
+    }
 
     public GameMap getMap() {
         return gameMap;
@@ -59,7 +87,7 @@ public class GameModel {
         return gameState;
     }
 
-    public List<Zombie> getZombies() {
+    public List<ZombieInstance> getZombies() {
         return activeZombies;
     }
 

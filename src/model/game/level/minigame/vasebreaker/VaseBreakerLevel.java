@@ -1,7 +1,7 @@
 package model.game.level.minigame.vasebreaker;
 
 import model.enums.MiniGameType;
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
 

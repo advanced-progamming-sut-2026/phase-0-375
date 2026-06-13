@@ -1,4 +1,4 @@
-package model.core;
+package model.game.core;
 
 import model.enums.GameState;
 

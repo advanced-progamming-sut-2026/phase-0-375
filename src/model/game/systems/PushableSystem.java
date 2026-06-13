@@ -1,8 +1,8 @@
 package model.game.systems;
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.event.EventBus;
-import model.game.GameModel;
+import model.game.core.GameModel;
 
 public class PushableSystem implements Tickable {
 

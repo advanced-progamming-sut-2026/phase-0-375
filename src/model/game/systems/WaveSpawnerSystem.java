@@ -1,17 +1,12 @@
 package model.game.systems;
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.enums.Chapter;
-import model.enums.ZombieBehaviorType;
-import model.enums.ZombieSize;
 import model.event.EventBus;
-import model.event.GameEvent;
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.zombie.ZombieFactory;
 import model.zombie.definition.Zombie;
-import model.zombie.instance.ZombieInstance;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 

@@ -1,7 +1,6 @@
 package model.game.rule;
 
-import model.game.GameModel;
-import model.game.level.Level;
+import model.game.core.GameModel;
 import model.game.level.RegularLevel;
 
 public class RegularEndGameCondition implements EndGameCondition {

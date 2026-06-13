@@ -1,12 +1,17 @@
 package model.game.systems;
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.enums.SunType;
-import model.item.Sun;
 
 public class SunFallSystem implements Tickable {
     private float skyDropTimer;
     private boolean skyDropEnabled;
+
+    public SunFallSystem(float skyDropTimer, boolean skyDropEnabled) {
+        this.skyDropTimer = skyDropTimer;
+        this.skyDropEnabled = skyDropEnabled;
+    }
+
 
     public boolean isSkyDropEnabled() {
         return skyDropEnabled;

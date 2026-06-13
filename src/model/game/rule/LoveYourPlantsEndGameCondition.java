@@ -1,6 +1,6 @@
 package model.game.rule;
 
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.game.level.special.LoveYourPlantsLevel;
 
 public class LoveYourPlantsEndGameCondition implements EndGameCondition {

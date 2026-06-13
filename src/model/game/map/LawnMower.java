@@ -1,13 +1,12 @@
 package model.game.map;
 
 public class LawnMower {
-    private int row;
     private boolean active = true;
     private boolean isTriggered = false;
-    private double xPosInTime;
+    private double xPosInTime = 0;
 
-    public LawnMower(int row) {
-        this.row = row;
+    public LawnMower() {
+
     }
 
     public boolean isActive() {

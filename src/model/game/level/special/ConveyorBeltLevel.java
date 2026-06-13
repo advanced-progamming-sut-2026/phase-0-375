@@ -1,14 +1,8 @@
 package model.game.level.special;
 
-import model.enums.Chapter;
-import model.enums.LevelType;
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
-import model.game.rule.GameRules;
-import model.game.wave.Wave;
-
-import java.util.List;
 
 public class ConveyorBeltLevel extends Level {
 

@@ -1,6 +1,6 @@
 package model.game.level.special;
 
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
 

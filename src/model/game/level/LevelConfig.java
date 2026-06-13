@@ -3,8 +3,8 @@ package model.game.level;
 import model.enums.Chapter;
 import model.enums.LevelType;
 import model.enums.SlideDirection;
-import model.game.GameModel;
 import model.game.map.Point;
+import model.game.rule.EndGameCondition;
 import model.game.rule.GameRules;
 import model.game.wave.Wave;
 
@@ -18,6 +18,7 @@ public class LevelConfig {
     private int columns;
     private LevelType levelType;
     private GameRules rules;
+    private EndGameCondition endGameCondition;
     private List<Wave> waves;
     private boolean isCompleted;
     private int starsEarned;
@@ -52,6 +53,10 @@ public class LevelConfig {
 
     public LevelType getLevelType() {
         return levelType;
+    }
+
+    public EndGameCondition getEndGameCondition() {
+        return endGameCondition;
     }
 
     public GameRules getRules() {
@@ -122,6 +127,10 @@ public class LevelConfig {
 
     public void setLevelType(LevelType levelType) {
         this.levelType = levelType;
+    }
+
+    public void setEndGameCondition(EndGameCondition endGameCondition) {
+        this.endGameCondition = endGameCondition;
     }
 
     public void setRules(GameRules rules) {

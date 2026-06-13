@@ -1,6 +1,6 @@
 package model.game.level;
 
-import model.game.GameModel;
+import model.game.core.GameModel;
 
 public class RegularLevel extends Level{
     public RegularLevel(LevelConfig config) {

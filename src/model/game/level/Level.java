@@ -1,13 +1,6 @@
 package model.game.level;
 
-import model.enums.Chapter;
-import model.enums.LevelType;
-import model.game.GameModel;
-import model.game.rule.GameRules;
-import model.game.wave.Wave;
-
-import java.util.Collections;
-import java.util.List;
+import model.game.core.GameModel;
 
 /**
  * Represents a complete level in the game.

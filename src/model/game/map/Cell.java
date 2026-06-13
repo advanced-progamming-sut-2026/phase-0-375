@@ -20,7 +20,7 @@ public class Cell {
     private List<Zombie> zombies; // TODO: matter of discussion imo
     private List<Projectile> projectiles;
 
-    public Cell(int column, int row) {
+    public Cell(int row, int column) {
         this.column = column;
         this.row = row;
     }

@@ -1,6 +1,6 @@
 package model.game.rule;
 
-import model.game.GameModel;
+import model.game.core.GameModel;
 
 public interface EndGameCondition {
     boolean isWin(GameModel model);

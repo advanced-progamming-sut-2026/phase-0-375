@@ -1,9 +1,11 @@
 package model.game.systems;
 
-import model.core.Tickable;
+import model.game.core.Tickable;
 import model.event.EventBus;
-import model.game.GameModel;
+import model.game.core.GameModel;
 import model.zombie.instance.ZombieInstance;
+
+import java.util.List;
 
 public class ZombieSystem implements Tickable {
 
@@ -17,7 +19,14 @@ public class ZombieSystem implements Tickable {
 
     @Override
     public void tick(float deltaTime) {
+        List<ZombieInstance> zombies = gameModel.getZombies();
 
+        for (ZombieInstance zombie : zombies) {
+            zombie.tick(deltaTime);
+            zombie.tickBehaviors(deltaTime);
+
+            moveZombie(zombie, deltaTime);
+        }
     }
 
     /**
@@ -25,7 +34,20 @@ public class ZombieSystem implements Tickable {
      * Zombies in EATING state do not move.
      */
     private void moveZombie(ZombieInstance zombie, float deltaTime) {
+        if (zombie.getState() == model.enums.ZombieState.EATING) {
+            return;
+        }
 
+        float effectiveSpeed = zombie.getCurrentSpeed();
+
+        float deltaX = effectiveSpeed * deltaTime;
+        zombie.setContinuousX(zombie.getContinuousX() - deltaX);
+
+        int newGridX = (int) Math.floor(zombie.getContinuousX());
+        if (newGridX != zombie.getGridX()) {
+            zombie.setGridX(newGridX);
+            onZombieEnteredCell(zombie);
+        }
     }
 
     /**
