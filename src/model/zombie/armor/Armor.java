@@ -16,7 +16,6 @@ public class Armor {
     private boolean isDroppable;        // true = can be knocked off by specific attacks
     private boolean isHelm;             // true = occupies the head slot
     private boolean passesDamageThrough;// true = damage also hits zombie HP (shoulder pads)
-    private boolean chillsAttacker;     // true = chills plants that attack this armor (ice block)
     private List<String> damageLayers;  // visual layer names for damage states
     private List<Float> layerThresholds;// health % thresholds for each damage layer transition
 
@@ -26,7 +25,7 @@ public class Armor {
     }
 
     public Armor(ArmorType type, int baseHealth, boolean isMetallic, boolean isDroppable,
-                 boolean isHelm, boolean passesDamageThrough, boolean chillsAttacker) {
+                 boolean isHelm, boolean passesDamageThrough) {
         this.type = type;
         this.baseHealth = baseHealth;
         this.currentHealth = baseHealth;
@@ -34,7 +33,6 @@ public class Armor {
         this.isDroppable = isDroppable;
         this.isHelm = isHelm;
         this.passesDamageThrough = passesDamageThrough;
-        this.chillsAttacker = chillsAttacker;
         this.damageLayers = new ArrayList<>();
         this.layerThresholds = new ArrayList<>();
     }
@@ -85,10 +83,6 @@ public class Armor {
         return passesDamageThrough;
     }
 
-    public boolean isChillsAttacker() {
-        return chillsAttacker;
-    }
-
     public List<String> getDamageLayers() {
         return damageLayers;
     }
@@ -125,10 +119,6 @@ public class Armor {
 
     public void setPassesDamageThrough(boolean passesDamageThrough) {
         this.passesDamageThrough = passesDamageThrough;
-    }
-
-    public void setChillsAttacker(boolean chillsAttacker) {
-        this.chillsAttacker = chillsAttacker;
     }
 
     public void setDamageLayers(List<String> damageLayers) {
