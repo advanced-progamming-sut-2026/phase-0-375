@@ -192,7 +192,7 @@ public class ZombieInstance implements Tickable {
 
     public void setContinuousX(float x) { this.continuousPosition.setX(x); }
 
-    public void setContinuousY(float x) { this.continuousPosition.setX(x); }
+    public void setContinuousY(float x) { this.continuousPosition.setY(x); }
 
     public void setGridPosition(Point gridPosition) {
         this.gridPosition = gridPosition;

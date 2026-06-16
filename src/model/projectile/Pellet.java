@@ -1,4 +1,4 @@
 package model.projectile;
 
-public class Pellet {
+public class Pellet extends Projectile {
 }

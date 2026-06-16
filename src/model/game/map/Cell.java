@@ -1,15 +1,17 @@
 package model.game.map;
 
 import model.item.placeable.Placeable;
+import model.plant.instance.PlantInstance;
 import model.zombie.definition.Zombie;
 import model.enums.GroundType;
 import model.enums.PlacableLayer;
 import model.game.map.terrain.TerrainStrategy;
 import model.plant.definition.Plant;
 import model.projectile.Projectile;
+import model.zombie.instance.ZombieInstance;
 
-import java.util.List;
-import java.util.Map;
+import javax.sound.sampled.Line;
+import java.util.*;
 
 public class Cell {
     private int column;
@@ -17,21 +19,37 @@ public class Cell {
     private GroundType groundType;
     private TerrainStrategy terrainStrategy;
     private Map<PlacableLayer, Placeable> placeables;
-    private List<Zombie> zombies; // TODO: matter of discussion imo
+    private List<ZombieInstance> zombies; // TODO: matter of discussion imo
     private List<Projectile> projectiles;
 
     public Cell(int row, int column) {
         this.column = column;
         this.row = row;
+
+        placeables = new LinkedHashMap<>();
+        zombies = new LinkedList<>();
+        projectiles = new LinkedList<>();
     }
 
-    public boolean canPlant(Plant plant) { return false; }
+    public boolean canPlant(Plant plant) {
+        return placeables.isEmpty();
+    }
 
-    public boolean addPlaceable(Placeable placeable) { return false; }
+    public boolean addPlaceable(Placeable placeable) {
+        PlacableLayer layer = placeable.getLayer();
+        if (placeables.containsKey(layer)) return false;
 
-    public void removePlaceable(Placeable placeable) { }
+        placeables.put(layer, placeable);
+        return true;
+    }
 
-    public Placeable getPlaceable(PlacableLayer layer) { return placeables.get(layer); }
+    public void removePlaceable(Placeable placeable) {
+        placeables.remove(placeable.getLayer());
+    }
+
+    public Placeable getPlaceable(PlacableLayer layer) {
+        return placeables.get(layer);
+    }
 
     public Plant getMainPlant() {
         return (Plant) placeables.get(PlacableLayer.MAIN);
@@ -39,11 +57,25 @@ public class Cell {
 
     // TODO: getGridItem
 
-    public void addZombie(Zombie zombie) {}
+    public void addZombie(ZombieInstance zombie) {
+        zombies.add(zombie);
+    }
 
-    public void removeZombie(Zombie zombie) {}
+    public void removeZombie(ZombieInstance zombie) {
+        zombies.remove(zombie);
+    }
 
-    public boolean isPassableForZombie(Zombie zombie) { return false; }
+    public boolean isPassableForZombie(ZombieInstance zombie) {
+        return placeables.get(PlacableLayer.MAIN) == null;
+    }
 
-    public void onZombieEnter(Zombie zombie) {}
+    public void onZombieEnter(ZombieInstance zombie) {}
+
+    public void addProjectile(Projectile projectile) {
+        projectiles.add(projectile);
+    }
+
+    public void removeProjectile(Projectile projectile) {
+        projectiles.remove(projectile);
+    }
 }

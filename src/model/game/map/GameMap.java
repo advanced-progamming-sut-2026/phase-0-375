@@ -1,5 +1,8 @@
 package model.game.map;
 
+import model.projectile.Projectile;
+import model.zombie.instance.ZombieInstance;
+
 import java.util.stream.IntStream;
 
 public class GameMap {
@@ -24,5 +27,41 @@ public class GameMap {
 
     public Cell getCell(int x, int y) { return grid[x][y]; }
 
+    public void addZombie(ZombieInstance instance, int x, int y) {
+        if (x < 0 || y < 0 || x >= rows || y >= cols) return;
 
+        grid[x][y].addZombie(instance);
+    }
+
+    public void addProjectile(Projectile projectile, int x, int y) {
+        if (x < 0 || y < 0 || x >= rows || y >= cols) return;
+
+        grid[x][y].addProjectile(projectile);
+    }
+
+    public void removeZombie(ZombieInstance instance) {
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                // We call this function on every cell, one would eventually have the instance and remove it.
+                cell.removeZombie(instance);
+            }
+        }
+    }
+
+    public void removeProjectile(Projectile projectile) {
+        for (Cell[] row : grid) {
+            for (Cell cell : row) {
+                // We call this function on every cell, one would eventually have the instance and remove it.
+                cell.removeProjectile(projectile);
+            }
+        }
+    }
+
+    public int getCols() {
+        return cols;
+    }
+
+    public int getRows() {
+        return rows;
+    }
 }

@@ -1,5 +1,7 @@
 package model.item.placeable;
 
-public interface Placeable {
+import model.enums.PlacableLayer;
 
+public interface Placeable {
+    PlacableLayer getLayer();
 }

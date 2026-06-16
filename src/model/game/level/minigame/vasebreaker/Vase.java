@@ -1,5 +1,6 @@
 package model.game.level.minigame.vasebreaker;
 
+import model.enums.PlacableLayer;
 import model.enums.VaseContent;
 import model.game.map.Point;
 import model.item.placeable.Placeable;
@@ -46,6 +47,11 @@ public class Vase implements Placeable {
 
     public Plant getHiddenPlant() {
         return hiddenPlant;
+    }
+
+    @Override
+    public PlacableLayer getLayer() {
+        return PlacableLayer.GROUND;
     }
 
     // --- Setters ---

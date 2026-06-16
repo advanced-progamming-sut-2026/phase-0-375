@@ -4,8 +4,10 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
 import model.event.EventBus;
+import model.event.GameEvent;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.rule.EndGameCondition;
 import model.game.wave.WaveManager;
@@ -83,8 +85,18 @@ public class GameModel {
         return difficultyLevel;
     }
 
+    public Level getCurrentLevel() { return currentLevel; }
+
     public GameState getState() {
         return gameState;
+    }
+
+    public WaveManager getWaveManager() {
+        return waveManager;
+    }
+
+    public EventBus getEventBus() {
+        return eventBus;
     }
 
     public List<ZombieInstance> getZombies() {
@@ -108,7 +120,9 @@ public class GameModel {
     }
 
     public boolean spendSun(int amount) {
-        return false;
+        if (sunAmount < amount) return false;
+        sunAmount -= amount;
+        return true;
     }
 
     public void addPlantFood() {
@@ -116,29 +130,55 @@ public class GameModel {
     }
 
     public boolean usePlantFood() {
-        return false;
+        if (plantFoodCount < 1) return false;
+        plantFoodCount--;
+        return true;
     }
 
-    public void spawnZombie(Zombie zombie, int x, int y) {
-
+    public void spawnZombie(Zombie zombie, int lane) {
+        ZombieInstance instance = new ZombieInstance(zombie); // TODO: zombie factory ?
+        instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
+        activeZombies.add(instance);
+        gameMap.addZombie(instance, gameMap.getCols(), lane);
+        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
     }
 
-    public void removeZombie(Zombie zombie) {
+    public void removeZombie(ZombieInstance zombie) {
+        activeZombies.remove(zombie);
+        gameMap.removeZombie(zombie);
     }
 
-    public void spawnProjectile(Projectile projectile, int x, int y) {}
+    public void spawnProjectile(Projectile projectile, int x, int y) {
+        activeProjectiles.add(projectile);
+        gameMap.addProjectile(projectile, x, y);
+        eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_FIRED));
+    }
 
-    public void removeProjectile(Projectile projectile) {}
+    public void removeProjectile(Projectile projectile) {
+        activeProjectiles.remove(projectile);
+        gameMap.removeProjectile(projectile);
+    }
 
-    public void spawnSun(Sun sun) {}
+    public void spawnSun(Sun sun) {
+        activeSuns.add(sun);
+    }
 
-    public void collectSun(Sun sun) {}
+    public void collectSun(Sun sun) {
+        activeSuns.remove(sun);
+        sunAmount += sun.getValue();
+    }
 
-    public void advanceTick() {}
+    public void tick(float deltaTime) {
+        currentTick += 1;
+    }
 
     public void setGameState(GameState gameState) {}
 
     public void queueLootDrop(LootDrop loot) {}
 
     public void processLootDrops() {}
+
+    public int getZombieCount() {
+        return activeZombies.size();
+    }
 }

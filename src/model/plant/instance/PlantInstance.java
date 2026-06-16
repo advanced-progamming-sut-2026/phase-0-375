@@ -1,5 +1,6 @@
 package model.plant.instance;
 
+import model.enums.PlacableLayer;
 import model.enums.PlantAbilityType;
 import model.game.map.Point;
 import model.item.placeable.Placeable;
@@ -116,6 +117,10 @@ public class PlantInstance implements Placeable {
         return abilityStates;
     }
 
+    @Override
+    public PlacableLayer getLayer() {
+        return  PlacableLayer.MAIN; // returns which layer this instance is going to be placed on
+    }
 
     // --- Setters ---
 

@@ -1,7 +1,6 @@
 package model.event;
 
 public class GameEvent {
-
     public enum Type {
         SUN_COLLECTED,
         SUN_DROPPED,
@@ -32,4 +31,13 @@ public class GameEvent {
         NECROMANCY_SPAWN
     }
 
+    private Type type;
+
+    public GameEvent(model.event.GameEvent.Type type) {
+        this.type = type;
+    }
+
+    public Type getType() {
+        return type;
+    }
 }
