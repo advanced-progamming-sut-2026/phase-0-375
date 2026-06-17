@@ -14,6 +14,7 @@ import model.game.wave.WaveManager;
 import model.item.LootDrop;
 import model.item.Sun;
 import model.projectile.Projectile;
+import model.zombie.ZombieFactory;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
 
@@ -136,7 +137,7 @@ public class GameModel {
     }
 
     public void spawnZombie(Zombie zombie, int lane) {
-        ZombieInstance instance = new ZombieInstance(zombie); // TODO: zombie factory ?
+        ZombieInstance instance = ZombieFactory.createInstance(zombie);
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);

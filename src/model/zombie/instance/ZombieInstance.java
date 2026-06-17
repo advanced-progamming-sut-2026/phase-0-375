@@ -46,7 +46,7 @@ public class ZombieInstance implements Tickable {
         this.speedModifier = 1.0f;
         this.isGlowing = false;
         this.chillLevel = 0;
-        this.armors = new ArrayList<>();
+        this.armors = null;
         this.pushableItem = null;
         this.equippedItem = null;
         this.behaviorStates = new EnumMap<>(ZombieBehaviorType.class);
@@ -57,6 +57,13 @@ public class ZombieInstance implements Tickable {
         for (ZombieBehavior behavior : definition.getBehaviors()) {
             behaviorStates.put(behavior.getType(), new BehaviorState(behavior.getType()));
         }
+    }
+
+    public ZombieInstance(Zombie definition, List<Armor> armors, Pushable pushableItem, Equippable equippedItem) {
+        this(definition);
+        this.armors = new ArrayList<>(armors);
+        this.pushableItem = pushableItem;
+        this.equippedItem = equippedItem;
     }
 
     // --- Tick & lifecycle ---
