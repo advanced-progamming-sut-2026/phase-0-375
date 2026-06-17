@@ -73,12 +73,17 @@ public class Zombie {
 
     /** Finds the first behavior that matches the input in this zombie's behavior list */
     public ZombieBehavior getBehavior(ZombieBehaviorType type) {
+        for(ZombieBehavior behavior : behaviors) {
+            if(behavior.getType() == type) {
+                return behavior;
+            }
+        }
         return null;
     }
 
     /** Checks whether this zombie has at least one behavior of the given type. */
     public boolean hasBehavior(ZombieBehaviorType type) {
-        return false;
+        return getBehavior(type) != null;
     }
 
     /** Returns an unmodifiable list of this zombie's behaviors. */
@@ -88,7 +93,7 @@ public class Zombie {
 
     /** Adds a behavior to this zombie's behavior list. */
     public void addBehavior(ZombieBehavior behavior) {
-
+        behaviors.add(behavior);
     }
 
     /**
@@ -97,7 +102,7 @@ public class Zombie {
      * @return true if a behavior was removed
      */
     public boolean removeBehavior(ZombieBehavior behavior) {
-        return false;
+        return behaviors.remove(behavior);
     }
 
     // --- Getters ---

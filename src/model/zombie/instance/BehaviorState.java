@@ -1,11 +1,12 @@
 package model.zombie.instance;
 
 import model.enums.ZombieBehaviorType;
+import model.game.core.Tickable;
 
 /**
  * Runtime state tracker for a single behavior on a zombie instance
  */
-public class BehaviorState {
+public class BehaviorState implements Tickable {
     private ZombieBehaviorType behaviorType;
     private float cooldownRemaining;    // seconds until the behavior can fire again
     private boolean isActive;           // whether the behavior is currently performing its action
@@ -17,6 +18,11 @@ public class BehaviorState {
         this.behaviorType = behaviorType;
         this.isActive = true;
         this.currentSpeedModifier = 1.0f;
+    }
+
+    @Override
+    public void tick(float deltaTime) {
+
     }
 
     // --- Getters ---

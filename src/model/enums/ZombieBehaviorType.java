@@ -8,11 +8,13 @@ public enum ZombieBehaviorType {
     FLY,            // flies over plants/obstacles (Dodo)
     SUMMON,         // spawns grid items or units (Tomb Raiser, Weasel Hoarder)
     BUFF,           // enhances nearby zombies (Dark King)
-    TRANSFORM,      // transforms plants into other things (Wizard → sheep)
+    TRANSFORM,      // transforms plants into other things (Wizard -> sheep)
     FISH,           // hooks and pulls plants (Fisherman)
     THROW_IMP,      // throws an Imp at low health (Gargantuar)
     SMASH,          // instantly destroys plants on contact (Gargantuar)
     DISARM,         // attracts/steals metallic items (Magnet-shroom reverse)
     HYPNOTIZE,      // resists or interacts with hypno effects
-    DISGUISE        // appearance-based behavior (Camel segments)
+    DISGUISE,       // appearance-based behavior (Camel segments)
+    JUMP,           // Jumps over game entities (Prospector)
+    PUSH,           // Push items on the ground (Arcade, Pianist)
 }
