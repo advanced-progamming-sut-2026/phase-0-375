@@ -1,11 +1,12 @@
 package controller;
 
 import controller.result.CommandResult;
+import model.enums.MenuType;
 
 public class AppMenuController {
-    private static AppMenuController instance;
+    private static AppMenuController instance = null;
 
-    private AppMenuController() {
+    protected AppMenuController() {
     }
 
     public static AppMenuController getInstance() {
@@ -15,5 +16,5 @@ public class AppMenuController {
 
     public CommandResult<Void> menuEnter(String menuName) { return null; }
     public CommandResult<Void> menuExit() { return null; }
-    public CommandResult<String> menuShowCurrent() { return null; }
+    public CommandResult<MenuType> menuShowCurrent() { return null; }
 }

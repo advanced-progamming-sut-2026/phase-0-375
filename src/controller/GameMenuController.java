@@ -2,7 +2,16 @@ package controller;
 
 import controller.result.CommandResult;
 
-public class GameMenuController extends BaseMenuController {
+public class GameMenuController extends AppMenuController {
+    private static GameMenuController instance = null;
+
+    private GameMenuController() {}
+
+    public static GameMenuController getInstance() {
+        if (instance == null) instance = new GameMenuController();
+        return instance;
+    }
+
     public CommandResult<Void> enterChapter(String chapterName) { return null; }
     public CommandResult<Void> greenhouse() { return null; }
     public CommandResult<Void> travelLog() { return null; }

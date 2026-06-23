@@ -2,7 +2,16 @@ package controller;
 
 import controller.result.CommandResult;
 
-public class GameplayMenuController extends BaseMenuController {
+public class GameplayMenuController extends AppMenuController {
+    private static GameplayMenuController instance = null;
+
+    private GameplayMenuController() {}
+
+    public static GameplayMenuController getInstance() {
+        if (instance == null) instance = new GameplayMenuController();
+        return instance;
+    }
+
     public CommandResult<Void> advanceTime(int count) { return null; }
     public CommandResult<Void> collectSun(int x, int y) { return null; }
     public CommandResult<Integer> showSunAmount() { return null; }

@@ -2,7 +2,18 @@ package controller;
 
 import controller.result.CommandResult;
 
-public class CollectionMenuController extends BaseMenuController {
+public class CollectionMenuController extends AppMenuController {
+    private static CollectionMenuController instance = null;
+
+    private CollectionMenuController() {
+    }
+
+    public static CollectionMenuController getInstance() {
+        if  (instance == null) instance = new CollectionMenuController();
+        return instance;
+    }
+
+
     public CommandResult<Object> showPlants() { return null; }
     public CommandResult<Object> showAllPlants() { return null; }
     public CommandResult<Object> showZombies() { return null; }
