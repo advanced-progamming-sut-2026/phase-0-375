@@ -2,7 +2,14 @@ package view;
 
 import controller.LoginMenuController;
 
-public class LoginMenuView extends BaseMenuView {
+public class LoginMenuView extends AppMenuView {
+    private static LoginMenuView  instance;
+
+    public static LoginMenuView getInstance() {
+        if (instance == null) instance = new LoginMenuView();
+        return instance;
+    }
+
     private LoginMenuController controller;
 
     @Override

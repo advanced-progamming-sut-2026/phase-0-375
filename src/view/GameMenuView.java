@@ -2,7 +2,14 @@ package view;
 
 import controller.GameMenuController;
 
-public class GameMenuView extends BaseMenuView {
+public class GameMenuView extends AppMenuView {
+    private static GameMenuView instance = null;
+
+    public static GameMenuView getInstance() {
+        if (instance == null) instance = new GameMenuView();
+        return instance;
+    }
+
     private GameMenuController controller;
 
     @Override

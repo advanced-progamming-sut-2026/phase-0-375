@@ -2,8 +2,15 @@ package view;
 
 import controller.CollectionMenuController;
 
-public class CollectionMenuView extends BaseMenuView {
-    private CollectionMenuController controller;
+public class CollectionMenuView extends AppMenuView {
+    private static CollectionMenuView instance = null;
+
+    public static CollectionMenuView getInstance() {
+        if (instance == null) instance = new CollectionMenuView();
+        return instance;
+    }
+
+    private final CollectionMenuController controller = CollectionMenuController.getInstance();
 
     @Override
     public void processInput(String input) {}

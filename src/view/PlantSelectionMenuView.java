@@ -2,7 +2,15 @@ package view;
 
 import controller.PlantSelectionMenuController;
 
-public class PlantSelectionMenuView extends BaseMenuView {
+public class PlantSelectionMenuView extends AppMenuView {
+    private static PlantSelectionMenuView instance;
+
+    public static PlantSelectionMenuView getInstance() {
+        if (instance == null) instance = new PlantSelectionMenuView();
+        return instance;
+    }
+
+
     private PlantSelectionMenuController controller;
 
     @Override

@@ -2,7 +2,14 @@ package view;
 
 import controller.ProfileMenuController;
 
-public class ProfileMenuView extends BaseMenuView {
+public class ProfileMenuView extends AppMenuView {
+    private static ProfileMenuView instance;
+
+    public static ProfileMenuView getInstance() {
+        if (instance == null) instance = new ProfileMenuView();
+        return instance;
+    }
+
     private ProfileMenuController controller;
 
     @Override

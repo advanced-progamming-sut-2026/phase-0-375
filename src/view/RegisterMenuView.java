@@ -2,7 +2,14 @@ package view;
 
 import controller.RegisterMenuController;
 
-public class RegisterMenuView extends BaseMenuView {
+public class RegisterMenuView extends AppMenuView {
+    private static RegisterMenuView instance = null;
+
+    public static RegisterMenuView getInstance() {
+        if (instance == null) instance = new RegisterMenuView();
+        return instance;
+    }
+
     private RegisterMenuController controller;
 
     @Override
