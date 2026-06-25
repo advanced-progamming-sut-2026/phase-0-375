@@ -13,7 +13,7 @@ public interface ZombieBehavior {
      *
      * @param zombie the runtime zombie instance providing context
      */
-    void execute(ZombieInstance zombie);
+    void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime);
 
     /**
      * @return the type identifier for this behavior

@@ -5,7 +5,7 @@ import model.zombie.instance.ZombieInstance;
 
 public class ShootBehavior implements ZombieBehavior {
     @Override
-    public void execute(ZombieInstance zombie) {
+    public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
 
     }
 

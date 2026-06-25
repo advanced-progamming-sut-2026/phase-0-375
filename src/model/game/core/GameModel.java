@@ -3,25 +3,31 @@ package model.game.core;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
+import model.enums.PlacableLayer;
 import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
+import model.game.map.Point;
 import model.game.rule.EndGameCondition;
 import model.game.wave.WaveManager;
 import model.item.LootDrop;
 import model.item.Sun;
+import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.zombie.ZombieFactory;
+import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-public class GameModel {
+public class GameModel implements BehaviorContext {
     private long currentTick;
     private int sunAmount;
     private int plantFoodCount;
@@ -74,6 +80,7 @@ public class GameModel {
         return currentTick;
     }
 
+    @Override
     public int getSunAmount() {
         return sunAmount;
     }
@@ -108,7 +115,8 @@ public class GameModel {
         return activeProjectiles;
     }
 
-    public List<Sun> getSuns() {
+    @Override
+    public List<Sun> getActiveSuns() {
         return activeSuns;
     }
 
@@ -116,10 +124,12 @@ public class GameModel {
         return chapter == Chapter.DARK_AGES;
     }
 
+    @Override
     public void addSun(int amount) {
         sunAmount += amount;
     }
 
+    @Override
     public boolean spendSun(int amount) {
         if (sunAmount < amount) return false;
         sunAmount -= amount;
@@ -181,5 +191,83 @@ public class GameModel {
 
     public int getZombieCount() {
         return activeZombies.size();
+    }
+
+    // --- BehaviorContext implementation ---
+
+    @Override
+    public void removeSun(Sun sun) {
+        activeSuns.remove(sun);
+    }
+
+    @Override
+    public PlantInstance getPlantAt(int row, int col) {
+        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return null;
+        }
+        Object placeable = gameMap.getCell(row, col).getPlaceable(PlacableLayer.MAIN);
+        if (placeable instanceof PlantInstance) {
+            return (PlantInstance) placeable;
+        }
+        return null;
+    }
+
+    @Override
+    public List<PlantInstance> getPlantsInLane(int lane) {
+        if (lane < 0 || lane >= gameMap.getRows()) {
+            return Collections.emptyList();
+        }
+        List<PlantInstance> plants = new ArrayList<>();
+        for (int col = 0; col < gameMap.getCols(); col++) {
+            PlantInstance plant = getPlantAt(lane, col);
+            if (plant != null && plant.getCurrentHP() > 0) {
+                plants.add(plant);
+            }
+        }
+        return plants;
+    }
+
+    @Override
+    public void damagePlant(PlantInstance plant, int damage) {
+        if (plant == null || damage <= 0) return;
+
+        int newHP = Math.max(0, plant.getCurrentHP() - damage);
+        plant.setCurrentHP(newHP);
+    }
+
+    @Override
+    public List<ZombieInstance> getZombiesInLane(int lane) {
+        if (lane < 0 || lane >= gameMap.getRows()) {
+            return Collections.emptyList();
+        }
+        List<ZombieInstance> zombies = new ArrayList<>();
+        for (ZombieInstance zombie : activeZombies) {
+            if (zombie.getGridPosition().getY() == lane && !zombie.isDead()) {
+                zombies.add(zombie);
+            }
+        }
+        return zombies;
+    }
+
+    @Override
+    public void damageZombie(ZombieInstance zombie, int damage) {
+        if (zombie == null || damage <= 0) return;
+
+        zombie.takeDamage(damage);
+    }
+
+    @Override
+    public int getRowCount() {
+        return gameMap.getRows();
+    }
+
+    @Override
+    public int getColumnCount() {
+        return gameMap.getCols();
+    }
+
+    @Override
+    public Cell getCellAt(int row, int col) {
+        return null;
     }
 }
