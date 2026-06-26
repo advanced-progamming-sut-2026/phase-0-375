@@ -142,9 +142,52 @@ public class Shop {
         }
     }
 
+    /**
+     * Main purchase entry point — corresponds to the
+     * {@code shop buy -i <item_id> -n <count> [-t <plant_type>]} command.
+     *
+     * @param itemId    the ID of the item to buy
+     * @param count     the number of units to buy
+     * @param plantType the target plant type (mandatory for SEED_PACKET_CHOSEN,
+     *                  ignored for other item types)
+     * @return true if the purchase was successful
+     */
     public boolean buy(int itemId, int count, String plantType) {
-        // TODO
-        return false;
+        if (customer == null || count <= 0) {
+            return false;
+        }
+
+        // Daily offer is a special case — only one purchase per day.
+        if (itemId == ITEM_ID_DAILY_OFFER) {
+            return buyDailyOffer();
+        }
+
+        ShopItem item = findItemById(itemId);
+        if (item == null) {
+            return false;
+        }
+
+        // For SEED_PACKET_CHOSEN, the plant type is mandatory and must be unlocked.
+        if (item.getItemType() == ShopItemType.SEED_PACKET_CHOSEN) {
+            if (plantType == null || plantType.isEmpty()) {
+                return false;
+            }
+            Set<String> unlocked = customer.getUnlockedPlants();
+            if (unlocked == null || !unlocked.contains(plantType)) {
+                return false;
+            }
+        }
+
+        if (!canAfford(item, count)) {
+            return false;
+        }
+        if (!hasCapacity(item.getItemType(), count)) {
+            return false;
+        }
+
+        deductCurrency(item, count);
+        applyItemEffect(item, count, plantType);
+        return true;
     }
 
 
