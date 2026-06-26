@@ -1,7 +1,6 @@
 package model.zombie.definition;
 
 import model.enums.*;
-import model.zombie.behavior.ZombieBehavior;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,16 +23,15 @@ public class Zombie {
     private List<ArmorType> armorTypes;             // armor pieces; empty = no armor
     private PushableItemType pushableItemType;      // null = none
     private EquippedItemType equippedItemType;      // null = none
-    private ImpType impType;                        // null = no imp
 
     // --- Behavior identifiers ---
-    private List<ZombieBehavior> behaviors;
+    private List<ZombieBehaviorType> behaviors;
 
     public Zombie(String name, int baseHP, float speed, float eatDPS,
                   ZombieSize size, Chapter chapter, int wavePointCost,
                   int weight, List<ArmorType> armorTypes,
                   PushableItemType pushableItemType, EquippedItemType equippedItemType,
-                  ImpType impType, List<ZombieBehavior> behaviors) {
+                  ImpType impType, List<ZombieBehaviorType> behaviors) {
         this.name = name;
         this.baseHP = baseHP;
         this.speed = speed;
@@ -45,7 +43,6 @@ public class Zombie {
         this.armorTypes = armorTypes != null ? armorTypes : new ArrayList<>();
         this.pushableItemType = pushableItemType;
         this.equippedItemType = equippedItemType;
-        this.impType = impType;
         this.behaviors = behaviors != null ? behaviors : new ArrayList<>();
     }
 
@@ -67,32 +64,17 @@ public class Zombie {
     /**
      * @return true if this definition throw an Imp
      */
-    public boolean throwsImp() { return impType != null; }
-
-    // --- Behavior lookup helpers ---
-
-    /** Finds the first behavior that matches the input in this zombie's behavior list */
-    public ZombieBehavior getBehavior(ZombieBehaviorType type) {
-        for(ZombieBehavior behavior : behaviors) {
-            if(behavior.getType() == type) {
-                return behavior;
-            }
-        }
-        return null;
-    }
-
-    /** Checks whether this zombie has at least one behavior of the given type. */
-    public boolean hasBehavior(ZombieBehaviorType type) {
-        return getBehavior(type) != null;
+    public boolean throwsImp() {
+        return behaviors.contains(ZombieBehaviorType.THROW_IMP);
     }
 
     /** Returns an unmodifiable list of this zombie's behaviors. */
-    public List<ZombieBehavior> getBehaviors() {
+    public List<ZombieBehaviorType> getBehaviors() {
         return Collections.unmodifiableList(behaviors);
     }
 
     /** Adds a behavior to this zombie's behavior list. */
-    public void addBehavior(ZombieBehavior behavior) {
+    public void addBehavior(ZombieBehaviorType behavior) {
         behaviors.add(behavior);
     }
 
@@ -101,7 +83,7 @@ public class Zombie {
      *
      * @return true if a behavior was removed
      */
-    public boolean removeBehavior(ZombieBehavior behavior) {
+    public boolean removeBehavior(ZombieBehaviorType behavior) {
         return behaviors.remove(behavior);
     }
 
@@ -151,10 +133,6 @@ public class Zombie {
         return equippedItemType;
     }
 
-    public ImpType getImpType() {
-        return impType;
-    }
-
     // --- Setters ---
 
     public void setName(String name) {
@@ -199,9 +177,5 @@ public class Zombie {
 
     public void setEquippedItemType(EquippedItemType equippedItemType) {
         this.equippedItemType = equippedItemType;
-    }
-
-    public void setImpType(ImpType impType) {
-        this.impType = impType;
     }
 }

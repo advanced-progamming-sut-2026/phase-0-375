@@ -1,10 +1,8 @@
 package model.zombie.behavior;
 
-import model.enums.SunType;
 import model.enums.ZombieBehaviorType;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
-import model.zombie.instance.BehaviorState;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;

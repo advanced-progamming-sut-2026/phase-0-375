@@ -72,7 +72,7 @@ public class ZombieLoader {
         PushableItemType pushable = resolvePushable(entry.getObjclass(), zombieData);
         EquippedItemType equipped = resolveEquipped(entry.getObjclass(), zombieData);
         ImpType impType = resolveImpType(zombieData.getImpType());
-        List<ZombieBehavior> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
+        List<ZombieBehaviorType> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
 
         return new Zombie(
                 name, baseHP, speed, eatDPS,
@@ -154,87 +154,86 @@ public class ZombieLoader {
      * Derives the list of special behaviors for a zombie based on its
      * {@code objclass} and numeric-data fields.
      */
-    private List<ZombieBehavior> resolveBehaviors(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
-        List<ZombieBehavior> behaviors = new ArrayList<>();
+    private List<ZombieBehaviorType> resolveBehaviors(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
+        List<ZombieBehaviorType> behaviors = new ArrayList<>();
         if (objclass == null) return behaviors;
 
         switch (objclass) {
             case "ZombieRaProps":
-                behaviors.add(new StealSunBehavior());
+                behaviors.add(ZombieBehaviorType.STEAL_SUN);
                 break;
 
             case "ZombieExplorerProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieTombRaiserProps":
-                behaviors.add(new SummonBehavior());
+                behaviors.add(ZombieBehaviorType.SUMMON);
                 break;
 
             case "ZombieGargantuarProps":
-                behaviors.add(new SmashBehavior());
-                behaviors.add(new ThrowImpBehavior());
+                behaviors.add(ZombieBehaviorType.SMASH);
+                behaviors.add(ZombieBehaviorType.THROW_IMP);
                 break;
 
             case "ZombieIceAgeDodoProps":
-                behaviors.add(new FlyBehavior());
+                behaviors.add(ZombieBehaviorType.FLY);
                 break;
 
             case "ZombieIceAgeHunterProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieIceAgeTroglobiteProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
                 break;
 
             case "ZombieBeachFishermanProps":
-                behaviors.add(new FishBehavior());
+                behaviors.add(ZombieBehaviorType.FISH);
                 break;
 
             case "ZombieBeachOctopusProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieBeachSnorkelProps":
-                behaviors.add(new SwimBehavior());
+                behaviors.add(ZombieBehaviorType.SWIM);
                 break;
 
             case "ZombieDarkJugglerProps":
             case "ZombieLostCityJaneProps":
-                behaviors.add(new JuggleBehavior());
+                behaviors.add(ZombieBehaviorType.JUGGLE);
                 break;
 
             case "ZombieDarkWizardProps":
-                behaviors.add(new TransformBehavior());
+                behaviors.add(ZombieBehaviorType.TRANSFORM);
                 break;
 
             case "ZombieDarkKingProps":
-                behaviors.add(new BuffBehavior());
+                behaviors.add(ZombieBehaviorType.BUFF);
                 break;
 
             case "ZombieCrystalSkullProps":
-                behaviors.add(new StealSunBehavior());
-                behaviors.add(new ShootBehavior()); // laser
+                behaviors.add(ZombieBehaviorType.STEAL_SUN);
                 break;
 
             case "ZombieProspectorProps":
-                behaviors.add(new JumpBehavior());
+                behaviors.add(ZombieBehaviorType.JUMP);
                 break;
 
             case "ZombieModernAllStarProps":
-                behaviors.add(new SmashBehavior());
+                behaviors.add(ZombieBehaviorType.SMASH);
                 break;
 
             case "ZombiePianoProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
                 break;
 
             case "ZombieNewspaperProps":
                 break;
 
             case "ZombieArcadeProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
                 break;
 
             case "ZombiePropertySheet":

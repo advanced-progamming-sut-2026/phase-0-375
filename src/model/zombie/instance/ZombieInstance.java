@@ -8,13 +8,11 @@ import model.item.equippable.Equippable;
 import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
-import model.zombie.behavior.ZombieBehavior;
+import model.zombie.behavior.*;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The runtime representation of a zombie on the game field
@@ -33,8 +31,7 @@ public class ZombieInstance implements Tickable {
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
     private Equippable equippedItem;                       // null if not equipped
-    private Map<ZombieBehaviorType, BehaviorState> behaviorStates; // per-behavior runtime state
-    private boolean hasThrownImp;                          // for Gargantuar: ensures Imp thrown only once
+    private List<ZombieBehavior> behaviors;                // zombie behaviors
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
 
@@ -49,13 +46,15 @@ public class ZombieInstance implements Tickable {
         this.armors = null;
         this.pushableItem = null;
         this.equippedItem = null;
-        this.behaviorStates = new EnumMap<>(ZombieBehaviorType.class);
-        this.hasThrownImp = false;
+        this.behaviors = new ArrayList<>();
         this.eatingTarget = null;
 
-        // Initialize a BehaviorState for every behavior on the definition
-        for (ZombieBehavior behavior : definition.getBehaviors()) {
-            behaviorStates.put(behavior.getType(), new BehaviorState(behavior.getType()));
+        // Add a ZombieBehavior to behaviors for every behavior type on the definition.
+        for (ZombieBehaviorType type : definition.getBehaviors()) {
+            ZombieBehavior behavior = createBehavior(type);
+            if(behavior != null) {
+                behaviors.add(createBehavior(type));
+            }
         }
     }
 
@@ -108,9 +107,9 @@ public class ZombieInstance implements Tickable {
      * Delegates a tick to all behaviors. Each behavior checks its
      * own state and decides whether to act.
      */
-    public void tickBehaviors(float deltaTime) {
-        for(BehaviorState behaviorState : behaviorStates.values()) {
-            behaviorState.tick(deltaTime);
+    public void tickBehaviors(float deltaTime, BehaviorContext context) {
+        for(ZombieBehavior behavior : behaviors) {
+            behavior.execute(this, context, deltaTime);
         }
     }
 
@@ -215,11 +214,43 @@ public class ZombieInstance implements Tickable {
     // --- Behavior access ---
 
     /**
-     * Returns the runtime state for the given behavior type,
+     * Returns the behavior based on the given {@code type},
      * or null if this zombie doesn't have that behavior.
      */
-    public BehaviorState getBehaviorState(ZombieBehaviorType type) {
-        return behaviorStates.get(type);
+    public ZombieBehavior getBehavior(ZombieBehaviorType type) {
+        for(ZombieBehavior behavior : behaviors) {
+            if(behavior.getType() == type) {
+                return behavior;
+            }
+        }
+        return null;
+    }
+
+    /** Checks whether this zombie has at least one behavior of the given type. */
+    public boolean hasBehavior(ZombieBehaviorType type) {
+        return getBehavior(type) != null;
+    }
+
+    // --- Helpers ---
+
+    /** Creates a new {@link ZombieBehavior} instance based on the given {@code type} */
+    private ZombieBehavior createBehavior(ZombieBehaviorType type) {
+        switch(type) {
+            case SHOOT: return new ShootBehavior();
+            case STEAL_SUN: return new StealSunBehavior();
+            case JUGGLE: return new JuggleBehavior();
+            case SWIM: return new SwimBehavior();
+            case FLY: return new FlyBehavior();
+            case SUMMON: return new SummonBehavior();
+            case BUFF: return new BuffBehavior();
+            case TRANSFORM: return new TransformBehavior();
+            case FISH: return new FishBehavior();
+            case THROW_IMP: return new ThrowImpBehavior();
+            case SMASH: return new SmashBehavior();
+            case JUMP: return new JumpBehavior();
+            case PUSH: return new PushBehavior();
+            default: return null;
+        }
     }
 
     // --- Getters ---
@@ -276,12 +307,8 @@ public class ZombieInstance implements Tickable {
         return equippedItem;
     }
 
-    public Map<ZombieBehaviorType, BehaviorState> getBehaviorStates() {
-        return behaviorStates;
-    }
-
-    public boolean isHasThrownImp() {
-        return hasThrownImp;
+    public List<ZombieBehavior> getBehaviors() {
+        return behaviors;
     }
 
     public PlantInstance getEatingTarget() {
@@ -344,12 +371,8 @@ public class ZombieInstance implements Tickable {
         this.equippedItem = equippedItem;
     }
 
-    public void setBehaviorStates(Map<ZombieBehaviorType, BehaviorState> behaviorStates) {
-        this.behaviorStates = behaviorStates;
-    }
-
-    public void setHasThrownImp(boolean hasThrownImp) {
-        this.hasThrownImp = hasThrownImp;
+    public void setBehaviors(List<ZombieBehavior> behaviors) {
+        this.behaviors = behaviors;
     }
 
     public void setEatingTarget(PlantInstance eatingTarget) {

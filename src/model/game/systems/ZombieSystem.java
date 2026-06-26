@@ -23,7 +23,7 @@ public class ZombieSystem implements Tickable {
 
         for (ZombieInstance zombie : zombies) {
             zombie.tick(deltaTime);
-            zombie.tickBehaviors(deltaTime);
+            zombie.tickBehaviors(deltaTime, gameModel);
 
             moveZombie(zombie, deltaTime);
         }

@@ -9,6 +9,7 @@ public enum ZombieState {
     SPECIAL_ACTION,
     STUNNED,
     CHILLED,
+    HYPNOTIZED,
     DYING,
     DEAD
 }
