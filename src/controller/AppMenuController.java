@@ -1,20 +1,28 @@
 package controller;
 
 import controller.result.CommandResult;
+import model.app.App;
 import model.enums.MenuType;
 
-public class AppMenuController {
-    private static AppMenuController instance = null;
+public abstract class AppMenuController {
 
-    protected AppMenuController() {
+    /**
+     * Each concrete controller decides which menu can be entered
+     * from its own menu via "menu enter".
+     */
+    public abstract CommandResult<Void> menuEnter(String menuName);
+
+    /**
+     * Each concrete controller decides where "menu exit"
+     * takes the user.
+     */
+    public abstract CommandResult<Void> menuExit();
+
+    /**
+     * Common: reads current menu from App singleton.
+     */
+    public CommandResult<MenuType> menuShowCurrent() {
+        MenuType current = App.getInstance().getCurrentMenu();
+        return CommandResult.successWithData("Current menu: " + current.name().toLowerCase(), current);
     }
-
-    public static AppMenuController getInstance() {
-        if (instance == null) instance = new AppMenuController();
-        return instance;
-    }
-
-    public CommandResult<Void> menuEnter(String menuName) { return null; }
-    public CommandResult<Void> menuExit() { return null; }
-    public CommandResult<MenuType> menuShowCurrent() { return null; }
 }

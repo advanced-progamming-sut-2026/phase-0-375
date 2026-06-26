@@ -1,7 +1,8 @@
 package view;
 
-import controller.AppMenuController;
+import controller.*;
 import controller.result.CommandResult;
+import model.app.App;
 import model.command.CommonCommand;
 import model.enums.MenuType;
 
@@ -17,12 +18,12 @@ public class AppMenuView {
         return instance;
     }
 
-    private final MainMenuView mainMenuView = MainMenuView.getInstance();
     private final RegisterMenuView registerMenuView = RegisterMenuView.getInstance();
     private final LoginMenuView loginMenuView = LoginMenuView.getInstance();
-    private final CollectionMenuView collectionMenuView = CollectionMenuView.getInstance();
+    private final MainMenuView mainMenuView = MainMenuView.getInstance();
     private final GameMenuView gameMenuView = GameMenuView.getInstance();
     private final GameplayMenuView gameplayMenuView = GameplayMenuView.getInstance();
+    private final CollectionMenuView collectionMenuView = CollectionMenuView.getInstance();
     private final NewsMenuView newsMenuView = NewsMenuView.getInstance();
     private final PlantSelectionMenuView plantSelectionMenuView = PlantSelectionMenuView.getInstance();
     private final ProfileMenuView profileMenuView = ProfileMenuView.getInstance();
@@ -31,34 +32,29 @@ public class AppMenuView {
     private final GreenhouseMenuView greenhouseMenuView = GreenhouseMenuView.getInstance();
     private final TravelLogMenuVIew travelLogMenuVIew = TravelLogMenuVIew.getInstance();
 
-    private final AppMenuController appController = AppMenuController.getInstance();
     private final Scanner scanner = new Scanner(System.in);
-
     private boolean running = true;
-
-    protected void pause() {
-        running = false;
-    }
 
     public void run() {
         while (running && scanner.hasNextLine()) {
-            String command = scanner.nextLine();
+            String command = scanner.nextLine().trim();
 
+            // Phase 1: universal commands (work in any menu)
             if (CommonCommand.MENU_ENTER.matches(command)) {
-                String menu = CommonCommand.MENU_ENTER.getParameter("menu_name");
-                menuEnter(menu);
+                String menuName = CommonCommand.MENU_ENTER.getParameter("menu_name");
+                handleMenuEnter(menuName);
                 continue;
             } else if (CommonCommand.MENU_EXIT.matches(command)) {
-                menuExit();
+                handleMenuExit();
                 continue;
             } else if (CommonCommand.MENU_SHOW_CURRENT.matches(command)) {
-                menuShowCurrent();
+                handleMenuShowCurrent();
                 continue;
             }
 
-            MenuType menuType = appController.menuShowCurrent().getData();
-
-            switch (menuType) {
+            // Phase 2: delegate to current menu's specific handler
+            MenuType current = App.getInstance().getCurrentMenu();
+            switch (current) {
                 case MAIN -> mainMenuView.processInput(command);
                 case REGISTER -> registerMenuView.processInput(command);
                 case LOGIN -> loginMenuView.processInput(command);
@@ -73,42 +69,73 @@ public class AppMenuView {
                 case GREENHOUSE -> greenhouseMenuView.processInput(command);
                 case TRAVEL_LOG -> travelLogMenuVIew.processInput(command);
             }
-
-            scanner.close();
         }
+        scanner.close();
     }
 
     public void processInput(String input) {}
 
+    // ── Common command handlers ──
+
+    private void handleMenuEnter(String menuName) {
+        AppMenuController controller = getControllerForCurrentMenu();
+        CommandResult<Void> result = controller.menuEnter(menuName);
+        displayCommandResult(result);
+    }
+
+    private void handleMenuExit() {
+        AppMenuController controller = getControllerForCurrentMenu();
+        CommandResult<Void> result = controller.menuExit();
+        if (result.isSuccess() && "Exiting application.".equals(result.getMessage())) {
+            System.out.println("Goodbye!");
+            running = false;
+            return;
+        }
+        displayCommandResult(result);
+    }
+
+    private void handleMenuShowCurrent() {
+        MenuType current = App.getInstance().getCurrentMenu();
+        displayMessage("You are in the " + current.name().toLowerCase() + " menu.");
+    }
+
+    /**
+     * Routes "menu enter" and "menu exit" to the controller of the current menu.
+     */
+    private AppMenuController getControllerForCurrentMenu() {
+        MenuType current = App.getInstance().getCurrentMenu();
+        return switch (current) {
+            case REGISTER -> RegisterMenuController.getInstance();
+            case LOGIN -> LoginMenuController.getInstance();
+            case MAIN -> MainMenuController.getInstance();
+            case GAME -> GameMenuController.getInstance();
+            case SETTINGS -> SettingsMenuController.getInstance();
+            case NEWS -> NewsMenuController.getInstance();
+            case PROFILE -> ProfileMenuController.getInstance();
+            case COLLECTION -> CollectionMenuController.getInstance();
+            case PLANT_SELECTION -> PlantSelectionMenuController.getInstance();
+            case IN_GAME -> GameplayMenuController.getInstance();
+            case GREENHOUSE -> GreenhouseMenuController.getInstance();
+            case SHOP -> ShopMenuController.getInstance();
+            case TRAVEL_LOG -> TravelLogMenuController.getInstance();
+        };
+    }
+
+    // ── Display helpers ──
+
     public void displayMessage(String message) {
         System.out.println(message);
     }
+
     public void displayError(String error) {
         System.err.println(error);
     }
 
-    public void menuEnter(String menuName) {
-        CommandResult<Void> result = appController.menuEnter(menuName);
-        if (!result.isSuccess()) {
-            System.out.println(result.getMessage());
-            return;
-        }
-        System.out.println(result.getMessage());
-    }
-    public void menuExit() {
-        CommandResult<Void> result = appController.menuExit();
-        if (!result.isSuccess()) {
+    public void displayCommandResult(CommandResult<?> result) {
+        if (result.isSuccess()) {
+            displayMessage(result.getMessage());
+        } else {
             displayError(result.getMessage());
-            return;
         }
-        System.out.println(result.getMessage());
-    }
-    public void menuShowCurrent() {
-        CommandResult<MenuType> result = appController.menuShowCurrent();
-        if (!result.isSuccess()) {
-            System.err.println(result.getMessage());
-            return;
-        }
-        System.out.println("Current menu: " + result.getMessage());
     }
 }

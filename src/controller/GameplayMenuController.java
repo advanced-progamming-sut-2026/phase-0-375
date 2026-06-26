@@ -1,6 +1,8 @@
 package controller;
 
 import controller.result.CommandResult;
+import model.app.App;
+import model.enums.MenuType;
 
 public class GameplayMenuController extends AppMenuController {
     private static GameplayMenuController instance = null;
@@ -11,6 +13,21 @@ public class GameplayMenuController extends AppMenuController {
         if (instance == null) instance = new GameplayMenuController();
         return instance;
     }
+
+    @Override
+    public CommandResult<Void> menuEnter(String menuName) {
+        return CommandResult.error("Cannot enter other menus during gameplay.");
+    }
+
+    @Override
+    public CommandResult<Void> menuExit() {
+        App.getInstance().setCurrentMenu(MenuType.GAME);
+        App.getInstance().setCurrentGameModel(null);
+        App.getInstance().setCurrentGameLoop(null);
+        return CommandResult.success("Returned to game menu.");
+    }
+
+    // ── In-game commands (stubs) ──
 
     public CommandResult<Void> advanceTime(int count) { return null; }
     public CommandResult<Void> collectSun(int x, int y) { return null; }

@@ -41,6 +41,7 @@ public class GameModel {
     private List<LootDrop> pendingLootDrops;
 
     private EventBus eventBus;
+    private List<String> selectedPlants;       // plant types chosen for this level
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
@@ -178,6 +179,14 @@ public class GameModel {
     public void queueLootDrop(LootDrop loot) {}
 
     public void processLootDrops() {}
+
+    public List<String> getSelectedPlants() {
+        return selectedPlants;
+    }
+
+    public void setSelectedPlants(List<String> selectedPlants) {
+        this.selectedPlants = selectedPlants;
+    }
 
     public int getZombieCount() {
         return activeZombies.size();
