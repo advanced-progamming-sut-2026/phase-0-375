@@ -1,5 +1,6 @@
 package model.shop;
 
+import model.enums.CurrencyType;
 import model.enums.ShopCategory;
 import model.enums.ShopItemType;
 
@@ -13,13 +14,13 @@ public class ShopItem {
     private ShopItemType itemType;
     private ShopCategory category;
     private int price;
-    private String currency;         // "coin" or "gem"
+    private CurrencyType currency;       // "coin" or "gem"
     private int maxQuantity;         // 20 for pots, 3 for plant foods
     private String targetPlantType;
     private String description;
 
     public ShopItem(int id, ShopItemType itemType, ShopCategory category,
-                    int price, String currency, int maxQuantity,
+                    int price, CurrencyType currency, int maxQuantity,
                     String targetPlantType, String description) {
         this.id = id;
         this.itemType = itemType;
@@ -49,7 +50,7 @@ public class ShopItem {
         return price;
     }
 
-    public String getCurrency() {
+    public CurrencyType getCurrency() {
         return currency;
     }
 
@@ -83,7 +84,7 @@ public class ShopItem {
         this.price = price;
     }
 
-    public void setCurrency(String currency) {
+    public void setCurrency(CurrencyType currency) {
         this.currency = currency;
     }
 

@@ -1,5 +1,6 @@
 package model.shop;
 
+import model.enums.CurrencyType;
 import model.enums.ShopCategory;
 import model.enums.ShopItemType;
 import model.user.User;
@@ -62,7 +63,7 @@ public class Shop {
                 ShopItemType.POT,
                 ShopCategory.PERMANENT,
                 2000,
-                "coin",
+                CurrencyType.COIN,
                 MAX_POTS,
                 null,
                 "Opens a greenhouse pot slot (max 20 pots)"
@@ -72,7 +73,7 @@ public class Shop {
                 ShopItemType.PLANT_FOOD,
                 ShopCategory.PERMANENT,
                 3,
-                "gem",
+                CurrencyType.GEM,
                 MAX_PLANT_FOOD,
                 null,
                 "Plant Food usable at level start (max 3 stored)"
@@ -82,7 +83,7 @@ public class Shop {
                 ShopItemType.SEED_PACKET_RANDOM,
                 ShopCategory.PERMANENT,
                 1000,
-                "coin",
+                CurrencyType.COIN,
                 Integer.MAX_VALUE,
                 null,
                 "5 seed packets for a random unlocked plant"
@@ -92,7 +93,7 @@ public class Shop {
                 ShopItemType.SEED_PACKET_CHOSEN,
                 ShopCategory.PERMANENT,
                 5,
-                "gem",
+                CurrencyType.GEM,
                 Integer.MAX_VALUE,
                 null,
                 "10 seed packets for a chosen unlocked plant"
@@ -102,7 +103,7 @@ public class Shop {
                 ShopItemType.CURRENCY_CONVERSION,
                 ShopCategory.PERMANENT,
                 5,
-                "gem",
+                CurrencyType.GEM,
                 Integer.MAX_VALUE,
                 null,
                 "Convert 5 gems to 500 coins"
@@ -247,9 +248,9 @@ public class Shop {
             return false;
         }
         int totalCost = item.getPrice() * count;
-        if ("coin".equalsIgnoreCase(item.getCurrency())) {
+        if (item.getCurrency() == CurrencyType.COIN) {
             return customer.getCoins() >= totalCost;
-        } else if ("gem".equalsIgnoreCase(item.getCurrency())) {
+        } else if (item.getCurrency() == CurrencyType.GEM) {
             return customer.getGems() >= totalCost;
         }
         return false;
@@ -290,9 +291,9 @@ public class Shop {
      */
     private void deductCurrency(ShopItem item, int count) {
         int totalCost = item.getPrice() * count;
-        if ("coin".equalsIgnoreCase(item.getCurrency())) {
+        if (item.getCurrency() == CurrencyType.COIN) {
             customer.setCoins(customer.getCoins() - totalCost);
-        } else if ("gem".equalsIgnoreCase(item.getCurrency())) {
+        } else if (item.getCurrency() == CurrencyType.GEM) {
             customer.setGems(customer.getGems() - totalCost);
         }
     }
