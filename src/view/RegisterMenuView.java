@@ -20,9 +20,9 @@ public class RegisterMenuView extends AppMenuView {
         if (awaitingSecurityAnswer) {
             if (model.command.RegisterMenuCommand.PICK_QUESTION.matches(input)) {
                 int questionNumber = Integer.parseInt(
-                    model.command.RegisterMenuCommand.PICK_QUESTION.getParameter("question_number"));
+                    model.command.RegisterMenuCommand.PICK_QUESTION.getParameter("questionNumber"));
                 String answer = model.command.RegisterMenuCommand.PICK_QUESTION.getParameter("answer");
-                String answerConfirm = model.command.RegisterMenuCommand.PICK_QUESTION.getParameter("answer_confirm");
+                String answerConfirm = model.command.RegisterMenuCommand.PICK_QUESTION.getParameter("answerConfirm");
                 pickQuestion(questionNumber, answer, answerConfirm);
             } else {
                 displayError("Please choose a security question:");
@@ -32,7 +32,7 @@ public class RegisterMenuView extends AppMenuView {
             if (model.command.RegisterMenuCommand.REGISTER.matches(input)) {
                 String username = model.command.RegisterMenuCommand.REGISTER.getParameter("username");
                 String password = model.command.RegisterMenuCommand.REGISTER.getParameter("password");
-                String passwordConfirm = model.command.RegisterMenuCommand.REGISTER.getParameter("password_confirm");
+                String passwordConfirm = model.command.RegisterMenuCommand.REGISTER.getParameter("passwordConfirm");
                 String nickname = model.command.RegisterMenuCommand.REGISTER.getParameter("nickname");
                 String email = model.command.RegisterMenuCommand.REGISTER.getParameter("email");
                 String gender = model.command.RegisterMenuCommand.REGISTER.getParameter("gender");

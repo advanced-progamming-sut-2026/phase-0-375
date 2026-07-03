@@ -4,7 +4,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public enum CommonCommand implements CLICommand {
-    MENU_ENTER("menu enter (?<menu_name>\\S+)"),
+    MENU_ENTER("menu enter (?<menuName>\\S+)"),
     MENU_SHOW_CURRENT("menu show current"),
     MENU_EXIT("menu exit");
 

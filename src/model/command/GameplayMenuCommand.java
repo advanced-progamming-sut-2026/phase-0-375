@@ -18,7 +18,8 @@ public enum GameplayMenuCommand implements CLICommand {
     SHOW_TILE_STATUS("show tile status -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     RELEASE_NUKE("release the nuke"),
     ZOMBIES_INFO("zombies info"),
-    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombie_type>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)");
+    START_ZOMBIE_WAVES("start zombie waves"),
+    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombieType>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)");
 
     private final Pattern pattern;
     private Matcher matcher;

@@ -27,8 +27,8 @@ public class ProfileMenuView extends AppMenuView {
             String email = ProfileMenuCommand.CHANGE_EMAIL.getParameter("email");
             changeEmail(email);
         } else if (ProfileMenuCommand.CHANGE_PASSWORD.matches(input)) {
-            String newPass = ProfileMenuCommand.CHANGE_PASSWORD.getParameter("new_password");
-            String oldPass = ProfileMenuCommand.CHANGE_PASSWORD.getParameter("old_password");
+            String newPass = ProfileMenuCommand.CHANGE_PASSWORD.getParameter("newPassword");
+            String oldPass = ProfileMenuCommand.CHANGE_PASSWORD.getParameter("oldPassword");
             changePassword(newPass, oldPass);
         } else if (ProfileMenuCommand.SHOW_INFO.matches(input)) {
             showInfo();

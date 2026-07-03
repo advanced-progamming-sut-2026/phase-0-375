@@ -7,7 +7,7 @@ public enum ProfileMenuCommand implements CLICommand {
     CHANGE_USERNAME("menu profile change-username -u (?<username>\\S+)"),
     CHANGE_NICKNAME("menu profile change-nickname -u (?<nickname>\\S+)"),
     CHANGE_EMAIL("menu profile change-email -e (?<email>\\S+)"),
-    CHANGE_PASSWORD("menu profile change-password -p (?<new_password>\\S+) -o (?<old_password>\\S+)"),
+    CHANGE_PASSWORD("menu profile change-password -p (?<newPassword>\\S+) -o (?<oldPassword>\\S+)"),
     SHOW_INFO("menu profile show-info");
 
     private final Pattern pattern;

@@ -21,9 +21,9 @@ public class ShopMenuView extends AppMenuView {
         } else if (ShopMenuCommand.SHOP_DAILY.matches(input)) {
             shopDaily();
         } else if (ShopMenuCommand.SHOP_BUY.matches(input)) {
-            int itemId = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("item_id"));
+            int itemId = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("itemId"));
             int count = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("count"));
-            String plantType = ShopMenuCommand.SHOP_BUY.getParameter("plant_type");
+            String plantType = ShopMenuCommand.SHOP_BUY.getParameter("plantType");
             shopBuy(itemId, count, plantType);
         } else {
             displayError("Usage:");

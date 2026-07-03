@@ -27,16 +27,16 @@ public class CollectionMenuView extends AppMenuView {
         } else if (CollectionMenuCommand.SHOW_ALL_ZOMBIES.matches(input)) {
             showAllZombies();
         } else if (CollectionMenuCommand.SHOW_PLANT.matches(input)) {
-            String name = CollectionMenuCommand.SHOW_PLANT.getParameter("plant_name");
+            String name = CollectionMenuCommand.SHOW_PLANT.getParameter("plantName");
             showPlant(name);
         } else if (CollectionMenuCommand.SHOW_ZOMBIE.matches(input)) {
-            String name = CollectionMenuCommand.SHOW_ZOMBIE.getParameter("zombie_name");
+            String name = CollectionMenuCommand.SHOW_ZOMBIE.getParameter("zombieName");
             showZombie(name);
         } else if (CollectionMenuCommand.UPGRADE_PLANT.matches(input)) {
-            String name = CollectionMenuCommand.UPGRADE_PLANT.getParameter("plant_name");
+            String name = CollectionMenuCommand.UPGRADE_PLANT.getParameter("plantName");
             upgradePlant(name);
         } else if (CollectionMenuCommand.PURCHASE_PLANT.matches(input)) {
-            String name = CollectionMenuCommand.PURCHASE_PLANT.getParameter("plant_name");
+            String name = CollectionMenuCommand.PURCHASE_PLANT.getParameter("plantName");
             purchasePlant(name);
         } else {
             displayError("Usage:");

@@ -1,7 +1,7 @@
 package model.enums;
 
 public enum SecurityQuestion {
-    Q1("What is your mother's maiden name?"),
+    Q1("What was the name of your first school?"),
     Q2("What was the name of your first pet?"),
     Q3("What city were you born in?"),
     Q4("What is your favorite book?"),

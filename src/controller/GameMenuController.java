@@ -10,10 +10,13 @@ import model.game.core.PvZGameLoop;
 import model.game.level.LevelConfig;
 import model.game.level.RegularLevel;
 import model.game.rule.GameRules;
+import model.game.wave.EntryRuntime;
 import model.game.wave.Wave;
+import model.game.wave.WaveZombieEntry;
 import model.user.User;
 import model.user.persistance.UserRepository;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -72,7 +75,7 @@ public class GameMenuController extends AppMenuController {
         config.setColumns(9);
         config.setLevelType(LevelType.NORMAL);
         config.setRules(rules);
-        config.setWaves(Collections.emptyList());
+        config.setWaves(buildStubWaves());
 
         RegularLevel level = new RegularLevel(config);
         GameModel model = new GameModel(level);
@@ -83,6 +86,19 @@ public class GameMenuController extends AppMenuController {
         App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
 
         return CommandResult.success("Entering " + chapterName + ".");
+    }
+
+    private static List<Wave> buildStubWaves() {
+        List<Wave> waves = new ArrayList<>();
+        waves.add(new Wave(1, stubEntries(), 5.0f, false, false));
+        waves.add(new Wave(2, stubEntries(), 10.0f, false, true));
+        return waves;
+    }
+
+    private static List<EntryRuntime> stubEntries() {
+        List<EntryRuntime> entries = new ArrayList<>();
+        entries.add(new EntryRuntime(new WaveZombieEntry()));
+        return entries;
     }
 
     public CommandResult<Void> greenhouse() {

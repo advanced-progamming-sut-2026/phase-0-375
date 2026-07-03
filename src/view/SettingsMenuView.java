@@ -18,7 +18,7 @@ public class SettingsMenuView extends AppMenuView {
     public void processInput(String input) {
         if (SettingsMenuCommand.CHANGE_DIFFICULTY.matches(input)) {
             int level = Integer.parseInt(
-                SettingsMenuCommand.CHANGE_DIFFICULTY.getParameter("difficulty_level"));
+                SettingsMenuCommand.CHANGE_DIFFICULTY.getParameter("difficultyLevel"));
             changeDifficulty(level);
         } else {
             displayError("Usage: menu settings change-difficulty -l <1-5>");

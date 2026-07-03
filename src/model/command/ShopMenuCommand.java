@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 public enum ShopMenuCommand implements CLICommand {
     SHOP_LIST("shop list"),
     SHOP_DAILY("shop daily"),
-    SHOP_BUY("shop buy -i (?<item_id>\\d+) -n (?<count>\\d+)( -t (?<plant_type>\\S+))?");
+    SHOP_BUY("shop buy -i (?<itemId>\\d+) -n (?<count>\\d+)( -t (?<plantType>\\S+))?");
 
     private final Pattern pattern;
     private Matcher matcher;

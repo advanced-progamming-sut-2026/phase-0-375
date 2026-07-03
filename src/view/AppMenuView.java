@@ -18,19 +18,20 @@ public class AppMenuView {
         return instance;
     }
 
-    private final RegisterMenuView registerMenuView = RegisterMenuView.getInstance();
-    private final LoginMenuView loginMenuView = LoginMenuView.getInstance();
-    private final MainMenuView mainMenuView = MainMenuView.getInstance();
-    private final GameMenuView gameMenuView = GameMenuView.getInstance();
-    private final GameplayMenuView gameplayMenuView = GameplayMenuView.getInstance();
-    private final CollectionMenuView collectionMenuView = CollectionMenuView.getInstance();
-    private final NewsMenuView newsMenuView = NewsMenuView.getInstance();
-    private final PlantSelectionMenuView plantSelectionMenuView = PlantSelectionMenuView.getInstance();
-    private final ProfileMenuView profileMenuView = ProfileMenuView.getInstance();
-    private final SettingsMenuView settingsMenuView = SettingsMenuView.getInstance();
-    private final ShopMenuView shopMenuView = ShopMenuView.getInstance();
-    private final GreenhouseMenuView greenhouseMenuView = GreenhouseMenuView.getInstance();
-    private final TravelLogMenuVIew travelLogMenuVIew = TravelLogMenuVIew.getInstance();
+    // Menu view singletons are fetched lazily on demand.
+    private RegisterMenuView registerMenuView;
+    private LoginMenuView loginMenuView;
+    private MainMenuView mainMenuView;
+    private GameMenuView gameMenuView;
+    private GameplayMenuView gameplayMenuView;
+    private CollectionMenuView collectionMenuView;
+    private NewsMenuView newsMenuView;
+    private PlantSelectionMenuView plantSelectionMenuView;
+    private ProfileMenuView profileMenuView;
+    private SettingsMenuView settingsMenuView;
+    private ShopMenuView shopMenuView;
+    private GreenhouseMenuView greenhouseMenuView;
+    private TravelLogMenuVIew travelLogMenuVIew;
 
     private final Scanner scanner = new Scanner(System.in);
     private boolean running = true;
@@ -41,7 +42,7 @@ public class AppMenuView {
 
             // Phase 1: universal commands (work in any menu)
             if (CommonCommand.MENU_ENTER.matches(command)) {
-                String menuName = CommonCommand.MENU_ENTER.getParameter("menu_name");
+                String menuName = CommonCommand.MENU_ENTER.getParameter("menuName");
                 handleMenuEnter(menuName);
                 continue;
             } else if (CommonCommand.MENU_EXIT.matches(command)) {
@@ -55,22 +56,77 @@ public class AppMenuView {
             // Phase 2: delegate to current menu's specific handler
             MenuType current = App.getInstance().getCurrentMenu();
             switch (current) {
-                case MAIN -> mainMenuView.processInput(command);
-                case REGISTER -> registerMenuView.processInput(command);
-                case LOGIN -> loginMenuView.processInput(command);
-                case GAME -> gameMenuView.processInput(command);
-                case IN_GAME -> gameplayMenuView.processInput(command);
-                case NEWS -> newsMenuView.processInput(command);
-                case SHOP -> shopMenuView.processInput(command);
-                case PROFILE -> profileMenuView.processInput(command);
-                case SETTINGS -> settingsMenuView.processInput(command);
-                case COLLECTION -> collectionMenuView.processInput(command);
-                case PLANT_SELECTION -> plantSelectionMenuView.processInput(command);
-                case GREENHOUSE -> greenhouseMenuView.processInput(command);
-                case TRAVEL_LOG -> travelLogMenuVIew.processInput(command);
+                case MAIN -> mainMenuView().processInput(command);
+                case REGISTER -> registerMenuView().processInput(command);
+                case LOGIN -> loginMenuView().processInput(command);
+                case GAME -> gameMenuView().processInput(command);
+                case IN_GAME -> gameplayMenuView().processInput(command);
+                case NEWS -> newsMenuView().processInput(command);
+                case SHOP -> shopMenuView().processInput(command);
+                case PROFILE -> profileMenuView().processInput(command);
+                case SETTINGS -> settingsMenuView().processInput(command);
+                case COLLECTION -> collectionMenuView().processInput(command);
+                case PLANT_SELECTION -> plantSelectionMenuView().processInput(command);
+                case GREENHOUSE -> greenhouseMenuView().processInput(command);
+                case TRAVEL_LOG -> travelLogMenuVIew().processInput(command);
             }
         }
         scanner.close();
+    }
+
+    // Lazy accessors for menu views
+
+    private RegisterMenuView registerMenuView() {
+        if (registerMenuView == null) registerMenuView = RegisterMenuView.getInstance();
+        return registerMenuView;
+    }
+    private LoginMenuView loginMenuView() {
+        if (loginMenuView == null) loginMenuView = LoginMenuView.getInstance();
+        return loginMenuView;
+    }
+    private MainMenuView mainMenuView() {
+        if (mainMenuView == null) mainMenuView = MainMenuView.getInstance();
+        return mainMenuView;
+    }
+    private GameMenuView gameMenuView() {
+        if (gameMenuView == null) gameMenuView = GameMenuView.getInstance();
+        return gameMenuView;
+    }
+    private GameplayMenuView gameplayMenuView() {
+        if (gameplayMenuView == null) gameplayMenuView = GameplayMenuView.getInstance();
+        return gameplayMenuView;
+    }
+    private CollectionMenuView collectionMenuView() {
+        if (collectionMenuView == null) collectionMenuView = CollectionMenuView.getInstance();
+        return collectionMenuView;
+    }
+    private NewsMenuView newsMenuView() {
+        if (newsMenuView == null) newsMenuView = NewsMenuView.getInstance();
+        return newsMenuView;
+    }
+    private PlantSelectionMenuView plantSelectionMenuView() {
+        if (plantSelectionMenuView == null) plantSelectionMenuView = PlantSelectionMenuView.getInstance();
+        return plantSelectionMenuView;
+    }
+    private ProfileMenuView profileMenuView() {
+        if (profileMenuView == null) profileMenuView = ProfileMenuView.getInstance();
+        return profileMenuView;
+    }
+    private SettingsMenuView settingsMenuView() {
+        if (settingsMenuView == null) settingsMenuView = SettingsMenuView.getInstance();
+        return settingsMenuView;
+    }
+    private ShopMenuView shopMenuView() {
+        if (shopMenuView == null) shopMenuView = ShopMenuView.getInstance();
+        return shopMenuView;
+    }
+    private GreenhouseMenuView greenhouseMenuView() {
+        if (greenhouseMenuView == null) greenhouseMenuView = GreenhouseMenuView.getInstance();
+        return greenhouseMenuView;
+    }
+    private TravelLogMenuVIew travelLogMenuVIew() {
+        if (travelLogMenuVIew == null) travelLogMenuVIew = TravelLogMenuVIew.getInstance();
+        return travelLogMenuVIew;
     }
 
     public void processInput(String input) {}
@@ -99,9 +155,6 @@ public class AppMenuView {
         displayMessage("You are in the " + current.name().toLowerCase() + " menu.");
     }
 
-    /**
-     * Routes "menu enter" and "menu exit" to the controller of the current menu.
-     */
     private AppMenuController getControllerForCurrentMenu() {
         MenuType current = App.getInstance().getCurrentMenu();
         return switch (current) {
