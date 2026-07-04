@@ -37,6 +37,11 @@ public interface BehaviorContext {
     /** Drops a new sun on the field for the player to collect. */
     void spawnSun(Sun sun);
 
+    // --- Zombies (spawning) ---
+
+    /** Creates a new {@link ZombieInstance} of the given {@code zombieName}. */
+    ZombieInstance spawnZombieAt(String zombieName, int row, int col);
+
     // --- Plants ---
 
     /**

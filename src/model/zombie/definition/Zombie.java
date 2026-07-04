@@ -23,6 +23,7 @@ public class Zombie {
     private List<ArmorType> armorTypes;             // armor pieces; empty = no armor
     private PushableItemType pushableItemType;      // null = none
     private EquippedItemType equippedItemType;      // null = none
+    private ImpType impType;                        // null = does not throw/spawn an imp
 
     // --- Behavior identifiers ---
     private List<ZombieBehaviorType> behaviors;
@@ -43,6 +44,7 @@ public class Zombie {
         this.armorTypes = armorTypes != null ? armorTypes : new ArrayList<>();
         this.pushableItemType = pushableItemType;
         this.equippedItemType = equippedItemType;
+        this.impType = impType;
         this.behaviors = behaviors != null ? behaviors : new ArrayList<>();
     }
 
@@ -133,6 +135,10 @@ public class Zombie {
         return equippedItemType;
     }
 
+    public ImpType getImpType() {
+        return impType;
+    }
+
     // --- Setters ---
 
     public void setName(String name) {
@@ -177,5 +183,9 @@ public class Zombie {
 
     public void setEquippedItemType(EquippedItemType equippedItemType) {
         this.equippedItemType = equippedItemType;
+    }
+
+    public void setImpType(ImpType impType) {
+        this.impType = impType;
     }
 }

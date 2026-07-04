@@ -4,6 +4,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
 import model.enums.PlacableLayer;
+import model.enums.ZombieState;
 import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.level.Level;
@@ -152,6 +153,27 @@ public class GameModel implements BehaviorContext {
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+    }
+
+    @Override
+    public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
+        ZombieInstance instance = ZombieFactory.createInstance(zombieDefinitionName);
+        if (instance == null) {
+            return null;
+        }
+
+        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
+        int clampedCol = Math.max(0, Math.min(col, gameMap.getCols() - 1));
+
+        instance.setGridPosition(new Point(clampedCol, clampedRow));
+        instance.setContinuousPosition(new FloatPoint(clampedCol, clampedRow));
+        instance.setState(ZombieState.SPAWNING);
+
+        activeZombies.add(instance);
+        gameMap.addZombie(instance, clampedRow, clampedCol);
+        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+
+        return instance;
     }
 
     public void removeZombie(ZombieInstance zombie) {
