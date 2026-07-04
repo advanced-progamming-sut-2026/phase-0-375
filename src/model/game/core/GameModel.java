@@ -15,6 +15,7 @@ import model.game.map.GameMap;
 import model.game.map.Point;
 import model.game.rule.EndGameCondition;
 import model.game.wave.WaveManager;
+import model.item.Grave;
 import model.item.LootDrop;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
@@ -290,6 +291,25 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public Cell getCellAt(int row, int col) {
-        return null;
+        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return null;
+        }
+        return gameMap.getCell(row, col);
+    }
+
+    @Override
+    public boolean spawnGraveAt(int row, int col) {
+        Cell cell = getCellAt(row, col);
+        if (cell == null) {
+            return false;
+        }
+        if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
+            return false;
+        }
+        boolean placed = cell.addPlaceable(new Grave());
+        if (placed) {
+            eventBus.dispatch(new GameEvent(GameEvent.Type.GRAVE_SPAWNED));
+        }
+        return placed;
     }
 }

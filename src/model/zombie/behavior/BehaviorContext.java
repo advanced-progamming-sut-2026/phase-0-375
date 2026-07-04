@@ -42,6 +42,15 @@ public interface BehaviorContext {
     /** Creates a new {@link ZombieInstance} of the given {@code zombieName}. */
     ZombieInstance spawnZombieAt(String zombieName, int row, int col);
 
+    // --- Graves / ground items ---
+
+    /**
+     * Drops a new {@link model.item.Grave} on the GROUND layer of the given cell.
+     *
+     * @return true if the grave was placed successfully, false otherwise.
+     */
+    boolean spawnGraveAt(int row, int col);
+
     // --- Plants ---
 
     /**
