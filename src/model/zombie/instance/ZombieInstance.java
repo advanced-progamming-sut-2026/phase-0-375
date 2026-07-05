@@ -27,6 +27,7 @@ public class ZombieInstance implements Tickable {
     private float speedModifier;
     private boolean isGlowing;                             // a glowing zombie drops plant food after dying
     private int chillLevel;
+    private boolean movingBackward;                        // true while this zombie moves away from the house
 
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
@@ -43,6 +44,7 @@ public class ZombieInstance implements Tickable {
         this.speedModifier = 1.0f;
         this.isGlowing = false;
         this.chillLevel = 0;
+        this.movingBackward = false;
         this.armors = null;
         this.pushableItem = null;
         this.equippedItem = null;
@@ -152,6 +154,16 @@ public class ZombieInstance implements Tickable {
 
     public boolean isChilled() {
         return chillLevel > 0 && chillLevel < 3;
+    }
+
+    /** @return true while this zombie is walking away from the house instead of toward it. */
+    public boolean isMovingBackward() {
+        return movingBackward;
+    }
+
+    /** Reverses (or restores) this zombie's walking direction. */
+    public void setMovingBackward(boolean movingBackward) {
+        this.movingBackward = movingBackward;
     }
 
     // --- Speed modifier ---
