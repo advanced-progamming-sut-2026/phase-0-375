@@ -8,10 +8,10 @@ public enum CollectionMenuCommand implements CLICommand {
     SHOW_ALL_PLANTS("menu collection show-all-plants"),
     SHOW_ZOMBIES("menu collection show-zombies"),
     SHOW_ALL_ZOMBIES("menu collection show-all-zombies"),
-    SHOW_PLANT("menu collection show-plant -p (?<plant_name>\\S+)"),
-    SHOW_ZOMBIE("menu collection show-zombie -z (?<zombie_name>\\S+)"),
-    UPGRADE_PLANT("menu collection upgrade-plant -p (?<plant_name>\\S+)"),
-    PURCHASE_PLANT("menu collection purchase-plant -p (?<plant_name>\\S+)");
+    SHOW_PLANT("menu collection show-plant -p (?<plantName>\\S+)"),
+    SHOW_ZOMBIE("menu collection show-zombie -z (?<zombieName>\\S+)"),
+    UPGRADE_PLANT("menu collection upgrade-plant -p (?<plantName>\\S+)"),
+    PURCHASE_PLANT("menu collection purchase-plant -p (?<plantName>\\S+)");
 
     private final Pattern pattern;
     private Matcher matcher;

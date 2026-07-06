@@ -6,11 +6,11 @@ import java.util.regex.Pattern;
 public enum RegisterMenuCommand implements CLICommand {
     REGISTER("register\\s+" +
             "-u\\s+(?<username>\\S+)\\s+" +
-            "-p\\s+(?<password>\\S+)\\s+(?<password_confirm>\\S+)\\s+" +
+            "-p\\s+(?<password>\\S+)\\s+(?<passwordConfirm>\\S+)\\s+" +
             "-n\\s+(?<nickname>\\S+)\\s+" +
             "-e\\s+(?<email>\\S+)\\s+" +
             "-g\\s+(?<gender>\\S+)"),
-    PICK_QUESTION("pick question -q (?<question_number>\\d+) -a (?<answer>\\S+) -c (?<answer_confirm>\\S+)");
+    PICK_QUESTION("pick question -q (?<questionNumber>\\d+) -a (?<answer>\\S+) -c (?<answerConfirm>\\S+)");
 
     private final Pattern pattern;
     private Matcher matcher;

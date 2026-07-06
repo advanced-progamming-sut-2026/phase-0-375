@@ -4,7 +4,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public enum SettingsMenuCommand implements CLICommand {
-    CHANGE_DIFFICULTY("menu settings change-difficulty -l (?<difficulty_level>\\d+)");
+    CHANGE_DIFFICULTY("menu settings change-difficulty -l (?<difficultyLevel>\\d+)");
 
     private final Pattern pattern;
     private Matcher matcher;
