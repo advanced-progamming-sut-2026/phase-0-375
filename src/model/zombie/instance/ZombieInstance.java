@@ -156,6 +156,12 @@ public class ZombieInstance implements Tickable {
         return chillLevel > 0 && chillLevel < 3;
     }
 
+    /** @return true if this zombie is currently flying. */
+    public boolean isFlying() {
+        FlyBehavior flyBehavior = (FlyBehavior) getBehavior(ZombieBehaviorType.FLY);
+        return flyBehavior != null && flyBehavior.isFlying();
+    }
+
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;
