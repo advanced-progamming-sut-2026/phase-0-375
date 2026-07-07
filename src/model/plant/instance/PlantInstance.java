@@ -25,6 +25,8 @@ public class PlantInstance implements Placeable {
     private float plantFoodDurationRemaining;                   // seconds left on the plant food effect
     private float lifespanRemaining;                            // for temporary plants (e.g. Puff-shroom); -1 = infinite
     private Map<PlantAbilityType, AbilityState> abilityStates;  // per-ability runtime state
+    private int freezeHitCount;                                 // number of ice/snowball hits accumulated toward freezing
+    private PlantState stateBeforeFreeze;                       // state to restore to once unfrozen
 
     public PlantInstance(Plant definition) {
         this.definition = definition;
@@ -35,6 +37,8 @@ public class PlantInstance implements Placeable {
         this.isPlantFoodActive = false;
         this.lifespanRemaining = -1;
         this.abilityStates = new EnumMap<>(PlantAbilityType.class);
+        this.freezeHitCount = 0;
+        this.stateBeforeFreeze = null;
 
         // Initialize an AbilityState for every ability on the definition
         for (PlantAbility ability : definition.getAbilities()) {
@@ -74,6 +78,64 @@ public class PlantInstance implements Placeable {
      * Applies the stat upgrade for the given level (2, 3, or 4).
      */
     public void applyLevelUpgrade(int targetLevel) {}
+
+    // --- Freeze handling ---
+
+    /**
+     * @return true if this plant is currently frozen and unable to act.
+     */
+    public boolean isFrozen() {
+        return state == PlantState.FROZEN;
+    }
+
+    /**
+     * Registers one ice/snowball hit against this plant. Once
+     * {@code hitsToFreeze} hits have accumulated the plant becomes
+     * {@link PlantState#FROZEN}.
+     *
+     * @param hitsToFreeze number of hits required before freezing solid
+     */
+    public void registerFreezeHit(int hitsToFreeze) {
+        if (isFrozen()) {
+            return;
+        }
+        freezeHitCount++;
+        if (freezeHitCount >= hitsToFreeze) {
+            freeze();
+        }
+    }
+
+    /**
+     * Immediately freezes this plant, bypassing the hit-count threshold
+     */
+    public void freeze() {
+        if (isFrozen()) {
+            return;
+        }
+        stateBeforeFreeze = state;
+        state = PlantState.FROZEN;
+    }
+
+    /**
+     * Thaws this plant, restoring the state it had before being frozen
+     * and resetting the accumulated freeze-hit counter.
+     */
+    public void unfreeze() {
+        if (!isFrozen()) {
+            return;
+        }
+        state = (stateBeforeFreeze != null) ? stateBeforeFreeze : PlantState.IDLE;
+        stateBeforeFreeze = null;
+        freezeHitCount = 0;
+    }
+
+    public int getFreezeHitCount() {
+        return freezeHitCount;
+    }
+
+    public void setFreezeHitCount(int freezeHitCount) {
+        this.freezeHitCount = freezeHitCount;
+    }
 
     // --- Getters ---
 
