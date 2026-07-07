@@ -273,6 +273,23 @@ public class GameModel implements BehaviorContext {
     }
 
     @Override
+    public List<ZombieInstance> getZombiesInArea(int centerRow, int centerCol, int rowRadius, int colRadius) {
+        List<ZombieInstance> zombies = new ArrayList<>();
+        for (ZombieInstance zombie : activeZombies) {
+            if (zombie.isDead()) continue;
+            Point pos = zombie.getGridPosition();
+            if (pos == null) continue;
+
+            int rowDiff = Math.abs(pos.getY() - centerRow);
+            int colDiff = Math.abs(pos.getX() - centerCol);
+            if (rowDiff <= rowRadius && colDiff <= colRadius) {
+                zombies.add(zombie);
+            }
+        }
+        return zombies;
+    }
+
+    @Override
     public void damageZombie(ZombieInstance zombie, int damage) {
         if (zombie == null || damage <= 0) return;
 

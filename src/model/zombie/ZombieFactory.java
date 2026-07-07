@@ -73,6 +73,12 @@ public class ZombieFactory {
         return instance.definitionsByName.containsKey(name);
     }
 
+    /** Builds a fresh {@link Armor} instance of the given {@link ArmorType}. */
+    public static Armor createArmor(ArmorType armorType) {
+        if (instance == null || armorType == null) return null;
+        return instance.armorRegistry.create(armorType);
+    }
+
     // --- Instance creation ---
 
     /** Creates a {@link ZombieInstance} from the definition registered under {@code name}. */

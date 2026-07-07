@@ -70,6 +70,14 @@ public interface BehaviorContext {
     /** @return a list of {@link ZombieInstance}s in the given lane (row). */
     List<ZombieInstance> getZombiesInLane(int lane);
 
+    /**
+     * @return a list of {@link ZombieInstance}s within a rectangular area
+     * centered on ({@code centerRow}, {@code centerCol}), extending
+     * {@code rowRadius} rows up/down and {@code colRadius} columns
+     * left/right.
+     */
+    List<ZombieInstance> getZombiesInArea(int centerRow, int centerCol, int rowRadius, int colRadius);
+
     /** Applies {@code damage} to the {@code zombie}. */
     void damageZombie(ZombieInstance zombie, int damage);
 
