@@ -251,6 +251,20 @@ public class GameModel implements BehaviorContext {
     }
 
     @Override
+    public List<PlantInstance> getAllPlants() {
+        List<PlantInstance> plants = new ArrayList<>();
+        for (int row = 0; row < gameMap.getRows(); row++) {
+            for (int col = 0; col < gameMap.getCols(); col++) {
+                PlantInstance plant = getPlantAt(row, col);
+                if (plant != null && plant.getCurrentHP() > 0) {
+                    plants.add(plant);
+                }
+            }
+        }
+        return plants;
+    }
+
+    @Override
     public void damagePlant(PlantInstance plant, int damage) {
         if (plant == null || damage <= 0) return;
 

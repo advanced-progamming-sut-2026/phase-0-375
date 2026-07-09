@@ -11,6 +11,7 @@ public enum PlantState {
     PLANT_FOOD,
     STUNNED,
     FROZEN,
+    TRANSFORMED,
     DIGESTING,
     DYING
 }

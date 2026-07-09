@@ -62,6 +62,9 @@ public interface BehaviorContext {
     /** @return a list of {@link PlantInstance}s in the given lane (row), left-to-right. */
     List<PlantInstance> getPlantsInLane(int lane);
 
+    /** @return a list of every {@link PlantInstance} currently on the field. */
+    List<PlantInstance> getAllPlants();
+
     /** Applies {@code damage} to the {@code plant}. */
     void damagePlant(PlantInstance plant, int damage);
 

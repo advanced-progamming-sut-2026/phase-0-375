@@ -27,6 +27,7 @@ public class PlantInstance implements Placeable {
     private Map<PlantAbilityType, AbilityState> abilityStates;  // per-ability runtime state
     private int freezeHitCount;                                 // number of ice/snowball hits accumulated toward freezing
     private PlantState stateBeforeFreeze;                       // state to restore to once unfrozen
+    private PlantState stateBeforeTransform;                    // state to restore to once un-transformed
 
     public PlantInstance(Plant definition) {
         this.definition = definition;
@@ -39,6 +40,7 @@ public class PlantInstance implements Placeable {
         this.abilityStates = new EnumMap<>(PlantAbilityType.class);
         this.freezeHitCount = 0;
         this.stateBeforeFreeze = null;
+        this.stateBeforeTransform = null;
 
         // Initialize an AbilityState for every ability on the definition
         for (PlantAbility ability : definition.getAbilities()) {
@@ -135,6 +137,40 @@ public class PlantInstance implements Placeable {
 
     public void setFreezeHitCount(int freezeHitCount) {
         this.freezeHitCount = freezeHitCount;
+    }
+
+    // --- Transform handling (Wizard's cat) ---
+
+    /**
+     * @return true if this plant is currently transformed (e.g. into a cat
+     * by the Wizard zombie) and can neither attack nor be eaten.
+     */
+    public boolean isTransformed() {
+        return state == PlantState.TRANSFORMED;
+    }
+
+    /**
+     * Transforms this plant, saving its current state so it can be
+     * restored later via {@link #revertTransform()}.
+     */
+    public void transform() {
+        if (isTransformed()) {
+            return;
+        }
+        stateBeforeTransform = state;
+        state = PlantState.TRANSFORMED;
+    }
+
+    /**
+     * Reverts this plant back to the state it had before being
+     * transformed (e.g. once the Wizard that transformed it dies).
+     */
+    public void revertTransform() {
+        if (!isTransformed()) {
+            return;
+        }
+        state = (stateBeforeTransform != null) ? stateBeforeTransform : PlantState.IDLE;
+        stateBeforeTransform = null;
     }
 
     // --- Getters ---

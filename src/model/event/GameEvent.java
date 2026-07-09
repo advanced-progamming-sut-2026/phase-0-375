@@ -25,6 +25,7 @@ public class GameEvent {
         PUSHABLE_DESTROYED,
         EQUIPPABLE_DESTROYED,
         ZOMBIE_TRANSFORMED,
+        PLANT_TRANSFORMED,
         ZOMBIE_BUFFED,
         IMP_THROWN,
         GRAVE_SPAWNED,
