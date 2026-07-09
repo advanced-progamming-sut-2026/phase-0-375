@@ -35,7 +35,8 @@ public class ZombieSystem implements Tickable {
      */
     private void moveZombie(ZombieInstance zombie, float deltaTime) {
         if (zombie.getState() == model.enums.ZombieState.EATING ||
-                zombie.getState() == model.enums.ZombieState.SPECIAL_ACTION) {
+                zombie.getState() == model.enums.ZombieState.SPECIAL_ACTION ||
+                zombie.getState() == model.enums.ZombieState.PUSHING) {
             return;
         }
 

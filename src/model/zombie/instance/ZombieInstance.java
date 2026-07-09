@@ -45,7 +45,7 @@ public class ZombieInstance implements Tickable {
         this.isGlowing = false;
         this.chillLevel = 0;
         this.movingBackward = false;
-        this.armors = null;
+        this.armors = new ArrayList<>();
         this.pushableItem = null;
         this.equippedItem = null;
         this.behaviors = new ArrayList<>();
@@ -171,6 +171,16 @@ public class ZombieInstance implements Tickable {
     public boolean isSubmerged() {
         SwimBehavior swimBehavior = (SwimBehavior) getBehavior(ZombieBehaviorType.SWIM);
         return swimBehavior != null && swimBehavior.isSubmerged();
+    }
+
+    /**
+     * @return true while this zombie is actively pushing a {@link Pushable}.
+     *         Combat systems can use this to skip the normal eat-plant loop,
+     *         since the pushable itself instantly crushes any plant it touches.
+     */
+    public boolean isPushing() {
+        PushBehavior pushBehavior = (PushBehavior) getBehavior(ZombieBehaviorType.PUSH);
+        return pushBehavior != null && pushBehavior.isPushing();
     }
 
     /** @return true while this zombie is walking away from the house instead of toward it. */

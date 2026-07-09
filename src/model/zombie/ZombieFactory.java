@@ -97,7 +97,15 @@ public class ZombieFactory {
         Pushable pushable = instance.buildPushable(definition);
         Equippable equipped = instance.buildEquipped(definition);
 
-        return new ZombieInstance(definition, armors, pushable, equipped);
+        ZombieInstance zombie = new ZombieInstance(definition, armors, pushable, equipped);
+
+        // Wire the back-reference so the pushable can notify its owner on
+        // destruction (PushBehavior also relies on this link).
+        if (pushable != null) {
+            pushable.setPusher(zombie);
+        }
+
+        return zombie;
     }
 
     // --- Item builders ---
