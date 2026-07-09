@@ -68,6 +68,20 @@ public interface BehaviorContext {
     /** Applies {@code damage} to the {@code plant}. */
     void damagePlant(PlantInstance plant, int damage);
 
+    /**
+     * Moves {@code plant} from its current cell to ({@code row}, {@code col}),
+     * provided the destination cell's MAIN layer is empty.
+     *
+     * @return true if the plant was relocated, false if the destination was occupied/invalid.
+     */
+    boolean movePlant(PlantInstance plant, int row, int col);
+
+    /**
+     * Removes {@code plant} from the field entirely (e.g. thrown away and destroyed),
+     * without going through the normal damage/death flow.
+     */
+    void destroyPlant(PlantInstance plant);
+
     // --- Zombies ---
 
     /** @return a list of {@link ZombieInstance}s in the given lane (row). */

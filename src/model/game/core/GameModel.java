@@ -273,6 +273,45 @@ public class GameModel implements BehaviorContext {
     }
 
     @Override
+    public boolean movePlant(PlantInstance plant, int row, int col) {
+        if (plant == null || row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return false;
+        }
+
+        Point currentPos = plant.getPosition();
+        if (currentPos == null) {
+            return false;
+        }
+
+        Cell destinationCell = gameMap.getCell(row, col);
+        if (destinationCell.getPlaceable(PlacableLayer.MAIN) != null) {
+            return false;
+        }
+
+        Cell sourceCell = gameMap.getCell(currentPos.getY(), currentPos.getX());
+        sourceCell.removePlaceable(plant);
+        destinationCell.addPlaceable(plant);
+        plant.setPosition(new Point(col, row));
+        return true;
+    }
+
+    @Override
+    public void destroyPlant(PlantInstance plant) {
+        if (plant == null) return;
+
+        Point pos = plant.getPosition();
+        if (pos != null) {
+            Cell cell = getCellAt(pos.getY(), pos.getX());
+            if (cell != null) {
+                cell.removePlaceable(plant);
+            }
+        }
+        plant.setCurrentHP(0);
+        eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_DESTROYED));
+    }
+
+
+    @Override
     public List<ZombieInstance> getZombiesInLane(int lane) {
         if (lane < 0 || lane >= gameMap.getRows()) {
             return Collections.emptyList();
