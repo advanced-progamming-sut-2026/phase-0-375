@@ -162,6 +162,17 @@ public class ZombieInstance implements Tickable {
         return flyBehavior != null && flyBehavior.isFlying();
     }
 
+    /**
+     * @return true while this zombie is submerged underwater (e.g. a Snorkel
+     *         swimming under a water tile). Combat / projectile systems use
+     *         this to restrict which damage sources can hit the zombie.
+     *         only lobber plants can damage a submerged zombie.
+     */
+    public boolean isSubmerged() {
+        SwimBehavior swimBehavior = (SwimBehavior) getBehavior(ZombieBehaviorType.SWIM);
+        return swimBehavior != null && swimBehavior.isSubmerged();
+    }
+
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;
