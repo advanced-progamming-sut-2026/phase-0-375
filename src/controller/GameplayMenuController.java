@@ -190,7 +190,7 @@ public class GameplayMenuController extends AppMenuController {
 
         GameModel model = requireGame();
         Sun picked = null;
-        for (Sun s : model.getSuns()) {
+        for (Sun s : model.getActiveSuns()) {
             if (s.getX() == x && s.getY() == y) {
                 picked = s;
                 break;
@@ -439,9 +439,9 @@ public class GameplayMenuController extends AppMenuController {
             sb.append(row).append('\n');
         }
         // Sun tokens on the ground
-        if (!model.getSuns().isEmpty()) {
+        if (!model.getActiveSuns().isEmpty()) {
             sb.append("Sun tokens on the ground:\n");
-            for (Sun s : model.getSuns()) {
+            for (Sun s : model.getActiveSuns()) {
                 sb.append("  (").append(s.getX()).append(", ").append(s.getY())
                         .append(") value=").append(s.getValue()).append('\n');
             }

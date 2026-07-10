@@ -1,0 +1,25 @@
+[
+  {
+    "chapter": "ANCIENT_EGYPT",
+    "levelId": 1,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "skyDropEnabled": true,
+      "zombiesFreezable": true,
+      "initialSun": 150,
+      "sunDropRateModifier": 1.0,
+      "minPlantsRequired": 1,
+      "maxPlantsAllowed": 8,
+      "sunFallsFromSky": true,
+      "sunProducingPlantsAllowed": true,
+      "plantFoodDrops": true,
+      "lawnMowersEnabled": true,
+      "shovelEnabled": true,
+      "allowsChoosingPlants": true,
+      "plantRechargeInSetup": true
+    },
+    "waves": []
+  }
+]
