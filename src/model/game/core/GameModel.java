@@ -188,7 +188,9 @@ public class GameModel implements BehaviorContext {
         eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_FIRED));
     }
 
+    @Override
     public void removeProjectile(Projectile projectile) {
+        if (projectile == null) return;
         activeProjectiles.remove(projectile);
         gameMap.removeProjectile(projectile);
     }
@@ -347,6 +349,20 @@ public class GameModel implements BehaviorContext {
         if (zombie == null || damage <= 0) return;
 
         zombie.takeDamage(damage);
+    }
+
+    @Override
+    public List<Projectile> getProjectilesInLane(int lane) {
+        if (lane < 0 || lane >= gameMap.getRows()) {
+            return Collections.emptyList();
+        }
+        List<Projectile> inLane = new ArrayList<>();
+        for (Projectile projectile : activeProjectiles) {
+            if (projectile != null && projectile.getRow() == lane) {
+                inLane.add(projectile);
+            }
+        }
+        return inLane;
     }
 
     @Override

@@ -183,6 +183,14 @@ public class ZombieInstance implements Tickable {
         return pushBehavior != null && pushBehavior.isPushing();
     }
 
+    /**
+     * @return true while this zombie is spinning.
+     */
+    public boolean isSpinning() {
+        JuggleBehavior juggleBehavior = (JuggleBehavior) getBehavior(ZombieBehaviorType.JUGGLE);
+        return juggleBehavior != null && juggleBehavior.isSpinning();
+    }
+
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;

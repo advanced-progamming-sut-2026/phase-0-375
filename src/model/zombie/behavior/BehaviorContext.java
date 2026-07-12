@@ -4,6 +4,7 @@ import model.event.GameEvent;
 import model.game.map.Cell;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
+import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.List;
@@ -97,6 +98,20 @@ public interface BehaviorContext {
 
     /** Applies {@code damage} to the {@code zombie}. */
     void damageZombie(ZombieInstance zombie, int damage);
+
+    // --- Projectiles ---
+
+    /**
+     * @return a list of every {@link Projectile} currently traveling in the
+     *         given lane (row).
+     */
+    List<Projectile> getProjectilesInLane(int lane);
+
+    /**
+     * Permanently removes a projectile from the field.
+     * Safe to call with a projectile that isn't on the field (no-op in that case).
+     */
+    void removeProjectile(Projectile projectile);
 
     // --- Game map ---
 
