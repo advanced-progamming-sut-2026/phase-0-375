@@ -34,6 +34,8 @@ public class ZombieInstance implements Tickable {
     private Equippable equippedItem;                       // null if not equipped
     private List<ZombieBehavior> behaviors;                // zombie behaviors
 
+    private float fireDamageMultiplier = 1.0f;             // Multiplier applied to incoming FIRE-elemental damage
+
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
 
     public ZombieInstance(Zombie definition) {
@@ -50,6 +52,7 @@ public class ZombieInstance implements Tickable {
         this.equippedItem = null;
         this.behaviors = new ArrayList<>();
         this.eatingTarget = null;
+        this.fireDamageMultiplier = definition.getFireDamageMultiplier();
 
         // Add a ZombieBehavior to behaviors for every behavior type on the definition.
         for (ZombieBehaviorType type : definition.getBehaviors()) {
@@ -191,6 +194,14 @@ public class ZombieInstance implements Tickable {
         return juggleBehavior != null && juggleBehavior.isSpinning();
     }
 
+    /**
+     * @return true while this zombie is actively holding up a parasol
+     *         that deflects lobbed plant projectiles.
+     */
+    public boolean isDeflectingLobbed() {
+        return hasBehavior(ZombieBehaviorType.DEFLECT_LOBBER);
+    }
+
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;
@@ -286,6 +297,7 @@ public class ZombieInstance implements Tickable {
             case SHOOT: return new ShootBehavior();
             case STEAL_SUN: return new StealSunBehavior();
             case JUGGLE: return new JuggleBehavior();
+            case DEFLECT_LOBBER: return new DeflectLobberBehavior();
             case SWIM: return new SwimBehavior();
             case FLY: return new FlyBehavior();
             case SUMMON: return new SummonBehavior();
@@ -424,5 +436,21 @@ public class ZombieInstance implements Tickable {
 
     public void setEatingTarget(PlantInstance eatingTarget) {
         this.eatingTarget = eatingTarget;
+    }
+
+    public void setFireDamageMultiplier(float fireDamageMultiplier) {
+        this.fireDamageMultiplier = fireDamageMultiplier;
+    }
+
+    // --- Damage modifiers ---
+
+    /** @return multiplier applied to incoming FIRE-elemental damage (0..1). */
+    public float getFireDamageMultiplier() {
+        return fireDamageMultiplier;
+    }
+
+    /** @return true if this zombie takes no damage from FIRE-elemental sources. */
+    public boolean isImmuneToFire() {
+        return fireDamageMultiplier <= 0f;
     }
 }

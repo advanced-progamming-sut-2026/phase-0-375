@@ -25,6 +25,9 @@ public class Zombie {
     private EquippedItemType equippedItemType;      // null = none
     private ImpType impType;                        // null = does not throw/spawn an imp
 
+    // --- Damage modifiers ---
+    private float fireDamageMultiplier = 1.0f; // Multiplier applied to incoming FIRE-elemental damage
+
     // --- Behavior identifiers ---
     private List<ZombieBehaviorType> behaviors;
 
@@ -33,6 +36,17 @@ public class Zombie {
                   int weight, List<ArmorType> armorTypes,
                   PushableItemType pushableItemType, EquippedItemType equippedItemType,
                   ImpType impType, List<ZombieBehaviorType> behaviors) {
+        this(name, baseHP, speed, eatDPS, size, chapter, wavePointCost, weight,
+                armorTypes, pushableItemType, equippedItemType, impType,
+                behaviors, 1.0f);
+    }
+
+    public Zombie(String name, int baseHP, float speed, float eatDPS,
+                  ZombieSize size, Chapter chapter, int wavePointCost,
+                  int weight, List<ArmorType> armorTypes,
+                  PushableItemType pushableItemType, EquippedItemType equippedItemType,
+                  ImpType impType, List<ZombieBehaviorType> behaviors,
+                  float fireDamageMultiplier) {
         this.name = name;
         this.baseHP = baseHP;
         this.speed = speed;
@@ -46,6 +60,7 @@ public class Zombie {
         this.equippedItemType = equippedItemType;
         this.impType = impType;
         this.behaviors = behaviors != null ? behaviors : new ArrayList<>();
+        this.fireDamageMultiplier = fireDamageMultiplier;
     }
 
     /**
@@ -139,6 +154,14 @@ public class Zombie {
         return impType;
     }
 
+    public float getFireDamageMultiplier() {
+        return fireDamageMultiplier;
+    }
+
+    public boolean isImmuneToFire() {
+        return fireDamageMultiplier <= 0f;
+    }
+
     // --- Setters ---
 
     public void setName(String name) {
@@ -187,5 +210,9 @@ public class Zombie {
 
     public void setImpType(ImpType impType) {
         this.impType = impType;
+    }
+
+    public void setFireDamageMultiplier(float fireDamageMultiplier) {
+        this.fireDamageMultiplier = fireDamageMultiplier;
     }
 }

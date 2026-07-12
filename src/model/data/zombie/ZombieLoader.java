@@ -39,6 +39,25 @@ public class ZombieLoader {
         if (inputStream == null) {
             throw new IOException("zombies.json resource not found: " + classpathPath);
         }
+        try (InputStream in = inputStream) {
+            return loadFromStream(in);
+        }
+    }
+
+    /**
+     * Loads all zombie definitions from an open {@link InputStream}.
+     * Useful for tests and for callers that already have the JSON in
+     * hand.
+     *
+     * @param inputStream open JSON stream; not closed by this method
+     * @return unmodifiable list of zombie definitions, one per JSON entry
+     * @throws IOException if the stream cannot be parsed
+     */
+    public List<Zombie> loadFromStream(InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            throw new IOException("zombies.json input stream is null");
+        }
+        ObjectMapper mapper = new ObjectMapper();
         List<ZombieDataEntry> entries = mapper.readValue(inputStream, new TypeReference<>() {});
 
         List<Zombie> result = new ArrayList<>(entries.size());
@@ -71,13 +90,15 @@ public class ZombieLoader {
         List<ArmorType> armorTypes = resolveArmorTypes(zombieData.getZombieArmorProps());
         PushableItemType pushable = resolvePushable(entry.getObjclass(), zombieData);
         EquippedItemType equipped = resolveEquipped(entry.getObjclass(), zombieData);
-        ImpType impType = resolveImpType(zombieData.getImpType());
+        ImpType impType = resolveImpType(zombieData.getImpType(), alias);
         List<ZombieBehaviorType> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
+        float fireDamageMultiplier = zombieData.getFireDamageMultiplier();
 
         return new Zombie(
                 name, baseHP, speed, eatDPS,
                 size, chapter, wavePointCost, weight,
-                armorTypes, pushable, equipped, impType, behaviors
+                armorTypes, pushable, equipped, impType, behaviors,
+                fireDamageMultiplier
         );
     }
 
@@ -92,15 +113,29 @@ public class ZombieLoader {
         }
     }
 
-    private ImpType resolveImpType(String raw) {
-        if (raw == null) return null;
-        switch (raw.toLowerCase()) {
-            case "egypt_imp": return ImpType.EGYPT_IMP;
-            case "iceage_imp": return ImpType.ICEAGE_IMP;
-            default:
-                System.err.println("[ZombieLoader] Unknown ImpType: " + raw);
-                return null;
+    /** Resolves the {@link ImpType} set on a zombie definition */
+    private ImpType resolveImpType(String raw, String alias) {
+        if (raw != null) {
+            switch (raw.toLowerCase()) {
+                case "egypt_imp": return ImpType.EGYPT_IMP;
+                case "iceage_imp": return ImpType.ICEAGE_IMP;
+                case "dragon_imp":
+                case "dark_imp_dragon":
+                    return ImpType.DRAGON_IMP;
+                default:
+                    System.err.println("[ZombieLoader] Unknown ImpType: " + raw);
+                    return null;
+            }
         }
+        // No explicit ImpType field - fall back to alias-based detection
+        // for zombies that are imps themselves.
+        if (alias != null) {
+            String lower = alias.toLowerCase();
+            if (lower.contains("impdragon") || lower.contains("darkimpdragon")) {
+                return ImpType.DRAGON_IMP;
+            }
+        }
+        return null;
     }
 
     /**
@@ -201,8 +236,11 @@ public class ZombieLoader {
                 break;
 
             case "ZombieDarkJugglerProps":
-            case "ZombieLostCityJaneProps":
                 behaviors.add(ZombieBehaviorType.JUGGLE);
+                break;
+
+            case "ZombieLostCityJaneProps":
+                behaviors.add(ZombieBehaviorType.DEFLECT_LOBBER);
                 break;
 
             case "ZombieDarkWizardProps":
