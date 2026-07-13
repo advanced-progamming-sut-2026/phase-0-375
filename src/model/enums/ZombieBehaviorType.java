@@ -15,4 +15,6 @@ public enum ZombieBehaviorType {
     SMASH,          // instantly destroys plants on contact (Gargantuar)
     JUMP,           // Jumps over game entities (Prospector)
     PUSH,           // Push items on the ground (Arcade, Pianist)
+    ENRAGE,         // Speeds up and eats faster when its armor is destroyed
+    PIANO_SWAP,     // Periodically swaps rows of nearby zombies while playing
 }

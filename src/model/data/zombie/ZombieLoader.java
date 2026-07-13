@@ -265,9 +265,11 @@ public class ZombieLoader {
 
             case "ZombiePianoProps":
                 behaviors.add(ZombieBehaviorType.PUSH);
+                behaviors.add(ZombieBehaviorType.PIANO_SWAP);
                 break;
 
             case "ZombieNewspaperProps":
+                behaviors.add(ZombieBehaviorType.ENRAGE);
                 break;
 
             case "ZombieArcadeProps":

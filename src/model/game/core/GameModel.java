@@ -352,6 +352,33 @@ public class GameModel implements BehaviorContext {
     }
 
     @Override
+    public boolean moveZombieToLane(ZombieInstance zombie, int newRow) {
+        if (zombie == null) return false;
+        if (newRow < 0 || newRow >= gameMap.getRows()) return false;
+
+        Point pos = zombie.getGridPosition();
+        if (pos == null) return false;
+        int oldRow = pos.getY();
+        int col = pos.getX();
+        if (oldRow == newRow) return true;
+
+        // Update grid registration
+        Cell oldCell = gameMap.getCell(oldRow, col);
+        if (oldCell != null) {
+            oldCell.removeZombie(zombie);
+        }
+        Cell newCell = gameMap.getCell(newRow, col);
+        if (newCell != null) {
+            newCell.addZombie(zombie);
+        }
+
+        // Update the zombie's own position
+        zombie.setGridPosition(new Point(col, newRow));
+        zombie.setContinuousPosition(new FloatPoint(zombie.getContinuousX(), newRow));
+        return true;
+    }
+
+    @Override
     public List<Projectile> getProjectilesInLane(int lane) {
         if (lane < 0 || lane >= gameMap.getRows()) {
             return Collections.emptyList();

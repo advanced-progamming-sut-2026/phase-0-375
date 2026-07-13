@@ -96,6 +96,13 @@ public interface BehaviorContext {
      */
     List<ZombieInstance> getZombiesInArea(int centerRow, int centerCol, int rowRadius, int colRadius);
 
+    /**
+     * Moves the given zombie to a new lane (row).
+     *
+     * @return true if the move succeeded.
+     */
+    boolean moveZombieToLane(ZombieInstance zombie, int newRow);
+
     /** Applies {@code damage} to the {@code zombie}. */
     void damageZombie(ZombieInstance zombie, int damage);
 

@@ -183,12 +183,13 @@ public class StealSunBehavior implements ZombieBehavior {
     }
 
     /**
-     * Called by the game system whenever any sun-stealing zombie dies.
+     * Called by the ZombieSystem whenever any sun-stealing zombie dies.
      *
      * @param zombie the zombie that just died.
      */
+    @Override
     public void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
-        if(zombie == null) return;
+        if (zombie == null || context == null) return;
         if (isTurquoise(zombie)) {
             onTurquoiseZombieDeath(context);
         } else {

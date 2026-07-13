@@ -89,10 +89,11 @@ public class TransformBehavior implements ZombieBehavior {
     // --- Death handling ---
 
     /**
-     * Called by the game system when this Wizard is killed. Reverts every
+     * Called by the ZombieSystem when this Wizard is killed. Reverts every
      * plant this Wizard had transformed back to its normal state.
      */
-    public void onZombieDeath(BehaviorContext context) {
+    @Override
+    public void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
         for (PlantInstance plant : transformedPlants) {
             if (plant != null) {
                 plant.revertTransform();
