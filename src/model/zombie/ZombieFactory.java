@@ -6,6 +6,7 @@ import model.enums.ArmorType;
 import model.enums.PushableItemType;
 import model.item.equippable.Equippable;
 import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Barrel;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
@@ -25,6 +26,9 @@ import java.util.Map;
  */
 public class ZombieFactory {
     private static final int ICE_BLOCK_HP = 600;
+
+    /** HP of the Barrel Roller's barrel. */
+    private static final int BARREL_HP = 1100;
 
     private final ArmorRegistry armorRegistry;
 
@@ -133,6 +137,7 @@ public class ZombieFactory {
             case ARCADE_MACHINE: return new ArcadeMachine(definition.getBaseHP());
             case ICE_BLOCK: return new IceBlock(ICE_BLOCK_HP);
             case PIANO: return new Piano(definition.getBaseHP());
+            case BARREL: return new Barrel(BARREL_HP);
             default:
                 System.err.println("[ZombieFactory] Unknown PushableItemType: " + type);
                 return null;

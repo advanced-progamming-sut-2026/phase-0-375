@@ -177,6 +177,7 @@ public class ZombieLoader {
         if (objclass.contains("Troglobite")) return PushableItemType.ICE_BLOCK;
         if (objclass.contains("Arcade")) return PushableItemType.ARCADE_MACHINE;
         if (objclass.contains("Piano")) return PushableItemType.PIANO;
+        if (objclass.contains("BarrelRoller")) return PushableItemType.BARREL;
         return null;
     }
 
@@ -274,6 +275,11 @@ public class ZombieLoader {
 
             case "ZombieArcadeProps":
                 behaviors.add(ZombieBehaviorType.PUSH);
+                break;
+
+            case "ZombieBarrelRollerProps":
+                behaviors.add(ZombieBehaviorType.PUSH);
+                behaviors.add(ZombieBehaviorType.BARREL_ROLLER);
                 break;
 
             case "ZombiePropertySheet":

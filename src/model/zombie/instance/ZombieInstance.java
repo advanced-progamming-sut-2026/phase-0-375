@@ -34,7 +34,13 @@ public class ZombieInstance implements Tickable {
     private Equippable equippedItem;                       // null if not equipped
     private List<ZombieBehavior> behaviors;                // zombie behaviors
 
-    private float fireDamageMultiplier = 1.0f;             // Multiplier applied to incoming FIRE-elemental damage
+    /**
+     * Multiplier applied to incoming FIRE-elemental damage. Mirrors
+     * {@link Zombie#getFireDamageMultiplier()} so combat systems can
+     * read it directly off the instance without round-tripping to the
+     * definition. Defaults to {@code 1.0f}.
+     */
+    private float fireDamageMultiplier = 1.0f;
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
 
@@ -57,8 +63,8 @@ public class ZombieInstance implements Tickable {
         // Add a ZombieBehavior to behaviors for every behavior type on the definition.
         for (ZombieBehaviorType type : definition.getBehaviors()) {
             ZombieBehavior behavior = createBehavior(type);
-            if(behavior != null) {
-                behaviors.add(createBehavior(type));
+            if (behavior != null) {
+                behaviors.add(behavior);
             }
         }
     }
@@ -87,9 +93,12 @@ public class ZombieInstance implements Tickable {
      * Applies damage to this zombie instance.
      * Damage is first absorbed by armor,
      * then overflow hits the zombie's HP.
-     * May trigger reactive behaviors (e.g. ThrowImp).
+     * Triggers reactive behaviors.
      */
     public void takeDamage(int damage) {
+        if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
         int damageOverflow = damage;
         for(Armor armor : armors) {
             damageOverflow = armor.takeDamage(damageOverflow);
@@ -99,13 +108,61 @@ public class ZombieInstance implements Tickable {
             }
         }
         currentHP -= damageOverflow;
+    }
 
-        // TODO: implement triggering zombie behavior on taking damage mechanism
+    /**
+     * Variant of {@link #takeDamage(int)} that respects the zombie's
+     * {@link #fireDamageMultiplier}.
+     *
+     * @return the actual damage dealt after the multiplier was applied
+     *         (0 if the zombie is immune to fire).
+     */
+    public int takeFireDamage(int damage) {
+        if (damage <= 0) return 0;
+        int scaled = (int) (damage * fireDamageMultiplier);
+        if (scaled <= 0) return 0;
+        takeDamage(scaled);
+        return scaled;
     }
 
     /** Bypasses all armor. */
     public void takePoisonDamage(int damage) {
+        if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
         currentHP -= damage;
+    }
+
+    /** Applies a chill stack to this zombie. Three stacks freezes it solid */
+    public void applyChill() {
+        if (isFrozen()) return;
+        chillLevel = Math.min(3, chillLevel + 1);
+        if (chillLevel > 0 && chillLevel < 3 && state != ZombieState.CHILLED
+                && state != ZombieState.EATING) {
+            state = ZombieState.CHILLED;
+        }
+    }
+
+    /**
+     * Removes one chill stack from this zombie. Called by the combat
+     * system when a chill stack expires.
+     */
+    public void removeChill() {
+        chillLevel = Math.max(0, chillLevel - 1);
+        if (chillLevel == 0 && state == ZombieState.CHILLED) {
+            state = ZombieState.WALKING;
+        }
+    }
+
+    /**
+     * Notifies every behavior on this zombie that the zombie has died.
+     * The ZombieSystem calls this exactly once per zombie, right before
+     * removing it from the field.
+     */
+    public void fireOnDeathBehaviors(BehaviorContext context) {
+        for (ZombieBehavior behavior : behaviors) {
+            behavior.onZombieDeath(this, context);
+        }
     }
 
     /**
@@ -308,6 +365,9 @@ public class ZombieInstance implements Tickable {
             case SMASH: return new SmashBehavior();
             case JUMP: return new JumpBehavior();
             case PUSH: return new PushBehavior();
+            case ENRAGE: return new EnrageBehavior();
+            case PIANO_SWAP: return new PianoSwapBehavior();
+            case BARREL_ROLLER: return new BarrelRollerBehavior();
             default: return null;
         }
     }
