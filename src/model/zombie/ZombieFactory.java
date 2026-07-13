@@ -6,6 +6,7 @@ import model.enums.ArmorType;
 import model.enums.PushableItemType;
 import model.item.equippable.Equippable;
 import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Barrel;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
@@ -25,6 +26,9 @@ import java.util.Map;
  */
 public class ZombieFactory {
     private static final int ICE_BLOCK_HP = 600;
+
+    /** HP of the Barrel Roller's barrel. */
+    private static final int BARREL_HP = 1100;
 
     private final ArmorRegistry armorRegistry;
 
@@ -73,6 +77,12 @@ public class ZombieFactory {
         return instance.definitionsByName.containsKey(name);
     }
 
+    /** Builds a fresh {@link Armor} instance of the given {@link ArmorType}. */
+    public static Armor createArmor(ArmorType armorType) {
+        if (instance == null || armorType == null) return null;
+        return instance.armorRegistry.create(armorType);
+    }
+
     // --- Instance creation ---
 
     /** Creates a {@link ZombieInstance} from the definition registered under {@code name}. */
@@ -91,7 +101,15 @@ public class ZombieFactory {
         Pushable pushable = instance.buildPushable(definition);
         Equippable equipped = instance.buildEquipped(definition);
 
-        return new ZombieInstance(definition, armors, pushable, equipped);
+        ZombieInstance zombie = new ZombieInstance(definition, armors, pushable, equipped);
+
+        // Wire the back-reference so the pushable can notify its owner on
+        // destruction (PushBehavior also relies on this link).
+        if (pushable != null) {
+            pushable.setPusher(zombie);
+        }
+
+        return zombie;
     }
 
     // --- Item builders ---
@@ -119,6 +137,7 @@ public class ZombieFactory {
             case ARCADE_MACHINE: return new ArcadeMachine(definition.getBaseHP());
             case ICE_BLOCK: return new IceBlock(ICE_BLOCK_HP);
             case PIANO: return new Piano(definition.getBaseHP());
+            case BARREL: return new Barrel(BARREL_HP);
             default:
                 System.err.println("[ZombieFactory] Unknown PushableItemType: " + type);
                 return null;

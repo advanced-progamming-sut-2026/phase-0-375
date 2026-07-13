@@ -3,6 +3,8 @@ package model.data.zombie;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -83,7 +85,7 @@ public class ZombieDataEntry {
 
         /** HP fraction at which the imp is thrown (Gargantuar = 0.5). */
         @JsonProperty("HealthThresholdToImpAmmoLayers")
-        private List<Float> healthThresholdToImpAmmoLayers;
+        private List<HealthThresholdToImpAmmoLayer> healthThresholdToImpAmmoLayers;
 
         /**
          * Armor refs: e.g. ["RTID(ConeDefault@ArmorTypes)"].
@@ -185,6 +187,13 @@ public class ZombieDataEntry {
         @JsonProperty("DelayBetweenKnightings")
         private float delayBetweenKnightings;
 
+        /**
+         * Multiplier applied to incoming FIRE-elemental damage.
+         * Defaults to {@code 1.0f} (full damage).
+         */
+        @JsonProperty("FireDamageMultiplier")
+        private float fireDamageMultiplier = 1.0f;
+
         // --- getters ---
 
         public int getHitPoints() {
@@ -220,6 +229,22 @@ public class ZombieDataEntry {
         }
 
         public List<Float> getHealthThresholdToImpAmmoLayers() {
+            if (healthThresholdToImpAmmoLayers == null
+                    || healthThresholdToImpAmmoLayers.isEmpty()) {
+                return Collections.emptyList();
+            }
+            List<Float> out = new ArrayList<>(
+                    healthThresholdToImpAmmoLayers.size());
+            for (HealthThresholdToImpAmmoLayer layer : healthThresholdToImpAmmoLayers) {
+                if (layer != null) {
+                    out.add(layer.getHealthPercentThrowImp());
+                }
+            }
+            return out;
+        }
+
+        /** Returns the raw (typed) list of imp-throw threshold layer entries. */
+        public List<HealthThresholdToImpAmmoLayer> getHealthThresholdToImpAmmoLayerEntries() {
             return healthThresholdToImpAmmoLayers;
         }
 
@@ -313,6 +338,43 @@ public class ZombieDataEntry {
 
         public float getDelayBetweenKnightings() {
             return delayBetweenKnightings;
+        }
+
+        public float getFireDamageMultiplier() {
+            return fireDamageMultiplier;
+        }
+    }
+
+    /**
+     * Mirrors one element of the {@code HealthThresholdToImpAmmoLayers}
+     * array on the Gargantuar entry. The Gargantuar throws its imp
+     * when its HP drops to {@link #healthPercentThrowImp} of max.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class HealthThresholdToImpAmmoLayer {
+
+        /** HP fraction (0..1) at which the imp is thrown. */
+        @JsonProperty("HealthPercentThrowImp")
+        private float healthPercentThrowImp = 0.5f;
+
+        /** Visual sprite layers to hide once the imp is thrown. */
+        @JsonProperty("ProjectileLayersToHide")
+        private List<String> projectileLayersToHide;
+
+        public float getHealthPercentThrowImp() {
+            return healthPercentThrowImp;
+        }
+
+        public List<String> getProjectileLayersToHide() {
+            return projectileLayersToHide;
+        }
+
+        public void setHealthPercentThrowImp(float healthPercentThrowImp) {
+            this.healthPercentThrowImp = healthPercentThrowImp;
+        }
+
+        public void setProjectileLayersToHide(List<String> projectileLayersToHide) {
+            this.projectileLayersToHide = projectileLayersToHide;
         }
     }
 }

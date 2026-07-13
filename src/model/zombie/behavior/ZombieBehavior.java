@@ -19,4 +19,12 @@ public interface ZombieBehavior {
      * @return the type identifier for this behavior
      */
     ZombieBehaviorType getType();
+
+    /**
+     * Called by the ZombieSystem once when the owning zombie dies.
+     * Default implementation is a no-op.
+     */
+    default void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
+        // no-op by default
+    }
 }

@@ -23,24 +23,30 @@ public class ZombieSystem implements Tickable {
 
         for (ZombieInstance zombie : zombies) {
             zombie.tick(deltaTime);
-            zombie.tickBehaviors(deltaTime);
+            zombie.tickBehaviors(deltaTime, gameModel);
 
             moveZombie(zombie, deltaTime);
         }
     }
 
     /**
-     * Moves a zombie leftward based on its current speed and status modifiers.
-     * Zombies in EATING state do not move.
+     * Moves a zombie based on its current speed, status modifiers, and direction.
+     * Zombies in EATING or SPECIAL_ACTION state do not move.
      */
     private void moveZombie(ZombieInstance zombie, float deltaTime) {
-        if (zombie.getState() == model.enums.ZombieState.EATING) {
+        if (zombie.getState() == model.enums.ZombieState.EATING ||
+                zombie.getState() == model.enums.ZombieState.SPECIAL_ACTION ||
+                zombie.getState() == model.enums.ZombieState.PUSHING) {
             return;
         }
 
         float effectiveSpeed = zombie.getCurrentSpeed();
 
         float deltaX = effectiveSpeed * deltaTime;
+        if (zombie.isMovingBackward()) {
+            deltaX = -deltaX;
+        }
+
         zombie.setContinuousX(zombie.getContinuousX() - deltaX);
 
         int newGridX = (int) Math.floor(zombie.getContinuousX());

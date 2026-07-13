@@ -39,6 +39,25 @@ public class ZombieLoader {
         if (inputStream == null) {
             throw new IOException("zombies.json resource not found: " + classpathPath);
         }
+        try (InputStream in = inputStream) {
+            return loadFromStream(in);
+        }
+    }
+
+    /**
+     * Loads all zombie definitions from an open {@link InputStream}.
+     * Useful for tests and for callers that already have the JSON in
+     * hand.
+     *
+     * @param inputStream open JSON stream; not closed by this method
+     * @return unmodifiable list of zombie definitions, one per JSON entry
+     * @throws IOException if the stream cannot be parsed
+     */
+    public List<Zombie> loadFromStream(InputStream inputStream) throws IOException {
+        if (inputStream == null) {
+            throw new IOException("zombies.json input stream is null");
+        }
+        ObjectMapper mapper = new ObjectMapper();
         List<ZombieDataEntry> entries = mapper.readValue(inputStream, new TypeReference<>() {});
 
         List<Zombie> result = new ArrayList<>(entries.size());
@@ -71,13 +90,15 @@ public class ZombieLoader {
         List<ArmorType> armorTypes = resolveArmorTypes(zombieData.getZombieArmorProps());
         PushableItemType pushable = resolvePushable(entry.getObjclass(), zombieData);
         EquippedItemType equipped = resolveEquipped(entry.getObjclass(), zombieData);
-        ImpType impType = resolveImpType(zombieData.getImpType());
-        List<ZombieBehavior> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
+        ImpType impType = resolveImpType(zombieData.getImpType(), alias);
+        List<ZombieBehaviorType> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
+        float fireDamageMultiplier = zombieData.getFireDamageMultiplier();
 
         return new Zombie(
                 name, baseHP, speed, eatDPS,
                 size, chapter, wavePointCost, weight,
-                armorTypes, pushable, equipped, impType, behaviors
+                armorTypes, pushable, equipped, impType, behaviors,
+                fireDamageMultiplier
         );
     }
 
@@ -92,15 +113,29 @@ public class ZombieLoader {
         }
     }
 
-    private ImpType resolveImpType(String raw) {
-        if (raw == null) return null;
-        switch (raw.toLowerCase()) {
-            case "egypt_imp": return ImpType.EGYPT_IMP;
-            case "iceage_imp": return ImpType.ICEAGE_IMP;
-            default:
-                System.err.println("[ZombieLoader] Unknown ImpType: " + raw);
-                return null;
+    /** Resolves the {@link ImpType} set on a zombie definition */
+    private ImpType resolveImpType(String raw, String alias) {
+        if (raw != null) {
+            switch (raw.toLowerCase()) {
+                case "egypt_imp": return ImpType.EGYPT_IMP;
+                case "iceage_imp": return ImpType.ICEAGE_IMP;
+                case "dragon_imp":
+                case "dark_imp_dragon":
+                    return ImpType.DRAGON_IMP;
+                default:
+                    System.err.println("[ZombieLoader] Unknown ImpType: " + raw);
+                    return null;
+            }
         }
+        // No explicit ImpType field - fall back to alias-based detection
+        // for zombies that are imps themselves.
+        if (alias != null) {
+            String lower = alias.toLowerCase();
+            if (lower.contains("impdragon") || lower.contains("darkimpdragon")) {
+                return ImpType.DRAGON_IMP;
+            }
+        }
+        return null;
     }
 
     /**
@@ -142,6 +177,7 @@ public class ZombieLoader {
         if (objclass.contains("Troglobite")) return PushableItemType.ICE_BLOCK;
         if (objclass.contains("Arcade")) return PushableItemType.ARCADE_MACHINE;
         if (objclass.contains("Piano")) return PushableItemType.PIANO;
+        if (objclass.contains("BarrelRoller")) return PushableItemType.BARREL;
         return null;
     }
 
@@ -154,87 +190,96 @@ public class ZombieLoader {
      * Derives the list of special behaviors for a zombie based on its
      * {@code objclass} and numeric-data fields.
      */
-    private List<ZombieBehavior> resolveBehaviors(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
-        List<ZombieBehavior> behaviors = new ArrayList<>();
+    private List<ZombieBehaviorType> resolveBehaviors(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
+        List<ZombieBehaviorType> behaviors = new ArrayList<>();
         if (objclass == null) return behaviors;
 
         switch (objclass) {
             case "ZombieRaProps":
-                behaviors.add(new StealSunBehavior());
+                behaviors.add(ZombieBehaviorType.STEAL_SUN);
                 break;
 
             case "ZombieExplorerProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieTombRaiserProps":
-                behaviors.add(new SummonBehavior());
+                behaviors.add(ZombieBehaviorType.SUMMON);
                 break;
 
             case "ZombieGargantuarProps":
-                behaviors.add(new SmashBehavior());
-                behaviors.add(new ThrowImpBehavior());
+                behaviors.add(ZombieBehaviorType.SMASH);
+                behaviors.add(ZombieBehaviorType.THROW_IMP);
                 break;
 
             case "ZombieIceAgeDodoProps":
-                behaviors.add(new FlyBehavior());
+                behaviors.add(ZombieBehaviorType.FLY);
                 break;
 
             case "ZombieIceAgeHunterProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieIceAgeTroglobiteProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
                 break;
 
             case "ZombieBeachFishermanProps":
-                behaviors.add(new FishBehavior());
+                behaviors.add(ZombieBehaviorType.FISH);
                 break;
 
             case "ZombieBeachOctopusProps":
-                behaviors.add(new ShootBehavior());
+                behaviors.add(ZombieBehaviorType.SHOOT);
                 break;
 
             case "ZombieBeachSnorkelProps":
-                behaviors.add(new SwimBehavior());
+                behaviors.add(ZombieBehaviorType.SWIM);
                 break;
 
             case "ZombieDarkJugglerProps":
+                behaviors.add(ZombieBehaviorType.JUGGLE);
+                break;
+
             case "ZombieLostCityJaneProps":
-                behaviors.add(new JuggleBehavior());
+                behaviors.add(ZombieBehaviorType.DEFLECT_LOBBER);
                 break;
 
             case "ZombieDarkWizardProps":
-                behaviors.add(new TransformBehavior());
+                behaviors.add(ZombieBehaviorType.TRANSFORM);
                 break;
 
             case "ZombieDarkKingProps":
-                behaviors.add(new BuffBehavior());
+                behaviors.add(ZombieBehaviorType.BUFF);
                 break;
 
             case "ZombieCrystalSkullProps":
-                behaviors.add(new StealSunBehavior());
-                behaviors.add(new ShootBehavior()); // laser
+                behaviors.add(ZombieBehaviorType.STEAL_SUN);
                 break;
 
             case "ZombieProspectorProps":
-                behaviors.add(new JumpBehavior());
+                behaviors.add(ZombieBehaviorType.JUMP);
                 break;
 
             case "ZombieModernAllStarProps":
-                behaviors.add(new SmashBehavior());
+                behaviors.add(ZombieBehaviorType.SMASH);
                 break;
 
             case "ZombiePianoProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
+                behaviors.add(ZombieBehaviorType.PIANO_SWAP);
                 break;
 
             case "ZombieNewspaperProps":
+                behaviors.add(ZombieBehaviorType.ENRAGE);
                 break;
 
             case "ZombieArcadeProps":
-                behaviors.add(new PushBehavior());
+                behaviors.add(ZombieBehaviorType.PUSH);
+                break;
+
+            case "ZombieBarrelRollerProps":
+                behaviors.add(ZombieBehaviorType.PUSH);
+                behaviors.add(ZombieBehaviorType.BARREL_ROLLER);
                 break;
 
             case "ZombiePropertySheet":

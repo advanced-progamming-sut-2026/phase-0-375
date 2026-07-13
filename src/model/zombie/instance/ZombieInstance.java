@@ -8,13 +8,11 @@ import model.item.equippable.Equippable;
 import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
-import model.zombie.behavior.ZombieBehavior;
+import model.zombie.behavior.*;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * The runtime representation of a zombie on the game field
@@ -29,12 +27,20 @@ public class ZombieInstance implements Tickable {
     private float speedModifier;
     private boolean isGlowing;                             // a glowing zombie drops plant food after dying
     private int chillLevel;
+    private boolean movingBackward;                        // true while this zombie moves away from the house
 
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
     private Equippable equippedItem;                       // null if not equipped
-    private Map<ZombieBehaviorType, BehaviorState> behaviorStates; // per-behavior runtime state
-    private boolean hasThrownImp;                          // for Gargantuar: ensures Imp thrown only once
+    private List<ZombieBehavior> behaviors;                // zombie behaviors
+
+    /**
+     * Multiplier applied to incoming FIRE-elemental damage. Mirrors
+     * {@link Zombie#getFireDamageMultiplier()} so combat systems can
+     * read it directly off the instance without round-tripping to the
+     * definition. Defaults to {@code 1.0f}.
+     */
+    private float fireDamageMultiplier = 1.0f;
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
 
@@ -46,16 +52,20 @@ public class ZombieInstance implements Tickable {
         this.speedModifier = 1.0f;
         this.isGlowing = false;
         this.chillLevel = 0;
-        this.armors = null;
+        this.movingBackward = false;
+        this.armors = new ArrayList<>();
         this.pushableItem = null;
         this.equippedItem = null;
-        this.behaviorStates = new EnumMap<>(ZombieBehaviorType.class);
-        this.hasThrownImp = false;
+        this.behaviors = new ArrayList<>();
         this.eatingTarget = null;
+        this.fireDamageMultiplier = definition.getFireDamageMultiplier();
 
-        // Initialize a BehaviorState for every behavior on the definition
-        for (ZombieBehavior behavior : definition.getBehaviors()) {
-            behaviorStates.put(behavior.getType(), new BehaviorState(behavior.getType()));
+        // Add a ZombieBehavior to behaviors for every behavior type on the definition.
+        for (ZombieBehaviorType type : definition.getBehaviors()) {
+            ZombieBehavior behavior = createBehavior(type);
+            if (behavior != null) {
+                behaviors.add(behavior);
+            }
         }
     }
 
@@ -83,9 +93,12 @@ public class ZombieInstance implements Tickable {
      * Applies damage to this zombie instance.
      * Damage is first absorbed by armor,
      * then overflow hits the zombie's HP.
-     * May trigger reactive behaviors (e.g. ThrowImp).
+     * Triggers reactive behaviors.
      */
     public void takeDamage(int damage) {
+        if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
         int damageOverflow = damage;
         for(Armor armor : armors) {
             damageOverflow = armor.takeDamage(damageOverflow);
@@ -95,22 +108,70 @@ public class ZombieInstance implements Tickable {
             }
         }
         currentHP -= damageOverflow;
+    }
 
-        // TODO: implement triggering zombie behavior on taking damage mechanism
+    /**
+     * Variant of {@link #takeDamage(int)} that respects the zombie's
+     * {@link #fireDamageMultiplier}.
+     *
+     * @return the actual damage dealt after the multiplier was applied
+     *         (0 if the zombie is immune to fire).
+     */
+    public int takeFireDamage(int damage) {
+        if (damage <= 0) return 0;
+        int scaled = (int) (damage * fireDamageMultiplier);
+        if (scaled <= 0) return 0;
+        takeDamage(scaled);
+        return scaled;
     }
 
     /** Bypasses all armor. */
     public void takePoisonDamage(int damage) {
+        if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
         currentHP -= damage;
+    }
+
+    /** Applies a chill stack to this zombie. Three stacks freezes it solid */
+    public void applyChill() {
+        if (isFrozen()) return;
+        chillLevel = Math.min(3, chillLevel + 1);
+        if (chillLevel > 0 && chillLevel < 3 && state != ZombieState.CHILLED
+                && state != ZombieState.EATING) {
+            state = ZombieState.CHILLED;
+        }
+    }
+
+    /**
+     * Removes one chill stack from this zombie. Called by the combat
+     * system when a chill stack expires.
+     */
+    public void removeChill() {
+        chillLevel = Math.max(0, chillLevel - 1);
+        if (chillLevel == 0 && state == ZombieState.CHILLED) {
+            state = ZombieState.WALKING;
+        }
+    }
+
+    /**
+     * Notifies every behavior on this zombie that the zombie has died.
+     * The ZombieSystem calls this exactly once per zombie, right before
+     * removing it from the field.
+     */
+    public void fireOnDeathBehaviors(BehaviorContext context) {
+        for (ZombieBehavior behavior : behaviors) {
+            behavior.onZombieDeath(this, context);
+        }
     }
 
     /**
      * Delegates a tick to all behaviors. Each behavior checks its
      * own state and decides whether to act.
      */
-    public void tickBehaviors(float deltaTime) {
-        for(BehaviorState behaviorState : behaviorStates.values()) {
-            behaviorState.tick(deltaTime);
+    public void tickBehaviors(float deltaTime, BehaviorContext context) {
+        for(ZombieBehavior behavior : behaviors) {
+            behavior.execute(this, context, deltaTime);
         }
     }
 
@@ -153,6 +214,59 @@ public class ZombieInstance implements Tickable {
 
     public boolean isChilled() {
         return chillLevel > 0 && chillLevel < 3;
+    }
+
+    /** @return true if this zombie is currently flying. */
+    public boolean isFlying() {
+        FlyBehavior flyBehavior = (FlyBehavior) getBehavior(ZombieBehaviorType.FLY);
+        return flyBehavior != null && flyBehavior.isFlying();
+    }
+
+    /**
+     * @return true while this zombie is submerged underwater (e.g. a Snorkel
+     *         swimming under a water tile). Combat / projectile systems use
+     *         this to restrict which damage sources can hit the zombie.
+     *         only lobber plants can damage a submerged zombie.
+     */
+    public boolean isSubmerged() {
+        SwimBehavior swimBehavior = (SwimBehavior) getBehavior(ZombieBehaviorType.SWIM);
+        return swimBehavior != null && swimBehavior.isSubmerged();
+    }
+
+    /**
+     * @return true while this zombie is actively pushing a {@link Pushable}.
+     *         Combat systems can use this to skip the normal eat-plant loop,
+     *         since the pushable itself instantly crushes any plant it touches.
+     */
+    public boolean isPushing() {
+        PushBehavior pushBehavior = (PushBehavior) getBehavior(ZombieBehaviorType.PUSH);
+        return pushBehavior != null && pushBehavior.isPushing();
+    }
+
+    /**
+     * @return true while this zombie is spinning.
+     */
+    public boolean isSpinning() {
+        JuggleBehavior juggleBehavior = (JuggleBehavior) getBehavior(ZombieBehaviorType.JUGGLE);
+        return juggleBehavior != null && juggleBehavior.isSpinning();
+    }
+
+    /**
+     * @return true while this zombie is actively holding up a parasol
+     *         that deflects lobbed plant projectiles.
+     */
+    public boolean isDeflectingLobbed() {
+        return hasBehavior(ZombieBehaviorType.DEFLECT_LOBBER);
+    }
+
+    /** @return true while this zombie is walking away from the house instead of toward it. */
+    public boolean isMovingBackward() {
+        return movingBackward;
+    }
+
+    /** Reverses (or restores) this zombie's walking direction. */
+    public void setMovingBackward(boolean movingBackward) {
+        this.movingBackward = movingBackward;
     }
 
     // --- Speed modifier ---
@@ -215,11 +329,47 @@ public class ZombieInstance implements Tickable {
     // --- Behavior access ---
 
     /**
-     * Returns the runtime state for the given behavior type,
+     * Returns the behavior based on the given {@code type},
      * or null if this zombie doesn't have that behavior.
      */
-    public BehaviorState getBehaviorState(ZombieBehaviorType type) {
-        return behaviorStates.get(type);
+    public ZombieBehavior getBehavior(ZombieBehaviorType type) {
+        for(ZombieBehavior behavior : behaviors) {
+            if(behavior.getType() == type) {
+                return behavior;
+            }
+        }
+        return null;
+    }
+
+    /** Checks whether this zombie has at least one behavior of the given type. */
+    public boolean hasBehavior(ZombieBehaviorType type) {
+        return getBehavior(type) != null;
+    }
+
+    // --- Helpers ---
+
+    /** Creates a new {@link ZombieBehavior} instance based on the given {@code type} */
+    private ZombieBehavior createBehavior(ZombieBehaviorType type) {
+        switch(type) {
+            case SHOOT: return new ShootBehavior();
+            case STEAL_SUN: return new StealSunBehavior();
+            case JUGGLE: return new JuggleBehavior();
+            case DEFLECT_LOBBER: return new DeflectLobberBehavior();
+            case SWIM: return new SwimBehavior();
+            case FLY: return new FlyBehavior();
+            case SUMMON: return new SummonBehavior();
+            case BUFF: return new BuffBehavior();
+            case TRANSFORM: return new TransformBehavior();
+            case FISH: return new FishBehavior();
+            case THROW_IMP: return new ThrowImpBehavior();
+            case SMASH: return new SmashBehavior();
+            case JUMP: return new JumpBehavior();
+            case PUSH: return new PushBehavior();
+            case ENRAGE: return new EnrageBehavior();
+            case PIANO_SWAP: return new PianoSwapBehavior();
+            case BARREL_ROLLER: return new BarrelRollerBehavior();
+            default: return null;
+        }
     }
 
     // --- Getters ---
@@ -276,12 +426,8 @@ public class ZombieInstance implements Tickable {
         return equippedItem;
     }
 
-    public Map<ZombieBehaviorType, BehaviorState> getBehaviorStates() {
-        return behaviorStates;
-    }
-
-    public boolean isHasThrownImp() {
-        return hasThrownImp;
+    public List<ZombieBehavior> getBehaviors() {
+        return behaviors;
     }
 
     public PlantInstance getEatingTarget() {
@@ -344,15 +490,27 @@ public class ZombieInstance implements Tickable {
         this.equippedItem = equippedItem;
     }
 
-    public void setBehaviorStates(Map<ZombieBehaviorType, BehaviorState> behaviorStates) {
-        this.behaviorStates = behaviorStates;
-    }
-
-    public void setHasThrownImp(boolean hasThrownImp) {
-        this.hasThrownImp = hasThrownImp;
+    public void setBehaviors(List<ZombieBehavior> behaviors) {
+        this.behaviors = behaviors;
     }
 
     public void setEatingTarget(PlantInstance eatingTarget) {
         this.eatingTarget = eatingTarget;
+    }
+
+    public void setFireDamageMultiplier(float fireDamageMultiplier) {
+        this.fireDamageMultiplier = fireDamageMultiplier;
+    }
+
+    // --- Damage modifiers ---
+
+    /** @return multiplier applied to incoming FIRE-elemental damage (0..1). */
+    public float getFireDamageMultiplier() {
+        return fireDamageMultiplier;
+    }
+
+    /** @return true if this zombie takes no damage from FIRE-elemental sources. */
+    public boolean isImmuneToFire() {
+        return fireDamageMultiplier <= 0f;
     }
 }

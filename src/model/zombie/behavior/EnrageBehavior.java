@@ -1,0 +1,93 @@
+package model.zombie.behavior;
+
+import model.enums.ArmorType;
+import model.enums.ZombieBehaviorType;
+import model.zombie.armor.Armor;
+import model.zombie.instance.ZombieInstance;
+
+import java.util.List;
+
+/**
+ * Enrage behavior.
+ */
+public class EnrageBehavior implements ZombieBehavior {
+
+    // --- Constants ---
+
+    /** Movement-speed multiplier applied permanently once enraged. */
+    public static final float ENRAGED_SPEED_SCALE = 3.0f;
+
+    /**
+     * Eat-damage multiplier applied permanently once enraged.
+     * CombatSystem multiplies each bite by this factor.
+     */
+    public static final float ENRAGED_EAT_SCALE = 3.0f;
+
+    // --- State ---
+
+    /** True once the Newspaper has been destroyed and the zombie enraged. */
+    private boolean enraged = false;
+
+    // --- ZombieBehavior ---
+
+    @Override
+    public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (zombie == null || context == null || zombie.isDead()) {
+            return;
+        }
+        if (enraged) {
+            return; // permanent transition - nothing else to do
+        }
+
+        if (!hasNewspaper(zombie)) {
+            enrage(zombie);
+        }
+    }
+
+    @Override
+    public ZombieBehaviorType getType() {
+        return ZombieBehaviorType.ENRAGE;
+    }
+
+    // --- Core logic ---
+
+    /** Returns true if the zombie still carries its Newspaper armor piece. */
+    private boolean hasNewspaper(ZombieInstance zombie) {
+        List<Armor> armors = zombie.getArmors();
+        if (armors == null || armors.isEmpty()) {
+            return false;
+        }
+        for (Armor armor : armors) {
+            if (armor != null && armor.getType() == ArmorType.Newspaper && !armor.isDestroyed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Flips the zombie into the enraged state and applies the speed multiplier. */
+    private void enrage(ZombieInstance zombie) {
+        enraged = true;
+        zombie.applySpeedModifier(ENRAGED_SPEED_SCALE);
+    }
+
+    // --- Getters / setters ---
+
+    /** @return true once the zombie has enraged (Newspaper destroyed). */
+    public boolean isEnraged() {
+        return enraged;
+    }
+
+    /**
+     * @return the eat-damage multiplier that CombatSystem should apply to
+     *         this zombie's bites. {@code 1.0f} before enraging,
+     *         {@link #ENRAGED_EAT_SCALE} afterwards.
+     */
+    public float getEatDamageScale() {
+        return enraged ? ENRAGED_EAT_SCALE : 1.0f;
+    }
+
+    public void setEnraged(boolean enraged) {
+        this.enraged = enraged;
+    }
+}

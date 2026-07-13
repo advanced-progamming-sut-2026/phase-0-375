@@ -78,4 +78,41 @@ public class Cell {
     public void removeProjectile(Projectile projectile) {
         projectiles.remove(projectile);
     }
+
+    // --- Ground / terrain access ---
+
+    /**
+     * @return the {@link GroundType} of this cell.
+     */
+    public GroundType getGroundType() {
+        return groundType;
+    }
+
+    /** Sets the ground type for this cell. */
+    public void setGroundType(GroundType groundType) {
+        this.groundType = groundType;
+    }
+
+    /**
+     * @return the {@link TerrainStrategy} attached to this cell, or
+     *         {@code null} if none has been configured.
+     */
+    public TerrainStrategy getTerrainStrategy() {
+        return terrainStrategy;
+    }
+
+    /** Attaches a terrain strategy to this cell. */
+    public void setTerrainStrategy(TerrainStrategy terrainStrategy) {
+        this.terrainStrategy = terrainStrategy;
+    }
+
+    /** @return the column index of this cell on the map. */
+    public int getColumn() {
+        return column;
+    }
+
+    /** @return the row index of this cell on the map. */
+    public int getRow() {
+        return row;
+    }
 }
