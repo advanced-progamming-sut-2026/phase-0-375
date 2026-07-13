@@ -27,6 +27,14 @@ public class GameMap {
 
     public Cell getCell(int x, int y) { return grid[x][y]; }
 
+    /** @return the {@link Lane} at the given row index. */
+    public Lane getLane(int row) {
+        if (row < 0 || row >= rows) {
+            return null;
+        }
+        return lanes[row];
+    }
+
     public void addZombie(ZombieInstance instance, int x, int y) {
         if (x < 0 || y < 0 || x >= rows || y >= cols) return;
 
