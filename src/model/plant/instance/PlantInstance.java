@@ -76,6 +76,9 @@ public class PlantInstance implements Placeable {
             // Traps start disarmed; armed state is ticked by the system.
             if (definition.hasTag(PlantTags.TRAP)) {
                 abilityState.setArmed(false);
+                if (definition.hasTag(PlantTags.CHARGE) && definition.getActionInterval() > 0) {
+                    abilityState.setCooldownRemaining(definition.getActionInterval());
+                }
             }
             abilityStates.put(definition.getAbilityType(), abilityState);
         }
@@ -191,10 +194,13 @@ public class PlantInstance implements Placeable {
         if (strategy == null) return;
         strategy.execute(this, context);
 
-        // Reset cooldown for recurring abilities
         AbilityState state = abilityStates.get(definition.getAbilityType());
         if (state != null && definition.getActionInterval() > 0) {
-            state.setCooldownRemaining(definition.getActionInterval());
+            if (definition.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE && state.isArmed()) {
+                state.setCooldownRemaining(0);
+            } else {
+                state.setCooldownRemaining(definition.getActionInterval());
+            }
         }
     }
 
