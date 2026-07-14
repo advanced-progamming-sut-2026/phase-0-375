@@ -1,11 +1,16 @@
 package model.game.systems;
 
 
+import model.enums.PlantCategory;
+import model.enums.PlantTags;
 import model.enums.ZombieBehaviorType;
 import model.game.core.Tickable;
 import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.core.GameModel;
+import model.plant.definition.Plant;
+import model.plant.instance.PlantInstance;
+import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.projectile.Splash;
 import model.zombie.behavior.JumpBehavior;
@@ -35,6 +40,8 @@ public class ProjectileSystem implements Tickable {
             if (projectile == null) continue;
 
             moveProjectile(projectile, deltaTime);
+
+            applyTorchwood(projectile);
 
             float x = projectile.getX();
             if (x < 0f || x >= gameModel.getColumnCount()) {
@@ -68,6 +75,41 @@ public class ProjectileSystem implements Tickable {
     private void moveProjectile(Projectile projectile, float deltaTime) {
         float newX = projectile.getX() + projectile.getVelocity() * projectile.getDirection() * deltaTime;
         projectile.setX(newX);
+    }
+
+    // --- Torchwood pea-conversion hook ---
+
+    /**
+     * Modifier hook for {@code Torchwood}: if the given projectile is a
+     * straight-line pea ({@link Pellet}) that is not already FIRE-aligned
+     * and its current tile is occupied by a Torchwood, the pea is ignited
+     * (its element becomes {@link Projectile.Element#FIRE}) and its damage
+     * is multiplied by the Torchwood's {@code abilityValue}.
+     */
+    private void applyTorchwood(Projectile projectile) {
+        if (!(projectile instanceof Pellet)) return;
+        if (projectile.isFire()) return;
+        if (projectile.isReflected()) return;
+
+        int row = projectile.getRow();
+        int col = (int) Math.floor(projectile.getX());
+        if (col < 0 || col >= gameModel.getColumnCount()) return;
+
+        PlantInstance plant = gameModel.getPlantAt(row, col);
+        if (plant == null) return;
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+        if (def.getCategory() != PlantCategory.MODIFIER) return;
+        if (!def.hasTag(PlantTags.FIRE)) return;
+
+        // Ignite the pea
+        projectile.setElement(Projectile.Element.FIRE);
+
+        // Boost damage by the Torchwood's ability value
+        float multiplier = def.getAbilityValue();
+        if (multiplier <= 0f) multiplier = 2.0f;
+        int boosted = Math.max(projectile.getDamage(), Math.round(projectile.getDamage() * multiplier));
+        projectile.setDamage(boosted);
     }
 
     // --- Collision ---

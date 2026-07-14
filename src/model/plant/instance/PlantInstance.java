@@ -39,6 +39,20 @@ public class PlantInstance implements Placeable {
     private PlantState stateBeforeFreeze;
     private PlantState stateBeforeTransform;
 
+    /**
+     * Imitater support: the name of the plant this Imitater is copying.
+     * Resolved via {@code PlantFactory} when the transform countdown
+     * expires. {@code null} for every non-Imitater plant.
+     */
+    private String imitateTarget;
+
+    /**
+     * Imitater support: seconds remaining before the instance transforms
+     * into its {@link #imitateTarget}. {@code -1} means "not an Imitater"
+     * or "already transformed".
+     */
+    private float transformCountdown;
+
     /** Cached ability strategy. */
     private PlantAbility abilityStrategy;
 
@@ -71,7 +85,29 @@ public class PlantInstance implements Placeable {
             // Warm-up plants start growing; lifespan is infinite, but they ramp.
             this.lifespanRemaining = -1f;
         }
+
+        // Imitater starts a short countdown before it morphs into its target.
+        // The actual target name is set externally via setImitateTarget(...)
+        // (e.g. by the plant-selection / placement flow). Until it is set,
+        // transformCountdown stays at -1 so execute() does nothing.
+        this.imitateTarget = null;
+        this.transformCountdown = -1f;
+        if (isImitater(definition)) {
+            this.transformCountdown = IMITATER_TRANSFORM_DELAY;
+        }
     }
+
+    /** @return true if the given definition represents an Imitater. */
+    private static boolean isImitater(Plant def) {
+        return def != null
+                && def.getCategory() == PlantCategory.MODIFIER
+                && def.getAbilityType() == PlantAbilityType.MODIFIER_UTILITY
+                && def.getName() != null
+                && def.getName().toLowerCase().contains("imitat");
+    }
+
+    /** Default delay (in seconds) before an Imitater morphs into its target. */
+    private static final float IMITATER_TRANSFORM_DELAY = 1.0f;
 
     // --- Tick ---
 
@@ -96,6 +132,13 @@ public class PlantInstance implements Placeable {
         if (canAct()) {
             executeAbility(context);
         }
+
+        // Imitater transform countdown is a lifecycle concern (like
+        // recharge / lifespan), so it ticks here rather than inside
+        // ModifierAbility.execute() — the ability interface has no
+        // deltaTime parameter. When the countdown hits zero the
+        // instance morphs into its imitate target.
+        tickImitaterTransform(deltaTime);
     }
 
     private void tickRecharge(float deltaTime) {
@@ -342,6 +385,84 @@ public class PlantInstance implements Placeable {
         stateBeforeTransform = null;
     }
 
+    // --- Imitater transform ---
+
+    /**
+     * Tick the Imitater's transform countdown. Called by
+     * {@link ModifierAbility#execute} once per game tick while the
+     * instance is still an Imitater. When the countdown expires the
+     * instance morphs into its {@link #imitateTarget} via
+     * {@link #transformIntoImitated()}.
+     *
+     * @param deltaTime seconds elapsed since the last tick
+     * @return {@code true} if the transform fired this tick
+     */
+    public boolean tickImitaterTransform(float deltaTime) {
+        if (transformCountdown < 0f) return false;
+        transformCountdown -= deltaTime;
+        if (transformCountdown <= 0f) {
+            transformCountdown = -1f;
+            transformIntoImitated();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Morphs this instance into the plant named by {@link #imitateTarget}.
+     * Resolves the target definition through {@code PlantFactory}, swaps
+     * the definition, resets HP / state / recharge, rebuilds the per-ability
+     * state map for the new ability type, and invalidates the cached
+     * ability strategy so it re-resolves on the next {@link #tick}.
+     */
+    public void transformIntoImitated() {
+        if (imitateTarget == null || imitateTarget.isEmpty()) return;
+        model.plant.definition.Plant newDef = null;
+        try {
+            newDef = model.plant.PlantFactory.getDefinition(imitateTarget);
+        } catch (IllegalStateException ignored) {
+            // PlantFactory not initialised — leave the instance as-is.
+        }
+        if (newDef == null) return;
+        transformInto(newDef);
+    }
+
+    /**
+     * Swaps this instance's definition to {@code newDefinition} and
+     * re-initialises every piece of derived runtime state so the
+     * instance behaves exactly like a freshly-placed instance of the
+     * new plant (same HP, recharge, ability cooldowns, strategy cache).
+     *
+     * @param newDefinition the definition to adopt
+     */
+    public void transformInto(Plant newDefinition) {
+        if (newDefinition == null) return;
+        this.definition = newDefinition;
+        this.state = PlantState.IDLE;
+        this.currentHP = newDefinition.getBaseHP();
+        this.currentRecharge = newDefinition.getRechargeTime();
+        this.isPlantFoodActive = false;
+        this.plantFoodDurationRemaining = 0f;
+        this.pendingPlantFoodEffect = false;
+
+        // Rebuild ability state for the new ability type.
+        this.abilityStates.clear();
+        if (newDefinition.getAbilityType() != null) {
+            AbilityState fresh = new AbilityState(newDefinition.getAbilityType());
+            if (newDefinition.hasTag(PlantTags.TRAP)) {
+                fresh.setArmed(false);
+            }
+            this.abilityStates.put(newDefinition.getAbilityType(), fresh);
+        }
+
+        // Force the strategy to re-resolve against the new category.
+        this.abilityStrategy = null;
+
+        // The instance is no longer an Imitater.
+        this.imitateTarget = null;
+        this.transformCountdown = -1f;
+    }
+
     // --- Getters ---
 
     public Plant getDefinition() { return definition; }
@@ -382,4 +503,20 @@ public class PlantInstance implements Placeable {
     }
 
     public void setFreezeHitCount(int freezeHitCount) { this.freezeHitCount = freezeHitCount; }
+
+    // --- Imitater getters / setters ---
+
+    /** @return the plant name this Imitater is copying, or {@code null}. */
+    public String getImitateTarget() { return imitateTarget; }
+
+    /** Sets the plant name this Imitater should morph into. */
+    public void setImitateTarget(String imitateTarget) { this.imitateTarget = imitateTarget; }
+
+    /** @return seconds remaining before the Imitater transforms, or {@code -1} if inactive. */
+    public float getTransformCountdown() { return transformCountdown; }
+
+    /** Sets the Imitater transform countdown (in seconds). */
+    public void setTransformCountdown(float transformCountdown) {
+        this.transformCountdown = transformCountdown;
+    }
 }

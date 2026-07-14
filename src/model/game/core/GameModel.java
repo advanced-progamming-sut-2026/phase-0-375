@@ -3,6 +3,7 @@ package model.game.core;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
+import model.enums.GroundType;
 import model.enums.PlacableLayer;
 import model.enums.ZombieState;
 import model.event.EventBus;
@@ -125,6 +126,38 @@ public class GameModel implements BehaviorContext {
 
     public boolean isNightLevel() {
         return chapter == Chapter.DARK_AGES;
+    }
+
+    /**
+     * @return true if the cell at {@code (row, col)} is a water tile.
+     */
+    public boolean isWaterTile(int row, int col) {
+        Cell cell = getCellAt(row, col);
+        return cell != null && cell.getGroundType() == GroundType.WATER;
+    }
+
+    /**
+     * Places an already-constructed plant instance onto the field at the
+     * given grid cell.
+     *
+     * @return true if the plant was placed; false if the
+     *         cell is out of bounds or already occupied on the MAIN layer
+     */
+    public boolean placePlant(PlantInstance plant, int row, int col) {
+        if (plant == null) return false;
+        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return false;
+        }
+        Cell cell = gameMap.getCell(row, col);
+        if (cell.getPlaceable(PlacableLayer.MAIN) != null) {
+            return false;
+        }
+        plant.setPosition(new Point(col, row));
+        boolean added = cell.addPlaceable(plant);
+        if (added && eventBus != null) {
+            eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_PLACED));
+        }
+        return added;
     }
 
     @Override

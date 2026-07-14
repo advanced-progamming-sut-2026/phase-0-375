@@ -97,6 +97,11 @@ public class PlantSystem implements Tickable {
         }
 
         @Override
+        public boolean isWaterTile(int row, int col) {
+            return gameModel.isWaterTile(row, col);
+        }
+
+        @Override
         public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
             gameModel.spawnProjectile(p, (int) x, (int) y);
             return p;
@@ -125,6 +130,11 @@ public class PlantSystem implements Tickable {
         @Override
         public void destroyPlant(PlantInstance plant) {
             gameModel.destroyPlant(plant);
+        }
+
+        @Override
+        public boolean placePlant(PlantInstance plant, int row, int col) {
+            return gameModel.placePlant(plant, row, col);
         }
 
         @Override

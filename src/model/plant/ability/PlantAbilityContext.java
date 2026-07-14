@@ -57,6 +57,13 @@ public interface PlantAbilityContext {
     /** @return true if the level is a night / dark-ages level. */
     boolean isNightLevel();
 
+    /**
+     * @return true if the cell at {@code (row, col)} is a water tile.
+     *         Used by Lily Pad (and other aquatic plants) to decide
+     *         where clones / platforms may be placed.
+     */
+    boolean isWaterTile(int row, int col);
+
     // --- Mutations ---
 
     /** Spawns a projectile at the given pixel position. */
@@ -76,6 +83,12 @@ public interface PlantAbilityContext {
 
     /** Removes the plant from the field. */
     void destroyPlant(PlantInstance plant);
+
+    /**
+     * Places an already-constructed plant instance onto the field at the
+     * given grid cell.
+     */
+    boolean placePlant(PlantInstance plant, int row, int col);
 
     /**
      * Triggers the plant-food effect of every plant on the field that
