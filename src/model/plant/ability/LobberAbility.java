@@ -15,7 +15,7 @@ import model.projectile.Splash;
  */
 public class LobberAbility implements PlantAbility {
 
-    private static final float LOB_VELOCITY = 3.5f;
+    private static final float LOB_VELOCITY = 0.8f;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.LOBBER; }
