@@ -1,149 +1,136 @@
 package model.plant.definition;
 
 import model.enums.PlantAbilityType;
+import model.enums.PlantCategory;
+import model.enums.PlantFoodType;
 import model.enums.PlantTags;
-import model.item.placeable.Placeable;
-import model.plant.ability.PlantAbility;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * A concrete, data-driven definition of a plant type.
+ * Concrete, data-driven definition of a plant type.
  */
-public abstract class Plant {
+public class Plant {
+    private final int id;
     private String name;
-    private PlantAbilityType category;
+    private PlantCategory category;
     private List<PlantTags> tags;
     private int cost;
     private int baseHP;
+    private int damage;
     private float rechargeTime;         // seconds before the seed is available again
-    private float actionInterval;       // seconds between ability actions
-    private List<PlantAbility> abilities;
+    private float actionInterval;       // seconds between ability actions; 0 = no recurring action
+
+    /** What the plant does on each {@link #actionInterval} tick. */
+    private PlantAbilityType abilityType;
+    /** Magnitude parameter for {@link #abilityType}. */
+    private float abilityValue;
+
+    /** What the plant does when fed plant food. */
     private PlantFoodEffect plantFoodEffect;
+
     private PlantLevels levels;
 
-    public Plant(String name, PlantAbilityType category, List<PlantTags> tags,
-                 int cost, int baseHP, float rechargeTime, float actionInterval,
-                 List<PlantAbility> abilities, PlantFoodEffect plantFoodEffect, PlantLevels levels) {
+    // --- Constructors ---
+
+    public Plant(int id, String name, PlantCategory category, List<PlantTags> tags,
+                 int cost, int baseHP, int damage,
+                 float rechargeTime, float actionInterval,
+                 PlantAbilityType abilityType, float abilityValue,
+                 PlantFoodType plantFoodType, float plantFoodValue,
+                 PlantLevels levels) {
+        this.id = id;
         this.name = name;
         this.category = category;
-        this.tags = tags != null ? tags : new ArrayList<>();
+        this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
         this.cost = cost;
         this.baseHP = baseHP;
+        this.damage = damage;
         this.rechargeTime = rechargeTime;
         this.actionInterval = actionInterval;
-        this.abilities = abilities != null ? abilities : new ArrayList<>();
-        this.plantFoodEffect = plantFoodEffect;
+        this.abilityType = abilityType;
+        this.abilityValue = abilityValue;
+        this.plantFoodEffect = new PlantFoodEffect(plantFoodType, plantFoodValue);
         this.levels = levels;
     }
 
-    // --- Ability lookup helpers ---
+    // --- Tag helpers ---
 
-    /** Finds the first ability that matches the input in this plant's ability list */
-    public PlantAbility getAbility(PlantAbilityType type) {
-        return null;
+    public boolean hasTag(PlantTags tag) {
+        return tag != null && tags.contains(tag);
     }
 
-    /** Checks whether this plant has at least one ability of the given type. */
-    public boolean hasAbility(PlantAbilityType type) {
-        return false;
-    }
-
-    /** Returns an unmodifiable list of this plant's abilities. */
-    public List<PlantAbility> getAbilities() {
-        return Collections.unmodifiableList(abilities);
-    }
-
-    /** Adds an ability to this plant's ability list. */
-    public void addAbility(PlantAbility ability) {
-
-    }
-
-    /**
-     * Removes the first ability of the given type from this plant.
-     *
-     * @return true if an ability was removed
-     */
-    public boolean removeAbility(PlantAbilityType type) {
-        return false;
-    }
+    public boolean isShroom() { return hasTag(PlantTags.SHROOM); }
+    public boolean isDayPlant() { return hasTag(PlantTags.DAY); }
+    public boolean isNightPlant() { return hasTag(PlantTags.NIGHT); }
+    public boolean isInstant() { return baseHP <= 0; }
+    public boolean isFreePlant() { return cost == 0; }
+    public boolean hasPlantFood() { return !plantFoodEffect.isNone(); }
 
     // --- Getters ---
 
-    public String getName() {
-        return name;
-    }
+    public int getId() { return id; }
 
-    public PlantAbilityType getCategory() {
-        return category;
-    }
+    public String getName() { return name; }
 
-    public List<PlantTags> getTags() {
-        return tags;
-    }
+    public PlantCategory getCategory() { return category; }
 
-    public int getCost() {
-        return cost;
-    }
+    public List<PlantTags> getTags() { return Collections.unmodifiableList(tags); }
 
-    public int getBaseHP() {
-        return baseHP;
-    }
+    public int getCost() { return cost; }
 
-    public float getRechargeTime() {
-        return rechargeTime;
-    }
+    public int getBaseHP() { return baseHP; }
 
-    public float getActionInterval() {
-        return actionInterval;
-    }
+    public int getDamage() { return damage; }
 
-    public PlantFoodEffect getPlantFoodEffect() {
-        return plantFoodEffect;
-    }
+    public float getRechargeTime() { return rechargeTime; }
 
-    public PlantLevels getLevels() {
-        return levels;
-    }
+    public float getActionInterval() { return actionInterval; }
+
+    public PlantAbilityType getAbilityType() { return abilityType; }
+
+    public float getAbilityValue() { return abilityValue; }
+
+    public PlantFoodType getPlantFoodType() { return plantFoodEffect.getType(); }
+
+    public float getPlantFoodValue() { return plantFoodEffect.getValue(); }
+
+    public PlantLevels getLevels() { return levels; }
 
     // --- Setters ---
 
+    public void setName(String name) { this.name = name; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setCategory(PlantAbilityType category) {
-        this.category = category;
-    }
+    public void setCategory(PlantCategory category) { this.category = category; }
 
     public void setTags(List<PlantTags> tags) {
-        this.tags = tags;
+        this.tags = tags != null ? new ArrayList<>(tags) : new ArrayList<>();
     }
 
-    public void setCost(int cost) {
-        this.cost = cost;
-    }
+    public void setCost(int cost) { this.cost = cost; }
 
-    public void setBaseHP(int baseHP) {
-        this.baseHP = baseHP;
-    }
+    public void setBaseHP(int baseHP) { this.baseHP = baseHP; }
 
-    public void setRechargeTime(float rechargeTime) {
-        this.rechargeTime = rechargeTime;
-    }
+    public void setDamage(int damage) { this.damage = damage; }
 
-    public void setActionInterval(float actionInterval) {
-        this.actionInterval = actionInterval;
-    }
+    public void setRechargeTime(float rechargeTime) { this.rechargeTime = rechargeTime; }
 
-    public void setPlantFoodEffect(PlantFoodEffect plantFoodEffect) {
-        this.plantFoodEffect = plantFoodEffect;
-    }
+    public void setActionInterval(float actionInterval) { this.actionInterval = actionInterval; }
 
-    public void setLevels(PlantLevels levels) {
-        this.levels = levels;
+    public void setAbilityType(PlantAbilityType abilityType) { this.abilityType = abilityType; }
+
+    public void setAbilityValue(float abilityValue) { this.abilityValue = abilityValue; }
+
+    public void setPlantFoodType(PlantFoodType plantFoodType) { this.plantFoodEffect.setType(plantFoodType); }
+
+    public void setPlantFoodValue(float plantFoodValue) { this.plantFoodEffect.setValue(plantFoodValue); }
+
+    public void setLevels(PlantLevels levels) { this.levels = levels; }
+
+    @Override
+    public String toString() {
+        return "Plant{" + id + ":" + name + " (" + category + ")}";
     }
 }

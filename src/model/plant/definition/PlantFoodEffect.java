@@ -1,29 +1,28 @@
 package model.plant.definition;
 
-public class PlantFoodEffect {
-    private String description;    // human-readable effect description; null if N/A
-    private boolean isInstant;     // true = resolves immediately (burst sun, explosion)
-    private float duration;        // seconds the effect lasts; 0 if instant
+import model.enums.PlantFoodType;
 
-    public PlantFoodEffect(String description, boolean isInstant, float duration) {
-        this.description = description;
-        this.isInstant = isInstant;
-        this.duration = duration;
+/**
+ * Data-driven description of what happens when a plant is fed plant food.
+ */
+public class PlantFoodEffect {
+    private PlantFoodType type;
+    private float value;
+
+    public PlantFoodEffect(PlantFoodType type, float value) {
+        this.type = type != null ? type : PlantFoodType.NONE;
+        this.value = value;
     }
 
-    // --- Getters ---
+    public PlantFoodType getType() { return type; }
 
-    public String getDescription() { return description; }
+    public float getValue() { return value; }
 
-    public boolean isInstant() { return isInstant; }
+    public void setType(PlantFoodType type) {
+        this.type = type != null ? type : PlantFoodType.NONE;
+    }
 
-    public float getDuration() { return duration; }
+    public void setValue(float value) { this.value = value; }
 
-    // --- Setters ---
-
-    public void setDescription(String description) { this.description = description; }
-
-    public void setInstant(boolean instant) { isInstant = instant; }
-
-    public void setDuration(float duration) { this.duration = duration; }
+    public boolean isNone() { return type == null || type == PlantFoodType.NONE; }
 }
