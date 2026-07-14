@@ -88,6 +88,7 @@ public class ShooterAbility implements PlantAbility {
     private Projectile.Element inferElement(Plant def) {
         if (def.hasTag(PlantTags.ICE)) return Projectile.Element.ICE;
         if (def.hasTag(PlantTags.FIRE)) return Projectile.Element.FIRE;
+        if (def.hasTag(PlantTags.POISON)) return Projectile.Element.POISON;
         return Projectile.Element.NONE;
     }
 }

@@ -119,6 +119,8 @@ public class ProjectileSystem implements Tickable {
 
         if (projectile.isFire()) {
             zombie.takeFireDamage(damage);
+        } else if (projectile.isPoison()) {
+            zombie.takePoisonDamage(damage);
         } else {
             gameModel.damageZombie(zombie, damage);
         }
@@ -145,6 +147,8 @@ public class ProjectileSystem implements Tickable {
 
             if (splash.isFire()) {
                 zombie.takeFireDamage(splash.getDamage());
+            } else if (splash.isPoison()) {
+                zombie.takePoisonDamage(splash.getDamage());
             } else {
                 gameModel.damageZombie(zombie, splash.getDamage());
             }

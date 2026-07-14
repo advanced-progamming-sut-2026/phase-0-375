@@ -14,7 +14,9 @@ public abstract class Projectile {
         /** Chills/freezes the target on hit. */
         ICE,
         /** Ignites or relights flame sources on hit. */
-        FIRE
+        FIRE,
+        /** Poison the target on hit. */
+        POISON,
     }
 
     /** Damage dealt on hit (before armor absorption). */
@@ -137,6 +139,11 @@ public abstract class Projectile {
     /** @return true if this projectile carries the {@link Element#FIRE} affinity. */
     public boolean isFire() {
         return element == Element.FIRE;
+    }
+
+    /** @return true if this projectile carries the {@link Element#POISON} affinity. */
+    public boolean isPoison() {
+        return element == Element.POISON;
     }
 
     /** @return true if this projectile is traveling leftward. */
