@@ -5,7 +5,7 @@ public enum PlantCategory {
     SHOOTER,
     LOBBER,
     EXPLOSIVE,
-    MELEE_ATTACKER,
+    MELEE,
     WALL_NUT,
     MODIFIER,
     STRIKE_THROUGH,
