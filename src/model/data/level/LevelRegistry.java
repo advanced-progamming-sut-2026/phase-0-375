@@ -36,10 +36,24 @@ public class LevelRegistry {
         Map<String, LevelDataEntry> byKey = new HashMap<>();
         Map<Chapter, List<LevelDataEntry>> byChapter = new EnumMap<>(Chapter.class);
         for (LevelDataEntry entry : entries) {
-            Chapter chapter = resolveEnum(Chapter.class, entry.getChapter(), Chapter.ANCIENT_EGYPT);
+            Chapter chapter = resolveEnum(Chapter.class, entry.getChapter(), null);
+            if (chapter == null) {
+                System.err.println("[LevelRegistry] Skipping level " + entry.getLevelId()
+                        + " with unknown chapter: " + entry.getChapter());
+                continue;
+            }
+            if (entry.getLevelId() <= 0) {
+                System.err.println("[LevelRegistry] Skipping level with invalid id " + entry.getLevelId()
+                        + " in chapter " + chapter);
+                continue;
+            }
             String key = key(chapter, entry.getLevelId());
             if (byKey.containsKey(key)) {
-                throw new IllegalArgumentException("Duplicate level definition: " + key);
+                System.err.println("[LevelRegistry] Skipping duplicate level definition: " + key);
+                continue;
+            }
+            if (entry.getWaves() == null || entry.getWaves().isEmpty()) {
+                System.err.println("[LevelRegistry] Warning: level " + key + " has no waves defined.");
             }
             byKey.put(key, entry);
             byChapter.computeIfAbsent(chapter, ignored -> new ArrayList<>()).add(entry);
@@ -67,6 +81,7 @@ public class LevelRegistry {
     }
 
     public static LevelRegistry load(String classpathPath) throws IOException {
+        ensureZombieDefinitionsLoaded();
         ObjectMapper mapper = new ObjectMapper();
         try (InputStream inputStream = openLevelStream(classpathPath)) {
             List<LevelDataEntry> entries = mapper.readValue(inputStream, new TypeReference<List<LevelDataEntry>>() {});
@@ -94,12 +109,30 @@ public class LevelRegistry {
 
     public List<LevelConfig> getAllConfigs() {
         List<LevelConfig> configs = new ArrayList<>(entriesByKey.size());
-        for (LevelDataEntry entry : entriesByKey.values()) configs.add(buildConfig(entry));
+        for (Chapter chapter : Chapter.values()) {
+            for (LevelDataEntry entry : entriesByChapter.getOrDefault(chapter, Collections.emptyList())) {
+                configs.add(buildConfig(entry));
+            }
+        }
         return Collections.unmodifiableList(configs);
     }
 
     public boolean hasLevel(Chapter chapter, int levelId) {
         return entriesByKey.containsKey(key(chapter, levelId));
+    }
+
+    /** Default classpath locations used to bootstrap zombie definitions on demand. */
+    private static final String DEFAULT_ZOMBIES_JSON = "/assets/data/zombies/zombies.json";
+    private static final String DEFAULT_ARMOR_JSON = "/assets/data/armor/ArmorTypeData.json";
+
+    /**
+     * Wave entries reference zombie definitions by name, so the zombie
+     * registry must be initialized before level configs can be built.
+     * Without this bootstrap, {@link #buildWaveEntry} would fail on the
+     * first {@link ZombieFactory#getDefinition} call.
+     */
+    private static void ensureZombieDefinitionsLoaded() throws IOException {
+        ZombieFactory.init(DEFAULT_ZOMBIES_JSON, DEFAULT_ARMOR_JSON);
     }
 
     private static InputStream openLevelStream(String path) throws IOException {
@@ -212,7 +245,11 @@ public class LevelRegistry {
         if (raw.getPool() != null) {
             for (LevelDataEntry.ZombieCandidateData candidate : raw.getPool()) {
                 Zombie zombie = ZombieFactory.getDefinition(candidate.getZombie());
-                if (zombie != null) builder.addCandidate(zombie, candidate.getWeight());
+                if (zombie == null) {
+                    System.err.println("[LevelRegistry] Unknown zombie in wave pool: " + candidate.getZombie());
+                    continue;
+                }
+                builder.addCandidate(zombie, candidate.getWeight());
             }
         }
         EntryRuntime placeholderRuntime = new EntryRuntime(new WaveZombieEntry());
@@ -247,7 +284,7 @@ public class LevelRegistry {
         if (rawTiles == null) return Collections.emptyMap();
         Map<Point, SlideDirection> result = new HashMap<>();
         for (LevelDataEntry.SlideTileData tile : rawTiles) {
-            result.put(new Point(tile.getX(), tile.getY()), resolveEnum(SlideDirection.class, tile.getDirection(), SlideDirection.RIGHT));
+            result.put(new Point(tile.getX(), tile.getY()), resolveEnum(SlideDirection.class, tile.getDirection(), SlideDirection.UP));
         }
         return Collections.unmodifiableMap(result);
     }
@@ -259,7 +296,7 @@ public class LevelRegistry {
     private static <T extends Enum<T>> T resolveEnum(Class<T> enumType, String raw, T fallback) {
         if (raw == null) return fallback;
         try {
-            return Enum.valueOf(enumType, raw.trim().toUpperCase().replace(' ', '_').replace('-', '_'));
+            return Enum.valueOf(enumType, raw.trim().toUpperCase(Locale.ROOT).replace(' ', '_').replace('-', '_'));
         } catch (IllegalArgumentException e) {
             System.err.println("[LevelRegistry] Unknown " + enumType.getSimpleName() + ": " + raw);
             return fallback;
