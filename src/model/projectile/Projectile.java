@@ -34,6 +34,9 @@ public abstract class Projectile {
     /** World-units per second. */
     protected float velocity;
 
+    /** True if this projectile pierces through zombies and doesn't get destroyed. */
+    protected boolean pierce;
+
     /** Elemental affinity, preserved across reflection. */
     protected Element element;
 
@@ -49,6 +52,7 @@ public abstract class Projectile {
         this.currentPosition = position;
         this.row = row;
         this.velocity = velocity;
+        this.pierce = false;
         this.element = element == null ? Element.NONE : element;
         this.direction = direction >= 0 ? +1 : -1;
     }
@@ -121,6 +125,14 @@ public abstract class Projectile {
 
     public void setVelocity(float velocity) {
         this.velocity = velocity;
+    }
+
+    public boolean pierce() {
+        return pierce;
+    }
+
+    public void setPierce(boolean pierce) {
+        this.pierce = pierce;
     }
 
     public Element getElement() {

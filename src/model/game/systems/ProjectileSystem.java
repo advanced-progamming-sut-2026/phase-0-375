@@ -55,7 +55,8 @@ public class ProjectileSystem implements Tickable {
                 applySplashDamage((Splash) projectile, target);
             }
 
-            gameModel.removeProjectile(projectile);
+            if (!projectile.pierce()) { gameModel.removeProjectile(projectile); }
+
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
             }
