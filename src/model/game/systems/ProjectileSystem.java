@@ -73,8 +73,49 @@ public class ProjectileSystem implements Tickable {
     // --- Movement ---
 
     private void moveProjectile(Projectile projectile, float deltaTime) {
+        // Homing projectiles steer toward their target each tick.
+        if (projectile.isHoming()) {
+            steerHoming(projectile, deltaTime);
+            return;
+        }
         float newX = projectile.getX() + projectile.getVelocity() * projectile.getDirection() * deltaTime;
         projectile.setX(newX);
+    }
+
+    /** Steers a homing projectile toward its target. */
+    private void steerHoming(Projectile projectile, float deltaTime) {
+        ZombieInstance target = projectile.getHomingTarget();
+        if (target == null || target.isDead() || target.getContinuousPosition() == null) {
+            float newX = projectile.getX()
+                    + projectile.getVelocity() * projectile.getDirection() * deltaTime;
+            projectile.setX(newX);
+            return;
+        }
+
+        float dx = target.getContinuousX() - projectile.getX();
+        float dy = target.getContinuousY() - projectile.getY();
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
+        if (dist < 0.001f) {
+            // Already on the target, let collision detection finish it.
+            return;
+        }
+
+        float speed = projectile.getVelocity();
+        float step = speed * deltaTime;
+        // Don't overshoot the target.
+        if (step > dist) step = dist;
+
+        float newX = projectile.getX() + (dx / dist) * step;
+        float newY = projectile.getY() + (dy / dist) * step;
+        projectile.setX(newX);
+        projectile.getCurrentPosition().setY(newY);
+
+        // Update the projectile's row so lane-based collision detection
+        // still works.
+        int newRow = Math.round(newY);
+        if (newRow != projectile.getRow()) {
+            projectile.setRow(newRow);
+        }
     }
 
     // --- Torchwood pea-conversion hook ---

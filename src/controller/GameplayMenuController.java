@@ -302,9 +302,40 @@ public class GameplayMenuController extends AppMenuController {
 
         PlantInstance instance = new PlantInstance(definition);
         instance.setPosition(new Point(x, y));
+
+        // Imitater: default the imitate target to the first non-Imitater
+        // plant in the player's selection.
+        wireImitateTargetIfNeeded(instance, definition, model.getSelectedPlants());
+
         cell.addPlaceable(instance);
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
                 + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + ".");
+    }
+
+    /**
+     * If the placed plant is an Imitater, sets its imitate target to the
+     * first non-Imitater plant in the player's selection.
+     */
+    private void wireImitateTargetIfNeeded(PlantInstance instance, Plant definition,
+                                           List<String> selectedPlants) {
+        if (instance == null || definition == null) return;
+        String name = definition.getName();
+        if (name == null) return;
+        if (!name.toLowerCase().contains("imitat")) return;
+        if (selectedPlants == null || selectedPlants.isEmpty()) return;
+
+        for (String candidate : selectedPlants) {
+            if (candidate == null) continue;
+            if (candidate.equalsIgnoreCase(name)) continue; // skip self
+            // Skip other Imitaters.
+            if (candidate.toLowerCase().contains("imitat")) continue;
+            // Skip mints (they're one-shot boosts, not useful copy targets).
+            if (candidate.toLowerCase().contains("-mint")) continue;
+            // Make sure the candidate actually exists in the factory.
+            if (!PlantFactory.hasDefinition(candidate)) continue;
+            instance.setImitateTarget(candidate);
+            return;
+        }
     }
 
     /**
@@ -383,8 +414,8 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("No plant food available. Cheat with 'cheat add-plant-food'.");
         }
         // Activate the plant food effect on this instance. PlantInstance's
-        // activatePlantFood() is currently a stub in the model layer; once
-        // it is wired up, this call will trigger the per-plant effect.
+        // activatePlantFood() schedules the per-plant plant-food effect,
+        // which fires on the next tick via the plant's ability strategy.
         instance.activatePlantFood();
         return CommandResult.success("Fed plant food to '" + instance.getDefinition().getName()
                 + "' at (" + x + ", " + y

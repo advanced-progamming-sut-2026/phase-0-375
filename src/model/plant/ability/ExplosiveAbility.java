@@ -1,10 +1,13 @@
 package model.plant.ability;
 
 import model.enums.PlantCategory;
+import model.enums.PlantSpecialTag;
 import model.enums.PlantTags;
 import model.game.map.FloatPoint;
 import model.plant.PlantFactory;
+import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
+import model.plant.definition.PlantLevels;
 import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
 import model.projectile.Pellet;
@@ -133,16 +136,19 @@ public class ExplosiveAbility implements PlantAbility {
     /**
      * Returns the zombies that trigger this trap. Most traps trigger on
      * same-tile contact. Squash triggers on a wider area - any zombie
-     * in the same tile or up to 2 tiles ahead in the lane.
+     * in the same tile or up to {@code (2 + BONUS_SMASH_CHARGES)} tiles
+     * ahead in the lane.
      */
     private List<ZombieInstance> getTriggerZombies(PlantInstance plant,
                                                    PlantAbilityContext context,
                                                    int row, int col) {
         Plant def = plant.getDefinition();
 
-        // Squash: checks 2 tiles ahead (toward the zombie spawn).
+        // Squash: checks ahead (toward the zombie spawn). The default
+        // reach is 2 tiles; BONUS_SMASH_CHARGES adds to it.
         if (isSquash(def)) {
-            return context.getZombiesInArea(row, col, 0, 2);
+            int reach = 2 + (int) cumulativeSpecialValue(plant, PlantSpecialTag.BONUS_SMASH_CHARGES);
+            return context.getZombiesInArea(row, col, 0, reach);
         }
 
         // Default: same-tile trigger.
@@ -160,6 +166,7 @@ public class ExplosiveAbility implements PlantAbility {
         Plant def = plant.getDefinition();
         int radius = (int) def.getAbilityValue();
         if (radius <= 0) radius = 1;
+        radius += (int) cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
         detonateAt(plant, context, radius);
     }
 
@@ -174,6 +181,8 @@ public class ExplosiveAbility implements PlantAbility {
         int col = plant.getPosition().getX();
         boolean isFire = def.hasTag(PlantTags.FIRE);
         int damage = def.getDamage();
+        // EXPLODE_DAMAGE_BUFF adds to the explosion damage.
+        damage += (int) cumulativeSpecialValue(plant, PlantSpecialTag.EXPLODE_DAMAGE_BUFF);
 
         // Mapwide explosion (Doom-shroom).
         if (radius >= MAPWIDE_THRESHOLD) {
@@ -223,18 +232,23 @@ public class ExplosiveAbility implements PlantAbility {
      * Fires a volley of grape projectiles down the plant's lane and
      * each adjacent lane. Each grape deals {@value #GRAPE_DAMAGE}
      * damage and travels at {@value #GRAPE_VELOCITY} grid-units/sec.
+     * The number of grapes per lane can be increased by the
+     * GRAPE_BOUNCE_EXT upgrade.
      */
     private void spawnGrapes(PlantInstance plant, PlantAbilityContext context) {
         if (plant.getPosition() == null) return;
         int row = plant.getPosition().getY();
         float originX = plant.getPosition().getX() + 0.5f;
 
+        int grapesPerLane = GRAPES_PER_LANE
+                + (int) cumulativeSpecialValue(plant, PlantSpecialTag.GRAPE_BOUNCE_EXT);
+
         // Fire grapes in the plant's lane and each adjacent lane.
         for (int laneOffset = -1; laneOffset <= 1; laneOffset++) {
             int lane = row + laneOffset;
             if (lane < 0 || lane >= context.getRowCount()) continue;
 
-            for (int i = 0; i < GRAPES_PER_LANE; i++) {
+            for (int i = 0; i < grapesPerLane; i++) {
                 Pellet grape = new Pellet(
                         GRAPE_DAMAGE,
                         new FloatPoint(originX + i * 0.3f, lane),
@@ -372,5 +386,23 @@ public class ExplosiveAbility implements PlantAbility {
     private boolean isSquash(Plant def) {
         return def.getName() != null
                 && def.getName().toLowerCase().contains("squash");
+    }
+
+    /** Sums up every upgrade value with the given special tag. */
+    private float cumulativeSpecialValue(PlantInstance plant, PlantSpecialTag tag) {
+        Plant def = plant.getDefinition();
+        if (def == null || def.getLevels() == null) return 0f;
+        PlantLevels levels = def.getLevels();
+        float total = 0f;
+        for (int lvl = 2; lvl <= 4; lvl++) {
+            if (lvl > plant.getLevel()) break;
+            LevelUpgrade upgrade = levels.getUpgrade(lvl);
+            if (upgrade == null) continue;
+            if (upgrade.isSpecialMechanic()
+                    && upgrade.getSpecialTag() == tag) {
+                total += upgrade.getValue();
+            }
+        }
+        return total;
     }
 }

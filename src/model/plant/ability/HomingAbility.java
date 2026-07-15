@@ -1,10 +1,8 @@
 package model.plant.ability;
 
-import model.enums.PlantAbilityType;
-import model.enums.PlantCategory;
-import model.enums.PlantFoodType;
-import model.enums.ZombieState;
+import model.enums.*;
 import model.game.map.FloatPoint;
+import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Pellet;
@@ -30,6 +28,10 @@ public class HomingAbility implements PlantAbility {
         if (def == null || plant.getPosition() == null) return;
 
         switch (def.getAbilityType()) {
+            case MINT_FAMILY_BOOST:
+                context.triggerFamilyPlantFood(PlantCategory.HOMING);
+                break;
+
             case SHOOT_PROJECTILE:
                 fireHomingPellet(plant, context);
                 break;
@@ -80,9 +82,11 @@ public class HomingAbility implements PlantAbility {
                 Projectile.Element.NONE,
                 +1
         );
-        // Tag the pellet as homing so the projectile system steers it
-        // toward the target each tick. (Implementation of steering is
-        // in ProjectileSystem; here we only spawn.)
+        // Attach the target so ProjectileSystem steers the pellet toward
+        // it each tick. The pellet's row is initially set to the plant's
+        // lane but will be updated by the steering logic to follow the
+        // target across lanes if needed.
+        pellet.setHomingTarget(target);
         context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
     }
 
@@ -187,14 +191,20 @@ public class HomingAbility implements PlantAbility {
                 zombie.setState(ZombieState.HYPNOTIZED);
                 zombie.setMovingBackward(true);
                 count--;
-            }
+            }        // If the plant has the PRIORITIZE_GARGANTUARS upgrade (Electric
+        // Blueberry L3), prefer Gargantuars over everything else.
         }
     }
 
     // --- Target selection ---
 
     private ZombieInstance pickTarget(PlantInstance plant, PlantAbilityContext context) {
-        // Default policy: prefer the highest-HP zombie on the field
+        if (hasPrioritizeGargantuars(plant)) {
+            ZombieInstance garg = findGargantuar(context);
+            if (garg != null) return garg;
+        }
+
+        // Default policy: prefer the highest-HP zombie on the field.
         ZombieInstance best = null;
         for (int lane = 0; lane < context.getRowCount(); lane++) {
             for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
@@ -204,5 +214,35 @@ public class HomingAbility implements PlantAbility {
             }
         }
         return best;
+    }
+
+    /** @return true if the plant has the PRIORITIZE_GARGANTUARS upgrade. */
+    private boolean hasPrioritizeGargantuars(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def == null || def.getLevels() == null) return false;
+        for (int lvl = 2; lvl <= 4; lvl++) {
+            if (lvl > plant.getLevel()) break;
+            LevelUpgrade upgrade = def.getLevels().getUpgrade(lvl);
+            if (upgrade == null) continue;
+            if (upgrade.isSpecialMechanic()
+                    && upgrade.getSpecialTag() == PlantSpecialTag.PRIORITIZE_GARGANTUARS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** @return the first alive Gargantuar on the field, or {@code null}. */
+    private ZombieInstance findGargantuar(PlantAbilityContext context) {
+        for (int lane = 0; lane < context.getRowCount(); lane++) {
+            for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
+                if (zombie == null || zombie.isDead()) continue;
+                String name = zombie.getDefinition().getName();
+                if (name != null && name.toLowerCase().contains("gargantuar")) {
+                    return zombie;
+                }
+            }
+        }
+        return null;
     }
 }

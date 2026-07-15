@@ -26,9 +26,18 @@ public class ShooterAbility implements PlantAbility {
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+
+        // Appease-mint: trigger plant-food on every SHOOTER plant.
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.SHOOTER);
+            return;
+        }
+
+        if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!shouldFire(plant, context)) return;
 
-        Plant def = plant.getDefinition();
         int pelletCount = (int) def.getAbilityValue();
         if (pelletCount <= 0) pelletCount = 1;
 

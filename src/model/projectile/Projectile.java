@@ -2,6 +2,7 @@ package model.projectile;
 
 import model.game.map.FloatPoint;
 import model.game.map.Point;
+import model.zombie.instance.ZombieInstance;
 
 /**
  * Abstract base class for all projectiles fired by plants.
@@ -39,6 +40,14 @@ public abstract class Projectile {
 
     /** Elemental affinity, preserved across reflection. */
     protected Element element;
+
+    /**
+     * Optional homing target. When non-null, the projectile system
+     * steers this projectile toward the target each tick (overriding
+     * the linear x-axis movement). Used by homing shooters like
+     * Caulipower, Electric Blueberry, and Cat-tail.
+     */
+    protected ZombieInstance homingTarget;
 
     // --- Constructors ---
 
@@ -161,5 +170,22 @@ public abstract class Projectile {
     /** @return true if this projectile is traveling leftward. */
     public boolean isReflected() {
         return direction < 0;
+    }
+
+    // --- Homing ---
+
+    /** @return the zombie this projectile is homing in on, or {@code null}. */
+    public ZombieInstance getHomingTarget() {
+        return homingTarget;
+    }
+
+    /** Sets the zombie this projectile should steer toward. */
+    public void setHomingTarget(ZombieInstance target) {
+        this.homingTarget = target;
+    }
+
+    /** @return true if this projectile is actively homing in on a target. */
+    public boolean isHoming() {
+        return homingTarget != null && !homingTarget.isDead();
     }
 }

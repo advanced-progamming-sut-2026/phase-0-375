@@ -39,6 +39,12 @@ public class PlantInstance implements Placeable {
     private PlantState stateBeforeFreeze;
     private PlantState stateBeforeTransform;
 
+    /** Seconds remaining before a frozen plant automatically unfreezes. */
+    private float freezeTimer = 0f;
+
+    /** Default duration (in seconds) that a plant stays frozen. */
+    public static final float FREEZE_DURATION = 8.0f;
+
     /**
      * Imitater support: the name of the plant this Imitater is copying.
      * Resolved via {@code PlantFactory} when the transform countdown
@@ -87,6 +93,9 @@ public class PlantInstance implements Placeable {
         if (definition.hasTag(PlantTags.WARM_UP)) {
             // Warm-up plants start growing; lifespan is infinite, but they ramp.
             this.lifespanRemaining = -1f;
+        } else if (definition.isShroom() && !isImitater(definition)) {
+            // Non-warm-up shrooms (Puff-shroom, Sea-shroom) are temporary
+            this.lifespanRemaining = SHROOM_BASE_LIFESPAN;
         }
 
         // Imitater starts a short countdown before it morphs into its target.
@@ -111,6 +120,12 @@ public class PlantInstance implements Placeable {
 
     /** Default delay (in seconds) before an Imitater morphs into its target. */
     private static final float IMITATER_TRANSFORM_DELAY = 1.0f;
+
+    /**
+     * Base lifespan (in seconds) for non-warm-up shrooms (Puff-shroom,
+     * Sea-shroom) before any LIFESPAN_EXT upgrades are applied.
+     */
+    private static final float SHROOM_BASE_LIFESPAN = 60.0f;
 
     // --- Tick ---
 
@@ -176,6 +191,17 @@ public class PlantInstance implements Placeable {
             if (state.getCooldownRemaining() > 0) {
                 state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime));
             }
+            // Tick down the Chomper's digestion timer. When it reaches
+            // zero, the plant exits the digesting phase and is ready to
+            // swallow again.
+            if (state.isDigesting()) {
+                state.setDigestRemaining(Math.max(0f, state.getDigestRemaining() - deltaTime));
+                if (state.getDigestRemaining() <= 0f) {
+                    state.setDigesting(false);
+                    state.setDigestRemaining(0f);
+                    state.setCooldownRemaining(0f);
+                }
+            }
         }
     }
 
@@ -196,6 +222,12 @@ public class PlantInstance implements Placeable {
 
         AbilityState state = abilityStates.get(definition.getAbilityType());
         if (state != null && definition.getActionInterval() > 0) {
+            // If the ability just entered a digesting phase (Chomper),
+            // preserve the digest timer as the cooldown - don't override
+            // it with the plant's actionInterval.
+            if (state.isDigesting()) {
+                return;
+            }
             if (definition.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE && state.isArmed()) {
                 state.setCooldownRemaining(0);
             } else {
@@ -307,8 +339,14 @@ public class PlantInstance implements Placeable {
     private void applySpecialMechanic(LevelUpgrade upgrade) {
         switch (upgrade.getSpecialTag()) {
             case LIFESPAN_EXT:
+                // If the plant has an infinite lifespan, this upgrade is a no-op.
+                // Otherwise, extend the remaining lifespan by the upgrade value.
                 if (lifespanRemaining > 0) {
                     lifespanRemaining += upgrade.getValue();
+                } else if (lifespanRemaining < 0 && definition.isShroom()) {
+                    // First time the lifespan is set on a shroom: initialize
+                    // it to the base value plus the upgrade bonus.
+                    lifespanRemaining = SHROOM_BASE_LIFESPAN + upgrade.getValue();
                 }
                 break;
             case GROWTH_STAGE_MAX_UP:
@@ -317,8 +355,33 @@ public class PlantInstance implements Placeable {
                     state.setGrowthStage(state.getGrowthStage() + (int) upgrade.getValue());
                 }
                 break;
+            case GROW_TIME_REDUCTION:
+                AbilityState prodState = abilityStates.get(PlantAbilityType.PRODUCE_SUN);
+                if (prodState != null && prodState.getCooldownRemaining() > 0) {
+                    prodState.setCooldownRemaining(
+                            Math.max(0f, prodState.getCooldownRemaining() - upgrade.getValue()));
+                }
+                break;
+            case ARM_TIME_REDUCTION:
+                // Traps arm faster; reduce the initial arming cooldown.
+                AbilityState trapState = abilityStates.get(PlantAbilityType.DELAYED_EXPLOSIVE);
+                if (trapState != null && !trapState.isArmed() && trapState.getCooldownRemaining() > 0) {
+                    trapState.setCooldownRemaining(
+                            Math.max(0f, trapState.getCooldownRemaining() - upgrade.getValue()));
+                }
+                break;
+            case DURATION_EXT:
+                // Mint family boost duration extension. Mints are one-shot
+                // plants that detonate immediately; this upgrade increases
+                // the boost's effective window by extending the plant food
+                // duration on affected plants.
+                plantFoodDurationRemaining += upgrade.getValue();
+                break;
+            // The remaining special tags are read live by their owning
+            // ability (e.g. DOUBLE_SUN_CHANCE is checked in
+            // SunProducerAbility.execute each tick). No permanent state
+            // change is needed here.
             default:
-                // Other special tags are read live by their owning system.
                 break;
         }
     }
@@ -346,8 +409,6 @@ public class PlantInstance implements Placeable {
             case WALL_NUT: return new WallAbility();
             case MODIFIER: return new ModifierAbility();
             case HOMING: return new HomingAbility();
-            case STRIKE_THROUGH: return new StrikeThroughAbility();
-            case MINT: return new MintAbility();
             default: return null;
         }
     }
@@ -366,6 +427,7 @@ public class PlantInstance implements Placeable {
         if (isFrozen()) return;
         stateBeforeFreeze = state;
         state = PlantState.FROZEN;
+        freezeTimer = FREEZE_DURATION;
     }
 
     public void unfreeze() {
@@ -373,7 +435,28 @@ public class PlantInstance implements Placeable {
         state = (stateBeforeFreeze != null) ? stateBeforeFreeze : PlantState.IDLE;
         stateBeforeFreeze = null;
         freezeHitCount = 0;
+        freezeTimer = 0f;
     }
+
+    /**
+     * Advances the freeze timer by {@code deltaTime} seconds. When the
+     * timer reaches zero the plant automatically unfreezes. Called by
+     * {@code CombatSystem} once per tick for every plant on the field.
+     *
+     * @return {@code true} if the plant unfroze this tick
+     */
+    public boolean tickFreeze(float deltaTime) {
+        if (!isFrozen()) return false;
+        freezeTimer -= deltaTime;
+        if (freezeTimer <= 0f) {
+            unfreeze();
+            return true;
+        }
+        return false;
+    }
+
+    public float getFreezeTimer() { return freezeTimer; }
+    public void setFreezeTimer(float freezeTimer) { this.freezeTimer = freezeTimer; }
 
     // --- Transform handling (Wizard's cat) ---
 
