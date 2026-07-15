@@ -30,7 +30,11 @@ public class DailyOffer {
      * @return true if the purchase was successful
      */
     public boolean purchase() {
-        return false;
+        if (purchased || isExpired()) {
+            return false;
+        }
+        purchased = true;
+        return true;
     }
 
     /**
@@ -49,7 +53,7 @@ public class DailyOffer {
      * @return true if the offer is expired
      */
     public boolean isExpired() {
-        return false;
+        return LocalDate.now().isAfter(offerDate);
     }
 
     // --- Getters ---

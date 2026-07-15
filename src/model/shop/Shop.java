@@ -129,10 +129,17 @@ public class Shop {
             lastRefreshDate = today;
             return;
         }
-        // TODO
-//        dailyOffer = new DailyOffer(
-//
-//        );
+        ShopItem offerItem = new ShopItem(
+                ITEM_ID_DAILY_OFFER,
+                ShopItemType.SEED_PACKET_CHOSEN,
+                ShopCategory.DAILY,
+                DAILY_OFFER_BASE_PRICE,
+                CurrencyType.COIN,
+                Integer.MAX_VALUE,
+                plant,
+                DAILY_OFFER_PACKET_AMOUNT + " seed packets for " + plant + " (20% off)"
+        );
+        dailyOffer = new DailyOffer(offerItem, DAILY_OFFER_BASE_PRICE, today);
         lastRefreshDate = today;
 
         // If the player already purchased this date's offer in a previous session,
@@ -223,7 +230,7 @@ public class Shop {
         customer.setCoins(customer.getCoins() - cost);
 
         // Grant the seed packets.
-        // TODO
+        applySeedPacketPurchase(dailyOffer.getItem().getTargetPlantType(), DAILY_OFFER_PACKET_AMOUNT);
 
         // Mark as purchased (both in-memory and in the user's persistence map).
         dailyOffer.setPurchased(true);
@@ -423,8 +430,14 @@ public class Shop {
      * @return combined list of all shop items
      */
     public List<ShopItem> getAllPurchasableItems() {
-        // TODO
-        return null;
+        List<ShopItem> all = new ArrayList<>(permanentItems);
+        if (needsRefresh()) {
+            refreshDailyOffer();
+        }
+        if (dailyOffer != null && !dailyOffer.isPurchased() && !dailyOffer.isExpired()) {
+            all.add(dailyOffer.getItem());
+        }
+        return all;
     }
 
     /**
