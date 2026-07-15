@@ -138,6 +138,16 @@ public class PlantSystem implements Tickable {
         }
 
         @Override
+        public boolean moveZombieToLane(ZombieInstance zombie, int newRow) {
+            return gameModel.moveZombieToLane(zombie, newRow);
+        }
+
+        @Override
+        public void pushZombieBack(ZombieInstance zombie, float tiles) {
+            gameModel.pushZombieBack(zombie, tiles);
+        }
+
+        @Override
         public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
             for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                 if (plant.getDefinition().getCategory() == family) {

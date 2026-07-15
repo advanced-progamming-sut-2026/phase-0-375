@@ -91,6 +91,26 @@ public interface PlantAbilityContext {
     boolean placePlant(PlantInstance plant, int row, int col);
 
     /**
+     * Moves the given zombie to a different lane (row). Updates both the
+     * zombie's grid position and its continuous Y coordinate, and
+     * re-registers it on the map's per-cell zombie list.
+     *
+     * @return true if the move succeeded; false if the
+     *         target row is out of bounds or the zombie has no grid position
+     */
+    boolean moveZombieToLane(ZombieInstance zombie, int newRow);
+
+    /**
+     * Pushes the given zombie backward (toward the zombie spawn point)
+     * by {@code tiles} grid units. If the zombie is pushed past the
+     * right edge of the map it is killed instantly.
+     *
+     * @param zombie the zombie to push
+     * @param tiles the distance to push, in grid units (positive = backward)
+     */
+    void pushZombieBack(ZombieInstance zombie, float tiles);
+
+    /**
      * Triggers the plant-food effect of every plant on the field that
      * shares the given category. Used by all mint plants.
      */

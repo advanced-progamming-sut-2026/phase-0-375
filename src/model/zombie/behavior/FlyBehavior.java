@@ -114,7 +114,7 @@ public class FlyBehavior implements ZombieBehavior {
         Plant definition = plant.getDefinition();
 
         // Plants that redirect zombies to another lane block flight
-        if (definition.getTags().contains(PlantTags.MOVE_ZOMBIES)) {
+        if (definition.getTags().contains(PlantTags.MOVE_ZOMBIE)) {
             return true;
         }
 

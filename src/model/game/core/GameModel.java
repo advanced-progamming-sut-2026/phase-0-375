@@ -420,6 +420,49 @@ public class GameModel implements BehaviorContext {
         return true;
     }
 
+    /**
+     * Pushes a zombie backward (toward the spawn point) by {@code tiles}
+     * grid units. If the zombie is pushed past the right edge of the map
+     * it is killed instantly.
+     */
+    public void pushZombieBack(ZombieInstance zombie, float tiles) {
+        if (zombie == null || zombie.isDead() || tiles <= 0) return;
+
+        FloatPoint pos = zombie.getContinuousPosition();
+        if (pos == null) return;
+
+        float newX = pos.getX() + tiles;
+
+        // Pushed off the right edge - kill the zombie instantly.
+        if (newX >= gameMap.getCols()) {
+            zombie.setCurrentHP(0);
+            zombie.setState(ZombieState.DEAD);
+            return;
+        }
+
+        zombie.setContinuousX(newX);
+
+        // Update grid column if the zombie crossed a tile boundary.
+        int newGridX = (int) Math.floor(newX);
+        Point gridPos = zombie.getGridPosition();
+        if (gridPos != null && newGridX != gridPos.getX()) {
+            int row = gridPos.getY();
+            int oldCol = gridPos.getX();
+
+            Cell oldCell = gameMap.getCell(row, oldCol);
+            if (oldCell != null) {
+                oldCell.removeZombie(zombie);
+            }
+            if (newGridX >= 0 && newGridX < gameMap.getCols()) {
+                Cell newCell = gameMap.getCell(row, newGridX);
+                if (newCell != null) {
+                    newCell.addZombie(zombie);
+                }
+            }
+            zombie.setGridX(newGridX);
+        }
+    }
+
     @Override
     public List<Projectile> getProjectilesInLane(int lane) {
         if (lane < 0 || lane >= gameMap.getRows()) {

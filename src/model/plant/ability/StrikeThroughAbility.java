@@ -1,6 +1,5 @@
 package model.plant.ability;
 
-import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.enums.PlantFoodType;
 import model.game.map.FloatPoint;
@@ -16,6 +15,9 @@ import model.zombie.instance.ZombieInstance;
 public class StrikeThroughAbility implements PlantAbility {
 
     private static final float PELLET_VELOCITY = 1f;
+
+    /** Distance (in grid units) that Fume-shroom's plant food pushes zombies back. */
+    private static final float KNOCKBACK_TILES = 1.5f;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.STRIKE_THROUGH; }
@@ -49,12 +51,12 @@ public class StrikeThroughAbility implements PlantAbility {
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
-        if (def.getPlantFoodType() == PlantFoodType.KNOCKBACK_BLAST) {
-            if (plant.getPosition() == null) return;
-            int row = plant.getPosition().getY();
-            for (ZombieInstance zombie : context.getZombiesInLane(row)) {
-                context.damageZombie(zombie, (int) def.getPlantFoodValue());
-            }
+        if (def.getPlantFoodType() != PlantFoodType.KNOCKBACK_BLAST) return;
+        if (plant.getPosition() == null) return;
+
+        int row = plant.getPosition().getY();
+        for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+            context.pushZombieBack(zombie, KNOCKBACK_TILES);
         }
     }
 }
