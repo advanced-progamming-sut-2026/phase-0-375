@@ -41,6 +41,11 @@ public class GameplayMenuController extends AppMenuController {
     /** One in-game tick is treated as this many seconds of simulated time. */
     private static final float SECONDS_PER_TICK = 0.1f;
 
+    private static final String WIN_MESSAGE =
+            "Dear humanz, zis is not done yet; we will come back to eat your brainz, humanz.";
+    private static final String LOSE_MESSAGE =
+            "The zombie ate your brain; LOSER!!!";
+
     private GameplayMenuController() {}
 
     public static GameplayMenuController getInstance() {
@@ -150,8 +155,15 @@ public class GameplayMenuController extends AppMenuController {
         if (loop == null) {
             return CommandResult.error("Game loop is not initialized.");
         }
+        GameModel model = requireGame();
         for (int i = 0; i < count; i++) {
             loop.update(SECONDS_PER_TICK);
+            if (model.getState() == GameState.WON) {
+                return CommandResult.success(WIN_MESSAGE);
+            }
+            if (model.getState() == GameState.LOST) {
+                return CommandResult.success(LOSE_MESSAGE);
+            }
         }
         return CommandResult.success("Advanced " + count + " ticks.");
     }

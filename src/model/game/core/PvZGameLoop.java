@@ -2,7 +2,9 @@ package model.game.core;
 
 import model.enums.GameState;
 import model.event.EventBus;
+import model.event.GameEvent;
 import model.game.level.LevelConfig;
+import model.game.rule.EndGameCondition;
 import model.game.systems.*;
 import model.game.wave.WaveManager;
 
@@ -45,7 +47,7 @@ public class PvZGameLoop implements GameLoop {
 
     @Override
     public void update(float deltaTime) {
-        if (gameState == GameState.PAUSED) return;
+        if (gameState != GameState.RUNNING) return;
 
         sunFallSystem.tick(deltaTime);
         plantSystem.tick(deltaTime);
@@ -57,7 +59,29 @@ public class PvZGameLoop implements GameLoop {
         pushableSystem.tick(deltaTime);
         gameModel.tick(deltaTime);
 
+        evaluateEndGame();
 
+
+    }
+
+    /** Checks the level's end-game condition and finishes the game on a verdict. */
+    private void evaluateEndGame() {
+        EndGameCondition condition = gameModel.getEndGameCondition();
+        if (condition == null) return;
+
+        if (condition.isGameOver(gameModel)) {
+            finish(GameState.LOST, GameEvent.Type.GAME_LOST);
+        } else if (condition.isWin(gameModel)) {
+            finish(GameState.WON, GameEvent.Type.GAME_WON);
+        }
+    }
+
+    private void finish(GameState result, GameEvent.Type eventType) {
+        this.gameState = result;
+        gameModel.setGameState(result);
+        if (eventBus != null) {
+            eventBus.dispatch(new GameEvent(eventType));
+        }
     }
 
     @Override

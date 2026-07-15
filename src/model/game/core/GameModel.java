@@ -53,6 +53,12 @@ public class GameModel implements BehaviorContext {
     private EventBus eventBus;
     private List<String> selectedPlants;       // plant types chosen for this level
 
+    // End-game bookkeeping (read by EndGameCondition implementations)
+    private boolean houseBreached;
+    private int zombiesKilled;
+    private int plantsLost;
+    private float elapsedSeconds;
+
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
         this.difficultyLevel = App.getInstance().getCurrentUser().getDifficultyLevel();
@@ -241,10 +247,42 @@ public class GameModel implements BehaviorContext {
 
     public void tick(float deltaTime) {
         currentTick += 1;
+        elapsedSeconds += deltaTime;
     }
 
     public void setGameState(GameState gameState) {
         this.gameState = gameState;
+    }
+
+    public EndGameCondition getEndGameCondition() {
+        return endGameCondition;
+    }
+
+    /** True once a zombie has walked into the player's house. */
+    public boolean isHouseBreached() {
+        return houseBreached;
+    }
+
+    public void markHouseBreached() {
+        this.houseBreached = true;
+    }
+
+    public int getZombiesKilled() {
+        return zombiesKilled;
+    }
+
+    public void incrementZombiesKilled() {
+        zombiesKilled++;
+    }
+
+    /** Number of plants that have died this level. */
+    public int getPlantsLost() {
+        return plantsLost;
+    }
+
+    /** Seconds of simulated time since the level started. */
+    public float getElapsedSeconds() {
+        return elapsedSeconds;
     }
 
     public void queueLootDrop(LootDrop loot) {
@@ -333,7 +371,11 @@ public class GameModel implements BehaviorContext {
         if (plant == null || damage <= 0) return;
 
         int newHP = Math.max(0, plant.getCurrentHP() - damage);
+        boolean wasAlive = plant.getCurrentHP() > 0;
         plant.setCurrentHP(newHP);
+        if (wasAlive && newHP == 0) {
+            plantsLost++;
+        }
     }
 
     @Override
@@ -369,6 +411,9 @@ public class GameModel implements BehaviorContext {
             if (cell != null) {
                 cell.removePlaceable(plant);
             }
+        }
+        if (plant.getCurrentHP() > 0) {
+            plantsLost++;
         }
         plant.setCurrentHP(0);
         eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_DESTROYED));
