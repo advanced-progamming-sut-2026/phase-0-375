@@ -4,7 +4,9 @@ import model.enums.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A concrete, data-driven definition of a zombie type.
@@ -22,7 +24,6 @@ public class Zombie {
     // --- Structural composition (what the zombie carries) ---
     private List<ArmorType> armorTypes;             // armor pieces; empty = no armor
     private PushableItemType pushableItemType;      // null = none
-    private EquippedItemType equippedItemType;      // null = none
     private ImpType impType;                        // null = does not throw/spawn an imp
 
     // --- Damage modifiers ---
@@ -31,20 +32,22 @@ public class Zombie {
     // --- Behavior identifiers ---
     private List<ZombieBehaviorType> behaviors;
 
+    private Map<String, Object> behaviorProps = new HashMap<>(); // Behavior-specific numeric/string properties
+
     public Zombie(String name, int baseHP, float speed, float eatDPS,
                   ZombieSize size, Chapter chapter, int wavePointCost,
                   int weight, List<ArmorType> armorTypes,
-                  PushableItemType pushableItemType, EquippedItemType equippedItemType,
+                  PushableItemType pushableItemType,
                   ImpType impType, List<ZombieBehaviorType> behaviors) {
         this(name, baseHP, speed, eatDPS, size, chapter, wavePointCost, weight,
-                armorTypes, pushableItemType, equippedItemType, impType,
+                armorTypes, pushableItemType, impType,
                 behaviors, 1.0f);
     }
 
     public Zombie(String name, int baseHP, float speed, float eatDPS,
                   ZombieSize size, Chapter chapter, int wavePointCost,
                   int weight, List<ArmorType> armorTypes,
-                  PushableItemType pushableItemType, EquippedItemType equippedItemType,
+                  PushableItemType pushableItemType,
                   ImpType impType, List<ZombieBehaviorType> behaviors,
                   float fireDamageMultiplier) {
         this.name = name;
@@ -57,7 +60,6 @@ public class Zombie {
         this.weight = weight;
         this.armorTypes = armorTypes != null ? armorTypes : new ArrayList<>();
         this.pushableItemType = pushableItemType;
-        this.equippedItemType = equippedItemType;
         this.impType = impType;
         this.behaviors = behaviors != null ? behaviors : new ArrayList<>();
         this.fireDamageMultiplier = fireDamageMultiplier;
@@ -72,11 +74,6 @@ public class Zombie {
      * @return true if this definition push an item
      */
     public boolean isPusher() { return pushableItemType != null; }
-
-    /**
-     * @return true if this definition carry an equipped item
-     */
-    public boolean isEquipped() { return equippedItemType != null; }
 
     /**
      * @return true if this definition throw an Imp
@@ -146,10 +143,6 @@ public class Zombie {
         return pushableItemType;
     }
 
-    public EquippedItemType getEquippedItemType() {
-        return equippedItemType;
-    }
-
     public ImpType getImpType() {
         return impType;
     }
@@ -204,15 +197,58 @@ public class Zombie {
         this.pushableItemType = pushableItemType;
     }
 
-    public void setEquippedItemType(EquippedItemType equippedItemType) {
-        this.equippedItemType = equippedItemType;
-    }
-
     public void setImpType(ImpType impType) {
         this.impType = impType;
     }
 
     public void setFireDamageMultiplier(float fireDamageMultiplier) {
         this.fireDamageMultiplier = fireDamageMultiplier;
+    }
+
+    // --- Behavior-property accessors ---
+
+    /** Underlying property map. */
+    public Map<String, Object> getBehaviorProps() {
+        return behaviorProps;
+    }
+
+    public void setBehaviorProps(Map<String, Object> behaviorProps) {
+        this.behaviorProps = behaviorProps != null ? behaviorProps : new HashMap<>();
+    }
+
+    /** Stores a behavior property. */
+    public void putBehaviorProp(String key, Object value) {
+        if (key != null) behaviorProps.put(key, value);
+    }
+
+    /** @return the behavior property for {@code key}, or {@code null} if absent. */
+    public Object getBehaviorProp(String key) {
+        return behaviorProps.get(key);
+    }
+
+    /**
+     * @return the behavior property for {@code key} as an int.
+     */
+    public int getBehaviorPropInt(String key, int defaultValue) {
+        Object v = behaviorProps.get(key);
+        if (v instanceof Number) return ((Number) v).intValue();
+        return defaultValue;
+    }
+
+    /**
+     * @return the behavior property for {@code key} as a float.
+     */
+    public float getBehaviorPropFloat(String key, float defaultValue) {
+        Object v = behaviorProps.get(key);
+        if (v instanceof Number) return ((Number) v).floatValue();
+        return defaultValue;
+    }
+
+    /**
+     * @return the behavior property for {@code key} as a string.
+     */
+    public String getBehaviorPropString(String key) {
+        Object v = behaviorProps.get(key);
+        return v != null ? v.toString() : null;
     }
 }

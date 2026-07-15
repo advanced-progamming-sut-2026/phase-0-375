@@ -37,8 +37,15 @@ public class Armor {
      * that should be applied to the zombie's HP.
      */
     public int takeDamage(int damage) {
+        if (damage <= 0) return 0;
         currentHealth -= damage;
-        if(currentHealth <= 0) {
+        if (passesDamageThrough) {
+            if (currentHealth < 0) {
+                currentHealth = 0;
+            }
+            return damage;
+        }
+        if (currentHealth <= 0) {
             int overflow = -currentHealth;
             currentHealth = 0;
             return overflow;

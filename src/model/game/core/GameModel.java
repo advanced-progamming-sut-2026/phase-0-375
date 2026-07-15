@@ -28,6 +28,7 @@ import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 public class GameModel implements BehaviorContext {
@@ -242,11 +243,30 @@ public class GameModel implements BehaviorContext {
         currentTick += 1;
     }
 
-    public void setGameState(GameState gameState) {}
+    public void setGameState(GameState gameState) {
+        this.gameState = gameState;
+    }
 
-    public void queueLootDrop(LootDrop loot) {}
+    public void queueLootDrop(LootDrop loot) {
+        if (loot != null) {
+            pendingLootDrops.add(loot);
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.LOOT_DROPPED));
+            }
+        }
+    }
 
-    public void processLootDrops() {}
+    public void processLootDrops() {
+        if (pendingLootDrops.isEmpty()) return;
+        Iterator<LootDrop> iterator = pendingLootDrops.iterator();
+        while (iterator.hasNext()) {
+            LootDrop drop = iterator.next();
+            if (drop != null) {
+                drop.apply(this);
+            }
+            iterator.remove();
+        }
+    }
 
     public List<String> getSelectedPlants() {
         return selectedPlants;

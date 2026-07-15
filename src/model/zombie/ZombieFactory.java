@@ -4,7 +4,6 @@ import model.data.armor.ArmorRegistry;
 import model.data.zombie.ZombieLoader;
 import model.enums.ArmorType;
 import model.enums.PushableItemType;
-import model.item.equippable.Equippable;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
 import model.item.pushable.IceBlock;
@@ -99,9 +98,8 @@ public class ZombieFactory {
     public static ZombieInstance createInstance(Zombie definition) {
         List<Armor> armors = instance.buildArmors(definition);
         Pushable pushable = instance.buildPushable(definition);
-        Equippable equipped = instance.buildEquipped(definition);
 
-        ZombieInstance zombie = new ZombieInstance(definition, armors, pushable, equipped);
+        ZombieInstance zombie = new ZombieInstance(definition, armors, pushable);
 
         // Wire the back-reference so the pushable can notify its owner on
         // destruction (PushBehavior also relies on this link).
@@ -142,10 +140,5 @@ public class ZombieFactory {
                 System.err.println("[ZombieFactory] Unknown PushableItemType: " + type);
                 return null;
         }
-    }
-
-    private Equippable buildEquipped(Zombie definition) {
-        // TODO: write this method after implementing EquippedItemType
-        return null;
     }
 }

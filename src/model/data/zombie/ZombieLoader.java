@@ -102,17 +102,63 @@ public class ZombieLoader {
         int weight = zombieData.getWeight();
         List<ArmorType> armorTypes = resolveArmorTypes(zombieData.getZombieArmorProps());
         PushableItemType pushable = resolvePushable(entry.getObjclass(), zombieData);
-        EquippedItemType equipped = resolveEquipped(entry.getObjclass(), zombieData);
         ImpType impType = resolveImpType(zombieData.getImpType(), alias);
         List<ZombieBehaviorType> behaviors = resolveBehaviors(entry.getObjclass(), zombieData);
         float fireDamageMultiplier = zombieData.getFireDamageMultiplier();
 
-        return new Zombie(
+        Zombie zombie = new Zombie(
                 name, baseHP, speed, eatDPS,
                 size, chapter, wavePointCost, weight,
-                armorTypes, pushable, equipped, impType, behaviors,
+                armorTypes, pushable, impType, behaviors,
                 fireDamageMultiplier
         );
+        populateBehaviorProps(zombie, zombieData);
+        return zombie;
+    }
+
+    /**
+     * Copies every behavior-relevant numeric/string field from the JSON
+     * DTO onto the zombie's behavior-property map.
+     */
+    private void populateBehaviorProps(Zombie zombie, ZombieDataEntry.ZombieObjData data) {
+        // Imp / Gargantuar
+        zombie.putBehaviorProp("ImpTargetColumn", data.getImpTargetColumn());
+        if (!data.getHealthThresholdToImpAmmoLayers().isEmpty()) {
+            zombie.putBehaviorProp("HealthPercentThrowImp", data.getHealthThresholdToImpAmmoLayers().getFirst());
+        }
+        // Ra
+        zombie.putBehaviorProp("MaxClaimedSunCurrency", data.getMaxClaimedSunCurrency());
+        // Explorer
+        zombie.putBehaviorProp("MaxTorchReach", data.getMaxTorchReach());
+        // Tomb Raiser
+        zombie.putBehaviorProp("NumberOfTombsToSpawn", data.getNumberOfTombsToSpawn());
+        zombie.putBehaviorProp("TimeBetweenRaisings", data.getTimeBetweenRaisings());
+        // Gargantuar / All Star
+        zombie.putBehaviorProp("SmashDamage", data.getSmashDamage());
+        zombie.putBehaviorProp("SmashDuration", data.getSmashDuration());
+        zombie.putBehaviorProp("RunningSpeedScale", data.getRunningSpeedScale());
+        // Hunter
+        zombie.putBehaviorProp("SnowballsPerBarrage", data.getSnowballsPerBarrage());
+        // Troglobite
+        zombie.putBehaviorProp("NumberOfIceblocksToSpawnWith", data.getNumberOfIceblocksToSpawnWith());
+        // Prospector
+        zombie.putBehaviorProp("LaunchCountdown", data.getLaunchCountdown());
+        // Piano
+        zombie.putBehaviorProp("FastMoveSpeed", data.getFastMoveSpeed());
+        // Newspaper
+        zombie.putBehaviorProp("EnragedDamageScale", data.getEnragedDamageScale());
+        zombie.putBehaviorProp("EnragedSpeedScale", data.getEnragedSpeedScale());
+        // Crystal Skull (Turquoise)
+        zombie.putBehaviorProp("ChargingTime", data.getChargingTime());
+        zombie.putBehaviorProp("LaserBeamLength", data.getLaserBeamLength());
+        zombie.putBehaviorProp("LaserBeamDamage", data.getLaserBeamDamage());
+        zombie.putBehaviorProp("ChargingTimeDecrementPerFiveSun", data.getChargingTimeDecrementPerFiveSun());
+        // Fisherman
+        zombie.putBehaviorProp("DelayBetweenCasting", data.getDelayBetweenCasting());
+        // Juggler
+        zombie.putBehaviorProp("MoveSpeedMultiplierWhileJuggling", data.getMoveSpeedMultiplierWhileJuggling());
+        // Dark King
+        zombie.putBehaviorProp("DelayBetweenKnightings", data.getDelayBetweenKnightings());
     }
 
     // --- Enum resolvers ---
@@ -191,11 +237,6 @@ public class ZombieLoader {
         if (objclass.contains("Arcade")) return PushableItemType.ARCADE_MACHINE;
         if (objclass.contains("Piano")) return PushableItemType.PIANO;
         if (objclass.contains("BarrelRoller")) return PushableItemType.BARREL;
-        return null;
-    }
-
-    private EquippedItemType resolveEquipped(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
-        // TODO: write this method after implementing EquippedItemType
         return null;
     }
 

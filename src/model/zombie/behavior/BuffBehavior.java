@@ -15,14 +15,14 @@ public class BuffBehavior implements ZombieBehavior {
 
     // --- Dark King constants ---
 
-    /** Seconds between two consecutive knighting actions. */
-    public static final float DELAY_BETWEEN_KNIGHTINGS = 2.5f;
+    /** Default seconds between two consecutive knighting actions. */
+    public static final float DEFAULT_DELAY_BETWEEN_KNIGHTINGS = 2.5f;
 
-    /** Columns to either side of the King that fall within its knighting area. */
-    public static final int KNIGHTING_AREA_COL_RADIUS = 4;
+    /** Default columns to either side of the King that fall within its knighting area. */
+    public static final int DEFAULT_KNIGHTING_AREA_COL_RADIUS = 4;
 
-    /** Rows above/below the King that fall within its knighting area. */
-    public static final int KNIGHTING_AREA_ROW_RADIUS = 3;
+    /** Default rows above/below the King that fall within its knighting area. */
+    public static final int DEFAULT_KNIGHTING_AREA_ROW_RADIUS = 3;
 
     /** Definition name of the plain zombie that is eligible to be knighted. */
     public static final String PLAIN_ZOMBIE_NAME = "ZombieDefault";
@@ -57,13 +57,24 @@ public class BuffBehavior implements ZombieBehavior {
      * knighting area.
      */
     private void tickDarkKing(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        float delay = zombie.getDefinition().getBehaviorPropFloat(
+                "DelayBetweenKnightings", DEFAULT_DELAY_BETWEEN_KNIGHTINGS);
+        if (delay <= 0f) delay = DEFAULT_DELAY_BETWEEN_KNIGHTINGS;
+
+        int colRadius = zombie.getDefinition().getBehaviorPropInt(
+                "KnightingAreaX", DEFAULT_KNIGHTING_AREA_COL_RADIUS);
+        int rowRadius = zombie.getDefinition().getBehaviorPropInt(
+                "KnightingAreaY", DEFAULT_KNIGHTING_AREA_ROW_RADIUS);
+        if (colRadius <= 0) colRadius = DEFAULT_KNIGHTING_AREA_COL_RADIUS;
+        if (rowRadius <= 0) rowRadius = DEFAULT_KNIGHTING_AREA_ROW_RADIUS;
+
         knightTimer += deltaTime;
-        if (knightTimer < DELAY_BETWEEN_KNIGHTINGS) {
+        if (knightTimer < delay) {
             return;
         }
-        knightTimer -= DELAY_BETWEEN_KNIGHTINGS;
+        knightTimer -= delay;
 
-        ZombieInstance target = findKnightableZombie(zombie, context);
+        ZombieInstance target = findKnightableZombie(zombie, context, rowRadius, colRadius);
         if (target == null) {
             return;
         }
@@ -75,12 +86,14 @@ public class BuffBehavior implements ZombieBehavior {
      * Searches the King's knighting area for a plain zombie that hasn't
      * already been knighted.
      */
-    private ZombieInstance findKnightableZombie(ZombieInstance king, BehaviorContext context) {
+    private ZombieInstance findKnightableZombie(ZombieInstance king,
+                                                BehaviorContext context,
+                                                int rowRadius, int colRadius) {
         int row = king.getGridY();
         int col = king.getGridX();
 
         List<ZombieInstance> nearby = context.getZombiesInArea(
-                row, col, KNIGHTING_AREA_ROW_RADIUS, KNIGHTING_AREA_COL_RADIUS
+                row, col, rowRadius, colRadius
         );
 
         for (ZombieInstance candidate : nearby) {
@@ -119,9 +132,16 @@ public class BuffBehavior implements ZombieBehavior {
         if (candidate == null || candidate.isDead()) {
             return false;
         }
-        if (!PLAIN_ZOMBIE_NAME.equalsIgnoreCase(candidate.getDefinition().getName())) {
-            return false;
-        }
+        String name = candidate.getDefinition().getName();
+        if (name == null) return false;
+        String lower = name.toLowerCase();
+        boolean isDarkBasic = lower.equals("zombiedefault")
+                || lower.equals("zombiearmor1")
+                || lower.equals("zombiearmor2")
+                || lower.equals("zombiearmor4")
+                || lower.equals("zombiedarkarmor3")
+                || lower.startsWith("dark");
+        if (!isDarkBasic) return false;
         List<Armor> armors = candidate.getArmors();
         return armors == null || armors.isEmpty();
     }

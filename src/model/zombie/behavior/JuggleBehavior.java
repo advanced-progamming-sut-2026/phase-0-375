@@ -4,6 +4,8 @@ import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
 import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
+import model.projectile.Pellet;
+import model.projectile.Splash;
 
 import java.util.List;
 
@@ -14,11 +16,20 @@ public class JuggleBehavior implements ZombieBehavior {
 
     // --- Constants ---
 
-    /** Multiplier applied to the zombie's base speed while spinning. */
-    public static final float SPIN_SPEED_MULTIPLIER = 2.0f;
+    /** Default multiplier applied to the zombie's base speed while spinning. */
+    public static final float DEFAULT_SPIN_SPEED_MULTIPLIER = 1.1f;
 
     /** Seconds the zombie keeps spinning after the last projectile was reflected. */
     public static final float SPIN_TIMEOUT = 1.0f;
+
+    /**
+     * Maximum number of projectiles the Juggler can be juggling at once.
+     * Beyond this limit, extra projectiles pass through unaffected.
+     */
+    public static final int MAX_JUGGLED_PROJECTILES = 3;
+
+    /** When true, only {@link Pellet} projectiles are reflected. */
+    public static final boolean RESTRICT_TO_JUGGLEABLE = true;
 
     // --- State ---
 
@@ -30,6 +41,9 @@ public class JuggleBehavior implements ZombieBehavior {
 
     /** Total projectiles reflected by this zombie. */
     private int reflectedCount = 0;
+
+    /** Number of projectiles currently being juggled. */
+    private int currentJuggledCount = 0;
 
     // --- ZombieBehavior ---
 
@@ -92,24 +106,35 @@ public class JuggleBehavior implements ZombieBehavior {
     // --- Reflection logic ---
 
     /**
-     * Finds every incoming projectile in the zombie's lane that has reached
-     * or passed the zombie's column, reflects each one back toward the plants,
+     * Finds every incoming juggleable projectile in the zombie's lane
+     * that has reached or passed the zombie's column, reflects each one
+     * back toward the plants (up to {@link #MAX_JUGGLED_PROJECTILES}),
      * and returns true if at least one was reflected this tick.
      */
     private boolean reflectIncomingProjectiles(ZombieInstance zombie, BehaviorContext context) {
         int lane = zombie.getGridY();
         int zombieCol = zombie.getGridX();
+        float spinSpeed = zombie.getDefinition().getBehaviorPropFloat(
+                "MoveSpeedMultiplierWhileJuggling", DEFAULT_SPIN_SPEED_MULTIPLIER);
+        if (spinSpeed <= 0f) spinSpeed = DEFAULT_SPIN_SPEED_MULTIPLIER;
 
         List<Projectile> projectilesInLane = context.getProjectilesInLane(lane);
         boolean reflectedAny = false;
+        int reflectedThisTick = 0;
 
         for (Projectile projectile : projectilesInLane) {
             if (projectile == null) {
                 continue;
             }
-
             if (projectile.getDirection() <= 0) {
+                continue; // already reflected, traveling toward plants
+            }
+            if (!isJuggleable(projectile)) {
                 continue;
+            }
+            // Don't exceed the concurrent juggle cap.
+            if (currentJuggledCount + reflectedThisTick >= MAX_JUGGLED_PROJECTILES) {
+                break;
             }
 
             float projCol = projectile.getX();
@@ -121,15 +146,30 @@ public class JuggleBehavior implements ZombieBehavior {
             projectile.reflect();
             reflectedCount++;
             reflectedAny = true;
+            reflectedThisTick++;
         }
 
+        currentJuggledCount += reflectedThisTick;
+        if (reflectedAny) {
+            zombie.applySpeedModifier(spinSpeed);
+        }
         return reflectedAny;
     }
 
     /**
-     * Finds the first incoming (rightward) projectile in the zombie's
-     * lane that has reached or passed the zombie's column, or null if
-     * there is none.
+     * @return true if this projectile type can be juggled by the Juggler.
+     *         Straight-line {@link Pellet}s are juggleable; lobbed
+     *         {@link Splash} projectiles are not.
+     */
+    private boolean isJuggleable(Projectile projectile) {
+        if (!RESTRICT_TO_JUGGLEABLE) return true;
+        return projectile instanceof Pellet;
+    }
+
+    /**
+     * Finds the first incoming (rightward) juggleable projectile in the
+     * zombie's lane that has reached or passed the zombie's column, or
+     * null if there is none.
      */
     private Projectile findIncomingProjectile(ZombieInstance zombie, BehaviorContext context) {
         int lane = zombie.getGridY();
@@ -140,6 +180,9 @@ public class JuggleBehavior implements ZombieBehavior {
                 continue;
             }
             if (projectile.getDirection() <= 0) {
+                continue;
+            }
+            if (!isJuggleable(projectile)) {
                 continue;
             }
             if (projectile.getX() >= zombieCol) {
@@ -155,7 +198,10 @@ public class JuggleBehavior implements ZombieBehavior {
     private void startSpinning(ZombieInstance zombie) {
         phase = JugglePhase.SPINNING;
         timeSinceLastProjectile = 0f;
-        zombie.applySpeedModifier(SPIN_SPEED_MULTIPLIER);
+        float spinSpeed = zombie.getDefinition().getBehaviorPropFloat(
+                "MoveSpeedMultiplierWhileJuggling", DEFAULT_SPIN_SPEED_MULTIPLIER);
+        if (spinSpeed <= 0f) spinSpeed = DEFAULT_SPIN_SPEED_MULTIPLIER;
+        zombie.applySpeedModifier(spinSpeed);
         zombie.setState(ZombieState.SPECIAL_ACTION);
     }
 
@@ -163,6 +209,7 @@ public class JuggleBehavior implements ZombieBehavior {
     private void stopSpinning(ZombieInstance zombie) {
         phase = JugglePhase.IDLE;
         timeSinceLastProjectile = 0f;
+        currentJuggledCount = 0;
         zombie.clearSpeedModifier();
         zombie.setState(ZombieState.WALKING);
     }

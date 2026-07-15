@@ -1,8 +1,10 @@
 package model.zombie.behavior;
 
+import model.enums.PushableItemType;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
 import model.game.map.Point;
+import model.item.pushable.IceBlock;
 import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
@@ -37,6 +39,17 @@ public class PushBehavior implements ZombieBehavior {
     /** Seconds elapsed in the current PUSH phase. */
     private float pushTimer = 0f;
 
+    /**
+     * For Troglobite: how many ice blocks are still waiting in reserve
+     * (excluding the one currently being pushed). When the current
+     * pushable is destroyed, if this is greater than zero, a new ice block
+     * is spawned and the zombie resumes pushing.
+     */
+    private int sparePushablesRemaining = 0;
+
+    /** True once we've initialized {@link #sparePushablesRemaining} from the definition. */
+    private boolean pushableReserveInitialized = false;
+
     // --- ZombieBehavior ---
 
     @Override
@@ -45,12 +58,35 @@ public class PushBehavior implements ZombieBehavior {
             return;
         }
 
+        if (!pushableReserveInitialized) {
+            int total = zombie.getDefinition().getBehaviorPropInt(
+                    "NumberOfIceblocksToSpawnWith", 1);
+            sparePushablesRemaining = Math.max(0, total - 1);
+            pushableReserveInitialized = true;
+        }
+
         Pushable pushable = zombie.getPushableItem();
 
-        // If the pushable was destroyed, drop it and let the zombie walk.
+        // If the pushable was destroyed, drop it and either spawn the
+        // next spare or let the zombie walk freely.
         if (pushable == null || pushable.isDestroyed()) {
             if (pushable != null && pushable.isDestroyed()) {
                 pushable.onDestroyed(); // idempotent notification
+            }
+            if (sparePushablesRemaining > 0) {
+                // Spawn the next ice block in front of the zombie.
+                Pushable next = createSparePushable(zombie);
+                if (next != null) {
+                    sparePushablesRemaining--;
+                    zombie.setPushableItem(next);
+                    next.setPusher(zombie);
+                    if (zombie.getState() == ZombieState.PUSHING) {
+                        zombie.setState(ZombieState.WALKING);
+                    }
+                    phase = PushPhase.WALKING;
+                    pushTimer = 0f;
+                    return;
+                }
             }
             if (zombie.getState() == ZombieState.PUSHING) {
                 zombie.setState(ZombieState.WALKING);
@@ -76,6 +112,15 @@ public class PushBehavior implements ZombieBehavior {
             default:
                 break;
         }
+    }
+
+    /** Constructs a fresh ice block for the Troglobite's spare-reserve mechanic. */
+    private Pushable createSparePushable(ZombieInstance zombie) {
+        PushableItemType type = zombie.getDefinition().getPushableItemType();
+        if (type == PushableItemType.ICE_BLOCK) {
+            return new IceBlock(600);
+        }
+        return null;
     }
 
     @Override
@@ -230,6 +275,14 @@ public class PushBehavior implements ZombieBehavior {
 
     public void setPushTimer(float pushTimer) {
         this.pushTimer = pushTimer;
+    }
+
+    public int getSparePushablesRemaining() {
+        return sparePushablesRemaining;
+    }
+
+    public void setSparePushablesRemaining(int sparePushablesRemaining) {
+        this.sparePushablesRemaining = sparePushablesRemaining;
     }
 
     // --- Inner types ---

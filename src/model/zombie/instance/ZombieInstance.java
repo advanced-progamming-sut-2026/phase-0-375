@@ -4,7 +4,6 @@ import model.enums.*;
 import model.game.core.Tickable;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
-import model.item.equippable.Equippable;
 import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
@@ -31,18 +30,32 @@ public class ZombieInstance implements Tickable {
 
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
-    private Equippable equippedItem;                       // null if not equipped
     private List<ZombieBehavior> behaviors;                // zombie behaviors
 
-    /**
-     * Multiplier applied to incoming FIRE-elemental damage. Mirrors
-     * {@link Zombie#getFireDamageMultiplier()} so combat systems can
-     * read it directly off the instance without round-tripping to the
-     * definition. Defaults to {@code 1.0f}.
-     */
+    /** Multiplier applied to incoming FIRE-elemental damage. */
     private float fireDamageMultiplier = 1.0f;
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
+
+    // --- Status-effect timers (driven by CombatSystem) ---
+
+    /** Seconds remaining on the current chill stack. When this hits 0,
+     *  one chill stack is removed and the timer resets (if any chill remains). */
+    private float chillStackTimer = 0f;
+
+    /** Seconds of poison damage remaining. While > 0 the zombie takes
+     *  {@link #poisonDPS} damage per second. */
+    private float poisonTimer = 0f;
+
+    /** Damage per second dealt by poison while {@link #poisonTimer} > 0. */
+    private int poisonDPS = 0;
+
+    /** Seconds of burn damage remaining. While > 0 the zombie takes
+     *  {@link #burnDPS} damage per second. */
+    private float burnTimer = 0f;
+
+    /** Damage per second dealt by burning while {@link #burnTimer} > 0. */
+    private int burnDPS = 0;
 
     public ZombieInstance(Zombie definition) {
         this.definition = definition;
@@ -55,7 +68,6 @@ public class ZombieInstance implements Tickable {
         this.movingBackward = false;
         this.armors = new ArrayList<>();
         this.pushableItem = null;
-        this.equippedItem = null;
         this.behaviors = new ArrayList<>();
         this.eatingTarget = null;
         this.fireDamageMultiplier = definition.getFireDamageMultiplier();
@@ -69,11 +81,10 @@ public class ZombieInstance implements Tickable {
         }
     }
 
-    public ZombieInstance(Zombie definition, List<Armor> armors, Pushable pushableItem, Equippable equippedItem) {
+    public ZombieInstance(Zombie definition, List<Armor> armors, Pushable pushableItem) {
         this(definition);
         this.armors = new ArrayList<>(armors);
         this.pushableItem = pushableItem;
-        this.equippedItem = equippedItem;
     }
 
     // --- Tick & lifecycle ---
@@ -99,15 +110,23 @@ public class ZombieInstance implements Tickable {
         if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
             return;
         }
-        int damageOverflow = damage;
-        for(Armor armor : armors) {
-            damageOverflow = armor.takeDamage(damageOverflow);
+        int remaining = damage;
+        for (Armor armor : armors) {
+            if (armor.isDestroyed()) continue;
 
-            if(damageOverflow <= 0) {
+            if (armor.isPassesDamageThrough()) {
+                // Pass-through armor
+                armor.takeDamage(remaining);
+                currentHP -= remaining;
+                return;
+            }
+
+            remaining = armor.takeDamage(remaining);
+            if (remaining <= 0) {
                 return;
             }
         }
-        currentHP -= damageOverflow;
+        currentHP -= remaining;
     }
 
     /**
@@ -137,11 +156,16 @@ public class ZombieInstance implements Tickable {
     public void applyChill() {
         if (isFrozen()) return;
         chillLevel = Math.min(3, chillLevel + 1);
+        // Reset the per-stack timer each time a new stack is applied.
+        chillStackTimer = CHILL_STACK_DURATION;
         if (chillLevel > 0 && chillLevel < 3 && state != ZombieState.CHILLED
                 && state != ZombieState.EATING) {
             state = ZombieState.CHILLED;
         }
     }
+
+    /** Default duration (in seconds) of a single chill stack. */
+    public static final float CHILL_STACK_DURATION = 5.0f;
 
     /**
      * Removes one chill stack from this zombie. Called by the combat
@@ -152,6 +176,83 @@ public class ZombieInstance implements Tickable {
         if (chillLevel == 0 && state == ZombieState.CHILLED) {
             state = ZombieState.WALKING;
         }
+    }
+
+    /**
+     * Advances status-effect timers by {@code deltaTime} seconds and
+     * applies any per-tick damage (poison, burn). Called by
+     * {@code CombatSystem} once per tick. Returns the total status
+     * damage dealt this tick so the caller can dispatch events.
+     */
+    public int tickStatusEffects(float deltaTime) {
+        if (state == ZombieState.DEAD || state == ZombieState.DYING) return 0;
+        int damage = 0;
+
+        // Chill stack expiry.
+        if (chillLevel > 0) {
+            chillStackTimer -= deltaTime;
+            if (chillStackTimer <= 0f) {
+                removeChill();
+                if (chillLevel > 0) {
+                    chillStackTimer = CHILL_STACK_DURATION;
+                }
+            }
+        }
+
+        // Poison damage over time.
+        if (poisonTimer > 0f) {
+            poisonTimer -= deltaTime;
+            int deltaDamage = (int) (poisonDPS * deltaTime);
+            if (deltaDamage > 0) {
+                takePoisonDamage(deltaDamage);
+                damage += deltaDamage;
+            }
+            if (poisonTimer <= 0f) {
+                poisonTimer = 0f;
+                poisonDPS = 0;
+            }
+        }
+
+        // Burn damage over time (only if not immune to fire).
+        if (burnTimer > 0f && !isImmuneToFire()) {
+            burnTimer -= deltaTime;
+            int deltaDamage = (int) (burnDPS * fireDamageMultiplier * deltaTime);
+            if (deltaDamage > 0) {
+                takeDamage(deltaDamage);
+                damage += deltaDamage;
+            }
+            if (burnTimer <= 0f) {
+                burnTimer = 0f;
+                burnDPS = 0;
+            }
+        }
+        return damage;
+    }
+
+    /**
+     * Applies a poison damage-over-time effect to this zombie. Stacks
+     * with any existing poison by taking the higher DPS and longer
+     * remaining duration.
+     */
+    public void applyPoison(int dps, float duration) {
+        if (dps <= 0 || duration <= 0f) return;
+        if (dps >= poisonDPS) {
+            poisonDPS = dps;
+        }
+        poisonTimer = Math.max(poisonTimer, duration);
+    }
+
+    /**
+     * Applies a burn damage-over-time effect to this zombie. Fire-immune
+     * zombies ignore burn entirely. Stacks by taking the higher DPS and
+     * longer remaining duration.
+     */
+    public void applyBurn(int dps, float duration) {
+        if (dps <= 0 || duration <= 0f || isImmuneToFire()) return;
+        if (dps >= burnDPS) {
+            burnDPS = dps;
+        }
+        burnTimer = Math.max(burnTimer, duration);
     }
 
     /**
@@ -319,13 +420,6 @@ public class ZombieInstance implements Tickable {
         this.pushableItem = null;
     }
 
-    /**
-     * Called when the zombie's equipped item is destroyed.
-     */
-    public void onEquippedItemDestroyed() {
-        this.equippedItem = null;
-    }
-
     // --- Behavior access ---
 
     /**
@@ -422,10 +516,6 @@ public class ZombieInstance implements Tickable {
         return pushableItem;
     }
 
-    public Equippable getEquippedItem() {
-        return equippedItem;
-    }
-
     public List<ZombieBehavior> getBehaviors() {
         return behaviors;
     }
@@ -486,10 +576,6 @@ public class ZombieInstance implements Tickable {
         this.pushableItem = pushableItem;
     }
 
-    public void setEquippedItem(Equippable equippedItem) {
-        this.equippedItem = equippedItem;
-    }
-
     public void setBehaviors(List<ZombieBehavior> behaviors) {
         this.behaviors = behaviors;
     }
@@ -513,4 +599,19 @@ public class ZombieInstance implements Tickable {
     public boolean isImmuneToFire() {
         return fireDamageMultiplier <= 0f;
     }
+
+    // --- Status-effect accessors ---
+
+    public float getChillStackTimer() { return chillStackTimer; }
+    public void setChillStackTimer(float chillStackTimer) { this.chillStackTimer = chillStackTimer; }
+
+    public float getPoisonTimer() { return poisonTimer; }
+    public int getPoisonDPS() { return poisonDPS; }
+    public void setPoisonTimer(float poisonTimer) { this.poisonTimer = poisonTimer; }
+    public void setPoisonDPS(int poisonDPS) { this.poisonDPS = poisonDPS; }
+
+    public float getBurnTimer() { return burnTimer; }
+    public int getBurnDPS() { return burnDPS; }
+    public void setBurnTimer(float burnTimer) { this.burnTimer = burnTimer; }
+    public void setBurnDPS(int burnDPS) { this.burnDPS = burnDPS; }
 }

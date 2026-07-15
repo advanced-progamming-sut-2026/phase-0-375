@@ -11,22 +11,22 @@ public class SmashBehavior implements ZombieBehavior {
 
     // --- Gargantuar constants ---
 
-    /** Damage dealt by each Gargantuar smash. Guaranteed to one-shot any plant. */
-    public static final int GARGANTUAR_SMASH_DAMAGE = 6767;
+    /** Default damage dealt by each Gargantuar smash. Guaranteed to one-shot any plant. */
+    public static final int DEFAULT_GARGANTUAR_SMASH_DAMAGE = 6767;
 
-    /** Seconds the Gargantuar spends winding up before the smash lands. */
-    public static final float GARGANTUAR_SMASH_DURATION = 2.0f;
+    /** Default seconds the Gargantuar spends winding up before the smash lands. */
+    public static final float DEFAULT_GARGANTUAR_SMASH_DURATION = 2.0f;
 
     // --- All Star constants ---
 
     /** Damage dealt by the All Star's first impact. Guaranteed to one-shot any plant. */
-    public static final int ALL_STAR_SMASH_DAMAGE = GARGANTUAR_SMASH_DAMAGE;
+    public static final int ALL_STAR_SMASH_DAMAGE = DEFAULT_GARGANTUAR_SMASH_DAMAGE;
 
     /** All star speed modifier that applies to it before its first smash. */
     public static final float ALL_STAR_BEFORE_SMASH_SPEED_MODIFIER = 2.0f;
 
-    /** All star speed modifier that applies to it after its first smash. */
-    public static final float ALL_STAR_AFTER_SMASH_SPEED_MODIFIER = 0.5f;
+    /** Default all star speed modifier that applies to it after its first smash. */
+    public static final float DEFAULT_ALL_STAR_AFTER_SMASH_SPEED_MODIFIER = 0.5f;
 
     // --- State ---
 
@@ -93,7 +93,7 @@ public class SmashBehavior implements ZombieBehavior {
     }
 
     /**
-     * Smashes the {@link #currentTarget} plant after {@link #GARGANTUAR_SMASH_DURATION} seconds.
+     * Smashes the {@link #currentTarget} plant after the configured smash duration.
      */
     private void tickGargantuarSmashing(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         if (currentTarget == null || currentTarget.getCurrentHP() <= 0) {
@@ -101,9 +101,16 @@ public class SmashBehavior implements ZombieBehavior {
             return;
         }
 
+        float smashDuration = zombie.getDefinition().getBehaviorPropFloat(
+                "SmashDuration", DEFAULT_GARGANTUAR_SMASH_DURATION);
+        if (smashDuration <= 0f) smashDuration = DEFAULT_GARGANTUAR_SMASH_DURATION;
+        int smashDamage = zombie.getDefinition().getBehaviorPropInt(
+                "SmashDamage", DEFAULT_GARGANTUAR_SMASH_DAMAGE);
+        if (smashDamage <= 0) smashDamage = DEFAULT_GARGANTUAR_SMASH_DAMAGE;
+
         smashTimer += deltaTime;
-        if (smashTimer >= GARGANTUAR_SMASH_DURATION) {
-            context.damagePlant(currentTarget, GARGANTUAR_SMASH_DAMAGE);
+        if (smashTimer >= smashDuration) {
+            context.damagePlant(currentTarget, smashDamage);
             abortSmashing(zombie);
         }
     }
@@ -131,8 +138,15 @@ public class SmashBehavior implements ZombieBehavior {
             return;
         }
 
-        context.damagePlant(plant, ALL_STAR_SMASH_DAMAGE);
-        zombie.applySpeedModifier(ALL_STAR_AFTER_SMASH_SPEED_MODIFIER);
+        int smashDamage = zombie.getDefinition().getBehaviorPropInt(
+                "SmashDamage", ALL_STAR_SMASH_DAMAGE);
+        if (smashDamage <= 0) smashDamage = ALL_STAR_SMASH_DAMAGE;
+
+        context.damagePlant(plant, smashDamage);
+        float afterSmash = zombie.getDefinition().getBehaviorPropFloat(
+                "RunningSpeedScale", DEFAULT_ALL_STAR_AFTER_SMASH_SPEED_MODIFIER);
+        if (afterSmash <= 0f) afterSmash = DEFAULT_ALL_STAR_AFTER_SMASH_SPEED_MODIFIER;
+        zombie.applySpeedModifier(afterSmash);
 
         hasSmashedOnce = true;
     }
