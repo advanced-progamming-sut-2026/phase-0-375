@@ -1,11 +1,17 @@
 package model.game.systems;
 
 import model.enums.PlacableLayer;
+import model.enums.PlantCategory;
 import model.enums.PlantState;
+import model.enums.PlantTags;
 import model.event.EventBus;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.plant.ability.PlantAbilityContext;
+import model.plant.ability.WallAbility;
+import model.plant.definition.LevelUpgrade;
+import model.plant.definition.Plant;
+import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
@@ -31,10 +37,30 @@ public class PlantSystem implements Tickable {
             if (plant.getState() == PlantState.DYING) continue;
             plant.tick(deltaTime, context);
             if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING) {
+                // Explode-o-nut: trigger the death explosion before
+                // removing the plant from the field.
+                triggerDeathExplosionIfNeeded(plant);
                 plant.setState(PlantState.DYING);
                 gameModel.destroyPlant(plant);
             }
         }
+    }
+
+    /**
+     * If the dying plant is a WALL_NUT with the EXPLOSIVE tag
+     * (Explode-o-nut), invokes the {@link WallAbility#onPlantDeath}
+     * hook to detonate the plant in a 3x3 area.
+     */
+    private void triggerDeathExplosionIfNeeded(PlantInstance plant) {
+        if (plant == null) return;
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+        if (def.getCategory() != PlantCategory.WALL_NUT) return;
+        if (!def.hasTag(PlantTags.EXPLOSIVE)) return;
+
+        // Reuse the singleton WallAbility strategy to fire the explosion.
+        WallAbility wallAbility = new WallAbility();
+        wallAbility.onPlantDeath(plant, context);
     }
 
     private static class GameModelPlantAbilityContext implements PlantAbilityContext {
@@ -149,11 +175,46 @@ public class PlantSystem implements Tickable {
 
         @Override
         public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
+            boolean resetCooldowns = false;
+            // Detect if any plant of this family has the RESET_FAMILY_COOLDOWNS upgrade.
+            // If so, after triggering plant-food on every family member, also clear their
+            // per-ability cooldowns so they can immediately act.
+            for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
+                if (plant.getDefinition().getCategory() == family) {
+                    if (hasResetFamilyCooldownsUpgrade(plant)) {
+                        resetCooldowns = true;
+                    }
+                }
+            }
+
             for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                 if (plant.getDefinition().getCategory() == family) {
                     plant.activatePlantFood(this);
+                    if (resetCooldowns) {
+                        // Clear every ability cooldown on this plant.
+                        for (AbilityState state : plant.getAbilityStates().values()) {
+                            state.setCooldownRemaining(0f);
+                        }
+                        plant.setCurrentRecharge(0f);
+                    }
                 }
             }
+        }
+
+        /** @return true if the plant has the RESET_FAMILY_COOLDOWNS upgrade. */
+        private boolean hasResetFamilyCooldownsUpgrade(PlantInstance plant) {
+            Plant def = plant.getDefinition();
+            if (def == null || def.getLevels() == null) return false;
+            for (int lvl = 2; lvl <= 4; lvl++) {
+                if (lvl > plant.getLevel()) break;
+                LevelUpgrade upgrade = def.getLevels().getUpgrade(lvl);
+                if (upgrade == null) continue;
+                if (upgrade.isSpecialMechanic()
+                        && upgrade.getSpecialTag() == model.enums.PlantSpecialTag.RESET_FAMILY_COOLDOWNS) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

@@ -1,5 +1,7 @@
 package model.game.systems;
 
+import model.enums.PlantCategory;
+import model.enums.PlantTags;
 import model.enums.ZombieBehaviorType;
 import model.event.GameEvent;
 import model.event.EventBus;
@@ -8,6 +10,9 @@ import model.game.core.Tickable;
 import model.game.map.Cell;
 import model.game.map.Lane;
 import model.enums.ZombieState;
+import model.plant.ability.PlantAbilityContext;
+import model.plant.ability.WallAbility;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
@@ -153,6 +158,7 @@ public class ZombieSystem implements Tickable {
             gameModel.markHouseBreached();
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_REACHED_END));
+                eventBus.dispatch(new GameEvent(GameEvent.Type.GAME_LOST));
             }
             zombie.setState(ZombieState.DYING);
         }
@@ -202,6 +208,13 @@ public class ZombieSystem implements Tickable {
         int damage = (int) (eatDPS * deltaTime);
         if (damage > 0) {
             context.damagePlant(plant, damage);
+
+            // Sun Bean: every bite the zombie takes drops sun next to
+            // the plant. The drop only fires while the plant still has
+            // HP left (i.e. it's still being eaten, not just destroyed).
+            if (plant.getCurrentHP() > 0 && isSunBean(plant)) {
+                WallAbility.onSunBeanBitten(plant, sunBeanContext());
+            }
         }
 
         if (plant.getCurrentHP() <= 0) {
@@ -210,6 +223,70 @@ public class ZombieSystem implements Tickable {
             }
             zombie.stopEating();
         }
+    }
+
+    /** @return true if the given plant is a Sun Bean (WALL_NUT with SUN tag). */
+    private boolean isSunBean(PlantInstance plant) {
+        if (plant == null) return false;
+        Plant def = plant.getDefinition();
+        if (def == null) return false;
+        if (def.getCategory() != PlantCategory.WALL_NUT) return false;
+        return def.hasTag(PlantTags.SUN);
+    }
+
+    /**
+     * Returns the {@link PlantAbilityContext} used
+     * by the plant system. Because the zombie system does not own a
+     * context, we build a thin adapter that forwards to the game model.
+     */
+    private PlantAbilityContext sunBeanContext() {
+        return new PlantAbilityContext() {
+            @Override public int getSunAmount() { return gameModel.getSunAmount(); }
+            @Override public int getRowCount() { return gameModel.getRowCount(); }
+            @Override public int getColumnCount() { return gameModel.getColumnCount(); }
+            @Override public PlantInstance getPlantAt(int row, int col) { return gameModel.getPlantAt(row, col); }
+            @Override public List<PlantInstance> getPlantsInLane(int lane) { return gameModel.getPlantsInLane(lane); }
+            @Override public List<PlantInstance> getAllPlants() { return gameModel.getAllPlants(); }
+            @Override public List<ZombieInstance> getZombiesInLane(int lane) { return gameModel.getZombiesInLane(lane); }
+            @Override public List<ZombieInstance> getZombiesInArea(int row, int col, int rowRadius, int colRadius) {
+                return gameModel.getZombiesInArea(row, col, rowRadius, colRadius);
+            }
+            @Override public boolean hasZombieInLane(int lane) {
+                return !gameModel.getZombiesInLane(lane).isEmpty();
+            }
+            @Override public boolean hasAdjacentZombie(int row, int col) {
+                for (int rowDist = -1; rowDist <= 1; rowDist++) {
+                    for (int colDist = -1; colDist <= 1; colDist++) {
+                        if (rowDist == 0 && colDist == 0) continue;
+                        if (!gameModel.getZombiesInArea(row + rowDist, col + colDist, 0, 0).isEmpty()) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            @Override public boolean isNightLevel() { return gameModel.isNightLevel(); }
+            @Override public boolean isWaterTile(int row, int col) { return gameModel.isWaterTile(row, col); }
+            @Override public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
+                gameModel.spawnProjectile(p, (int) x, (int) y);
+                return p;
+            }
+            @Override public void spawnSun(model.item.Sun sun) { gameModel.spawnSun(sun); }
+            @Override public void addSun(int amount) { gameModel.addSun(amount); }
+            @Override public void damageZombie(ZombieInstance zombie, int damage) { gameModel.damageZombie(zombie, damage); }
+            @Override public void damagePlant(PlantInstance plant, int damage) { gameModel.damagePlant(plant, damage); }
+            @Override public void destroyPlant(PlantInstance plant) { gameModel.destroyPlant(plant); }
+            @Override public boolean placePlant(PlantInstance plant, int row, int col) { return gameModel.placePlant(plant, row, col); }
+            @Override public boolean moveZombieToLane(ZombieInstance zombie, int newRow) { return gameModel.moveZombieToLane(zombie, newRow); }
+            @Override public void pushZombieBack(ZombieInstance zombie, float tiles) { gameModel.pushZombieBack(zombie, tiles); }
+            @Override public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
+                for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
+                    if (plant.getDefinition().getCategory() == family) {
+                        plant.activatePlantFood();
+                    }
+                }
+            }
+        };
     }
 
     /** @return true if the given plant is a Hypno-shroom. */
