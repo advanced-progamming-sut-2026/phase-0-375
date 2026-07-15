@@ -19,6 +19,8 @@ import java.util.Set;
  * The shop is accessible from the greenhouse.
  */
 public class Shop {
+    private static Shop instance = null;
+
     private List<ShopItem> permanentItems;
     private DailyOffer dailyOffer;
     private LocalDate lastRefreshDate;
@@ -41,12 +43,30 @@ public class Shop {
     public static final int ITEM_ID_CURRENCY_CONVERSION = 5;
     public static final int ITEM_ID_DAILY_OFFER = 6;
 
-    public Shop(User customer) {
+    private Shop(User customer) {
         this.customer = customer;
         this.permanentItems = new ArrayList<>();
         this.dailyOffer = null;
         this.lastRefreshDate = null;
         initializePermanentItems();
+    }
+
+    /**
+     * Returns the single shared Shop instance, creating it on first call.
+     * On every call the customer reference is refreshed to the given user,
+     * so the shop always operates on the currently logged-in user while
+     * preserving its daily-offer state across calls.
+     *
+     * @param customer the current user of the shop
+     * @return the singleton Shop instance
+     */
+    public static Shop getInstance(User customer) {
+        if (instance == null) {
+            instance = new Shop(customer);
+        } else {
+            instance.setCustomer(customer);
+        }
+        return instance;
     }
 
     /**

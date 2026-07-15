@@ -68,6 +68,6 @@ public class ShopMenuController extends AppMenuController {
     }
 
     private Shop buildShop() {
-        return new Shop(App.getInstance().getCurrentUser());
+        return Shop.getInstance(App.getInstance().getCurrentUser());
     }
 }
