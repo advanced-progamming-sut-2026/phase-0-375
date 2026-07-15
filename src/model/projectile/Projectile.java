@@ -14,7 +14,9 @@ public abstract class Projectile {
         /** Chills/freezes the target on hit. */
         ICE,
         /** Ignites or relights flame sources on hit. */
-        FIRE
+        FIRE,
+        /** Poison the target on hit. */
+        POISON,
     }
 
     /** Damage dealt on hit (before armor absorption). */
@@ -32,6 +34,9 @@ public abstract class Projectile {
     /** World-units per second. */
     protected float velocity;
 
+    /** True if this projectile pierces through zombies and doesn't get destroyed. */
+    protected boolean pierce;
+
     /** Elemental affinity, preserved across reflection. */
     protected Element element;
 
@@ -47,6 +52,7 @@ public abstract class Projectile {
         this.currentPosition = position;
         this.row = row;
         this.velocity = velocity;
+        this.pierce = false;
         this.element = element == null ? Element.NONE : element;
         this.direction = direction >= 0 ? +1 : -1;
     }
@@ -121,6 +127,14 @@ public abstract class Projectile {
         this.velocity = velocity;
     }
 
+    public boolean pierce() {
+        return pierce;
+    }
+
+    public void setPierce(boolean pierce) {
+        this.pierce = pierce;
+    }
+
     public Element getElement() {
         return element;
     }
@@ -137,6 +151,11 @@ public abstract class Projectile {
     /** @return true if this projectile carries the {@link Element#FIRE} affinity. */
     public boolean isFire() {
         return element == Element.FIRE;
+    }
+
+    /** @return true if this projectile carries the {@link Element#POISON} affinity. */
+    public boolean isPoison() {
+        return element == Element.POISON;
     }
 
     /** @return true if this projectile is traveling leftward. */

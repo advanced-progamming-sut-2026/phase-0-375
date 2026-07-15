@@ -5,7 +5,6 @@ import model.app.App;
 import model.enums.GameState;
 import model.enums.MenuType;
 import model.enums.PlacableLayer;
-import model.enums.PlantAbilityType;
 import model.enums.WaveManagerPhase;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
@@ -14,6 +13,7 @@ import model.game.map.GameMap;
 import model.game.map.Point;
 import model.game.wave.WaveManager;
 import model.item.Sun;
+import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.ZombieFactory;
@@ -630,7 +630,7 @@ public class GameplayMenuController extends AppMenuController {
     }
 
     // ──────────────────────────────────────────────
-    // Plant definition lookup (temporary until PlantRegistry lands)
+    // Plant definition lookup
     // ──────────────────────────────────────────────
 
     /**
@@ -638,49 +638,28 @@ public class GameplayMenuController extends AppMenuController {
      * before PlantRegistry is merged. Each entry maps a name to a
      * fully-constructed {@link Plant} with sensible starter stats.
      *
-     * <p>TODO: replace with PlantRegistry.getInstance().get(name) once merged.
+     * @param name plant name (e.g. {@code "Sunflower"})
+     * @return the matching definition, or {@code null} if no plant with
+     *         that name is registered or the factory has not been initialized
      */
-    private static final java.util.Map<String, Plant> PLANT_CATALOGUE = buildPlantCatalogue();
-
-    private static java.util.Map<String, Plant> buildPlantCatalogue() {
-        java.util.Map<String, Plant> m = new java.util.HashMap<>();
-        // Helper: define plants with simple constructor parameters.
-        // Plant is abstract, so we instantiate an anonymous subclass.
-        m.put("Peashooter", makePlant("Peashooter", 100, 100, 7.5f, 1.5f));
-        m.put("Sunflower",  makePlant("Sunflower",  50,  300, 7.5f, 24f));
-        m.put("Wall-nut",   makePlant("Wall-nut",   50, 4000, 30f,  0f));
-        m.put("Cherry Bomb",makePlant("Cherry Bomb",150,  300, 50f,  1.5f));
-        m.put("Potato Mine",makePlant("Potato Mine",25,  300, 30f, 14f));
-        m.put("Snow Pea",   makePlant("Snow Pea",  175,  300, 7.5f, 1.5f));
-        m.put("Repeater",   makePlant("Repeater",  200,  300, 7.5f, 1.5f));
-        m.put("Chomper",    makePlant("Chomper",   150,  300, 7.5f, 1.5f));
-        m.put("Tall-nut",   makePlant("Tall-nut",  125, 8000, 30f,  0f));
-        m.put("Jalapeno",   makePlant("Jalapeno",  125,  300, 50f,  1.5f));
-        m.put("Spikeweed",  makePlant("Spikeweed", 100,  300, 7.5f, 1.5f));
-        m.put("Torchwood",  makePlant("Torchwood", 175,  300, 7.5f, 1.5f));
-        m.put("Puff-shroom",makePlant("Puff-shroom", 0,  300, 7.5f, 1.5f));
-        m.put("Sun-shroom", makePlant("Sun-shroom", 25,  300, 7.5f, 24f));
-        m.put("Fume-shroom",makePlant("Fume-shroom",75,  300, 7.5f, 1.5f));
-        return java.util.Collections.unmodifiableMap(m);
-    }
-
-    private static Plant makePlant(String name, int cost, int hp, float recharge, float actionInterval) {
-        return new Plant(name, model.enums.PlantAbilityType.SHOOTER,
-                java.util.Collections.emptyList(),
-                cost, hp, recharge, actionInterval,
-                java.util.Collections.emptyList(), null, null) {};
-    }
-
     private Plant lookupPlantDefinition(String name) {
-        if (name == null) return null;
-        Plant p = PLANT_CATALOGUE.get(name);
-        if (p != null) return p;
-        // Case-insensitive fallback
-        for (var e : PLANT_CATALOGUE.entrySet()) {
-            if (e.getKey().equalsIgnoreCase(name)) return e.getValue();
+        if (name == null || name.isBlank()) return null;
+        // Exact match first (fast path).
+        try {
+            Plant plant = PlantFactory.getDefinition(name);
+            if (plant != null) return plant;
+        } catch (IllegalStateException ignored) {
+            // Factory not initialized yet - fall through to return null.
+            return null;
+        }
+        // Case-insensitive fallback across every registered definition.
+        for (Plant plant : PlantFactory.getAllDefinitions()) {
+            if (plant.getName().equalsIgnoreCase(name)) return plant;
         }
         return null;
     }
+
+
 
     /**
      * Returns the list of plant names this user has selected for the

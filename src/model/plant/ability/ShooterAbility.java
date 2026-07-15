@@ -1,23 +1,94 @@
 package model.plant.ability;
 
-import model.Ability;
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
+import model.enums.PlantFoodType;
+import model.enums.PlantTags;
+import model.game.map.FloatPoint;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
+import model.projectile.Pellet;
+import model.projectile.Projectile;
+import model.zombie.instance.ZombieInstance;
 
+import java.util.List;
+
+/**
+ * Strategy for the {@link PlantCategory#SHOOTER} family.
+ */
 public class ShooterAbility implements PlantAbility {
-    @Override
-    public void execute(PlantInstance plant) {
 
+    private static final float PELLET_VELOCITY = 1f;     // grid-units per second
+    private static final float PELLET_SPAWN_OFFSET = 0.5f; // tiles ahead of the plant
+
+    @Override
+    public PlantCategory getCategory() { return PlantCategory.SHOOTER; }
+
+    @Override
+    public void execute(PlantInstance plant, PlantAbilityContext context) {
+        if (!shouldFire(plant, context)) return;
+
+        Plant def = plant.getDefinition();
+        int pelletCount = (int) def.getAbilityValue();
+        if (pelletCount <= 0) pelletCount = 1;
+
+        Projectile.Element element = inferElement(def);
+        FloatPoint origin = pelletOrigin(plant);
+
+        for (int i = 0; i < pelletCount; i++) {
+            Pellet pellet = new Pellet(
+                    def.getDamage(),
+                    new FloatPoint(origin.getX() + i * 0.05f, origin.getY()),
+                    plant.getPosition().getY(),
+                    PELLET_VELOCITY,
+                    element,
+                    +1
+            );
+            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+        }
     }
 
     @Override
-    public void onPlantFood(PlantInstance plant) {
-
+    public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def.getPlantFoodType() != PlantFoodType.PROJECTILE_BURST) {
+            return;
+        }
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+        Projectile.Element element = inferElement(def);
+        int lane = plant.getPosition().getY();
+        FloatPoint origin = pelletOrigin(plant);
+        for (int i = 0; i < volley; i++) {
+            Pellet pellet = new Pellet(
+                    def.getDamage(),
+                    new FloatPoint(origin.getX() + i * 0.1f, origin.getY()),
+                    lane,
+                    PELLET_VELOCITY * 1.25f,
+                    element,
+                    +1
+            );
+            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+        }
     }
 
-    @Override
-    public PlantAbilityType getType() {
-        return null;
+    // --- Helpers ---
+
+    private boolean shouldFire(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return false;
+        return context.hasZombieInLane(plant.getPosition().getY());
+    }
+
+    private FloatPoint pelletOrigin(PlantInstance plant) {
+        int row = plant.getPosition().getY();
+        int col = plant.getPosition().getX();
+        return new FloatPoint(col + PELLET_SPAWN_OFFSET, row);
+    }
+
+    private Projectile.Element inferElement(Plant def) {
+        if (def.hasTag(PlantTags.ICE)) return Projectile.Element.ICE;
+        if (def.hasTag(PlantTags.FIRE)) return Projectile.Element.FIRE;
+        if (def.hasTag(PlantTags.POISON)) return Projectile.Element.POISON;
+        return Projectile.Element.NONE;
     }
 }

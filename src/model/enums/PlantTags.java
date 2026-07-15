@@ -15,7 +15,7 @@ public enum PlantTags {
     WATER,
     AOE,
     TRAP,
-    MOVE_ZOMBIES,
+    MOVE_ZOMBIE,
     SUN,
     EXPLOSIVE
 }

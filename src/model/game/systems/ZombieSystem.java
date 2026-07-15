@@ -205,7 +205,30 @@ public class ZombieSystem implements Tickable {
         }
 
         if (plant.getCurrentHP() <= 0) {
+            if (isHypnoShroom(plant)) {
+                hypnotise(zombie);
+            }
             zombie.stopEating();
+        }
+    }
+
+    /** @return true if the given plant is a Hypno-shroom. */
+    private boolean isHypnoShroom(PlantInstance plant) {
+        if (plant == null) return false;
+        model.plant.definition.Plant def = plant.getDefinition();
+        if (def == null) return false;
+        if (def.getCategory() != model.enums.PlantCategory.MODIFIER) return false;
+        String name = def.getName();
+        return name != null && name.toLowerCase().contains("hypno");
+    }
+
+    /** Hypnotizes a zombie. */
+    private void hypnotise(ZombieInstance zombie) {
+        if (zombie == null) return;
+        zombie.setState(ZombieState.HYPNOTIZED);
+        zombie.setMovingBackward(true);
+        if (eventBus != null) {
+            eventBus.dispatch(new GameEvent(GameEvent.Type.STATUS_APPLIED));
         }
     }
 
