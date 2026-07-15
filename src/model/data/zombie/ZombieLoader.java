@@ -34,14 +34,27 @@ public class ZombieLoader {
      * @throws IOException if the file cannot be read or parsed
      */
     public List<Zombie> load(String classpathPath) throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        InputStream inputStream = ZombieLoader.class.getResourceAsStream(classpathPath);
-        if (inputStream == null) {
-            throw new IOException("zombies.json resource not found: " + classpathPath);
-        }
-        try (InputStream in = inputStream) {
+        try (InputStream in = openZombieStream(classpathPath)) {
             return loadFromStream(in);
         }
+    }
+
+    /**
+     * Opens the zombie definition JSON, first from the classpath, then from
+     * the file system (relative to the working directory). Mirrors the
+     * fallback used by {@code LevelRegistry} so both registries behave the
+     * same when the assets folder is not on the classpath.
+     */
+    private static InputStream openZombieStream(String path) throws IOException {
+        InputStream inputStream = ZombieLoader.class.getResourceAsStream(path);
+        if (inputStream != null) return inputStream;
+
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        java.io.File file = new java.io.File(filePath);
+        if (!file.isFile()) {
+            throw new IOException("zombies.json resource not found: " + path);
+        }
+        return new java.io.FileInputStream(file);
     }
 
     /**

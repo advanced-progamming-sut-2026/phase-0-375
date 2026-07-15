@@ -59,7 +59,7 @@ public class GameMenuController extends AppMenuController {
             try {
                 LevelRegistry.init("/assets/data/levels/levels.json");
                 registry = LevelRegistry.getInstance();
-            } catch (IOException loadError) {
+            } catch (IOException | RuntimeException loadError) {
                 return CommandResult.error("Could not load level definitions: " + loadError.getMessage());
             }
         }

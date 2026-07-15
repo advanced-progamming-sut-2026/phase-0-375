@@ -6,20 +6,618 @@
     "rows": 5,
     "columns": 9,
     "rules": {
-      "skyDropEnabled": true,
-      "zombiesFreezable": true,
       "initialSun": 150,
-      "sunDropRateModifier": 1.0,
-      "minPlantsRequired": 1,
-      "maxPlantsAllowed": 8,
-      "sunFallsFromSky": true,
-      "sunProducingPlantsAllowed": true,
-      "plantFoodDrops": true,
-      "lawnMowersEnabled": true,
-      "shovelEnabled": true,
-      "allowsChoosingPlants": true,
-      "plantRechargeInSetup": true
+      "maxPlantsAllowed": 8
     },
-    "waves": []
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "minCount": 2,
+            "maxCount": 3,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 8,
+            "maxSpawnInterval": 12,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 3.0 },
+              { "zombie": "ZombieArmor1", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 20,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieArmor1", "weight": 2.0 },
+              { "zombie": "ZombieRa", "weight": 1.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "ANCIENT_EGYPT",
+    "levelId": 2,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 125,
+      "maxPlantsAllowed": 8
+    },
+    "initialGraves": [
+      { "x": 6, "y": 1 },
+      { "x": 7, "y": 3 }
+    ],
+    "necromancyTiles": [
+      { "x": 6, "y": 1 },
+      { "x": 7, "y": 3 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieExplorer", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 4,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 7,
+            "maxSpawnInterval": 11,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieTombRaiser", "weight": 1.0 },
+              { "zombie": "ZombieArmor1", "weight": 1.0 }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 20,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieArmor2", "weight": 2.0 },
+              { "zombie": "ZombieRa", "weight": 1.0 },
+              { "zombie": "ZombieTombRaiser", "weight": 1.0 }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 5,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "ANCIENT_EGYPT",
+    "levelId": 3,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 100,
+      "maxPlantsAllowed": 8
+    },
+    "initialGraves": [
+      { "x": 5, "y": 0 },
+      { "x": 6, "y": 2 },
+      { "x": 7, "y": 4 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieArmor1", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieExplorer", "weight": 1.0 },
+              { "zombie": "ZombieArmor2", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 8,
+            "pattern": "STREAM",
+            "streamDurationSeconds": 25
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 20,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 3.0 },
+              { "zombie": "ZombieArmor2", "weight": 2.0 },
+              { "zombie": "ZombieRa", "weight": 1.0 }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 5,
+            "pattern": "GROUP"
+          },
+          {
+            "pool": [{ "zombie": "ZombieGargantuar", "weight": 1.0 }],
+            "minCount": 1,
+            "maxCount": 1,
+            "minSpawnDelay": 10,
+            "maxSpawnDelay": 15,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "FROSTBITE_CAVES",
+    "levelId": 1,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150,
+      "maxPlantsAllowed": 8
+    },
+    "initialIceBlocks": [
+      { "x": 7, "y": 1 },
+      { "x": 8, "y": 3 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieIceAgeDodo", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 4,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 7,
+            "maxSpawnInterval": 11,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 18,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieIceAgeHunter", "weight": 2.0 },
+              { "zombie": "ZombieIceAgeDodo", "weight": 1.0 },
+              { "zombie": "ZombieDefault", "weight": 2.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "FROSTBITE_CAVES",
+    "levelId": 2,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 125,
+      "maxPlantsAllowed": 8
+    },
+    "initialIceBlocks": [
+      { "x": 6, "y": 0 },
+      { "x": 7, "y": 2 },
+      { "x": 8, "y": 4 }
+    ],
+    "slideTiles": [
+      { "x": 4, "y": 2, "direction": "UP" },
+      { "x": 5, "y": 2, "direction": "DOWN" }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieIceAgeHunter", "weight": 1.0 },
+              { "zombie": "ZombieDefault", "weight": 2.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 18,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieIceAgeTroglobite", "weight": 1.0 },
+              { "zombie": "ZombieIceAgeHunter", "weight": 2.0 },
+              { "zombie": "ZombieArmor1", "weight": 2.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "BIG_WAVE_BEACH",
+    "levelId": 1,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150,
+      "maxPlantsAllowed": 8
+    },
+    "waterTiles": [
+      { "x": 7, "y": 0 },
+      { "x": 8, "y": 0 },
+      { "x": 7, "y": 4 },
+      { "x": 8, "y": 4 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieBeachSnorkel", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 4,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 7,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 18,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieBeachFisherman", "weight": 1.0 },
+              { "zombie": "ZombieBeachSnorkel", "weight": 2.0 },
+              { "zombie": "ZombieDefault", "weight": 2.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "BIG_WAVE_BEACH",
+    "levelId": 2,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 125,
+      "maxPlantsAllowed": 8
+    },
+    "waterTiles": [
+      { "x": 6, "y": 1 },
+      { "x": 7, "y": 1 },
+      { "x": 8, "y": 1 },
+      { "x": 6, "y": 3 },
+      { "x": 7, "y": 3 },
+      { "x": 8, "y": 3 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieBeachSnorkel", "weight": 1.0 },
+              { "zombie": "ZombieDefault", "weight": 2.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 18,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieBeachOctopus", "weight": 1.0 },
+              { "zombie": "ZombieBeachFisherman", "weight": 1.0 },
+              { "zombie": "ZombieArmor2", "weight": 2.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "DARK_AGES",
+    "levelId": 1,
+    "levelType": "NIGHT_OPS",
+    "rows": 5,
+    "columns": 9,
+    "hasNightEffect": true,
+    "rules": {
+      "initialSun": 200,
+      "maxPlantsAllowed": 8
+    },
+    "initialGraves": [
+      { "x": 5, "y": 1 },
+      { "x": 6, "y": 3 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDefault", "weight": 2.0 },
+              { "zombie": "ZombieDarkJuggler", "weight": 1.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 4,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 7,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 18,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieWizard", "weight": 1.0 },
+              { "zombie": "ZombieDarkJuggler", "weight": 1.0 },
+              { "zombie": "ZombieDarkArmor3", "weight": 2.0 }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 6,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "chapter": "DARK_AGES",
+    "levelId": 2,
+    "levelType": "NORMAL",
+    "rows": 5,
+    "columns": 9,
+    "hasNightEffect": true,
+    "rules": {
+      "initialSun": 150,
+      "maxPlantsAllowed": 8
+    },
+    "initialGraves": [
+      { "x": 4, "y": 0 },
+      { "x": 5, "y": 2 },
+      { "x": 6, "y": 4 }
+    ],
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDarkJuggler", "weight": 1.0 },
+              { "zombie": "ZombieDefault", "weight": 2.0 }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieWizard", "weight": 1.0 },
+              { "zombie": "ZombieDarkArmor3", "weight": 2.0 }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 8,
+            "pattern": "AMBUSH"
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 20,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              { "zombie": "ZombieDarkKing", "weight": 1.0 },
+              { "zombie": "ZombieDarkImpDragon", "weight": 2.0 },
+              { "zombie": "ZombieDarkArmor3", "weight": 2.0 }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 0,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 5,
+            "pattern": "GROUP"
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -30,11 +30,10 @@ public class ArmorRegistry {
      */
     public static ArmorRegistry load(String classpathPath) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        InputStream inputStream = ArmorRegistry.class.getResourceAsStream(classpathPath);
-        if (inputStream == null) {
-            throw new IOException("ArmorTypeData resource not found: " + classpathPath);
+        List<ArmorDataEntry> entries;
+        try (InputStream inputStream = openArmorStream(classpathPath)) {
+            entries = mapper.readValue(inputStream, new TypeReference<>() {});
         }
-        List<ArmorDataEntry> entries = mapper.readValue(inputStream, new TypeReference<>() {});
 
         ArmorRegistry registry = new ArmorRegistry();
         for (ArmorDataEntry entry : entries) {
@@ -45,6 +44,23 @@ public class ArmorRegistry {
             }
         }
         return registry;
+    }
+
+    /**
+     * Opens the armor JSON, first from the classpath, then from the file
+     * system (relative to the working directory). Mirrors the fallback used
+     * by {@code LevelRegistry}.
+     */
+    private static InputStream openArmorStream(String path) throws IOException {
+        InputStream inputStream = ArmorRegistry.class.getResourceAsStream(path);
+        if (inputStream != null) return inputStream;
+
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        java.io.File file = new java.io.File(filePath);
+        if (!file.isFile()) {
+            throw new IOException("ArmorTypeData resource not found: " + path);
+        }
+        return new java.io.FileInputStream(file);
     }
 
     /**
