@@ -4,6 +4,8 @@ import controller.GreenhouseMenuController;
 import controller.result.CommandResult;
 import model.command.GreenhouseMenuCommand;
 
+import java.util.function.BiConsumer;
+
 public class GreenhouseMenuView extends AppMenuView {
     private static GreenhouseMenuView instance = null;
 
@@ -19,17 +21,11 @@ public class GreenhouseMenuView extends AppMenuView {
         if (GreenhouseMenuCommand.SHOW_GREENHOUSE.matches(input)) {
             showGreenhouse();
         } else if (GreenhouseMenuCommand.PLANT_POT.matches(input)) {
-            int x = Integer.parseInt(GreenhouseMenuCommand.PLANT_POT.getParameter("x"));
-            int y = Integer.parseInt(GreenhouseMenuCommand.PLANT_POT.getParameter("y"));
-            plantPot(x, y);
+            runWithCoords(GreenhouseMenuCommand.PLANT_POT, this::plantPot);
         } else if (GreenhouseMenuCommand.COLLECT.matches(input)) {
-            int x = Integer.parseInt(GreenhouseMenuCommand.COLLECT.getParameter("x"));
-            int y = Integer.parseInt(GreenhouseMenuCommand.COLLECT.getParameter("y"));
-            collect(x, y);
+            runWithCoords(GreenhouseMenuCommand.COLLECT, this::collect);
         } else if (GreenhouseMenuCommand.GROW.matches(input)) {
-            int x = Integer.parseInt(GreenhouseMenuCommand.GROW.getParameter("x"));
-            int y = Integer.parseInt(GreenhouseMenuCommand.GROW.getParameter("y"));
-            grow(x, y);
+            runWithCoords(GreenhouseMenuCommand.GROW, this::grow);
         } else if (GreenhouseMenuCommand.ENTER_SHOP.matches(input)) {
             enterShop();
         } else {
@@ -42,10 +38,21 @@ public class GreenhouseMenuView extends AppMenuView {
         }
     }
 
+    /** Parses x/y safely so huge numbers can't crash the app. */
+    private void runWithCoords(GreenhouseMenuCommand cmd, BiConsumer<Integer, Integer> action) {
+        try {
+            int x = Integer.parseInt(cmd.getParameter("x"));
+            int y = Integer.parseInt(cmd.getParameter("y"));
+            action.accept(x, y);
+        } catch (NumberFormatException e) {
+            displayError("Invalid number in command.");
+        }
+    }
+
     public void showGreenhouse() {
         CommandResult<String> result = controller.showGreenhouse();
         if (result.isSuccess()) {
-            displayMessage(result.getData());
+            displayMessage(result.getMessage());
         } else {
             displayError(result.getMessage());
         }

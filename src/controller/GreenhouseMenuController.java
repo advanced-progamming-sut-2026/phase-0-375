@@ -3,10 +3,15 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.enums.PotState;
 import model.greenhouse.Greenhouse;
 import model.greenhouse.GreenhouseProduce;
+import model.greenhouse.Pot;
 import model.user.User;
 import model.user.persistance.UserRepository;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class GreenhouseMenuController extends AppMenuController {
     private static GreenhouseMenuController instance = null;
@@ -21,7 +26,6 @@ public class GreenhouseMenuController extends AppMenuController {
     @Override
     public CommandResult<Void> menuEnter(String menuName) {
         if (menuName.equalsIgnoreCase("shop")) {
-            // Persist any in-flight pot mutations before leaving.
             saveGreenhouse();
             App.getInstance().setCurrentMenu(MenuType.SHOP);
             return CommandResult.success("Entered shop.");
@@ -55,13 +59,23 @@ public class GreenhouseMenuController extends AppMenuController {
 
     public CommandResult<Void> plantPot(int x, int y) {
         Greenhouse greenhouse = currentGreenhouse();
-        if (greenhouse.getPot(x, y) == null) {
+        Pot pot = greenhouse.getPot(x, y);
+        if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
                     + "). x must be 1..5, y must be 1..4.");
         }
+        // distinct errors per spec
+        if (pot.getState() == PotState.LOCKED) {
+            return CommandResult.error("Pot (" + x + "," + y
+                    + ") is locked. Buy a 'Pot' from the shop to unlock it.");
+        }
+        pot.isReady(); // refresh lazy GROWING -> READY
+        if (pot.getState() != PotState.EMPTY) {
+            return CommandResult.error("Pot (" + x + "," + y + ") is already occupied.");
+        }
         String planted = greenhouse.plantPot(x, y);
         if (planted == null) {
-            return CommandResult.error("Cannot plant here: pot is locked or already occupied.");
+            return CommandResult.error("Cannot plant here.");
         }
         saveGreenhouse();
         return CommandResult.success("Planted " + planted + " in pot (" + x + "," + y + ").");
@@ -82,20 +96,27 @@ public class GreenhouseMenuController extends AppMenuController {
         return CommandResult.success(message);
     }
 
-    /**
-     * Accelerates growth of the plant at {@code (x, y)} by spending
-     * {@code ceil(remainingHours)} gems.
-     */
+    /** Accelerates growth at (x, y) for ceil(remainingHours) gems. */
     public CommandResult<Void> grow(int x, int y) {
         Greenhouse greenhouse = currentGreenhouse();
-        if (greenhouse.getPot(x, y) == null) {
+        Pot pot = greenhouse.getPot(x, y);
+        if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
                     + "). x must be 1..5, y must be 1..4.");
         }
+        pot.isReady(); // refresh lazy state
+        // distinct errors: already ready vs nothing growing
+        if (pot.getState() == PotState.READY) {
+            return CommandResult.error("Plant at (" + x + "," + y
+                    + ") is already fully grown. Use collect instead.");
+        }
+        if (pot.getState() != PotState.GROWING) {
+            return CommandResult.error("No growing plant at (" + x + "," + y + ").");
+        }
         int cost = greenhouse.growCost(x, y);
         if (cost <= 0) {
-            // Either nothing is growing here, or it's already ready.
-            return CommandResult.error("No growing plant here, or plant is already ready.");
+            return CommandResult.error("Plant at (" + x + "," + y
+                    + ") is already fully grown. Use collect instead.");
         }
         User user = App.getInstance().getCurrentUser();
         if (user.getGems() < cost) {
@@ -113,20 +134,11 @@ public class GreenhouseMenuController extends AppMenuController {
     // Helpers
     // ──────────────────────────────────────────────
 
-    /**
-     * Returns the singleton greenhouse instance bound to the current user.
-     * The greenhouse reads its initial state from the user's persisted
-     * fields on construction.
-     */
     private Greenhouse currentGreenhouse() {
         return Greenhouse.getInstance(App.getInstance().getCurrentUser());
     }
 
-    /**
-     * Flushes the greenhouse's in-memory state back to the user's
-     * persisted fields and saves the user. Called after every mutation
-     * so changes survive a session restart.
-     */
+    /** Flushes greenhouse state to the user and persists it. */
     private void saveGreenhouse() {
         Greenhouse greenhouse = currentGreenhouse();
         greenhouse.save();
@@ -134,13 +146,7 @@ public class GreenhouseMenuController extends AppMenuController {
         repo.save(App.getInstance().getCurrentUser());
     }
 
-    /**
-     * Applies the produce of a harvest to the current user and returns a
-     * human-readable description of what happened.
-     *
-     * @param produce the harvest produce
-     * @return a message describing the reward
-     */
+    /** Applies harvest produce to the current user; returns the message. */
     private String applyProduceToUser(GreenhouseProduce produce) {
         User user = App.getInstance().getCurrentUser();
         if (produce.isCoinReward()) {
@@ -148,10 +154,12 @@ public class GreenhouseMenuController extends AppMenuController {
             return "Harvested marigold for " + produce.getCoinAmount() + " coins.";
         }
         if (produce.isBoost()) {
-            // Store the boost on the user's plantBoosts map.
-            if (user.getPlantBoosts() != null) {
-                user.getPlantBoosts().put(produce.getBoostPlantType(), true);
+            Map<String, Boolean> boosts = user.getPlantBoosts();
+            if (boosts == null) {
+                boosts = new HashMap<>(); // old saves may miss the map
+                user.setPlantBoosts(boosts);
             }
+            boosts.put(produce.getBoostPlantType(), true);
             return "Harvested " + produce.getBoostPlantType()
                     + " — a one-shot boost has been stored for that plant.";
         }
