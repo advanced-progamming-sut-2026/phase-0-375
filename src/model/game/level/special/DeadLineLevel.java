@@ -1,52 +1,27 @@
 package model.game.level.special;
 
-import model.game.core.GameModel;
-import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.RegularLevel;
+import model.game.rule.DeadLineEndGameCondition;
 
-public class DeadLineLevel extends Level {
+/**
+ * Dead Line: a regular level with a red line on the lawn. The level is lost
+ * the moment any zombie crosses the line, even if the house is still safe.
+ *
+ * <p>The loss rule itself lives in {@link DeadLineEndGameCondition}; this
+ * class wires it in and validates that the level data actually defines a
+ * line within the grid.
+ */
+public class DeadLineLevel extends RegularLevel {
 
     public DeadLineLevel(LevelConfig config) {
         super(config);
+        config.setEndGameCondition(new DeadLineEndGameCondition(this));
     }
 
     @Override
     public boolean canStart() {
-        return false;
-    }
-
-    @Override
-    public void onStart() {
-
-    }
-
-    @Override
-    public void tick(float deltaTime) {
-
-    }
-
-    @Override
-    public void onWaveCleared(int waveNumber) {
-
-    }
-
-    @Override
-    public void onComplete() {
-
-    }
-
-    @Override
-    public void onFail() {
-
-    }
-
-    @Override
-    public boolean checkWinCondition(GameModel model) {
-        return false;
-    }
-
-    @Override
-    public boolean checkLossCondition(GameModel model) {
-        return false;
+        int line = getConfig().getDeadLineColumn();
+        return super.canStart() && line >= 0 && line < getConfig().getColumns();
     }
 }
