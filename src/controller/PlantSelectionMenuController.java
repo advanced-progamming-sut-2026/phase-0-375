@@ -81,6 +81,9 @@ public class PlantSelectionMenuController extends AppMenuController {
         if (familyLockError != null) {
             return CommandResult.error(familyLockError);
         }
+        if (sunProducerBanned(model, type)) {
+            return CommandResult.error("Sun-producing plants are not allowed in this level.");
+        }
 
         List<String> selected = model.getSelectedPlants();
         if (selected == null) {
@@ -164,6 +167,20 @@ public class PlantSelectionMenuController extends AppMenuController {
             return null; // fail-open: don't block selection if definitions are unavailable
         }
         return null;
+    }
+
+    /** True when the level bans sun-producing plants and this plant is one. */
+    private static boolean sunProducerBanned(GameModel model, String type) {
+        if (model == null || model.getCurrentLevel() == null || model.getCurrentLevel().getConfig() == null
+                || model.getCurrentLevel().getConfig().getRules() == null
+                || model.getCurrentLevel().getConfig().getRules().isSunProducingPlantsAllowed()) {
+            return false;
+        }
+        try {
+            return familyOf(type) == PlantCategory.SUN_PRODUCER;
+        } catch (IllegalStateException factoryNotReady) {
+            return false; // fail-open: don't block selection if definitions are unavailable
+        }
     }
 
     /** The plant's family, or null when unknown. */
