@@ -3,6 +3,7 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.enums.PurchaseResult;
 import model.enums.ShopItemType;
 import model.greenhouse.Greenhouse;
 import model.shop.Shop;
@@ -46,8 +47,11 @@ public class ShopMenuController extends AppMenuController {
     public CommandResult<String> shopDaily() {
         Shop shop = buildShop();
         shop.refreshDailyOffer();
+        // Persist the refreshed offer identity (plant + date).
+        App.getInstance().getUserRepository().flush();
         if (shop.getDailyOffer() == null) {
-            return CommandResult.successWithData("No daily offer today.", "None");
+            String msg = "No daily offer today.";
+            return CommandResult.successWithData(msg, msg);
         }
         String msg = "── Daily Offer ──\n"
                 + "  " + shop.getDailyOffer().getItem().getDescription() + "\n"
@@ -56,19 +60,15 @@ public class ShopMenuController extends AppMenuController {
         return CommandResult.successWithData(msg, msg);
     }
 
-    /**
-     * TODO: Once Shop.buy() is implemented, this will process purchases.
-     */
     public CommandResult<Void> shopBuy(int itemId, int count, String plantType) {
         Shop shop = buildShop();
-        boolean success = shop.buy(itemId, count, plantType);
-        if (!success) {
-            return CommandResult.error("Purchase failed.");
+        PurchaseResult result = shop.buy(itemId, count, plantType);
+        if (result != PurchaseResult.SUCCESS) {
+            return CommandResult.error(errorMessage(result));
         }
         App.getInstance().getUserRepository().flush();
 
-        // If the purchased item was a Pot, enrich the success message with
-        // the coordinates of the pot(s) that were just unlocked.
+        // For pots, enrich the message with unlock progress.
         ShopItem item = shop.findItemById(itemId);
         String message = "Purchase successful!";
         if (item != null && item.getItemType() == ShopItemType.POT) {
@@ -84,6 +84,30 @@ public class ShopMenuController extends AppMenuController {
             }
         }
         return CommandResult.success(message);
+    }
+
+    /** Maps a purchase result to a user-facing error message. */
+    private String errorMessage(PurchaseResult result) {
+        switch (result) {
+            case INVALID_ITEM:
+                return "No shop item with this ID exists.";
+            case INVALID_COUNT:
+                return "Invalid count for this purchase.";
+            case PLANT_TYPE_REQUIRED:
+                return "-t <plant_type> is required for chosen seed packets.";
+            case PLANT_NOT_UNLOCKED:
+                return "This plant is not unlocked yet.";
+            case INSUFFICIENT_FUNDS:
+                return "Not enough coins/gems for this purchase.";
+            case CAPACITY_REACHED:
+                return "You have reached the capacity limit for this item.";
+            case NO_DAILY_OFFER:
+                return "No daily offer is available today.";
+            case ALREADY_PURCHASED:
+                return "You have already purchased today's daily offer.";
+            default:
+                return "Purchase failed.";
+        }
     }
 
     private Shop buildShop() {

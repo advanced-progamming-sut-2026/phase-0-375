@@ -52,6 +52,10 @@ public class User {
     private Map<String, Boolean> questStatus;
     private Map<String, Boolean> purchasedDailyDeals;
 
+    // Daily offer persistence (plant + date)
+    private String dailyOfferPlant;
+    private String dailyOfferDate;
+
     public User() {
     }
 
@@ -293,5 +297,21 @@ public class User {
 
     public void setPurchasedDailyDeals(Map<String, Boolean> purchasedDailyDeals) {
         this.purchasedDailyDeals = purchasedDailyDeals;
+    }
+
+    public String getDailyOfferPlant() {
+        return dailyOfferPlant;
+    }
+
+    public void setDailyOfferPlant(String dailyOfferPlant) {
+        this.dailyOfferPlant = dailyOfferPlant;
+    }
+
+    public String getDailyOfferDate() {
+        return dailyOfferDate;
+    }
+
+    public void setDailyOfferDate(String dailyOfferDate) {
+        this.dailyOfferDate = dailyOfferDate;
     }
 }

@@ -21,10 +21,15 @@ public class ShopMenuView extends AppMenuView {
         } else if (ShopMenuCommand.SHOP_DAILY.matches(input)) {
             shopDaily();
         } else if (ShopMenuCommand.SHOP_BUY.matches(input)) {
-            int itemId = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("itemId"));
-            int count = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("count"));
-            String plantType = ShopMenuCommand.SHOP_BUY.getParameter("plantType");
-            shopBuy(itemId, count, plantType);
+            try {
+                int itemId = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("itemId"));
+                int count = Integer.parseInt(ShopMenuCommand.SHOP_BUY.getParameter("count"));
+                String plantType = ShopMenuCommand.SHOP_BUY.getParameter("plantType");
+                shopBuy(itemId, count, plantType);
+            } catch (NumberFormatException e) {
+                // Guards against out-of-range numbers crashing the app.
+                displayError("Invalid number in command.");
+            }
         } else {
             displayError("Usage:");
             displayError("  shop list");
@@ -36,7 +41,7 @@ public class ShopMenuView extends AppMenuView {
     public void shopList() {
         CommandResult<String> result = controller.shopList();
         if (result.isSuccess()) {
-            displayMessage(result.getData());
+            displayMessage(result.getMessage());
         } else {
             displayError(result.getMessage());
         }
@@ -45,7 +50,7 @@ public class ShopMenuView extends AppMenuView {
     public void shopDaily() {
         CommandResult<String> result = controller.shopDaily();
         if (result.isSuccess()) {
-            displayMessage(result.getData());
+            displayMessage(result.getMessage());
         } else {
             displayError(result.getMessage());
         }

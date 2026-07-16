@@ -1,6 +1,7 @@
 package model.shop;
 
 import model.enums.CurrencyType;
+import model.enums.PurchaseResult;
 import model.enums.ShopCategory;
 import model.enums.ShopItemType;
 import model.greenhouse.Greenhouse;
@@ -9,15 +10,16 @@ import model.user.User;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 
 /**
- * The shop where players can spend coins and gems.
- * The shop has two sections: permanent items (always available)
- * and daily offers (refreshed at 00:00 each day, one-time purchase).
- * The shop is accessible from the greenhouse.
+ * The shop where players spend coins and gems.
+ * Two sections: permanent items (always available) and a daily offer
+ * (refreshed at 00:00, purchasable once per day).
  */
 public class Shop {
     private static Shop instance = null;
@@ -52,15 +54,7 @@ public class Shop {
         initializePermanentItems();
     }
 
-    /**
-     * Returns the single shared Shop instance, creating it on first call.
-     * On every call the customer reference is refreshed to the given user,
-     * so the shop always operates on the currently logged-in user while
-     * preserving its daily-offer state across calls.
-     *
-     * @param customer the current user of the shop
-     * @return the singleton Shop instance
-     */
+    /** Singleton accessor; switching users resets the in-memory daily offer. */
     public static Shop getInstance(User customer) {
         if (instance == null) {
             instance = new Shop(customer);
@@ -70,14 +64,6 @@ public class Shop {
         return instance;
     }
 
-    /**
-     * Initializes the permanent shop items:
-     * - Pot (2000 coins)
-     * - Plant Food (3 gems)
-     * - Random Seed Packet (1000 coins)
-     * - Chosen Seed Packet (5 gems)
-     * - Currency Conversion (5 gems = 500 coins)
-     */
     private void initializePermanentItems() {
         permanentItems.add(new ShopItem(
                 ITEM_ID_POT,
@@ -131,25 +117,34 @@ public class Shop {
         ));
     }
 
-
     /**
      * Refreshes the daily offer if the date has changed.
-     * Generates a new random seed packet offer with 20% discount.
+     * Reuses today's persisted offer (plant + date) so it survives restarts.
      */
     public void refreshDailyOffer() {
         LocalDate today = LocalDate.now();
-        // If we already have an offer created today, keep it.
         if (dailyOffer != null && today.equals(lastRefreshDate)) {
             return;
         }
-        // Otherwise, generate a new offer for a random unlocked plant.
-        String plant = pickRandomUnlockedPlant();
+        if (customer == null) {
+            return;
+        }
+
+        // Reuse today's saved offer if it exists and is still valid.
+        String plant = null;
+        if (today.toString().equals(customer.getDailyOfferDate())) {
+            plant = customer.getDailyOfferPlant();
+        }
+        if (plant == null || !isPlantUnlocked(plant)) {
+            plant = pickRandomUnlockedPlant();
+        }
         if (plant == null) {
-            // No unlocked plants available — no daily offer possible.
+            // No unlocked plants — no daily offer possible.
             dailyOffer = null;
             lastRefreshDate = today;
             return;
         }
+
         ShopItem offerItem = new ShopItem(
                 ITEM_ID_DAILY_OFFER,
                 ShopItemType.SEED_PACKET_CHOSEN,
@@ -163,119 +158,97 @@ public class Shop {
         dailyOffer = new DailyOffer(offerItem, DAILY_OFFER_BASE_PRICE, today);
         lastRefreshDate = today;
 
-        // If the player already purchased this date's offer in a previous session,
-        // restore the purchased flag from the user's persistence map.
+        // Persist the offer's identity (plant + date).
+        customer.setDailyOfferPlant(plant);
+        customer.setDailyOfferDate(today.toString());
+
+        // Restore the purchased flag from persistence.
         if (customer.getPurchasedDailyDeals() != null
                 && Boolean.TRUE.equals(customer.getPurchasedDailyDeals().get(today.toString()))) {
             dailyOffer.setPurchased(true);
         }
     }
 
-    /**
-     * Main purchase entry point — corresponds to the
-     * {@code shop buy -i <item_id> -n <count> [-t <plant_type>]} command.
-     *
-     * @param itemId    the ID of the item to buy
-     * @param count     the number of units to buy
-     * @param plantType the target plant type (mandatory for SEED_PACKET_CHOSEN,
-     *                  ignored for other item types)
-     * @return true if the purchase was successful
-     */
-    public boolean buy(int itemId, int count, String plantType) {
-        if (customer == null || count <= 0) {
-            return false;
+    /** Handles {@code shop buy -i <item_id> -n <count> [-t <plant_type>]}. */
+    public PurchaseResult buy(int itemId, int count, String plantType) {
+        if (customer == null) {
+            return PurchaseResult.INVALID_ITEM;
+        }
+        if (count <= 0) {
+            return PurchaseResult.INVALID_COUNT;
         }
 
-        // Daily offer is a special case — only one purchase per day.
         if (itemId == ITEM_ID_DAILY_OFFER) {
+            // Daily offer is a single bundle — only count 1 makes sense.
+            if (count != 1) {
+                return PurchaseResult.INVALID_COUNT;
+            }
             return buyDailyOffer();
         }
 
         ShopItem item = findItemById(itemId);
         if (item == null) {
-            return false;
+            return PurchaseResult.INVALID_ITEM;
         }
 
-        // For SEED_PACKET_CHOSEN, the plant type is mandatory and must be unlocked.
         if (item.getItemType() == ShopItemType.SEED_PACKET_CHOSEN) {
             if (plantType == null || plantType.isEmpty()) {
-                return false;
+                return PurchaseResult.PLANT_TYPE_REQUIRED;
             }
-            Set<String> unlocked = customer.getUnlockedPlants();
-            if (unlocked == null || !unlocked.contains(plantType)) {
-                return false;
+            if (!isPlantUnlocked(plantType)) {
+                return PurchaseResult.PLANT_NOT_UNLOCKED;
             }
         }
 
         if (!canAfford(item, count)) {
-            return false;
+            return PurchaseResult.INSUFFICIENT_FUNDS;
         }
         if (!hasCapacity(item.getItemType(), count)) {
-            return false;
+            return PurchaseResult.CAPACITY_REACHED;
         }
 
         deductCurrency(item, count);
         applyItemEffect(item, count, plantType);
-        return true;
+        return PurchaseResult.SUCCESS;
     }
 
-
-    /**
-     * Convenience method for buying the daily offer.
-     * Equivalent to {@code buy(ITEM_ID_DAILY_OFFER, 1, null)} but
-     * also enforces the once-per-day rule and uses the discounted price.
-     *
-     * @return true if the daily offer was purchased successfully
-     */
-    public boolean buyDailyOffer() {
+    /** Buys today's daily offer at the discounted price (once per day). */
+    public PurchaseResult buyDailyOffer() {
         if (customer == null) {
-            return false;
+            return PurchaseResult.INVALID_ITEM;
         }
-        // Ensure today's offer is loaded.
         if (needsRefresh()) {
             refreshDailyOffer();
         }
         if (dailyOffer == null) {
-            return false;
+            return PurchaseResult.NO_DAILY_OFFER;
         }
         if (dailyOffer.isPurchased()) {
-            return false;
+            return PurchaseResult.ALREADY_PURCHASED;
         }
 
         int cost = dailyOffer.getDiscountedPrice();
         if (customer.getCoins() < cost) {
-            return false;
+            return PurchaseResult.INSUFFICIENT_FUNDS;
         }
 
-        // Deduct coins.
         customer.setCoins(customer.getCoins() - cost);
-
-        // Grant the seed packets.
         applySeedPacketPurchase(dailyOffer.getItem().getTargetPlantType(), DAILY_OFFER_PACKET_AMOUNT);
 
-        // Mark as purchased (both in-memory and in the user's persistence map).
         dailyOffer.setPurchased(true);
-        if (customer.getPurchasedDailyDeals() != null) {
-            customer.getPurchasedDailyDeals()
-                    .put(dailyOffer.getOfferDate().toString(), true);
+        if (customer.getPurchasedDailyDeals() == null) {
+            customer.setPurchasedDailyDeals(new HashMap<>());
         }
-        return true;
+        customer.getPurchasedDailyDeals().put(dailyOffer.getOfferDate().toString(), true);
+        return PurchaseResult.SUCCESS;
     }
 
-    /**
-     * Validates whether the player can afford the given item in the given
-     * quantity. Checks the player's coin/gem balance against the item's
-     * price × count.
-     *
-     * @param item  the shop item to check
-     * @param count the number of units
-     * @return true if the player has enough currency
-     */
+    /** Overflow-safe affordability check (price × count computed as long). */
     public boolean canAfford(ShopItem item, int count) {
         if (item == null || count <= 0 || customer == null) {
             return false;
         }
-        int totalCost = item.getPrice() * count;
+        long totalCost = (long) item.getPrice() * count;
         if (item.getCurrency() == CurrencyType.COIN) {
             return customer.getCoins() >= totalCost;
         } else if (item.getCurrency() == CurrencyType.GEM) {
@@ -284,41 +257,27 @@ public class Shop {
         return false;
     }
 
-    /**
-     * Validates whether the player has enough remaining capacity
-     * for the given item type. Only meaningful for POT (max 20) and
-     * PLANT_FOOD (max 3). Other item types always return true.
-     *
-     * @param itemType the type of item to check
-     * @param count    the number of units to add
-     * @return true if the player has enough capacity
-     */
+    /** Capacity check; pots use the greenhouse as the single source of truth. */
     public boolean hasCapacity(ShopItemType itemType, int count) {
         if (count <= 0 || customer == null) {
             return false;
         }
         switch (itemType) {
             case POT:
-                int currentPots = customer.getUnlockedPots();
-                return currentPots + count <= MAX_POTS;
+                int currentPots = Greenhouse.getInstance(customer).getUnlockedPotCount();
+                return (long) currentPots + count <= MAX_POTS;
             case PLANT_FOOD:
                 int currentFood = customer.getPlantFoodCount();
-                return currentFood + count <= MAX_PLANT_FOOD;
+                return (long) currentFood + count <= MAX_PLANT_FOOD;
             default:
                 // Seed packets and currency conversion have no cap.
                 return true;
         }
     }
 
-    /**
-     * Deducts the cost of an item from the player's wallet.
-     * Handles both coin and gem deductions.
-     *
-     * @param item  the item being purchased
-     * @param count the number of units
-     */
     private void deductCurrency(ShopItem item, int count) {
-        int totalCost = item.getPrice() * count;
+        // Safe cast: canAfford already validated the total with long math.
+        int totalCost = (int) ((long) item.getPrice() * count);
         if (item.getCurrency() == CurrencyType.COIN) {
             customer.setCoins(customer.getCoins() - totalCost);
         } else if (item.getCurrency() == CurrencyType.GEM) {
@@ -326,14 +285,6 @@ public class Shop {
         }
     }
 
-    /**
-     * Applies the effect of a purchased item to the player's profile.
-     * Delegates to the appropriate handler based on item type.
-     *
-     * @param item      the purchased item
-     * @param count     the number of units
-     * @param plantType the target plant type (for seed packets)
-     */
     private void applyItemEffect(ShopItem item, int count, String plantType) {
         switch (item.getItemType()) {
             case POT:
@@ -343,16 +294,12 @@ public class Shop {
                 applyPlantFoodPurchase(count);
                 break;
             case SEED_PACKET_RANDOM:
-                // Each purchase grants RANDOM_SEED_PACKET_AMOUNT packets
-                // for one randomly chosen unlocked plant.
                 String randomPlant = pickRandomUnlockedPlant();
                 if (randomPlant != null) {
                     applySeedPacketPurchase(randomPlant, RANDOM_SEED_PACKET_AMOUNT * count);
                 }
                 break;
             case SEED_PACKET_CHOSEN:
-                // Each purchase grants CHOSEN_SEED_PACKET_AMOUNT packets
-                // for the specified plant.
                 applySeedPacketPurchase(plantType, CHOSEN_SEED_PACKET_AMOUNT * count);
                 break;
             case CURRENCY_CONVERSION:
@@ -361,68 +308,38 @@ public class Shop {
         }
     }
 
-    /**
-     * Unlocks {@code count} greenhouse pot slots for the player by delegating
-     * to {@link Greenhouse#unlockNextPot()}. This keeps the greenhouse grid
-     * (pot states, planting state) in sync with the user's
-     * {@code unlockedPots} counter. Used when buying the POT item.
-     *
-     * @param count the number of pots to unlock
-     */
     private void applyPotPurchase(int count) {
+        // Capacity was validated against the greenhouse, so unlocks cannot fail here.
         Greenhouse greenhouse = Greenhouse.getInstance(customer);
         for (int i = 0; i < count; i++) {
-            int[] coords = greenhouse.unlockNextPot();
-            if (coords == null) {
-                // All pots already unlocked — stop early.
+            if (greenhouse.unlockNextPot() == null) {
                 break;
             }
         }
         greenhouse.save();
     }
 
-    /**
-     * Adds {@code count} plant food units to the player's profile.
-     * Used when buying the PLANT_FOOD item.
-     *
-     * @param count the number of plant food units to add
-     */
     private void applyPlantFoodPurchase(int count) {
         customer.setPlantFoodCount(customer.getPlantFoodCount() + count);
     }
 
-    /**
-     * Adds seed packets for a specific plant to the player's profile.
-     * Used for both RANDOM and CHOSEN seed packet purchases.
-     *
-     * @param plantName   the target plant name
-     * @param packetCount the number of seed packets to add
-     */
     private void applySeedPacketPurchase(String plantName, int packetCount) {
-        if (plantName == null || customer.getSeedPackets() == null) {
+        if (plantName == null) {
             return;
+        }
+        if (customer.getSeedPackets() == null) {
+            customer.setSeedPackets(new HashMap<>());
         }
         Integer current = customer.getSeedPackets().get(plantName);
         int newCount = (current == null ? 0 : current) + packetCount;
         customer.getSeedPackets().put(plantName, newCount);
     }
 
-    /**
-     * Converts gems to coins at the fixed rate (5 gems → 500 coins per unit).
-     * Used when buying the CURRENCY_CONVERSION item.
-     *
-     * @param count the number of conversion units
-     */
     private void applyCurrencyConversion(int count) {
         customer.setCoins(customer.getCoins() + CURRENCY_CONVERSION_COINS * count);
     }
 
-    /**
-     * Finds a permanent ShopItem by its ID.
-     *
-     * @param itemId the ID to search for
-     * @return the matching ShopItem, or null if not found
-     */
+    /** Finds a permanent ShopItem by ID, or null if not found. */
     public ShopItem findItemById(int itemId) {
         for (ShopItem item : permanentItems) {
             if (item.getId() == itemId) {
@@ -432,13 +349,11 @@ public class Shop {
         return null;
     }
 
-    /**
-     * Picks a random plant from the player's unlocked plants.
-     * Used when generating the daily offer and when applying
-     * the RANDOM seed packet purchase.
-     *
-     * @return the name of a random unlocked plant, or null if the player has none
-     */
+    private boolean isPlantUnlocked(String plantName) {
+        Set<String> unlocked = customer.getUnlockedPlants();
+        return plantName != null && unlocked != null && unlocked.contains(plantName);
+    }
+
     private String pickRandomUnlockedPlant() {
         Set<String> unlocked = customer.getUnlockedPlants();
         if (unlocked == null || unlocked.isEmpty()) {
@@ -455,11 +370,7 @@ public class Shop {
         return null;
     }
 
-    /**
-     * Returns all purchasable items (both permanent and daily).
-     *
-     * @return combined list of all shop items
-     */
+    /** Returns all purchasable items (permanent + today's unpurchased daily offer). */
     public List<ShopItem> getAllPurchasableItems() {
         List<ShopItem> all = new ArrayList<>(permanentItems);
         if (needsRefresh()) {
@@ -471,21 +382,10 @@ public class Shop {
         return all;
     }
 
-    /**
-     * Checks whether the daily offer has been purchased today.
-     *
-     * @return true if today's offer is already purchased (or no offer exists)
-     */
     public boolean isDailyOfferPurchased() {
         return dailyOffer != null && dailyOffer.isPurchased();
     }
 
-    /**
-     * Checks whether the daily offer needs to be refreshed
-     * (i.e., the system date is past the last refresh date).
-     *
-     * @return true if a refresh is needed
-     */
     public boolean needsRefresh() {
         LocalDate today = LocalDate.now();
         return lastRefreshDate == null || !today.equals(lastRefreshDate);
@@ -523,7 +423,14 @@ public class Shop {
         this.lastRefreshDate = lastRefreshDate;
     }
 
+    /** Switching to a different user resets the in-memory daily-offer state. */
     public void setCustomer(User customer) {
+        boolean sameUser = this.customer != null && customer != null
+                && Objects.equals(this.customer.getUsername(), customer.getUsername());
         this.customer = customer;
+        if (!sameUser) {
+            this.dailyOffer = null;
+            this.lastRefreshDate = null;
+        }
     }
 }
