@@ -2,6 +2,7 @@ package model.data.plant;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import model.data.zombie.ZombieLoader;
 import model.enums.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -27,13 +28,27 @@ public class PlantLoader {
      * @throws IOException if the file cannot be read or parsed
      */
     public List<Plant> load(String classpathPath) throws IOException {
-        InputStream in = PlantLoader.class.getResourceAsStream(classpathPath);
-        if (in == null) {
-            throw new IOException("plants.json resource not found: " + classpathPath);
+        try (InputStream in = openPlantStream(classpathPath)) {
+            return loadFromStream(in);
         }
-        try (InputStream stream = in) {
-            return loadFromStream(stream);
+    }
+
+    /**
+     * Opens the plant definition JSON, first from the classpath, then from
+     * the file system (relative to the working directory). Mirrors the
+     * fallback used by {@code LevelRegistry} so both registries behave the
+     * same when the assets folder is not on the classpath.
+     */
+    private static InputStream openPlantStream(String path) throws IOException {
+        InputStream inputStream = PlantLoader.class.getResourceAsStream(path);
+        if (inputStream != null) return inputStream;
+
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        java.io.File file = new java.io.File(filePath);
+        if (!file.isFile()) {
+            throw new IOException("plants.json resource not found: " + path);
         }
+        return new java.io.FileInputStream(file);
     }
 
     /**
