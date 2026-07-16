@@ -10,7 +10,9 @@ import model.quest.QuestProgress;
 import model.quest.QuestReward;
 import model.quest.TravelLog;
 import model.user.User;
+import model.data.quest.QuestLoader;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,8 +24,16 @@ public class TravelLogMenuController extends AppMenuController {
 
     private TravelLogMenuController() {
         this.travelLog = new TravelLog();
+        travelLog.setQuests(loadQuests());
+    }
 
-        travelLog.setQuests(buildStarterQuests());
+    private List<Quest> loadQuests() {
+        try {
+            return new ArrayList<>(new QuestLoader().load("/quests.json"));
+        } catch (IOException e) {
+            System.err.println("[TravelLogMenuController] Failed to load quests.json: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     public static TravelLogMenuController getInstance() {
@@ -132,7 +142,6 @@ public class TravelLogMenuController extends AppMenuController {
                     + "' is not complete yet. Progress: " + remaining);
         }
 
-        grantReward(q.getReward());
         travelLog.completeQuest(q);
         // Bookkeeping on the user
         User user = App.getInstance().getCurrentUser();
@@ -198,87 +207,4 @@ public class TravelLogMenuController extends AppMenuController {
         return s.isEmpty() ? "(none)" : s;
     }
 
-    private void grantReward(QuestReward reward) {
-        if (reward == null) return;
-        User user = App.getInstance().getCurrentUser();
-        if (user == null) return;
-        if (reward.getCoinAmount() > 0) {
-            user.setCoins(user.getCoins() + reward.getCoinAmount());
-        }
-        if (reward.getGemAmount() > 0) {
-            user.setGems(user.getGems() + reward.getGemAmount());
-        }
-        if (reward.getInventoryItem() != null && !reward.getInventoryItem().isBlank()
-                && reward.getInventoryItemAmount() > 0
-                && user.getSeedPackets() != null) {
-            int current = user.getSeedPackets().getOrDefault(reward.getInventoryItem(), 0);
-            user.getSeedPackets().put(reward.getInventoryItem(),
-                    current + reward.getInventoryItemAmount());
-        }
-        if (reward.getUnlockableName() != null && !reward.getUnlockableName().isBlank()
-                && user.getUnlockedPlants() != null) {
-            user.getUnlockedPlants().add(reward.getUnlockableName());
-        }
-    }
-
-    /**
-     * TODO: replace with QuestRegistry.getInstance().loadAll() once merged.
-     */
-    private List<Quest> buildStarterQuests() {
-        List<Quest> quests = new ArrayList<>();
-        // Daily quests
-        quests.add(new Quest(
-                "Sun Harvester",
-                QuestCategory.DAILY,
-                "Collect 500 sun in a single level",
-                new QuestReward(model.enums.QuestRewardType.CURRENCY, 100, 0,
-                        null, null, 0),
-                QuestPriority.HIGH,
-                null,
-                new QuestProgress(0, 500)
-        ));
-        quests.add(new Quest(
-                "Zombie Slayer",
-                QuestCategory.DAILY,
-                "Defeat 20 zombies",
-                new QuestReward(model.enums.QuestRewardType.CURRENCY, 150, 0,
-                        null, null, 0),
-                QuestPriority.MEDIUM,
-                null,
-                new QuestProgress(0, 20)
-        ));
-        // Main quests
-        quests.add(new Quest(
-                "First Victory",
-                QuestCategory.MAIN,
-                "Complete your first level",
-                new QuestReward(model.enums.QuestRewardType.UNLOCKABLE, 0, 0,
-                        "Potato Mine", null, 0),
-                QuestPriority.CRITICAL,
-                null,
-                new QuestProgress(0, 1)
-        ));
-        quests.add(new Quest(
-                "Garden Keeper",
-                QuestCategory.MAIN,
-                "Harvest 5 plants from the greenhouse",
-                new QuestReward(model.enums.QuestRewardType.CURRENCY, 250, 1,
-                        null, null, 0),
-                QuestPriority.HIGH,
-                null,
-                new QuestProgress(0, 5)
-        ));
-        // Epic quests
-        quests.add(new Quest(
-                "Egypt Explorer",
-                QuestCategory.EPIC,
-                "Complete all Ancient Egypt levels",
-                new QuestReward(model.enums.QuestRewardType.UNLOCKABLE, 0, 5,
-                        "Snow Pea", null, 0),
-                QuestPriority.HIGH,
-                null,
-                new QuestProgress(0, 10)
-        ));
-        return quests;
-    }
 }

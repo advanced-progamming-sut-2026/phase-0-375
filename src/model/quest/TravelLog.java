@@ -1,9 +1,13 @@
 package model.quest;
 
+import model.data.quest.QuestLoader;
 import model.enums.QuestCategory;
+import model.enums.QuestPriority;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -27,7 +31,9 @@ public class TravelLog {
      *
      * @param pageName the category page to display
      */
-    public void changePage(QuestCategory pageName) {}
+    public void changePage(QuestCategory pageName) {
+        this.currentPage = pageName;
+    }
 
     /**
      * Shows quests belonging to the current page, sorted by priority.
@@ -35,7 +41,7 @@ public class TravelLog {
      * @return list of quests on the current page
      */
     public List<Quest> showCurrentPage() {
-        return Collections.emptyList();
+        return sortByPriority(filterByCategory(currentPage));
     }
 
     /**
@@ -44,7 +50,7 @@ public class TravelLog {
      * @return list of daily quests
      */
     public List<Quest> showDailyQuests() {
-        return Collections.emptyList();
+        return sortByPriority(filterByCategory(QuestCategory.DAILY));
     }
 
     /**
@@ -53,7 +59,7 @@ public class TravelLog {
      * @return list of main quests
      */
     public List<Quest> showMainQuests() {
-        return Collections.emptyList();
+        return sortByPriority(filterByCategory(QuestCategory.MAIN));
     }
 
     /**
@@ -62,7 +68,7 @@ public class TravelLog {
      * @return list of epic quests
      */
     public List<Quest> showEpicQuests() {
-        return Collections.emptyList();
+        return sortByPriority(filterByCategory(QuestCategory.EPIC));
     }
 
     /**
@@ -70,7 +76,11 @@ public class TravelLog {
      *
      * @param quest the quest to add
      */
-    public void addQuest(Quest quest) {}
+    public void addQuest(Quest quest) {
+        if (quest != null) {
+            quests.add(quest);
+        }
+    }
 
     /**
      * Removes a quest from the travel log.
@@ -79,7 +89,7 @@ public class TravelLog {
      * @return true if the quest was removed
      */
     public boolean removeQuest(Quest quest) {
-        return false;
+        return quests.remove(quest);
     }
 
     /**
@@ -87,13 +97,34 @@ public class TravelLog {
      *
      * @param quest the quest to complete
      */
-    public void completeQuest(Quest quest) {}
+    public void completeQuest(Quest quest) {
+        if (quest == null || !quests.contains(quest)) {
+            return;
+        }
+        quest.complete();
+        quests.remove(quest);
+        completedQuests.add(quest);
+    }
 
     /**
      * Refreshes daily quests at the start of a new day.
-     * Old daily quests are removed and new ones are generated.
+     * Old daily quests (active or completed) are removed and new ones
+     * are generated from the quest definitions file.
      */
-    public void refreshDailyQuests() {}
+    public void refreshDailyQuests() {
+        quests.removeIf(q -> q.getCategory() == QuestCategory.DAILY);
+        completedQuests.removeIf(q -> q.getCategory() == QuestCategory.DAILY);
+        try {
+            List<Quest> allQuests = new QuestLoader().load("/quests.json");
+            for (Quest q : allQuests) {
+                if (q.getCategory() == QuestCategory.DAILY) {
+                    quests.add(q);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("[TravelLog] Failed to refresh daily quests: " + e.getMessage());
+        }
+    }
 
     /**
      * Returns quests sorted by priority (critical first, then high,
@@ -102,7 +133,37 @@ public class TravelLog {
      * @return sorted list of quests
      */
     public List<Quest> getSortedByPriority() {
-        return Collections.emptyList();
+        return sortByPriority(quests);
+    }
+
+    // --- Helpers ---
+
+    private List<Quest> filterByCategory(QuestCategory category) {
+        List<Quest> out = new ArrayList<>();
+        for (Quest q : quests) {
+            if (q.getCategory() == category) {
+                out.add(q);
+            }
+        }
+        return out;
+    }
+
+    private List<Quest> sortByPriority(List<Quest> source) {
+        List<Quest> out = new ArrayList<>(source);
+        out.sort(Comparator.comparingInt(q -> priorityRank(q.getPriority())));
+        return out;
+    }
+
+    private int priorityRank(QuestPriority p) {
+        if (p == null) {
+            return 99;
+        }
+        return switch (p) {
+            case CRITICAL -> 0;
+            case HIGH -> 1;
+            case MEDIUM -> 2;
+            case LOW -> 3;
+        };
     }
 
     // --- Getters ---

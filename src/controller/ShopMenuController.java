@@ -3,6 +3,8 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.enums.ShopItemType;
+import model.greenhouse.Greenhouse;
 import model.shop.Shop;
 import model.shop.ShopItem;
 

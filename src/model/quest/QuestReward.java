@@ -25,9 +25,29 @@ public class QuestReward {
         this.inventoryItemAmount = inventoryItemAmount;
     }
     /**
-     * Grants the reward to the player.
+     * Grants this reward to the currently logged-in user
+     * (coins/gems, an inventory item, or an unlockable).
      */
-    public void grant() {}
+    public void grant() {
+        model.user.User user = model.app.App.getInstance().getCurrentUser();
+        if (user == null) {
+            return;
+        }
+        if (coinAmount > 0) {
+            user.setCoins(user.getCoins() + coinAmount);
+        }
+        if (gemAmount > 0) {
+            user.setGems(user.getGems() + gemAmount);
+        }
+        if (inventoryItem != null && !inventoryItem.isBlank()
+                && inventoryItemAmount > 0 && user.getSeedPackets() != null) {
+            int current = user.getSeedPackets().getOrDefault(inventoryItem, 0);
+            user.getSeedPackets().put(inventoryItem, current + inventoryItemAmount);
+        }
+        if (unlockableName != null && !unlockableName.isBlank() && user.getUnlockedPlants() != null) {
+            user.getUnlockedPlants().add(unlockableName);
+        }
+    }
 
     // --- Getters ---
 

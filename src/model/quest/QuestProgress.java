@@ -19,7 +19,12 @@ public class QuestProgress {
      *
      * @param amount the value to add to current progress
      */
-    public void increase(int amount) {}
+    public void increase(int amount) {
+        currentValue += amount;
+        if (currentValue > targetValue) {
+            currentValue = targetValue;
+        }
+    }
 
     /**
      * Checks whether the quest is complete.
@@ -27,13 +32,15 @@ public class QuestProgress {
      * @return true if currentValue >= targetValue
      */
     public boolean isComplete() {
-        return false;
+        return currentValue >= targetValue;
     }
 
     /**
      * Resets the progress to zero (e.g. for daily quests).
      */
-    public void reset() {}
+    public void reset() {
+        currentValue = 0;
+    }
 
     // --- Getters ---
 

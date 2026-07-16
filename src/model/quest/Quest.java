@@ -34,7 +34,11 @@ public class Quest {
      *
      * @param progressValue the amount to add to current progress
      */
-    public void updateProgress(int progressValue) {}
+    public void updateProgress(int progressValue) {
+        if (progress != null) {
+            progress.increase(progressValue);
+        }
+    }
 
     /**
      * Checks whether this quest's completion condition is met.
@@ -42,13 +46,17 @@ public class Quest {
      * @return true if the quest is complete
      */
     public boolean checkCompletion() {
-        return false;
+        return progress != null && progress.isComplete();
     }
 
     /**
      * Grants the quest reward to the player if the quest is complete.
      */
-    public void complete() {}
+    public void complete() {
+        if (checkCompletion() && reward != null) {
+            reward.grant();
+        }
+    }
 
     /**
      * Returns the current progress amount.
