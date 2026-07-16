@@ -10,7 +10,6 @@ import model.game.rule.SaveOurSeedsEndGameCondition;
 import model.plant.PlantFactory;
 import model.plant.instance.PlantInstance;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -28,8 +27,6 @@ import java.util.List;
  * finally to {@code Wall-nut}.
  */
 public class SaveOurSeedsLevel extends RegularLevel {
-
-    private static final String DEFAULT_PLANTS_JSON = "/assets/data/plants/plants.json";
 
     /** Last-resort plant when neither the tile nor the level names one. */
     private static final String DEFAULT_PROTECTED_PLANT = "Wall-nut";
@@ -83,23 +80,5 @@ public class SaveOurSeedsLevel extends RegularLevel {
             name = getConfig().getProtectedPlantName();
         }
         return name == null || name.isBlank() ? DEFAULT_PROTECTED_PLANT : name;
-    }
-
-    /**
-     * True when the plant factory is usable, initialising it from the default
-     * data file if nothing has done so yet.
-     */
-    private static boolean ensurePlantFactory() {
-        try {
-            PlantFactory.getAllDefinitions();
-            return true;
-        } catch (IllegalStateException notInitialised) {
-            try {
-                PlantFactory.init(DEFAULT_PLANTS_JSON);
-                return true;
-            } catch (IOException | RuntimeException loadError) {
-                return false;
-            }
-        }
     }
 }

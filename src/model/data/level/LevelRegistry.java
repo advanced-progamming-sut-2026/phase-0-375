@@ -161,6 +161,11 @@ public class LevelRegistry {
         config.setProtectedPlants(protectedPlants);
         config.setProtectedPlantPositions(protectedPlants.stream().map(ProtectedPlantTile::getPosition).toList());
         config.setProtectedPlantName(entry.getProtectedPlantName());
+        config.setForcedPlants(entry.getForcedPlants() == null
+                ? Collections.emptyList()
+                : List.copyOf(entry.getForcedPlants()));
+        config.setAllFamiliesRestricted(entry.isAllFamiliesRestricted());
+        config.setRestrictedFamilies(restrictedFamilies(entry));
         config.setWaterTiles(points(entry.getWaterTiles()));
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
@@ -192,15 +197,23 @@ public class LevelRegistry {
         rules.setMaxPlantDeaths(data.getMaxPlantDeaths());
         rules.setTimedWarLimit(data.getTimedWarLimit());
         rules.setTimedWarTargetKills(data.getTimedWarTargetKills());
-        applyLevelTypeDefaults(rules, levelType);
+        applyLevelTypeDefaults(rules, levelType, entry);
         return rules;
     }
 
-    private static void applyLevelTypeDefaults(GameRules rules, LevelType type) {
+    private static void applyLevelTypeDefaults(GameRules rules, LevelType type, LevelDataEntry entry) {
         switch (type) {
             case CONVEYOR_BELT:
-            case LOCKED_PLANTS:
                 rules.setAllowsChoosingPlants(false); break;
+            case LOCKED_PLANTS: {
+                // Family-pick variant still lets the player choose (constrained per
+                // family); the forced-set variant locks the whole selection.
+                boolean familyPickVariant = entry != null
+                        && (entry.isAllFamiliesRestricted()
+                                || (entry.getRestrictedFamilies() != null && !entry.getRestrictedFamilies().isEmpty()));
+                rules.setAllowsChoosingPlants(familyPickVariant);
+                break;
+            }
             case NIGHT_OPS:
                 rules.setSunFallsFromSky(false); break;
             case PLANT_WHAT_YOU_GET:
@@ -301,6 +314,20 @@ public class LevelRegistry {
             }
         }
         return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Locked Plants family-pick variant: the restricted families
+     * ({@code PlantCategory} names, stored uppercase) from which the player
+     * may select only one plant.
+     */
+    private static Set<String> restrictedFamilies(LevelDataEntry entry) {
+        if (entry.getRestrictedFamilies() == null) return Collections.emptySet();
+        Set<String> result = new LinkedHashSet<>();
+        for (String family : entry.getRestrictedFamilies()) {
+            if (family != null) result.add(family.trim().toUpperCase());
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     private static Map<Point, SlideDirection> slideTiles(List<LevelDataEntry.SlideTileData> rawTiles) {

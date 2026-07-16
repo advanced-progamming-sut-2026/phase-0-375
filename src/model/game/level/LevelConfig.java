@@ -10,6 +10,7 @@ import model.game.wave.Wave;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class LevelConfig {
     private Chapter chapter;
@@ -32,6 +33,9 @@ public class LevelConfig {
     private List<Point> protectedPlantPositions;   // for Save Our Seeds: positions of pre-placed plants
     private String protectedPlantName;             // for Save Our Seeds: plant pre-placed on protected tiles (null = default)
     private List<ProtectedPlantTile> protectedPlants;  // for Save Our Seeds: which plant sits on which tile
+    private List<String> forcedPlants;             // for Locked Plants (forced set): the seeds the player must start with
+    private Set<String> restrictedFamilies;        // for Locked Plants (family pick): families limited to one pick
+    private boolean allFamiliesRestricted;         // for Locked Plants (family pick): every family limited to one pick
     private List<Point> waterTiles;                // explicit water tile positions
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
 
@@ -103,6 +107,18 @@ public class LevelConfig {
 
     public List<ProtectedPlantTile> getProtectedPlants() {
         return protectedPlants;
+    }
+
+    public List<String> getForcedPlants() {
+        return forcedPlants;
+    }
+
+    public Set<String> getRestrictedFamilies() {
+        return restrictedFamilies;
+    }
+
+    public boolean isAllFamiliesRestricted() {
+        return allFamiliesRestricted;
     }
 
     public List<Point> getProtectedPlantPositions() {
@@ -185,6 +201,18 @@ public class LevelConfig {
 
     public void setProtectedPlants(List<ProtectedPlantTile> protectedPlants) {
         this.protectedPlants = protectedPlants;
+    }
+
+    public void setForcedPlants(List<String> forcedPlants) {
+        this.forcedPlants = forcedPlants;
+    }
+
+    public void setRestrictedFamilies(Set<String> restrictedFamilies) {
+        this.restrictedFamilies = restrictedFamilies;
+    }
+
+    public void setAllFamiliesRestricted(boolean allFamiliesRestricted) {
+        this.allFamiliesRestricted = allFamiliesRestricted;
     }
 
     public void setProtectedPlantPositions(List<Point> protectedPlantPositions) {

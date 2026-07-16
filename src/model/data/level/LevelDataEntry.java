@@ -17,6 +17,9 @@ public class LevelDataEntry {
     private List<PointData> protectedPlantPositions;
     private String protectedPlantName;
     private List<ProtectedPlantData> protectedPlants;
+    private List<String> forcedPlants;
+    private List<String> restrictedFamilies;
+    private boolean allFamiliesRestricted;
     private List<PointData> waterTiles;
     private int deadLineColumn = -1;
     private boolean hasNightEffect;
@@ -48,6 +51,12 @@ public class LevelDataEntry {
     public void setProtectedPlantName(String protectedPlantName) { this.protectedPlantName = protectedPlantName; }
     public List<ProtectedPlantData> getProtectedPlants() { return protectedPlants; }
     public void setProtectedPlants(List<ProtectedPlantData> protectedPlants) { this.protectedPlants = protectedPlants; }
+    public List<String> getForcedPlants() { return forcedPlants; }
+    public void setForcedPlants(List<String> forcedPlants) { this.forcedPlants = forcedPlants; }
+    public List<String> getRestrictedFamilies() { return restrictedFamilies; }
+    public void setRestrictedFamilies(List<String> restrictedFamilies) { this.restrictedFamilies = restrictedFamilies; }
+    public boolean isAllFamiliesRestricted() { return allFamiliesRestricted; }
+    public void setAllFamiliesRestricted(boolean allFamiliesRestricted) { this.allFamiliesRestricted = allFamiliesRestricted; }
     public List<PointData> getWaterTiles() { return waterTiles; }
     public void setWaterTiles(List<PointData> waterTiles) { this.waterTiles = waterTiles; }
     public int getDeadLineColumn() { return deadLineColumn; }

@@ -3,12 +3,16 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.enums.PlantCategory;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.game.level.LevelConfig;
+import model.plant.PlantFactory;
 import model.user.User;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class PlantSelectionMenuController extends AppMenuController {
     private static PlantSelectionMenuController instance = null;
@@ -70,6 +74,14 @@ public class PlantSelectionMenuController extends AppMenuController {
         }
 
         GameModel model = App.getInstance().getCurrentGameModel();
+        if (!plantChoiceAllowed(model)) {
+            return CommandResult.error("Plant selection is locked for this level.");
+        }
+        String familyLockError = familyLockError(model, type);
+        if (familyLockError != null) {
+            return CommandResult.error(familyLockError);
+        }
+
         List<String> selected = model.getSelectedPlants();
         if (selected == null) {
             selected = new ArrayList<>();
@@ -89,6 +101,10 @@ public class PlantSelectionMenuController extends AppMenuController {
 
     public CommandResult<Void> removePlant(String type) {
         GameModel model = App.getInstance().getCurrentGameModel();
+        if (!plantChoiceAllowed(model)) {
+            return CommandResult.error("Plant selection is locked for this level.");
+        }
+
         List<String> selected = model.getSelectedPlants();
         if (selected == null || !selected.contains(type)) {
             return CommandResult.error("'" + type + "' is not selected.");
@@ -113,6 +129,58 @@ public class PlantSelectionMenuController extends AppMenuController {
         user.getPlantBoosts().put(type, true);
         App.getInstance().getUserRepository().flush();
         return CommandResult.success("'" + type + "' boosted for this level!");
+    }
+
+    /** Error when adding this plant would give a restricted family a second pick, else null. */
+    private static String familyLockError(GameModel model, String type) {
+        if (model == null || model.getCurrentLevel() == null || model.getCurrentLevel().getConfig() == null) {
+            return null;
+        }
+        LevelConfig config = model.getCurrentLevel().getConfig();
+        boolean allRestricted = config.isAllFamiliesRestricted();
+        Set<String> restrictedFamilies = config.getRestrictedFamilies();
+        if (!allRestricted && (restrictedFamilies == null || restrictedFamilies.isEmpty())) {
+            return null;
+        }
+        try {
+            PlantCategory family = familyOf(type);
+            if (family == null) {
+                return null;
+            }
+            if (!allRestricted && !restrictedFamilies.contains(family.name())) {
+                return null; // this family is not restricted
+            }
+            List<String> selected = model.getSelectedPlants();
+            if (selected == null) {
+                return null;
+            }
+            for (String selectedName : selected) {
+                if (family == familyOf(selectedName)) {
+                    return "Only one plant from the " + family.name() + " family is allowed; '"
+                            + selectedName + "' is already picked.";
+                }
+            }
+        } catch (IllegalStateException factoryNotReady) {
+            return null; // fail-open: don't block selection if definitions are unavailable
+        }
+        return null;
+    }
+
+    /** The plant's family, or null when unknown. */
+    private static PlantCategory familyOf(String plantName) {
+        if (plantName == null || !PlantFactory.hasDefinition(plantName)) {
+            return null;
+        }
+        return PlantFactory.getDefinition(plantName).getCategory();
+    }
+
+    /** Whether the current level lets the player edit the seed selection. */
+    private static boolean plantChoiceAllowed(GameModel model) {
+        return model == null
+                || model.getCurrentLevel() == null
+                || model.getCurrentLevel().getConfig() == null
+                || model.getCurrentLevel().getConfig().getRules() == null
+                || model.getCurrentLevel().getConfig().getRules().isAllowsChoosingPlants();
     }
 
     /**

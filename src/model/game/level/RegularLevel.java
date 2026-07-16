@@ -6,8 +6,10 @@ import model.game.core.GameModel;
 import model.game.map.Point;
 import model.game.rule.EndGameCondition;
 import model.game.rule.RegularEndGameCondition;
+import model.plant.PlantFactory;
 import model.user.User;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -84,5 +86,24 @@ public class RegularLevel extends Level {
     public boolean checkLossCondition(GameModel model) {
         EndGameCondition condition = getConfig().getEndGameCondition();
         return condition != null && condition.isGameOver(model);
+    }
+
+    /**
+     * True when the plant factory is usable, initialising it from the default
+     * data file if nothing has done so yet. Shared by levels that pre-place
+     * or pre-select plants.
+     */
+    protected static boolean ensurePlantFactory() {
+        try {
+            PlantFactory.getAllDefinitions();
+            return true;
+        } catch (IllegalStateException notInitialised) {
+            try {
+                PlantFactory.init("/assets/data/plants/plants.json");
+                return true;
+            } catch (IOException | RuntimeException loadError) {
+                return false;
+            }
+        }
     }
 }
