@@ -33,6 +33,8 @@ public class PvZGameLoop implements GameLoop {
         LevelConfig levelConfig = gameModel.getCurrentLevel().getConfig();
 
         float sunDropRateModifier = (float) levelConfig.getRules().getSunDropRateModifier();
+        // Sky sun falls only when both the generic sky-drop flag and the
+        // special-level rule (false for Night Ops / Plant What You Get) allow it.
         boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled()
                 && levelConfig.getRules().isSunFallsFromSky();
         this.sunFallSystem = new SunFallSystem(gameModel, sunDropRateModifier, skyDropEnabled);
