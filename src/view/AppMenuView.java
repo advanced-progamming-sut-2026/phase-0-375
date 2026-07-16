@@ -31,7 +31,7 @@ public class AppMenuView {
     private SettingsMenuView settingsMenuView;
     private ShopMenuView shopMenuView;
     private GreenhouseMenuView greenhouseMenuView;
-    private TravelLogMenuVIew travelLogMenuVIew;
+    private TravelLogMenuView travelLogMenuVIew;
 
     private final Scanner scanner = new Scanner(System.in);
     private boolean running = true;
@@ -124,8 +124,8 @@ public class AppMenuView {
         if (greenhouseMenuView == null) greenhouseMenuView = GreenhouseMenuView.getInstance();
         return greenhouseMenuView;
     }
-    private TravelLogMenuVIew travelLogMenuVIew() {
-        if (travelLogMenuVIew == null) travelLogMenuVIew = TravelLogMenuVIew.getInstance();
+    private TravelLogMenuView travelLogMenuVIew() {
+        if (travelLogMenuVIew == null) travelLogMenuVIew = TravelLogMenuView.getInstance();
         return travelLogMenuVIew;
     }
 

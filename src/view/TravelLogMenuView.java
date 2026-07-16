@@ -10,11 +10,11 @@ import model.quest.QuestReward;
 
 import java.util.List;
 
-public class TravelLogMenuVIew extends AppMenuView {
-    private static TravelLogMenuVIew instance = null;
+public class TravelLogMenuView extends AppMenuView {
+    private static TravelLogMenuView instance = null;
 
-    public static TravelLogMenuVIew getInstance() {
-        if (instance == null) instance = new TravelLogMenuVIew();
+    public static TravelLogMenuView getInstance() {
+        if (instance == null) instance = new TravelLogMenuView();
         return instance;
     }
 
