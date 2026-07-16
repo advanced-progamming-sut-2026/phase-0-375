@@ -30,6 +30,8 @@ public class LevelConfig {
     // Additional configuration for special levels
     private int deadLineColumn;                    // for Dead Line levels (-1 = no dead line)
     private List<Point> protectedPlantPositions;   // for Save Our Seeds: positions of pre-placed plants
+    private String protectedPlantName;             // for Save Our Seeds: plant pre-placed on protected tiles (null = default)
+    private List<ProtectedPlantTile> protectedPlants;  // for Save Our Seeds: which plant sits on which tile
     private List<Point> waterTiles;                // explicit water tile positions
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
 
@@ -93,6 +95,14 @@ public class LevelConfig {
 
     public int getDeadLineColumn() {
         return deadLineColumn;
+    }
+
+    public String getProtectedPlantName() {
+        return protectedPlantName;
+    }
+
+    public List<ProtectedPlantTile> getProtectedPlants() {
+        return protectedPlants;
     }
 
     public List<Point> getProtectedPlantPositions() {
@@ -167,6 +177,14 @@ public class LevelConfig {
 
     public void setDeadLineColumn(int deadLineColumn) {
         this.deadLineColumn = deadLineColumn;
+    }
+
+    public void setProtectedPlantName(String protectedPlantName) {
+        this.protectedPlantName = protectedPlantName;
+    }
+
+    public void setProtectedPlants(List<ProtectedPlantTile> protectedPlants) {
+        this.protectedPlants = protectedPlants;
     }
 
     public void setProtectedPlantPositions(List<Point> protectedPlantPositions) {

@@ -157,7 +157,10 @@ public class LevelRegistry {
         config.setInitialIceBlocks(points(entry.getInitialIceBlocks()));
         config.setSlideTiles(slideTiles(entry.getSlideTiles()));
         config.setNecromancyTiles(points(entry.getNecromancyTiles()));
-        config.setProtectedPlantPositions(points(entry.getProtectedPlantPositions()));
+        List<ProtectedPlantTile> protectedPlants = protectedPlants(entry);
+        config.setProtectedPlants(protectedPlants);
+        config.setProtectedPlantPositions(protectedPlants.stream().map(ProtectedPlantTile::getPosition).toList());
+        config.setProtectedPlantName(entry.getProtectedPlantName());
         config.setWaterTiles(points(entry.getWaterTiles()));
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
@@ -277,6 +280,26 @@ public class LevelRegistry {
         if (rawPoints == null) return Collections.emptyList();
         List<Point> result = new ArrayList<>();
         for (LevelDataEntry.PointData point : rawPoints) result.add(new Point(point.getX(), point.getY()));
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Normalises the two JSON shapes for Save Our Seeds tiles into one list:
+     * {@code protectedPlants} ({x, y, plant}) wins when present; otherwise the
+     * legacy {@code protectedPlantPositions} points are used with no per-tile
+     * plant (the level falls back to its default plant).
+     */
+    private static List<ProtectedPlantTile> protectedPlants(LevelDataEntry entry) {
+        List<ProtectedPlantTile> result = new ArrayList<>();
+        if (entry.getProtectedPlants() != null) {
+            for (LevelDataEntry.ProtectedPlantData data : entry.getProtectedPlants()) {
+                result.add(new ProtectedPlantTile(new Point(data.getX(), data.getY()), data.getPlant()));
+            }
+        } else if (entry.getProtectedPlantPositions() != null) {
+            for (LevelDataEntry.PointData point : entry.getProtectedPlantPositions()) {
+                result.add(new ProtectedPlantTile(new Point(point.getX(), point.getY()), null));
+            }
+        }
         return Collections.unmodifiableList(result);
     }
 

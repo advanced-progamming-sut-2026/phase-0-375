@@ -15,6 +15,8 @@ public class LevelDataEntry {
     private List<SlideTileData> slideTiles;
     private List<PointData> necromancyTiles;
     private List<PointData> protectedPlantPositions;
+    private String protectedPlantName;
+    private List<ProtectedPlantData> protectedPlants;
     private List<PointData> waterTiles;
     private int deadLineColumn = -1;
     private boolean hasNightEffect;
@@ -42,6 +44,10 @@ public class LevelDataEntry {
     public void setNecromancyTiles(List<PointData> necromancyTiles) { this.necromancyTiles = necromancyTiles; }
     public List<PointData> getProtectedPlantPositions() { return protectedPlantPositions; }
     public void setProtectedPlantPositions(List<PointData> protectedPlantPositions) { this.protectedPlantPositions = protectedPlantPositions; }
+    public String getProtectedPlantName() { return protectedPlantName; }
+    public void setProtectedPlantName(String protectedPlantName) { this.protectedPlantName = protectedPlantName; }
+    public List<ProtectedPlantData> getProtectedPlants() { return protectedPlants; }
+    public void setProtectedPlants(List<ProtectedPlantData> protectedPlants) { this.protectedPlants = protectedPlants; }
     public List<PointData> getWaterTiles() { return waterTiles; }
     public void setWaterTiles(List<PointData> waterTiles) { this.waterTiles = waterTiles; }
     public int getDeadLineColumn() { return deadLineColumn; }
@@ -116,6 +122,7 @@ public class LevelDataEntry {
 
     public static class PointData { private int x; private int y; public int getX(){return x;} public void setX(int x){this.x=x;} public int getY(){return y;} public void setY(int y){this.y=y;} }
     public static class SlideTileData extends PointData { private String direction; public String getDirection(){return direction;} public void setDirection(String direction){this.direction=direction;} }
+    public static class ProtectedPlantData extends PointData { private String plant; public String getPlant(){return plant;} public void setPlant(String plant){this.plant=plant;} }
     public static class WaveData {
         private int waveNumber; private float startDelay; private boolean hugeWave; private boolean finalWave; private List<WaveEntryData> entries;
         public int getWaveNumber(){return waveNumber;} public void setWaveNumber(int waveNumber){this.waveNumber=waveNumber;} public float getStartDelay(){return startDelay;} public void setStartDelay(float startDelay){this.startDelay=startDelay;} public boolean isHugeWave(){return hugeWave;} public void setHugeWave(boolean hugeWave){this.hugeWave=hugeWave;} public boolean isFinalWave(){return finalWave;} public void setFinalWave(boolean finalWave){this.finalWave=finalWave;} public List<WaveEntryData> getEntries(){return entries;} public void setEntries(List<WaveEntryData> entries){this.entries=entries;}
