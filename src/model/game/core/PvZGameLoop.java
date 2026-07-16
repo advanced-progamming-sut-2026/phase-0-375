@@ -57,6 +57,7 @@ public class PvZGameLoop implements GameLoop {
         waveManager.tick(deltaTime);
         lawnMowerSystem.tick(deltaTime);
         pushableSystem.tick(deltaTime);
+        gameModel.getCurrentLevel().tick(deltaTime);
         gameModel.tick(deltaTime);
 
         evaluateEndGame();
@@ -79,6 +80,12 @@ public class PvZGameLoop implements GameLoop {
     private void finish(GameState result, GameEvent.Type eventType) {
         this.gameState = result;
         gameModel.setGameState(result);
+
+        if (result == GameState.WON) {
+            gameModel.getCurrentLevel().onComplete();
+        } else {
+            gameModel.getCurrentLevel().onFail();
+        }
         if (eventBus != null) {
             eventBus.dispatch(new GameEvent(eventType));
         }
