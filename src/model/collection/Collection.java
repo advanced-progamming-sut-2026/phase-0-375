@@ -108,12 +108,38 @@ public class Collection {
         return new ArrayList<>(allZombies.values());
     }
 
+    /** Case-insensitive lookup; exact match first. */
     public Plant getPlant(String name) {
-        return name != null ? allPlants.get(name) : null;
+        if (name == null) {
+            return null;
+        }
+        Plant exact = allPlants.get(name);
+        if (exact != null) {
+            return exact;
+        }
+        for (Map.Entry<String, Plant> e : allPlants.entrySet()) {
+            if (e.getKey().equalsIgnoreCase(name)) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 
+    /** Case-insensitive lookup; exact match first. */
     public Zombie getZombie(String name) {
-        return name != null ? allZombies.get(name) : null;
+        if (name == null) {
+            return null;
+        }
+        Zombie exact = allZombies.get(name);
+        if (exact != null) {
+            return exact;
+        }
+        for (Map.Entry<String, Zombie> e : allZombies.entrySet()) {
+            if (e.getKey().equalsIgnoreCase(name)) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 
     public boolean ownsPlant(String name) {

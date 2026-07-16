@@ -24,6 +24,7 @@ import model.item.LootDrop;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
+import model.user.User;
 import model.zombie.ZombieFactory;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
@@ -31,8 +32,10 @@ import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 public class GameModel implements BehaviorContext {
     private long currentTick;
@@ -196,8 +199,25 @@ public class GameModel implements BehaviorContext {
         return true;
     }
 
+    /** Records a zombie type as seen for the collection; saves only on first sighting. */
+    public void recordZombieSeen(String zombieName) {
+        User user = App.getInstance().getCurrentUser();
+        if (user == null || zombieName == null) {
+            return;
+        }
+        Set<String> seen = user.getUnlockedZombies();
+        if (seen == null) {
+            seen = new HashSet<>();
+            user.setUnlockedZombies(seen);
+        }
+        if (seen.add(zombieName)) {
+            App.getInstance().getUserRepository().flush();
+        }
+    }
+
     public void spawnZombie(Zombie zombie, int lane) {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
+        recordZombieSeen(zombie.getName());
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
@@ -210,6 +230,8 @@ public class GameModel implements BehaviorContext {
         if (instance == null) {
             return null;
         }
+        recordZombieSeen(instance.getDefinition() != null
+                ? instance.getDefinition().getName() : zombieDefinitionName);
 
         int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
         int clampedCol = Math.max(0, Math.min(col, gameMap.getCols() - 1));

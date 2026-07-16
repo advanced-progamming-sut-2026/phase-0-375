@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 public class CollectionMenuController extends AppMenuController {
@@ -64,6 +65,13 @@ public class CollectionMenuController extends AppMenuController {
      */
     private Collection buildCollection(User user) {
         ensureDefinitionsLoaded();
+        // old saves may miss these sets; init them so purchases persist
+        if (user.getUnlockedPlants() == null) {
+            user.setUnlockedPlants(new HashSet<>());
+        }
+        if (user.getUnlockedZombies() == null) {
+            user.setUnlockedZombies(new HashSet<>());
+        }
         Collection collection = new Collection(user.getUnlockedPlants(), user.getUnlockedZombies());
         for (Plant plant : safePlantDefinitions()) {
             collection.registerPlant(plant);
@@ -277,9 +285,11 @@ public class CollectionMenuController extends AppMenuController {
     public CommandResult<Void> upgradePlant(String plantName) {
         User user = App.getInstance().getCurrentUser();
         Collection collection = buildCollection(user);
-        if (collection.getPlant(plantName) == null) {
+        Plant plant = collection.getPlant(plantName);
+        if (plant == null) {
             return CommandResult.error("Unknown plant: '" + plantName + "'.");
         }
+        plantName = plant.getName(); // canonical casing
         if (!collection.ownsPlant(plantName)) {
             return CommandResult.error("Plant '" + plantName + "' is not unlocked yet.");
         }
@@ -316,9 +326,11 @@ public class CollectionMenuController extends AppMenuController {
     public CommandResult<Void> purchasePlant(String plantName) {
         User user = App.getInstance().getCurrentUser();
         Collection collection = buildCollection(user);
-        if (collection.getPlant(plantName) == null) {
+        Plant plant = collection.getPlant(plantName);
+        if (plant == null) {
             return CommandResult.error("Unknown plant: '" + plantName + "'.");
         }
+        plantName = plant.getName(); // canonical casing
         if (collection.ownsPlant(plantName)) {
             return CommandResult.error("Plant '" + plantName + "' is already unlocked.");
         }

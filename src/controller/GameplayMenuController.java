@@ -17,11 +17,13 @@ import model.item.Sun;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
+import model.user.User;
 import model.zombie.ZombieFactory;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Controller for the in-game (gameplay) menu.
@@ -306,6 +308,11 @@ public class GameplayMenuController extends AppMenuController {
         }
 
         PlantInstance instance = new PlantInstance(definition);
+        // apply the user's saved upgrade level (bought in the collection menu)
+        int level = plantLevelFor(definition.getName());
+        if (level > 1) {
+            instance.applyLevelUpgrade(level);
+        }
         instance.setPosition(new Point(x, y));
 
         // Imitater: default the imitate target to the first non-Imitater
@@ -693,6 +700,13 @@ public class GameplayMenuController extends AppMenuController {
      * @return the matching definition, or {@code null} if no plant with
      *         that name is registered or the factory has not been initialized
      */
+    /** User's saved level for this plant (defaults to 1). */
+    private int plantLevelFor(String plantName) {
+        User user = App.getInstance().getCurrentUser();
+        Map<String, Integer> levels = user != null ? user.getPlantLevels() : null;
+        return levels != null ? levels.getOrDefault(plantName, 1) : 1;
+    }
+
     private Plant lookupPlantDefinition(String name) {
         if (name == null || name.isBlank()) return null;
         // Exact match first (fast path).
