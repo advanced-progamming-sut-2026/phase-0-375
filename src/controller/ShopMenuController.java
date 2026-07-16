@@ -64,7 +64,24 @@ public class ShopMenuController extends AppMenuController {
             return CommandResult.error("Purchase failed.");
         }
         App.getInstance().getUserRepository().flush();
-        return CommandResult.success("Purchase successful!");
+
+        // If the purchased item was a Pot, enrich the success message with
+        // the coordinates of the pot(s) that were just unlocked.
+        ShopItem item = shop.findItemById(itemId);
+        String message = "Purchase successful!";
+        if (item != null && item.getItemType() == ShopItemType.POT) {
+            Greenhouse greenhouse = Greenhouse.getInstance(App.getInstance().getCurrentUser());
+            int[] next = greenhouse.nextPotToUnlock();
+            int unlocked = greenhouse.getUnlockedPotCount();
+            if (next == null) {
+                message = "All " + Greenhouse.TOTAL_POTS + " pots are now unlocked.";
+            } else {
+                message = "Unlocked " + count + " pot(s). You now have " + unlocked
+                        + "/" + Greenhouse.TOTAL_POTS + " pots. Next to unlock: ("
+                        + next[0] + "," + next[1] + ").";
+            }
+        }
+        return CommandResult.success(message);
     }
 
     private Shop buildShop() {

@@ -3,6 +3,7 @@ package model.shop;
 import model.enums.CurrencyType;
 import model.enums.ShopCategory;
 import model.enums.ShopItemType;
+import model.greenhouse.Greenhouse;
 import model.user.User;
 
 import java.time.LocalDate;
@@ -361,13 +362,23 @@ public class Shop {
     }
 
     /**
-     * Unlocks {@code count} greenhouse pot slots for the player.
-     * Used when buying the POT item.
+     * Unlocks {@code count} greenhouse pot slots for the player by delegating
+     * to {@link Greenhouse#unlockNextPot()}. This keeps the greenhouse grid
+     * (pot states, planting state) in sync with the user's
+     * {@code unlockedPots} counter. Used when buying the POT item.
      *
      * @param count the number of pots to unlock
      */
     private void applyPotPurchase(int count) {
-        customer.setUnlockedPots(customer.getUnlockedPots() + count);
+        Greenhouse greenhouse = Greenhouse.getInstance(customer);
+        for (int i = 0; i < count; i++) {
+            int[] coords = greenhouse.unlockNextPot();
+            if (coords == null) {
+                // All pots already unlocked — stop early.
+                break;
+            }
+        }
+        greenhouse.save();
     }
 
     /**

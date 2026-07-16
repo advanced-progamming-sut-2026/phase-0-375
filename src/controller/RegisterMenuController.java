@@ -3,6 +3,7 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.greenhouse.Greenhouse;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
@@ -136,7 +137,7 @@ public class RegisterMenuController extends AppMenuController {
         user.setGamesPlayed(0);
         user.setHighestMyopoint(0);
         user.setPlantFoodCount(0);
-        user.setUnlockedPots(0);
+        user.setUnlockedPots(Greenhouse.DEFAULT_UNLOCKED_POTS);
 
         user.setChapterProgress(new HashMap<>());
         user.setUnlockedPlants(new HashSet<>());
