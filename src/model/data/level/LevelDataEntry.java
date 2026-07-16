@@ -20,6 +20,9 @@ public class LevelDataEntry {
     private List<String> forcedPlants;
     private List<String> restrictedFamilies;
     private boolean allFamiliesRestricted;
+    private List<String> conveyorPlants;
+    private float conveyorIntervalSeconds = 5f;
+    private int conveyorCapacity = 10;
     private List<PointData> waterTiles;
     private int deadLineColumn = -1;
     private boolean hasNightEffect;
@@ -57,6 +60,12 @@ public class LevelDataEntry {
     public void setRestrictedFamilies(List<String> restrictedFamilies) { this.restrictedFamilies = restrictedFamilies; }
     public boolean isAllFamiliesRestricted() { return allFamiliesRestricted; }
     public void setAllFamiliesRestricted(boolean allFamiliesRestricted) { this.allFamiliesRestricted = allFamiliesRestricted; }
+    public List<String> getConveyorPlants() { return conveyorPlants; }
+    public void setConveyorPlants(List<String> conveyorPlants) { this.conveyorPlants = conveyorPlants; }
+    public float getConveyorIntervalSeconds() { return conveyorIntervalSeconds; }
+    public void setConveyorIntervalSeconds(float conveyorIntervalSeconds) { this.conveyorIntervalSeconds = conveyorIntervalSeconds; }
+    public int getConveyorCapacity() { return conveyorCapacity; }
+    public void setConveyorCapacity(int conveyorCapacity) { this.conveyorCapacity = conveyorCapacity; }
     public List<PointData> getWaterTiles() { return waterTiles; }
     public void setWaterTiles(List<PointData> waterTiles) { this.waterTiles = waterTiles; }
     public int getDeadLineColumn() { return deadLineColumn; }

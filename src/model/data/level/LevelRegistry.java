@@ -166,6 +166,11 @@ public class LevelRegistry {
                 : List.copyOf(entry.getForcedPlants()));
         config.setAllFamiliesRestricted(entry.isAllFamiliesRestricted());
         config.setRestrictedFamilies(restrictedFamilies(entry));
+        config.setConveyorPlants(entry.getConveyorPlants() == null
+                ? Collections.emptyList()
+                : List.copyOf(entry.getConveyorPlants()));
+        config.setConveyorIntervalSeconds(entry.getConveyorIntervalSeconds());
+        config.setConveyorCapacity(entry.getConveyorCapacity());
         config.setWaterTiles(points(entry.getWaterTiles()));
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());

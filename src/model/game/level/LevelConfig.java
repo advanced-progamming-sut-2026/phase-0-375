@@ -36,6 +36,9 @@ public class LevelConfig {
     private List<String> forcedPlants;             // for Locked Plants (forced set): the seeds the player must start with
     private Set<String> restrictedFamilies;        // for Locked Plants (family pick): families limited to one pick
     private boolean allFamiliesRestricted;         // for Locked Plants (family pick): every family limited to one pick
+    private List<String> conveyorPlants;           // for Conveyor Belt: delivery pool, cycled in order
+    private float conveyorIntervalSeconds;         // for Conveyor Belt: seconds between deliveries
+    private int conveyorCapacity;                  // for Conveyor Belt: max seed packets waiting on the belt
     private List<Point> waterTiles;                // explicit water tile positions
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
 
@@ -119,6 +122,18 @@ public class LevelConfig {
 
     public boolean isAllFamiliesRestricted() {
         return allFamiliesRestricted;
+    }
+
+    public List<String> getConveyorPlants() {
+        return conveyorPlants;
+    }
+
+    public float getConveyorIntervalSeconds() {
+        return conveyorIntervalSeconds;
+    }
+
+    public int getConveyorCapacity() {
+        return conveyorCapacity;
     }
 
     public List<Point> getProtectedPlantPositions() {
@@ -213,6 +228,18 @@ public class LevelConfig {
 
     public void setAllFamiliesRestricted(boolean allFamiliesRestricted) {
         this.allFamiliesRestricted = allFamiliesRestricted;
+    }
+
+    public void setConveyorPlants(List<String> conveyorPlants) {
+        this.conveyorPlants = conveyorPlants;
+    }
+
+    public void setConveyorIntervalSeconds(float conveyorIntervalSeconds) {
+        this.conveyorIntervalSeconds = conveyorIntervalSeconds;
+    }
+
+    public void setConveyorCapacity(int conveyorCapacity) {
+        this.conveyorCapacity = conveyorCapacity;
     }
 
     public void setProtectedPlantPositions(List<Point> protectedPlantPositions) {

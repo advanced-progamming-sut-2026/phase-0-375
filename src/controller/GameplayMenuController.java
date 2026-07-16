@@ -8,6 +8,7 @@ import model.enums.PlacableLayer;
 import model.enums.WaveManagerPhase;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.game.level.special.ConveyorBeltLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
@@ -270,10 +271,13 @@ public class GameplayMenuController extends AppMenuController {
         if (guard != null) return guard;
 
         GameModel model = requireGame();
+        boolean conveyor = model.getCurrentLevel() instanceof ConveyorBeltLevel;
         List<String> selected = model.getSelectedPlants();
         if (selected == null || !selected.contains(type)) {
-            return CommandResult.error("Plant '" + type + "' is not in your selection."
-                    + " Add it from the plant selection menu.");
+            return CommandResult.error(conveyor
+                    ? "Plant '" + type + "' is not on the conveyor belt right now."
+                    : "Plant '" + type + "' is not in your selection."
+                            + " Add it from the plant selection menu.");
         }
 
         GameMap map = model.getMap();
@@ -294,7 +298,8 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("Unknown plant type: '" + type + "'.");
         }
 
-        int cost = definition.getCost();
+        // Conveyor Belt levels: seed packets come from the belt and are free.
+        int cost = conveyor ? 0 : definition.getCost();
         if (!model.spendSun(cost)) {
             return CommandResult.error("Not enough sun. Need " + cost
                     + ", have " + model.getSunAmount() + ".");
@@ -303,6 +308,9 @@ public class GameplayMenuController extends AppMenuController {
         PlantInstance instance = new PlantInstance(definition);
         instance.setPosition(new Point(x, y));
         cell.addPlaceable(instance);
+        if (conveyor) {
+            selected.remove(type); // consume the seed packet from the belt
+        }
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
                 + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + ".");
     }
