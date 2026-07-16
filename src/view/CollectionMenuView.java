@@ -114,8 +114,8 @@ public class CollectionMenuView extends AppMenuView {
     public void showPlant(String plantName) {
         CommandResult<String> result = controller.showPlant(plantName);
         if (result.isSuccess()) {
-            displayMessage("Plant: " + result.getData());
-            displayMessage("  Use 'menu collection upgrade-plant -p " + plantName
+            displayMessage(result.getData());
+            displayMessage("Use 'menu collection upgrade-plant -p " + plantName
                     + "' to upgrade (if unlocked).");
         } else {
             displayError(result.getMessage());
@@ -125,7 +125,7 @@ public class CollectionMenuView extends AppMenuView {
     public void showZombie(String zombieName) {
         CommandResult<String> result = controller.showZombie(zombieName);
         if (result.isSuccess()) {
-            displayMessage("Zombie: " + result.getData());
+            displayMessage(result.getData());
         } else {
             displayError(result.getMessage());
         }

@@ -144,6 +144,7 @@ public class RegisterMenuController extends AppMenuController {
         user.setUnlockedZombies(new HashSet<>());
         user.setUnlockedMiniGames(new HashSet<>());
         user.setSeedPackets(new HashMap<>());
+        user.setPlantLevels(new HashMap<>());
         user.setPlantBoosts(new HashMap<>());
         user.setGreenhousePots(new HashMap<>());
         user.setGreenhousePlantTimestamps(new HashMap<>());

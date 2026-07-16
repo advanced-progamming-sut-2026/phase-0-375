@@ -37,6 +37,7 @@ public class User {
 
     private Map<String, Integer> seedPackets;
     private Map<String, Boolean> plantBoosts;
+    private Map<String, Integer> plantLevels;
 
     private int unlockedPots;
     private Map<String, String> greenhousePots;
@@ -212,6 +213,14 @@ public class User {
 
     public void setPlantBoosts(Map<String, Boolean> plantBoosts) {
         this.plantBoosts = plantBoosts;
+    }
+
+    public Map<String, Integer> getPlantLevels() {
+        return plantLevels;
+    }
+
+    public void setPlantLevels(Map<String, Integer> plantLevels) {
+        this.plantLevels = plantLevels;
     }
 
     public int getUnlockedPots() {
