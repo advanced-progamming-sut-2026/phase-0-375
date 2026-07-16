@@ -216,5 +216,10 @@ public class PlantSystem implements Tickable {
             }
             return false;
         }
+
+        @Override
+        public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
+            gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
+        }
     }
 }

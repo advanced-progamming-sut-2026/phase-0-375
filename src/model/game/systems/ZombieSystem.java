@@ -95,9 +95,18 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
-        zombie.setContinuousX(newX);
-
+        // Terrain passability: don't let the zombie step into a cell
+        // its terrain doesn't allow
         int newGridX = (int) Math.floor(newX);
+        if (newGridX != zombie.getGridX()) {
+            Cell targetCell = context.getCellAt(zombie.getGridY(), newGridX);
+            if (targetCell != null && targetCell.getTerrainStrategy() != null
+                    && !targetCell.getTerrainStrategy().isPassable(zombie, targetCell)) {
+                return;
+            }
+        }
+
+        zombie.setContinuousX(newX);
         if (newGridX != zombie.getGridX()) {
             zombie.setGridX(newGridX);
             onZombieEnteredCell(zombie, context);
@@ -134,7 +143,7 @@ public class ZombieSystem implements Tickable {
         // Apply terrain effects.
         Cell cell = context.getCellAt(row, col);
         if (cell != null && cell.getTerrainStrategy() != null) {
-            cell.getTerrainStrategy().onZombieEnter(zombie.getDefinition(), cell);
+            cell.getTerrainStrategy().onZombieEnter(zombie, cell, context);
         }
     }
 
@@ -285,6 +294,9 @@ public class ZombieSystem implements Tickable {
                         plant.activatePlantFood();
                     }
                 }
+            }
+            @Override public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
+                gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
             }
         };
     }

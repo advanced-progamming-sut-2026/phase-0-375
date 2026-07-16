@@ -191,6 +191,10 @@ public class ExplosiveAbility implements PlantAbility {
                     applyExplosionDamage(zombie, damage, isFire);
                 }
             }
+            // Heat melts every ice block on the map.
+            context.damageIceInArea(
+                    context.getRowCount() / 2, context.getColumnCount() / 2,
+                    context.getRowCount(), context.getColumnCount(), damage);
             return;
         }
 
@@ -199,6 +203,10 @@ public class ExplosiveAbility implements PlantAbility {
             for (ZombieInstance zombie : context.getZombiesInLane(row)) {
                 applyExplosionDamage(zombie, damage, isFire);
             }
+            // Jalapeno scorches the entire lane - melt all ice in it.
+            context.damageIceInArea(
+                    row, context.getColumnCount() / 2,
+                    0, context.getColumnCount(), damage);
             return;
         }
 
@@ -207,6 +215,8 @@ public class ExplosiveAbility implements PlantAbility {
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
                 applyExplosionDamage(zombie, damage, isFire);
             }
+            // Melt ice in the 3x3 blast area.
+            context.damageIceInArea(row, col, 1, 1, damage);
             return;
         }
 
@@ -214,6 +224,8 @@ public class ExplosiveAbility implements PlantAbility {
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
             applyExplosionDamage(zombie, damage, isFire);
         }
+        // Melt ice in the localized blast area.
+        context.damageIceInArea(row, col, radius, radius, damage);
     }
 
     /** Applies explosion damage to a single zombie. */

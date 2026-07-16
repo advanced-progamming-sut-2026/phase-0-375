@@ -115,4 +115,10 @@ public interface PlantAbilityContext {
      * shares the given category. Used by all mint plants.
      */
     void triggerFamilyPlantFood(PlantCategory family);
+
+    /**
+     * Applies damage to every ice-terrain block inside the rectangle
+     * centred on ({@code row}, {@code col}) with the given half-extents.
+     */
+    void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage);
 }

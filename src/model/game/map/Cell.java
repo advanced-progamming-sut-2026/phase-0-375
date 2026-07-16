@@ -65,6 +65,10 @@ public class Cell {
         zombies.remove(zombie);
     }
 
+    public List<ZombieInstance> getZombies() {
+        return Collections.unmodifiableList(zombies);
+    }
+
     public boolean isPassableForZombie(ZombieInstance zombie) {
         return placeables.get(PlacableLayer.MAIN) == null;
     }

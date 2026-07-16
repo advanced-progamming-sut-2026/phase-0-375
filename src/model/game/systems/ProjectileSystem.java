@@ -17,12 +17,23 @@ import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.ShootBehavior;
 import model.zombie.instance.ZombieInstance;
 
+import model.game.map.Cell;
+import model.game.map.terrain.IceTerrainStrategy;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ProjectileSystem implements Tickable {
 
     private final GameModel gameModel;
     private final EventBus eventBus;
+
+    /**
+     * Tracks the last ice-cell column each projectile has already damaged,
+     * so a fire pea melting an ice block deals its damage exactly once per
+     * tile instead of once per frame.
+     */
+    private final Map<Projectile, Integer> iceDamagedColumns = new IdentityHashMap<>();
 
     public ProjectileSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
@@ -43,9 +54,13 @@ public class ProjectileSystem implements Tickable {
 
             applyTorchwood(projectile);
 
+            // Fire peas melt ice terrain they cross (Frostbite Caves).
+            damageIceIfPresent(projectile);
+
             float x = projectile.getX();
             if (x < 0f || x >= gameModel.getColumnCount()) {
                 gameModel.removeProjectile(projectile);
+                iceDamagedColumns.remove(projectile);
                 continue;
             }
 
@@ -62,7 +77,10 @@ public class ProjectileSystem implements Tickable {
                 applySplashDamage((Splash) projectile, target);
             }
 
-            if (!projectile.pierce()) { gameModel.removeProjectile(projectile); }
+            if (!projectile.pierce()) {
+                gameModel.removeProjectile(projectile);
+                iceDamagedColumns.remove(projectile);
+            }
 
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
@@ -265,6 +283,38 @@ public class ProjectileSystem implements Tickable {
             if (shoot != null && shoot.isExplorer(zombie)) {
                 shoot.igniteTorch();
             }
+        }
+    }
+    // --- Ice-terrain melting ---
+
+    /**
+     * If this projectile is fire-elemental and currently overlies an
+     * ice-terrain cell, applies the projectile's damage to the ice block.
+     */
+    private void damageIceIfPresent(Projectile projectile) {
+        if (!projectile.isFire()) {
+            return;
+        }
+
+        int row = projectile.getRow();
+        int col = (int) Math.floor(projectile.getX());
+        if (col < 0 || col >= gameModel.getColumnCount()) {
+            return;
+        }
+
+        Integer lastDamaged = iceDamagedColumns.get(projectile);
+        if (lastDamaged != null && lastDamaged == col) {
+            return;
+        }
+
+        Cell cell = gameModel.getCellAt(row, col);
+        if (cell == null) {
+            return;
+        }
+        if (cell.getTerrainStrategy() instanceof IceTerrainStrategy) {
+            IceTerrainStrategy ice = (IceTerrainStrategy) cell.getTerrainStrategy();
+            ice.takeDamage(projectile.getDamage());
+            iceDamagedColumns.put(projectile, col);
         }
     }
 }

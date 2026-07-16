@@ -13,6 +13,9 @@ import model.game.level.LevelConfig;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
+import model.game.map.terrain.IceTerrainStrategy;
+import model.game.map.terrain.TerrainStrategy;
+import model.game.systems.TerrainSystem;
 import model.game.map.Point;
 import model.game.rule.EndGameCondition;
 import model.game.wave.WaveManager;
@@ -157,6 +160,10 @@ public class GameModel implements BehaviorContext {
         }
         Cell cell = gameMap.getCell(row, col);
         if (cell.getPlaceable(PlacableLayer.MAIN) != null) {
+            return false;
+        }
+        TerrainStrategy terrain = cell.getTerrainStrategy();
+        if (terrain != null && !terrain.canPlant(plant.getDefinition(), cell)) {
             return false;
         }
         plant.setPosition(new Point(col, row));
@@ -574,5 +581,46 @@ public class GameModel implements BehaviorContext {
             eventBus.dispatch(new GameEvent(GameEvent.Type.GRAVE_SPAWNED));
         }
         return placed;
+    }
+
+    // --- Terrain helpers ---
+
+    /** Applies damage to an ice-terrain block at the given cell. */
+    public void damageIceAt(int row, int col, int damage) {
+        if (damage <= 0) return;
+        Cell cell = getCellAt(row, col);
+        if (cell == null) return;
+        if (cell.getTerrainStrategy() instanceof IceTerrainStrategy) {
+            ((IceTerrainStrategy) cell.getTerrainStrategy()).takeDamage(damage);
+        }
+    }
+
+    /**
+     * Applies damage to every ice-terrain block inside the rectangle
+     * centred on ({@code row}, {@code col}) with the given half-extents.
+     */
+    public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
+        if (damage <= 0) return;
+        for (int rowDist = -rowRadius; rowDist <= rowRadius; rowDist++) {
+            for (int colDist = -colRadius; colDist <= colRadius; colDist++) {
+                damageIceAt(row + rowDist, col + colDist, damage);
+            }
+        }
+    }
+
+    /**
+     * Re-registers an existing zombie instance on the field at the given
+     * cell. Used by {@link TerrainSystem} when an ice block shatters and
+     * releases a zombie that was frozen inside at level-load time.
+     */
+    public void addExistingZombie(ZombieInstance zombie, int row, int col) {
+        if (zombie == null) return;
+        if (!activeZombies.contains(zombie)) {
+            activeZombies.add(zombie);
+        }
+        Cell cell = gameMap.getCell(row, col);
+        if (cell != null && !cell.getZombies().contains(zombie)) {
+            cell.addZombie(zombie);
+        }
     }
 }
