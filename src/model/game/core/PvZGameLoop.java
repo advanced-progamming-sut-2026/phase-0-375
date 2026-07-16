@@ -33,7 +33,10 @@ public class PvZGameLoop implements GameLoop {
         LevelConfig levelConfig = gameModel.getCurrentLevel().getConfig();
 
         float sunDropRateModifier = (float) levelConfig.getRules().getSunDropRateModifier();
-        boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled();
+        // Sky sun falls only when both the generic sky-drop flag and the
+        // special-level rule (false for Night Ops / Plant What You Get) allow it.
+        boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled()
+                && levelConfig.getRules().isSunFallsFromSky();
         this.sunFallSystem = new SunFallSystem(gameModel, sunDropRateModifier, skyDropEnabled);
 
         this.plantSystem = new PlantSystem(gameModel, eventBus);
@@ -57,6 +60,7 @@ public class PvZGameLoop implements GameLoop {
         waveManager.tick(deltaTime);
         lawnMowerSystem.tick(deltaTime);
         pushableSystem.tick(deltaTime);
+        gameModel.getCurrentLevel().tick(deltaTime);
         gameModel.tick(deltaTime);
 
         evaluateEndGame();
@@ -79,6 +83,12 @@ public class PvZGameLoop implements GameLoop {
     private void finish(GameState result, GameEvent.Type eventType) {
         this.gameState = result;
         gameModel.setGameState(result);
+
+        if (result == GameState.WON) {
+            gameModel.getCurrentLevel().onComplete();
+        } else {
+            gameModel.getCurrentLevel().onFail();
+        }
         if (eventBus != null) {
             eventBus.dispatch(new GameEvent(eventType));
         }

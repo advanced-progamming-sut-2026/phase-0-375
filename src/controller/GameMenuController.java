@@ -70,11 +70,17 @@ public class GameMenuController extends AppMenuController {
             return CommandResult.error("No level definition found for " + chapter + " level " + levelId + ".");
         }
 
+        if (!level.canStart()) {
+            return CommandResult.error("Level " + levelId + " of " + chapter + " cannot be started.");
+        }
+
         GameModel model = new GameModel(level);
         PvZGameLoop loop = new PvZGameLoop(model);
 
         App.getInstance().setCurrentGameModel(model);
         App.getInstance().setCurrentGameLoop(loop);
+
+        level.onStart();
         App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
 
         return CommandResult.success("Entering " + chapterName + " level " + levelId + ".");

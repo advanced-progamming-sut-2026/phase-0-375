@@ -157,7 +157,20 @@ public class LevelRegistry {
         config.setInitialIceBlocks(points(entry.getInitialIceBlocks()));
         config.setSlideTiles(slideTiles(entry.getSlideTiles()));
         config.setNecromancyTiles(points(entry.getNecromancyTiles()));
-        config.setProtectedPlantPositions(points(entry.getProtectedPlantPositions()));
+        List<ProtectedPlantTile> protectedPlants = protectedPlants(entry);
+        config.setProtectedPlants(protectedPlants);
+        config.setProtectedPlantPositions(protectedPlants.stream().map(ProtectedPlantTile::getPosition).toList());
+        config.setProtectedPlantName(entry.getProtectedPlantName());
+        config.setForcedPlants(entry.getForcedPlants() == null
+                ? Collections.emptyList()
+                : List.copyOf(entry.getForcedPlants()));
+        config.setAllFamiliesRestricted(entry.isAllFamiliesRestricted());
+        config.setRestrictedFamilies(restrictedFamilies(entry));
+        config.setConveyorPlants(entry.getConveyorPlants() == null
+                ? Collections.emptyList()
+                : List.copyOf(entry.getConveyorPlants()));
+        config.setConveyorIntervalSeconds(entry.getConveyorIntervalSeconds());
+        config.setConveyorCapacity(entry.getConveyorCapacity());
         config.setWaterTiles(points(entry.getWaterTiles()));
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
@@ -189,15 +202,23 @@ public class LevelRegistry {
         rules.setMaxPlantDeaths(data.getMaxPlantDeaths());
         rules.setTimedWarLimit(data.getTimedWarLimit());
         rules.setTimedWarTargetKills(data.getTimedWarTargetKills());
-        applyLevelTypeDefaults(rules, levelType);
+        applyLevelTypeDefaults(rules, levelType, entry);
         return rules;
     }
 
-    private static void applyLevelTypeDefaults(GameRules rules, LevelType type) {
+    private static void applyLevelTypeDefaults(GameRules rules, LevelType type, LevelDataEntry entry) {
         switch (type) {
             case CONVEYOR_BELT:
-            case LOCKED_PLANTS:
                 rules.setAllowsChoosingPlants(false); break;
+            case LOCKED_PLANTS: {
+                // Family-pick variant still lets the player choose (constrained per
+                // family); the forced-set variant locks the whole selection.
+                boolean familyPickVariant = entry != null
+                        && (entry.isAllFamiliesRestricted()
+                                || (entry.getRestrictedFamilies() != null && !entry.getRestrictedFamilies().isEmpty()));
+                rules.setAllowsChoosingPlants(familyPickVariant);
+                break;
+            }
             case NIGHT_OPS:
                 rules.setSunFallsFromSky(false); break;
             case PLANT_WHAT_YOU_GET:
@@ -278,6 +299,40 @@ public class LevelRegistry {
         List<Point> result = new ArrayList<>();
         for (LevelDataEntry.PointData point : rawPoints) result.add(new Point(point.getX(), point.getY()));
         return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Normalises the two JSON shapes for Save Our Seeds tiles into one list:
+     * {@code protectedPlants} ({x, y, plant}) wins when present; otherwise the
+     * legacy {@code protectedPlantPositions} points are used with no per-tile
+     * plant (the level falls back to its default plant).
+     */
+    private static List<ProtectedPlantTile> protectedPlants(LevelDataEntry entry) {
+        List<ProtectedPlantTile> result = new ArrayList<>();
+        if (entry.getProtectedPlants() != null) {
+            for (LevelDataEntry.ProtectedPlantData data : entry.getProtectedPlants()) {
+                result.add(new ProtectedPlantTile(new Point(data.getX(), data.getY()), data.getPlant()));
+            }
+        } else if (entry.getProtectedPlantPositions() != null) {
+            for (LevelDataEntry.PointData point : entry.getProtectedPlantPositions()) {
+                result.add(new ProtectedPlantTile(new Point(point.getX(), point.getY()), null));
+            }
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Locked Plants family-pick variant: the restricted families
+     * ({@code PlantCategory} names, stored uppercase) from which the player
+     * may select only one plant.
+     */
+    private static Set<String> restrictedFamilies(LevelDataEntry entry) {
+        if (entry.getRestrictedFamilies() == null) return Collections.emptySet();
+        Set<String> result = new LinkedHashSet<>();
+        for (String family : entry.getRestrictedFamilies()) {
+            if (family != null) result.add(family.trim().toUpperCase());
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     private static Map<Point, SlideDirection> slideTiles(List<LevelDataEntry.SlideTileData> rawTiles) {
