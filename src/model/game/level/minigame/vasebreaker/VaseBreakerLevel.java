@@ -35,11 +35,6 @@ public class VaseBreakerLevel extends MiniGameLevel {
     }
 
     @Override
-    public void onComplete() {
-
-    }
-
-    @Override
     public void onFail() {
 
     }

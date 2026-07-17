@@ -34,11 +34,6 @@ public class ZombotanyLevel extends MiniGameLevel {
     }
 
     @Override
-    public void onComplete() {
-
-    }
-
-    @Override
     public void onFail() {
 
     }

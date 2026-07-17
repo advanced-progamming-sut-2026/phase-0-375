@@ -34,11 +34,6 @@ public class WallnutBowlingLevel extends MiniGameLevel {
     }
 
     @Override
-    public void onComplete() {
-
-    }
-
-    @Override
     public void onFail() {
 
     }
