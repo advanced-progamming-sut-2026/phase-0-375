@@ -1,0 +1,118 @@
+[
+  {
+    "miniGameType": "WALLNUT_BOWLING",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 150,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false
+    },
+    "conveyorPlants": [
+      "Wall-nut",
+      "Wall-nut",
+      "Wall-nut",
+      "Explode-o-nut",
+      "Wall-nut",
+      "Giant Wall-nut"
+    ],
+    "conveyorIntervalSeconds": 4,
+    "conveyorCapacity": 10,
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 5,
+        "entries": [
+          {
+            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "VASE_BREAKER",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 150,
+    "rows": 5,
+    "columns": 9,
+    "rules": { "initialSun": 50 },
+    "waves": []
+  },
+  {
+    "miniGameType": "ZOMBOTANY",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 200,
+    "rows": 5,
+    "columns": 9,
+    "rules": { "initialSun": 150 },
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 8,
+            "maxSpawnInterval": 12,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "I_ZOMBIE",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 200,
+    "rows": 5,
+    "columns": 9,
+    "rules": { "initialSun": 0 },
+    "waves": []
+  },
+  {
+    "miniGameType": "BEGHOULED",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 250,
+    "rows": 5,
+    "columns": 9,
+    "rules": { "initialSun": 0 },
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 8,
+            "maxSpawnInterval": 12,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  }
+]
