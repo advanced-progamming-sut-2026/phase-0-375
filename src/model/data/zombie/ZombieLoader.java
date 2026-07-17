@@ -145,6 +145,9 @@ public class ZombieLoader {
         zombie.putBehaviorProp("LaunchCountdown", data.getLaunchCountdown());
         // Piano
         zombie.putBehaviorProp("FastMoveSpeed", data.getFastMoveSpeed());
+        // Zombotany
+        zombie.putBehaviorProp("ShotIntervalSeconds", data.getShotIntervalSeconds());
+        zombie.putBehaviorProp("FuseSeconds", data.getFuseSeconds());
         // Newspaper
         zombie.putBehaviorProp("EnragedDamageScale", data.getEnragedDamageScale());
         zombie.putBehaviorProp("EnragedSpeedScale", data.getEnragedSpeedScale());
@@ -334,6 +337,22 @@ public class ZombieLoader {
             case "ZombieBarrelRollerProps":
                 behaviors.add(ZombieBehaviorType.PUSH);
                 behaviors.add(ZombieBehaviorType.BARREL_ROLLER);
+                break;
+
+            case "ZombotanyPeashooterProps":
+                behaviors.add(ZombieBehaviorType.ZOMBOTANY_PEASHOOTER);
+                break;
+
+            case "ZombotanyWallnutProps":
+                // Passive: its wall-nut toughness comes from Hitpoints alone.
+                break;
+
+            case "ZombotanyJalapenoProps":
+                behaviors.add(ZombieBehaviorType.ZOMBOTANY_JALAPENO);
+                break;
+
+            case "ZombotanySquashProps":
+                behaviors.add(ZombieBehaviorType.ZOMBOTANY_SQUASH);
                 break;
 
             case "ZombiePropertySheet":

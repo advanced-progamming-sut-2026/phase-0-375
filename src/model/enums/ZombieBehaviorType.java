@@ -18,4 +18,7 @@ public enum ZombieBehaviorType {
     ENRAGE,         // Speeds up and eats faster when its armor is destroyed
     PIANO_SWAP,     // Periodically swaps rows of nearby zombies while playing
     BARREL_ROLLER,  // Spawns 2 imps when its barrel pushable is destroyed
+    ZOMBOTANY_PEASHOOTER, // Zombotany: shoots peas at plants in its lane
+    ZOMBOTANY_JALAPENO,   // Zombotany: ignites after a fuse, burning its lane's plants
+    ZOMBOTANY_SQUASH,     // Zombotany: squashes the first plant it reaches (mutual kill)
 }

@@ -147,6 +147,14 @@ public class ZombieDataEntry {
         @JsonProperty("FastMoveSpeed")
         private float fastMoveSpeed;
 
+        /** ZombotanyPeashooterProps – seconds between pea shots. */
+        @JsonProperty("ShotIntervalSeconds")
+        private float shotIntervalSeconds;
+
+        /** ZombotanyJalapenoProps – seconds on the lawn before igniting. */
+        @JsonProperty("FuseSeconds")
+        private float fuseSeconds;
+
         /** ZombieNewspaperProps – eat speed scale when enraged. */
         @JsonProperty("EnragedDamageScale")
         private float enragedDamageScale;
@@ -298,6 +306,14 @@ public class ZombieDataEntry {
 
         public float getFastMoveSpeed() {
             return fastMoveSpeed;
+        }
+
+        public float getShotIntervalSeconds() {
+            return shotIntervalSeconds;
+        }
+
+        public float getFuseSeconds() {
+            return fuseSeconds;
         }
 
         public float getEnragedDamageScale() {

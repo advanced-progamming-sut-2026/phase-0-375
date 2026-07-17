@@ -2471,5 +2471,67 @@
         }
       ]
     }
+  },
+  {
+    "aliases": [
+      "ZombotanyPeashooter"
+    ],
+    "objclass": "ZombotanyPeashooterProps",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 150,
+      "EatDPS": 100,
+      "Hitpoints": 190,
+      "Speed": 0.185,
+      "WavePointCost": 200,
+      "Weight": 1000,
+      "ShotIntervalSeconds": 1.5
+    }
+  },
+  {
+    "aliases": [
+      "ZombotanyWallnut"
+    ],
+    "objclass": "ZombotanyWallnutProps",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 150,
+      "EatDPS": 100,
+      "Hitpoints": 4190,
+      "Speed": 0.185,
+      "WavePointCost": 300,
+      "Weight": 800
+    }
+  },
+  {
+    "aliases": [
+      "ZombotanyJalapeno"
+    ],
+    "objclass": "ZombotanyJalapenoProps",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 150,
+      "EatDPS": 100,
+      "Hitpoints": 190,
+      "Speed": 0.185,
+      "WavePointCost": 250,
+      "Weight": 900,
+      "FuseSeconds": 10
+    }
+  },
+  {
+    "aliases": [
+      "ZombotanySquash"
+    ],
+    "objclass": "ZombotanySquashProps",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 150,
+      "EatDPS": 100,
+      "Hitpoints": 190,
+      "Speed": 0.37,
+      "WavePointCost": 250,
+      "Weight": 900
+    }
   }
 ]
