@@ -27,6 +27,9 @@ public class TravelLogMenuView extends AppMenuView {
             return;
         }
 
+        // per-user reload + once-a-day daily quest refresh
+        controller.syncForCurrentUser();
+
         if (TravelLogMenuCommand.CHANGE_PAGE.matches(input)) {
             String page = TravelLogMenuCommand.CHANGE_PAGE.getParameter("pageName");
             changePage(page);
@@ -52,6 +55,10 @@ public class TravelLogMenuView extends AppMenuView {
             showAllQuests();
             return;
         }
+        if (TravelLogMenuCommand.SHOW_COMPLETED_QUESTS.matches(input)) {
+            showCompletedQuests();
+            return;
+        }
         if (TravelLogMenuCommand.COMPLETE_QUEST.matches(input)) {
             String name = TravelLogMenuCommand.COMPLETE_QUEST.getParameter("questName");
             completeQuest(name);
@@ -70,6 +77,7 @@ public class TravelLogMenuView extends AppMenuView {
         displayError("  show main quests");
         displayError("  show epic quests");
         displayError("  show all quests");
+        displayError("  show completed quests");
         displayError("  show quest progress -n <quest name>");
         displayError("  complete quest -n <quest name>");
         displayError("  menu exit");
@@ -124,6 +132,15 @@ public class TravelLogMenuView extends AppMenuView {
 
     public void showAllQuests() {
         CommandResult<List<Quest>> result = controller.showAllQuests();
+        if (result.isSuccess()) {
+            renderQuestList(result.getMessage(), result.getData());
+        } else {
+            displayError(result.getMessage());
+        }
+    }
+
+    public void showCompletedQuests() {
+        CommandResult<List<Quest>> result = controller.showCompletedQuests();
         if (result.isSuccess()) {
             renderQuestList(result.getMessage(), result.getData());
         } else {

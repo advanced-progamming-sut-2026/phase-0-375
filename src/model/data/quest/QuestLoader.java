@@ -34,11 +34,10 @@ public class QuestLoader {
      */
     public List<Quest> load(String classpathPath) throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        InputStream inputStream = QuestLoader.class.getResourceAsStream(classpathPath);
-        if (inputStream == null) {
-            throw new IOException("quests.json resource not found: " + classpathPath);
+        List<QuestDataEntry> entries;
+        try (InputStream inputStream = openQuestStream(classpathPath)) {
+            entries = mapper.readValue(inputStream, new TypeReference<>() {});
         }
-        List<QuestDataEntry> entries = mapper.readValue(inputStream, new TypeReference<>() {});
 
         List<Quest> result = new ArrayList<>();
         for (QuestDataEntry entry : entries) {
@@ -70,7 +69,7 @@ public class QuestLoader {
                     reward,
                     priority,
                     null,
-                    new QuestProgress(0, 1)
+                    new QuestProgress(0, parseTarget(entry.getCondition()))
             );
             quests.add(quest);
         } else {
@@ -92,7 +91,7 @@ public class QuestLoader {
                     String questName = entry.getName() + " (" + value + ")";
                     String condition = entry.getCondition()
                             .replace("sun_amount", String.valueOf(value))
-                            .replace("n", String.valueOf(value));
+                            .replaceAll("\\bn\\b", String.valueOf(value));
 
                     QuestReward variantReward = buildVariantReward(entry, value);
 
@@ -103,7 +102,7 @@ public class QuestLoader {
                             variantReward,
                             priority,
                             String.valueOf(value),
-                            new QuestProgress(0, value)
+                            new QuestProgress(0, Math.max(1, value))
                     );
                     quests.add(quest);
                 }
@@ -117,13 +116,46 @@ public class QuestLoader {
                         reward,
                         priority,
                         variable,
-                        new QuestProgress(0, 1)
+                        new QuestProgress(0, parseTarget(entry.getCondition()))
                 );
                 quests.add(quest);
             }
         }
 
         return quests;
+    }
+
+    /**
+     * Opens quests.json, first from the classpath, then from the file system
+     * (relative to the working directory). Same fallback as ZombieLoader and
+     * LevelRegistry, since the assets folder is not on the classpath.
+     */
+    private static InputStream openQuestStream(String path) throws IOException {
+        InputStream inputStream = QuestLoader.class.getResourceAsStream(path);
+        if (inputStream != null) return inputStream;
+
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        java.io.File file = new java.io.File(filePath);
+        if (!file.isFile()) {
+            throw new IOException("quests.json resource not found: " + path);
+        }
+        return new java.io.FileInputStream(file);
+    }
+
+    /** Uses the first number in the condition text as the target (default 1). */
+    private int parseTarget(String condition) {
+        if (condition == null) {
+            return 1;
+        }
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\\d+").matcher(condition);
+        if (m.find()) {
+            try {
+                return Math.max(1, Integer.parseInt(m.group()));
+            } catch (NumberFormatException ignored) {
+                // fall through
+            }
+        }
+        return 1;
     }
 
     /**

@@ -56,6 +56,9 @@ public class User {
     private String dailyOfferPlant;
     private String dailyOfferDate;
 
+    // Last date the daily quests were refreshed
+    private String dailyQuestRefreshDate;
+
     public User() {
     }
 
@@ -289,6 +292,14 @@ public class User {
 
     public void setQuestStatus(Map<String, Boolean> questStatus) {
         this.questStatus = questStatus;
+    }
+
+    public String getDailyQuestRefreshDate() {
+        return dailyQuestRefreshDate;
+    }
+
+    public void setDailyQuestRefreshDate(String dailyQuestRefreshDate) {
+        this.dailyQuestRefreshDate = dailyQuestRefreshDate;
     }
 
     public Map<String, Boolean> getPurchasedDailyDeals() {

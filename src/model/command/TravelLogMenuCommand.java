@@ -10,6 +10,7 @@ public enum TravelLogMenuCommand implements CLICommand {
     SHOW_MAIN_QUESTS("show main quests"),
     SHOW_EPIC_QUESTS("show epic quests"),
     SHOW_ALL_QUESTS("show all quests"),
+    SHOW_COMPLETED_QUESTS("show completed quests"),
     COMPLETE_QUEST("complete quest -n (?<questName>.+)"),
     SHOW_QUEST_PROGRESS("show quest progress -n (?<questName>.+)");
 

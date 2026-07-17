@@ -13,14 +13,21 @@ import model.user.User;
 import model.data.quest.QuestLoader;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class TravelLogMenuController extends AppMenuController {
+    private static final String QUESTS_JSON = "/assets/data/quests/quests.json";
+
     private static TravelLogMenuController instance = null;
 
     private final TravelLog travelLog;
+    private String ownerUsername; // whose quests are currently loaded
 
     private TravelLogMenuController() {
         this.travelLog = new TravelLog();
@@ -29,7 +36,7 @@ public class TravelLogMenuController extends AppMenuController {
 
     private List<Quest> loadQuests() {
         try {
-            return new ArrayList<>(new QuestLoader().load("/quests.json"));
+            return new ArrayList<>(new QuestLoader().load(QUESTS_JSON));
         } catch (IOException e) {
             System.err.println("[TravelLogMenuController] Failed to load quests.json: " + e.getMessage());
             return new ArrayList<>();
@@ -39,6 +46,57 @@ public class TravelLogMenuController extends AppMenuController {
     public static TravelLogMenuController getInstance() {
         if (instance == null) instance = new TravelLogMenuController();
         return instance;
+    }
+
+    /**
+     * Reloads quests when the logged-in user changes and refreshes
+     * daily quests once per day. Called before handling any command.
+     */
+    public void syncForCurrentUser() {
+        User user = App.getInstance().getCurrentUser();
+        if (user == null) {
+            return;
+        }
+        boolean userChanged = !Objects.equals(user.getUsername(), ownerUsername);
+        if (userChanged) {
+            ownerUsername = user.getUsername();
+        }
+
+        String today = LocalDate.now().toString();
+        boolean newDay = !today.equals(user.getDailyQuestRefreshDate());
+        if (newDay) {
+            // completed dailies become available again on a new day
+            if (user.getQuestStatus() != null) {
+                for (Quest q : loadQuests()) {
+                    if (q.getCategory() == QuestCategory.DAILY) {
+                        user.getQuestStatus().remove(q.getName());
+                    }
+                }
+            }
+            user.setDailyQuestRefreshDate(today);
+            App.getInstance().getUserRepository().flush();
+        }
+
+        if (userChanged || newDay) {
+            reloadForUser(user);
+        }
+    }
+
+    /** Rebuilds active/completed lists from quests.json and the user's saved status. */
+    private void reloadForUser(User user) {
+        Map<String, Boolean> status = user.getQuestStatus();
+        List<Quest> active = new ArrayList<>();
+        List<Quest> completed = new ArrayList<>();
+        for (Quest q : loadQuests()) {
+            boolean done = status != null && Boolean.TRUE.equals(status.get(q.getName()));
+            if (done) {
+                completed.add(q);
+            } else {
+                active.add(q);
+            }
+        }
+        travelLog.setQuests(active);
+        travelLog.setCompletedQuests(completed);
     }
 
     // Menu navigation
@@ -111,8 +169,19 @@ public class TravelLogMenuController extends AppMenuController {
                 "All quests (" + quests.size() + "):", quests);
     }
 
+    public CommandResult<List<Quest>> showCompletedQuests() {
+        List<Quest> quests = sortByPriority(new ArrayList<>(travelLog.getCompletedQuests()));
+        return CommandResult.successWithData(
+                "Completed quests (" + quests.size() + "):", quests);
+    }
+
     public CommandResult<Void> showQuestProgress(String questName) {
+        boolean completed = false;
         Quest q = findQuest(questName);
+        if (q == null) {
+            q = findIn(travelLog.getCompletedQuests(), questName);
+            completed = q != null;
+        }
         if (q == null) {
             return CommandResult.error("No quest named '" + questName + "'.");
         }
@@ -124,11 +193,16 @@ public class TravelLogMenuController extends AppMenuController {
                 + "  Progress: "
                 + (p == null ? "(no progress tracked)"
                 : p.getCurrentValue() + " / " + p.getTargetValue())
-                + "\n  Reward: " + describeReward(q.getReward());
+                + "\n  Reward: " + describeReward(q.getReward())
+                + (completed ? "\n  Status: completed" : "");
         return CommandResult.success(info, null);
     }
 
     public CommandResult<Void> completeQuest(String questName) {
+        Quest done = findIn(travelLog.getCompletedQuests(), questName);
+        if (done != null) {
+            return CommandResult.error("Quest '" + done.getName() + "' is already completed.");
+        }
         Quest q = findQuest(questName);
         if (q == null) {
             return CommandResult.error("No quest named '" + questName + "'.");
@@ -151,6 +225,10 @@ public class TravelLogMenuController extends AppMenuController {
             } else {
                 user.setCompletedNonDailyQuests(user.getCompletedNonDailyQuests() + 1);
             }
+            if (user.getQuestStatus() == null) {
+                user.setQuestStatus(new HashMap<>());
+            }
+            user.getQuestStatus().put(q.getName(), true);
             App.getInstance().getUserRepository().flush();
         }
         return CommandResult.success("Quest '" + questName + "' completed! Reward granted.");
@@ -159,8 +237,12 @@ public class TravelLogMenuController extends AppMenuController {
     // Helpers
 
     private Quest findQuest(String name) {
+        return findIn(travelLog.getQuests(), name);
+    }
+
+    private Quest findIn(List<Quest> quests, String name) {
         if (name == null) return null;
-        for (Quest q : travelLog.getQuests()) {
+        for (Quest q : quests) {
             if (q.getName().equalsIgnoreCase(name.trim())) {
                 return q;
             }

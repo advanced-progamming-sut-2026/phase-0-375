@@ -111,11 +111,11 @@ public class TravelLog {
      * Old daily quests (active or completed) are removed and new ones
      * are generated from the quest definitions file.
      */
-    public void refreshDailyQuests() {
+    public void refreshDailyQuests(String questsPath) {
         quests.removeIf(q -> q.getCategory() == QuestCategory.DAILY);
         completedQuests.removeIf(q -> q.getCategory() == QuestCategory.DAILY);
         try {
-            List<Quest> allQuests = new QuestLoader().load("/quests.json");
+            List<Quest> allQuests = new QuestLoader().load(questsPath);
             for (Quest q : allQuests) {
                 if (q.getCategory() == QuestCategory.DAILY) {
                     quests.add(q);

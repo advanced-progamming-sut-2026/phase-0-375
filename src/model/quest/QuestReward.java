@@ -1,6 +1,16 @@
 package model.quest;
 
+import model.app.App;
 import model.enums.QuestRewardType;
+import model.plant.PlantFactory;
+import model.plant.definition.Plant;
+import model.user.User;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Random;
 
 /**
  * Represents the reward given upon completing a quest.
@@ -29,7 +39,7 @@ public class QuestReward {
      * (coins/gems, an inventory item, or an unlockable).
      */
     public void grant() {
-        model.user.User user = model.app.App.getInstance().getCurrentUser();
+        User user = App.getInstance().getCurrentUser();
         if (user == null) {
             return;
         }
@@ -39,13 +49,50 @@ public class QuestReward {
         if (gemAmount > 0) {
             user.setGems(user.getGems() + gemAmount);
         }
-        if (inventoryItem != null && !inventoryItem.isBlank()
-                && inventoryItemAmount > 0 && user.getSeedPackets() != null) {
+        if (inventoryItem != null && !inventoryItem.isBlank() && inventoryItemAmount > 0) {
+            if (user.getSeedPackets() == null) {
+                user.setSeedPackets(new HashMap<>());
+            }
             int current = user.getSeedPackets().getOrDefault(inventoryItem, 0);
             user.getSeedPackets().put(inventoryItem, current + inventoryItemAmount);
         }
-        if (unlockableName != null && !unlockableName.isBlank() && user.getUnlockedPlants() != null) {
-            user.getUnlockedPlants().add(unlockableName);
+        if (unlockableName != null && !unlockableName.isBlank()) {
+            String resolved = resolveUnlockable(unlockableName, user);
+            if (resolved != null) {
+                if (user.getUnlockedPlants() == null) {
+                    user.setUnlockedPlants(new HashSet<>());
+                }
+                user.getUnlockedPlants().add(resolved);
+            }
+        }
+    }
+
+    /** Resolves "random_*" placeholders to a real locked, kill-capable plant. */
+    private String resolveUnlockable(String name, User user) {
+        if (!name.toLowerCase().startsWith("random")) {
+            return name;
+        }
+        try {
+            List<Plant> candidates = new ArrayList<>();
+            for (Plant p : PlantFactory.getAllDefinitions()) {
+                boolean unlocked = user.getUnlockedPlants() != null
+                        && user.getUnlockedPlants().contains(p.getName());
+                if (!unlocked && p.getDamage() > 0) {
+                    candidates.add(p);
+                }
+            }
+            if (candidates.isEmpty()) {
+                return null;
+            }
+            return candidates.get(new Random().nextInt(candidates.size())).getName();
+        } catch (IllegalStateException e) {
+            // PlantFactory not initialized yet; try once
+            try {
+                PlantFactory.init("/assets/data/plants/plants.json");
+                return resolveUnlockable(name, user);
+            } catch (Exception ex) {
+                return null;
+            }
         }
     }
 
