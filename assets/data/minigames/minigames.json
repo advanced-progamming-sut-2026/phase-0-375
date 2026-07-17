@@ -28,7 +28,12 @@
         "startDelay": 5,
         "entries": [
           {
-            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
             "minCount": 4,
             "maxCount": 6,
             "minSpawnDelay": 2,
@@ -48,8 +53,34 @@
     "coinReward": 150,
     "rows": 5,
     "columns": 9,
-    "rules": { "initialSun": 50 },
-    "waves": []
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false
+    },
+    "waves": [],
+    "vaseColumns": 6,
+    "vaseZombieCount": 8,
+    "vaseSeedCount": 8,
+    "giantVaseCount": 1,
+    "emptyVaseCount": 3,
+    "seedPacketExpirySeconds": 20,
+    "giantVaseZombie": "ZombieGargantuar",
+    "vaseZombies": [
+      "ZombieDefault",
+      "ZombieDefault",
+      "ZombieArmor1",
+      "ZombieArmor2"
+    ],
+    "vasePlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Repeater",
+      "Wall-nut",
+      "Squash",
+      "Cherry Bomb"
+    ]
   },
   {
     "miniGameType": "ZOMBOTANY",
@@ -58,14 +89,21 @@
     "coinReward": 200,
     "rows": 5,
     "columns": 9,
-    "rules": { "initialSun": 150 },
+    "rules": {
+      "initialSun": 150
+    },
     "waves": [
       {
         "waveNumber": 1,
         "startDelay": 10,
         "entries": [
           {
-            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
             "minCount": 3,
             "maxCount": 5,
             "minSpawnDelay": 2,
@@ -85,7 +123,9 @@
     "coinReward": 200,
     "rows": 5,
     "columns": 9,
-    "rules": { "initialSun": 0 },
+    "rules": {
+      "initialSun": 0
+    },
     "waves": []
   },
   {
@@ -95,14 +135,21 @@
     "coinReward": 250,
     "rows": 5,
     "columns": 9,
-    "rules": { "initialSun": 0 },
+    "rules": {
+      "initialSun": 0
+    },
     "waves": [
       {
         "waveNumber": 1,
         "startDelay": 10,
         "entries": [
           {
-            "pool": [{ "zombie": "ZombieDefault", "weight": 1.0 }],
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
             "minCount": 3,
             "maxCount": 5,
             "minSpawnDelay": 2,

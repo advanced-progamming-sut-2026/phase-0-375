@@ -11,6 +11,9 @@ import model.game.core.PvZGameLoop;
 import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.PendingSeedPacket;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
@@ -280,6 +283,12 @@ public class GameplayMenuController extends AppMenuController {
             return rollWalnut(model, bowling, type, x, y);
         }
 
+        // Vase Breaker: plants come from seed packets revealed by breaking
+        // vases and are planted for free on any free tile.
+        if (model.getCurrentLevel() instanceof VaseBreakerLevel vaseBreaker) {
+            return plantFromVase(model, vaseBreaker, type, x, y);
+        }
+
         boolean conveyor = model.getCurrentLevel() instanceof ConveyorBeltLevel;
         List<String> selected = model.getSelectedPlants();
         if (selected == null || !selected.contains(type)) {
@@ -367,6 +376,62 @@ public class GameplayMenuController extends AppMenuController {
             }
         }
         return null;
+    }
+
+    /**
+     * Vase Breaker: plants are free but must come from a seed packet
+     * revealed by breaking a vase; it can then be planted on any free
+     * tile before it expires.
+     */
+    private CommandResult<Void> plantFromVase(GameModel model, VaseBreakerLevel level,
+                                              String type, int x, int y) {
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        if (level.vaseAt(x, y) != null) {
+            return CommandResult.error("There is an unbroken vase at (" + x + ", " + y + ")."
+                    + " Break it first: break vase -l (" + x + "," + y + ")");
+        }
+        Cell cell = map.getCell(x, y);
+        if (cell == null) {
+            return CommandResult.error("Cell (" + x + ", " + y + ") does not exist.");
+        }
+        if (plantAt(cell) != null) {
+            return CommandResult.error("A plant is already placed at (" + x + ", " + y + ").");
+        }
+        PendingSeedPacket packet = level.claimSeedPacket(type);
+        if (packet == null) {
+            return CommandResult.error("No '" + type + "' seed packet is available."
+                    + " Break a vase containing one and plant it before it expires.");
+        }
+        PlantInstance instance = new PlantInstance(packet.getPlant());
+        instance.setPosition(new Point(x, y));
+        cell.addPlaceable(instance);
+        return CommandResult.success("Planted " + packet.getPlant().getName()
+                + " at (" + x + ", " + y + ") for free.");
+    }
+
+    /** Vase Breaker: breaks the vase at (x, y) and reveals its contents. */
+    public CommandResult<Void> breakVase(int x, int y) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            return CommandResult.error("Breaking vases is only available in the Vase Breaker mini-game.");
+        }
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        Vase vase = level.vaseAt(x, y);
+        if (vase == null) {
+            return CommandResult.error("There is no unbroken vase at (" + x + ", " + y + ").");
+        }
+        return CommandResult.success(level.breakVase(model, vase));
     }
 
     /**

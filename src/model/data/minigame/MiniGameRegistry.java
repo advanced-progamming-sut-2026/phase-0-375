@@ -7,6 +7,8 @@ import model.enums.MiniGameType;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameFactory;
 import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerSettings;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -78,7 +80,27 @@ public final class MiniGameRegistry {
         if (level != null) {
             level.setCoinReward(entry.getCoinReward());
         }
+        if (level instanceof VaseBreakerLevel vaseBreaker) {
+            vaseBreaker.setSettings(buildVaseSettings(entry));
+        }
         return level;
+    }
+
+    /** Copies the vase-specific JSON keys into the level's settings. */
+    private static VaseBreakerSettings buildVaseSettings(MiniGameDataEntry entry) {
+        VaseBreakerSettings settings = new VaseBreakerSettings();
+        settings.setVaseColumns(entry.getVaseColumns());
+        settings.setRandomVaseCount(entry.getRandomVaseCount());
+        settings.setSeedVaseCount(entry.getSeedVaseCount());
+        settings.setGiantVaseCount(entry.getGiantVaseCount());
+        settings.setRandomEmptyWeight(entry.getRandomEmptyWeight());
+        settings.setRandomZombieWeight(entry.getRandomZombieWeight());
+        settings.setRandomSeedWeight(entry.getRandomSeedWeight());
+        settings.setSeedPacketExpirySeconds(entry.getSeedPacketExpirySeconds());
+        settings.setGiantVaseZombie(entry.getGiantVaseZombie());
+        settings.setZombiePool(entry.getVaseZombies());
+        settings.setPlantPool(entry.getVasePlants());
+        return settings;
     }
 
     public boolean hasStage(MiniGameType type, int stage) {

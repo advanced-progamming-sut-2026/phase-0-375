@@ -26,14 +26,18 @@ public class WaveManager implements Tickable {
     }
 
     public WaveManager(List<Wave> waves, GameModel gameModel) {
-        if (waves == null || waves.isEmpty()) {
-            throw new IllegalArgumentException("waves must be non-null and non-empty");
-        }
-        this.waves = new ArrayList<>(waves);
+        this.waves = waves == null ? new ArrayList<>() : new ArrayList<>(waves);
         this.gameModel = gameModel;
         this.currentWaveIndex = 0;
-        this.phase = WaveManagerPhase.WAITING_FOR_NEXT_WAVE;
-        this.interWaveTimer = waves.getFirst().getStartDelay();
+        if (this.waves.isEmpty()) {
+            // Levels without scripted waves (e.g. Vase Breaker, I,Zombie)
+            // are immediately "done": their zombies come from other sources.
+            this.phase = WaveManagerPhase.LEVEL_DONE;
+            this.interWaveTimer = 0f;
+        } else {
+            this.phase = WaveManagerPhase.WAITING_FOR_NEXT_WAVE;
+            this.interWaveTimer = this.waves.getFirst().getStartDelay();
+        }
         // Wire up the game model on every wave so they can spawn zombies
         if (gameModel != null) {
             for (Wave w : this.waves) w.setGameModel(gameModel);

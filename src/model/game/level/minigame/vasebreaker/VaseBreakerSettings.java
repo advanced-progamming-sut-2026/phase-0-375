@@ -1,24 +1,14 @@
-package model.data.minigame;
+package model.game.level.minigame.vasebreaker;
 
-import model.data.level.LevelDataEntry;
-
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * JSON DTO for one mini-game stage in minigames.json.
- *
- * Inherits every regular level field (rows, columns, rules, waves, ...)
- * from LevelDataEntry so mini-game stages are described with the exact
- * same vocabulary as normal levels, and adds the mini-game specific keys.
+ * Tunable configuration for one Vase Breaker stage, populated from the
+ * vase-specific keys in minigames.json (see MiniGameDataEntry /
+ * MiniGameRegistry).
  */
-public class MiniGameDataEntry extends LevelDataEntry {
-
-    private String miniGameType;
-    private int stage = 1;
-    private int difficultyTier = 3;
-    private int coinReward = 100;
-
-    // --- Vase Breaker specific keys ---
+public class VaseBreakerSettings {
 
     /** How many of the rightmost lawn columns hold vases. */
     private int vaseColumns = 3;
@@ -28,7 +18,7 @@ public class MiniGameDataEntry extends LevelDataEntry {
     private int seedVaseCount;
     /** Vases guaranteed to contain the giant-vase zombie. */
     private int giantVaseCount;
-    /** Relative odds for what a random vase holds. */
+    /** Relative odds for what a random vase holds (clamped to >= 0). */
     private float randomEmptyWeight = 1f;
     private float randomZombieWeight = 2f;
     private float randomSeedWeight = 1f;
@@ -37,21 +27,9 @@ public class MiniGameDataEntry extends LevelDataEntry {
     /** Zombie definition hidden inside giant vases. */
     private String giantVaseZombie = "ZombieGargantuar";
     /** Zombie definition names drawn from when a random vase holds a zombie. */
-    private List<String> vaseZombies;
+    private List<String> zombiePool = new ArrayList<>();
     /** Plant definition names drawn from for seed packets. */
-    private List<String> vasePlants;
-
-    public String getMiniGameType() { return miniGameType; }
-    public void setMiniGameType(String miniGameType) { this.miniGameType = miniGameType; }
-
-    public int getStage() { return stage; }
-    public void setStage(int stage) { this.stage = stage; }
-
-    public int getDifficultyTier() { return difficultyTier; }
-    public void setDifficultyTier(int difficultyTier) { this.difficultyTier = difficultyTier; }
-
-    public int getCoinReward() { return coinReward; }
-    public void setCoinReward(int coinReward) { this.coinReward = coinReward; }
+    private List<String> plantPool = new ArrayList<>();
 
     public int getVaseColumns() { return vaseColumns; }
     public void setVaseColumns(int vaseColumns) { this.vaseColumns = vaseColumns; }
@@ -66,23 +44,36 @@ public class MiniGameDataEntry extends LevelDataEntry {
     public void setGiantVaseCount(int giantVaseCount) { this.giantVaseCount = giantVaseCount; }
 
     public float getRandomEmptyWeight() { return randomEmptyWeight; }
-    public void setRandomEmptyWeight(float randomEmptyWeight) { this.randomEmptyWeight = randomEmptyWeight; }
+    public void setRandomEmptyWeight(float randomEmptyWeight) { this.randomEmptyWeight = Math.max(0f, randomEmptyWeight); }
 
     public float getRandomZombieWeight() { return randomZombieWeight; }
-    public void setRandomZombieWeight(float randomZombieWeight) { this.randomZombieWeight = randomZombieWeight; }
+    public void setRandomZombieWeight(float randomZombieWeight) { this.randomZombieWeight = Math.max(0f, randomZombieWeight); }
 
     public float getRandomSeedWeight() { return randomSeedWeight; }
-    public void setRandomSeedWeight(float randomSeedWeight) { this.randomSeedWeight = randomSeedWeight; }
+    public void setRandomSeedWeight(float randomSeedWeight) { this.randomSeedWeight = Math.max(0f, randomSeedWeight); }
+
+    /** Sum of the random-vase outcome weights. */
+    public float totalRandomWeight() {
+        return randomEmptyWeight + randomZombieWeight + randomSeedWeight;
+    }
 
     public float getSeedPacketExpirySeconds() { return seedPacketExpirySeconds; }
     public void setSeedPacketExpirySeconds(float seedPacketExpirySeconds) { this.seedPacketExpirySeconds = seedPacketExpirySeconds; }
 
     public String getGiantVaseZombie() { return giantVaseZombie; }
-    public void setGiantVaseZombie(String giantVaseZombie) { this.giantVaseZombie = giantVaseZombie; }
+    public void setGiantVaseZombie(String giantVaseZombie) {
+        if (giantVaseZombie != null && !giantVaseZombie.isBlank()) {
+            this.giantVaseZombie = giantVaseZombie;
+        }
+    }
 
-    public List<String> getVaseZombies() { return vaseZombies; }
-    public void setVaseZombies(List<String> vaseZombies) { this.vaseZombies = vaseZombies; }
+    public List<String> getZombiePool() { return zombiePool; }
+    public void setZombiePool(List<String> zombiePool) {
+        this.zombiePool = zombiePool == null ? new ArrayList<>() : new ArrayList<>(zombiePool);
+    }
 
-    public List<String> getVasePlants() { return vasePlants; }
-    public void setVasePlants(List<String> vasePlants) { this.vasePlants = vasePlants; }
+    public List<String> getPlantPool() { return plantPool; }
+    public void setPlantPool(List<String> plantPool) {
+        this.plantPool = plantPool == null ? new ArrayList<>() : new ArrayList<>(plantPool);
+    }
 }
