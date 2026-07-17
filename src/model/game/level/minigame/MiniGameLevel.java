@@ -4,6 +4,7 @@ import model.app.App;
 import model.enums.MiniGameType;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.rule.MiniGameEndGameCondition;
 import model.user.User;
 
 /**
@@ -17,6 +18,11 @@ public abstract class MiniGameLevel extends Level {
 
     public MiniGameLevel(LevelConfig config, MiniGameType miniGameType, int difficultyTier) {
         super(config);
+        // Mini-games drive the end-game verdict through their own
+        // checkWinCondition / checkLossCondition overrides.
+        if (config != null) {
+            config.setEndGameCondition(new MiniGameEndGameCondition(this));
+        }
         this.miniGameType = miniGameType;
         this.difficultyTier = difficultyTier;
         this.completed = false;

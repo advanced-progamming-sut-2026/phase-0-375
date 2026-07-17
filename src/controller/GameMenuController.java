@@ -92,8 +92,7 @@ public class GameMenuController extends AppMenuController {
     public CommandResult<Void> enterMiniGame(String typeName, int stage) {
         MiniGameType type;
         try {
-            type = MiniGameType.valueOf(
-                    typeName.toUpperCase().replace(' ', '_').replace('-', '_'));
+            type = MiniGameType.valueOf(typeName.toUpperCase().replace(' ', '_').replace('-', '_'));
         } catch (IllegalArgumentException e) {
             return CommandResult.error("Unknown mini-game: '" + typeName + "'.");
         }
@@ -106,8 +105,7 @@ public class GameMenuController extends AppMenuController {
                 MiniGameRegistry.init("/assets/data/minigames/minigames.json");
                 registry = MiniGameRegistry.getInstance();
             } catch (IOException | RuntimeException loadError) {
-                return CommandResult.error(
-                        "Could not load mini-game definitions: " + loadError.getMessage());
+                return CommandResult.error("Could not load mini-game definitions: " + loadError.getMessage());
             }
         }
 

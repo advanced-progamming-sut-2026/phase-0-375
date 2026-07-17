@@ -8,7 +8,9 @@ import model.enums.PlacableLayer;
 import model.enums.WaveManagerPhase;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
@@ -271,6 +273,13 @@ public class GameplayMenuController extends AppMenuController {
         if (guard != null) return guard;
 
         GameModel model = requireGame();
+
+        // Wall-nut Bowling: the plant command rolls a walnut from the
+        // leftmost column instead of placing a plant.
+        if (model.getCurrentLevel() instanceof WallnutBowlingLevel bowling) {
+            return rollWalnut(model, bowling, type, x, y);
+        }
+
         boolean conveyor = model.getCurrentLevel() instanceof ConveyorBeltLevel;
         List<String> selected = model.getSelectedPlants();
         if (selected == null || !selected.contains(type)) {
@@ -318,6 +327,46 @@ public class GameplayMenuController extends AppMenuController {
         }
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
                 + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + ".");
+    }
+
+    /**
+     * Wall-nut Bowling: consumes a walnut from the conveyor belt and rolls
+     * it from the leftmost column down the given lane.
+     */
+    private CommandResult<Void> rollWalnut(GameModel model, WallnutBowlingLevel bowling,
+                                           String type, int x, int y) {
+        BowlingWalnutType walnutType = WallnutBowlingLevel.parseWalnutType(type);
+        if (walnutType == null) {
+            return CommandResult.error("Unknown walnut type: '" + type + "'.");
+        }
+        List<String> belt = model.getSelectedPlants();
+        String beltEntry = findBeltEntry(belt, walnutType);
+        if (beltEntry == null) {
+            return CommandResult.error("Walnut '" + type + "' is not on the conveyor belt right now.");
+        }
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        if (y != 0) {
+            return CommandResult.error("Bowling walnuts must be launched from the leftmost column:"
+                    + " use -l (" + x + ",0).");
+        }
+        bowling.launchWalnut(walnutType, x);
+        belt.remove(beltEntry);
+        return CommandResult.success("Rolled " + beltEntry + " down lane " + x + ".");
+    }
+
+    /** First belt entry naming the same walnut type (aliases accepted). */
+    private String findBeltEntry(List<String> belt, BowlingWalnutType type) {
+        if (belt == null) return null;
+        for (String entry : belt) {
+            if (WallnutBowlingLevel.parseWalnutType(entry) == type) {
+                return entry;
+            }
+        }
+        return null;
     }
 
     /**
