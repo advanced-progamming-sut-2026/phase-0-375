@@ -380,7 +380,7 @@ public class GameModel implements BehaviorContext {
         List<PlantInstance> plants = new ArrayList<>();
         for (int col = 0; col < gameMap.getCols(); col++) {
             PlantInstance plant = getPlantAt(lane, col);
-            if (plant != null && plant.getCurrentHP() > 0) {
+            if (plant != null) {
                 plants.add(plant);
             }
         }
@@ -393,7 +393,7 @@ public class GameModel implements BehaviorContext {
         for (int row = 0; row < gameMap.getRows(); row++) {
             for (int col = 0; col < gameMap.getCols(); col++) {
                 PlantInstance plant = getPlantAt(row, col);
-                if (plant != null && plant.getCurrentHP() > 0) {
+                if (plant != null) {
                     plants.add(plant);
                 }
             }

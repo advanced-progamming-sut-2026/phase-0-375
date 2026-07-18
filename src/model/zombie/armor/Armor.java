@@ -149,4 +149,9 @@ public class Armor {
     public void setLayerThresholds(List<Float> layerThresholds) {
         this.layerThresholds = layerThresholds;
     }
+
+    @Override
+    public String toString() {
+        return type.getPrimaryAlias();
+    }
 }

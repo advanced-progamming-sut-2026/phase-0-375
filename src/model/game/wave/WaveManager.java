@@ -65,7 +65,7 @@ public class WaveManager implements Tickable {
                 current.markCleared();
                 if (hasPendingWaves()) {
                     phase = WaveManagerPhase.WAITING_FOR_NEXT_WAVE;
-                    interWaveTimer = waves.get(currentWaveIndex + 1).getStartDelay();
+                    interWaveTimer = waves.get(++currentWaveIndex).getStartDelay();
                 } else {
                     phase = WaveManagerPhase.LEVEL_DONE;
                 }

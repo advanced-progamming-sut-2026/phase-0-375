@@ -95,6 +95,9 @@ public class ZombieInstance implements Tickable {
      */
     public void tick(float deltaTime) {
         removeDestroyedArmor();
+        if (state == ZombieState.SPAWNING) {
+            state = ZombieState.WALKING;
+        }
         if (currentHP <= 0 && state != ZombieState.DYING && state != ZombieState.DEAD) {
             state = ZombieState.DYING;
         }

@@ -409,6 +409,7 @@ public class PlantInstance implements Placeable {
             case WALL_NUT: return new WallAbility();
             case MODIFIER: return new ModifierAbility();
             case HOMING: return new HomingAbility();
+            case STRIKE_THROUGH: return new StrikeThroughAbility();
             default: return null;
         }
     }

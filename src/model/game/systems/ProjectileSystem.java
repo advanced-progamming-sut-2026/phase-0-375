@@ -80,10 +80,10 @@ public class ProjectileSystem implements Tickable {
             if (!projectile.pierce()) {
                 gameModel.removeProjectile(projectile);
                 iceDamagedColumns.remove(projectile);
-            }
 
-            if (eventBus != null) {
-                eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+                if (eventBus != null) {
+                    eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+                }
             }
         }
     }
