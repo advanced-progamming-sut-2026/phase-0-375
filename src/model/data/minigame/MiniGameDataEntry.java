@@ -85,4 +85,22 @@ public class MiniGameDataEntry extends LevelDataEntry {
 
     public List<String> getVasePlants() { return vasePlants; }
     public void setVasePlants(List<String> vasePlants) { this.vasePlants = vasePlants; }
+
+    // --- I, Zombie specific keys ---
+
+    /** Placeable zombie roster: definition name + sun cost (5 per stage). */
+    private List<IZombieZombieData> placeableZombies;
+    /** Pre-planted defense: each plant with its fixed row and column. */
+    private List<IZombiePlantData> prePlantedPlants;
+    /** Definition name of the stationary sun-producing zombie. */
+    private String sunZombie = "ZombieIZombieSun";
+
+    public List<IZombieZombieData> getPlaceableZombies() { return placeableZombies; }
+    public void setPlaceableZombies(List<IZombieZombieData> placeableZombies) { this.placeableZombies = placeableZombies; }
+
+    public List<IZombiePlantData> getPrePlantedPlants() { return prePlantedPlants; }
+    public void setPrePlantedPlants(List<IZombiePlantData> prePlantedPlants) { this.prePlantedPlants = prePlantedPlants; }
+
+    public String getSunZombie() { return sunZombie; }
+    public void setSunZombie(String sunZombie) { this.sunZombie = sunZombie; }
 }

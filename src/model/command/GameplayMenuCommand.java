@@ -20,7 +20,8 @@ public enum GameplayMenuCommand implements CLICommand {
     RELEASE_NUKE("release the nuke"),
     ZOMBIES_INFO("zombies info"),
     START_ZOMBIE_WAVES("start zombie waves"),
-    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombieType>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)");
+    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombieType>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)"),
+    PLACE_ZOMBIE("place zombie -t (?<type>\\S+) -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)");
 
     private final Pattern pattern;
     private Matcher matcher;

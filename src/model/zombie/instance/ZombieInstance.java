@@ -466,6 +466,7 @@ public class ZombieInstance implements Tickable {
             case ZOMBOTANY_PEASHOOTER: return new ZombotanyPeashooterBehavior();
             case ZOMBOTANY_JALAPENO: return new ZombotanyJalapenoBehavior();
             case ZOMBOTANY_SQUASH: return new ZombotanySquashBehavior();
+            case PRODUCE_SUN: return new ProduceSunBehavior();
             default: return null;
         }
     }

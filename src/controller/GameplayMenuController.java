@@ -27,6 +27,7 @@ import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.List;
+import model.game.level.minigame.izombie.IZombieLevel;
 
 /**
  * Controller for the in-game (gameplay) menu.
@@ -792,6 +793,25 @@ public class GameplayMenuController extends AppMenuController {
         model.getZombies().add(instance);
         map.addZombie(instance, x, y);
         return CommandResult.success("Spawned '" + zombieType + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * I, Zombie: places a roster zombie on the lawn, spending sun.
+     * x is the row and y is the column, matching the plant command.
+     */
+    public CommandResult<Void> placeZombie(String type, int x, int y) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof IZombieLevel iZombie)) {
+            return CommandResult.error("Placing zombies is only possible in the I, Zombie mini-game.");
+        }
+        String error = iZombie.placeZombie(model, type, x, y);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Placed '" + type + "' at (" + x + ", " + y + ").");
     }
 
     // ──────────────────────────────────────────────

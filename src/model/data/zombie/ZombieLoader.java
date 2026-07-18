@@ -148,6 +148,10 @@ public class ZombieLoader {
         // Zombotany
         zombie.putBehaviorProp("ShotIntervalSeconds", data.getShotIntervalSeconds());
         zombie.putBehaviorProp("FuseSeconds", data.getFuseSeconds());
+        // I, Zombie sun zombie
+        zombie.putBehaviorProp("SunProduceIntervalSeconds", data.getSunProduceIntervalSeconds());
+        zombie.putBehaviorProp("SunProduceBaseAmount", data.getSunProduceBaseAmount());
+        zombie.putBehaviorProp("SunProduceGrowthAmount", data.getSunProduceGrowthAmount());
         // Newspaper
         zombie.putBehaviorProp("EnragedDamageScale", data.getEnragedDamageScale());
         zombie.putBehaviorProp("EnragedSpeedScale", data.getEnragedSpeedScale());
@@ -353,6 +357,9 @@ public class ZombieLoader {
 
             case "ZombotanySquashProps":
                 behaviors.add(ZombieBehaviorType.ZOMBOTANY_SQUASH);
+                break;
+            case "IZombieSunProps":
+                behaviors.add(ZombieBehaviorType.PRODUCE_SUN);
                 break;
 
             case "ZombiePropertySheet":

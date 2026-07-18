@@ -18,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.izombie.IZombieSettings;
 
 /**
  * Loads mini-game stage definitions from JSON and builds MiniGameLevel
@@ -83,6 +85,9 @@ public final class MiniGameRegistry {
         if (level instanceof VaseBreakerLevel vaseBreaker) {
             vaseBreaker.setSettings(buildVaseSettings(entry));
         }
+        if (level instanceof IZombieLevel iZombie) {
+            iZombie.setSettings(buildIZombieSettings(entry));
+        }
         return level;
     }
 
@@ -100,6 +105,36 @@ public final class MiniGameRegistry {
         settings.setGiantVaseZombie(entry.getGiantVaseZombie());
         settings.setZombiePool(entry.getVaseZombies());
         settings.setPlantPool(entry.getVasePlants());
+        return settings;
+    }
+
+    /** Copies the I, Zombie JSON keys into the level's settings. */
+    private static IZombieSettings buildIZombieSettings(MiniGameDataEntry entry) {
+        IZombieSettings settings = new IZombieSettings();
+        if (entry.getPlaceableZombies() != null) {
+            for (IZombieZombieData data : entry.getPlaceableZombies()) {
+                if (data != null && data.getZombie() != null) {
+                    settings.addPlaceableZombie(data.getZombie(), data.getCost());
+                }
+            }
+        }
+        if (entry.getPrePlantedPlants() != null) {
+            for (IZombiePlantData data : entry.getPrePlantedPlants()) {
+                if (data != null && data.getPlant() != null) {
+                    settings.addPlantPlacement(data.getPlant(), data.getRow(), data.getCol());
+                }
+            }
+        }
+        if (entry.getSunZombie() != null && !entry.getSunZombie().isBlank()) {
+            settings.setSunZombie(entry.getSunZombie());
+        }
+        int redLine = entry.getRules() != null ? entry.getRules().getDeadLineColumn() : -1;
+        if (redLine <= 0) {
+            redLine = entry.getDeadLineColumn();
+        }
+        if (redLine > 0) {
+            settings.setRedLineColumn(redLine);
+        }
         return settings;
     }
 

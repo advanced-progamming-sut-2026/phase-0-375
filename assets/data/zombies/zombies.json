@@ -2533,5 +2533,23 @@
       "WavePointCost": 250,
       "Weight": 900
     }
+  },
+  {
+    "aliases": [
+      "ZombieIZombieSun"
+    ],
+    "objclass": "IZombieSunProps",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 0,
+      "EatDPS": 0,
+      "Hitpoints": 1290,
+      "Speed": 0.0,
+      "WavePointCost": 0,
+      "Weight": 0,
+      "SunProduceIntervalSeconds": 8.0,
+      "SunProduceBaseAmount": 25,
+      "SunProduceGrowthAmount": 5
+    }
   }
 ]

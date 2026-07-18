@@ -107,6 +107,13 @@ public class GameplayMenuView extends AppMenuView {
             cheatSpawnZombie(type, x, y);
             return;
         }
+        if (GameplayMenuCommand.PLACE_ZOMBIE.matches(input)) {
+            String type = GameplayMenuCommand.PLACE_ZOMBIE.getParameter("type");
+            int x = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("x"));
+            int y = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("y"));
+            placeZombie(type, x, y);
+            return;
+        }
 
         displayError("Unknown gameplay command. Available commands:");
         displayError("  advance time -t <count> ticks");
@@ -126,6 +133,7 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  release the nuke");
         displayError("  zombies info");
         displayError("  cheat spawn-zombie -t <type> -l <x>, <y>");
+        displayError("  place zombie -t <type> -l (<x>, <y>)");
         displayError("  menu exit");
     }
 
@@ -136,6 +144,11 @@ public class GameplayMenuView extends AppMenuView {
 
     public void breakVase(int x, int y) {
         CommandResult<Void> result = controller.breakVase(x, y);
+        displayCommandResult(result);
+    }
+
+    public void placeZombie(String type, int x, int y) {
+        CommandResult<Void> result = controller.placeZombie(type, x, y);
         displayCommandResult(result);
     }
 
