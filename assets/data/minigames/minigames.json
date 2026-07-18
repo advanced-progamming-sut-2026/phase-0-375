@@ -914,7 +914,46 @@
       "shovelEnabled": false,
       "plantFoodDrops": false
     },
-    "waves": []
+    "waves": [],
+    "beghouledPlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Wall-nut",
+      "Puff-shroom",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 10,
+    "upgrades": [
+      {
+        "from": "Peashooter",
+        "to": "Repeater",
+        "cost": 500
+      },
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Puff-shroom",
+        "to": "Fume-shroom",
+        "cost": 250
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieImp",
+      "ZombieArmor1"
+    ],
+    "firstSpawnDelaySeconds": 15.0,
+    "spawnIntervalSeconds": 12.0,
+    "minSpawnIntervalSeconds": 6.0,
+    "spawnIntervalDecaySeconds": 0.25
   },
   {
     "miniGameType": "BEGHOULED",
@@ -931,7 +970,52 @@
       "shovelEnabled": false,
       "plantFoodDrops": false
     },
-    "waves": []
+    "waves": [],
+    "beghouledPlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Wall-nut",
+      "Bonk Choy",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 15,
+    "upgrades": [
+      {
+        "from": "Peashooter",
+        "to": "Repeater",
+        "cost": 500
+      },
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Cabbage-pult",
+        "to": "Melon-pult",
+        "cost": 1000
+      },
+      {
+        "from": "Melon-pult",
+        "to": "Winter Melon",
+        "cost": 750
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieArmor1",
+      "ZombieNewspaper",
+      "ZombieArmor2"
+    ],
+    "firstSpawnDelaySeconds": 12.0,
+    "spawnIntervalSeconds": 10.0,
+    "minSpawnIntervalSeconds": 5.0,
+    "spawnIntervalDecaySeconds": 0.25
   },
   {
     "miniGameType": "BEGHOULED",
@@ -948,6 +1032,52 @@
       "shovelEnabled": false,
       "plantFoodDrops": false
     },
-    "waves": []
+    "waves": [],
+    "beghouledPlants": [
+      "Repeater",
+      "Puff-shroom",
+      "Wall-nut",
+      "Bonk Choy",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 20,
+    "upgrades": [
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Puff-shroom",
+        "to": "Fume-shroom",
+        "cost": 250
+      },
+      {
+        "from": "Cabbage-pult",
+        "to": "Melon-pult",
+        "cost": 1000
+      },
+      {
+        "from": "Melon-pult",
+        "to": "Winter Melon",
+        "cost": 750
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieArmor2",
+      "ZombieExplorer",
+      "ZombieModernAllStar",
+      "ZombieArmor4"
+    ],
+    "firstSpawnDelaySeconds": 10.0,
+    "spawnIntervalSeconds": 8.0,
+    "minSpawnIntervalSeconds": 4.0,
+    "spawnIntervalDecaySeconds": 0.3
   }
 ]

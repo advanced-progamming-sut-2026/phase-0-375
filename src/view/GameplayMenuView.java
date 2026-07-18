@@ -114,6 +114,22 @@ public class GameplayMenuView extends AppMenuView {
             placeZombie(type, x, y);
             return;
         }
+        if (GameplayMenuCommand.SWAP_PLANT.matches(input)) {
+            int x = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("x"));
+            int y = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("y"));
+            String direction = GameplayMenuCommand.SWAP_PLANT.getParameter("dir");
+            swapPlant(x, y, direction);
+            return;
+        }
+        if (GameplayMenuCommand.UPGRADE_PLANT.matches(input)) {
+            String type = GameplayMenuCommand.UPGRADE_PLANT.getParameter("type");
+            upgradePlant(type);
+            return;
+        }
+        if (GameplayMenuCommand.SHOW_BEGHOULED_STATUS.matches(input)) {
+            showBeghouledStatus();
+            return;
+        }
 
         displayError("Unknown gameplay command. Available commands:");
         displayError("  advance time -t <count> ticks");
@@ -134,6 +150,9 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  zombies info");
         displayError("  cheat spawn-zombie -t <type> -l <x>, <y>");
         displayError("  place zombie -t <type> -l (<x>, <y>)");
+        displayError("  swap plant -l (<x>, <y>) -d <up|down|left|right>");
+        displayError("  upgrade plant -t <type>");
+        displayError("  show beghouled status");
         displayError("  menu exit");
     }
 
@@ -149,6 +168,21 @@ public class GameplayMenuView extends AppMenuView {
 
     public void placeZombie(String type, int x, int y) {
         CommandResult<Void> result = controller.placeZombie(type, x, y);
+        displayCommandResult(result);
+    }
+
+    public void swapPlant(int x, int y, String direction) {
+        CommandResult<Void> result = controller.swapPlant(x, y, direction);
+        displayCommandResult(result);
+    }
+
+    public void upgradePlant(String type) {
+        CommandResult<Void> result = controller.upgradePlant(type);
+        displayCommandResult(result);
+    }
+
+    public void showBeghouledStatus() {
+        CommandResult<Void> result = controller.beghouledStatus();
         displayCommandResult(result);
     }
 

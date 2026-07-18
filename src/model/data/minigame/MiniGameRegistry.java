@@ -20,6 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.izombie.IZombieSettings;
+import model.game.level.minigame.beghouled.BeghouledLevel;
+import model.game.level.minigame.beghouled.BeghouledSettings;
 
 /**
  * Loads mini-game stage definitions from JSON and builds MiniGameLevel
@@ -88,6 +90,9 @@ public final class MiniGameRegistry {
         if (level instanceof IZombieLevel iZombie) {
             iZombie.setSettings(buildIZombieSettings(entry));
         }
+        if (level instanceof BeghouledLevel beghouled) {
+            beghouled.setSettings(buildBeghouledSettings(entry));
+        }
         return level;
     }
 
@@ -152,5 +157,42 @@ public final class MiniGameRegistry {
 
         String filePath = path.startsWith("/") ? path.substring(1) : path;
         return new FileInputStream(filePath);
+    }
+
+    private static BeghouledSettings buildBeghouledSettings(MiniGameDataEntry entry) {
+        BeghouledSettings settings = new BeghouledSettings();
+        if (entry.getBeghouledPlants() != null) {
+            for (String plant : entry.getBeghouledPlants()) {
+                settings.addPlantType(plant);
+            }
+        }
+        if (entry.getMatchTarget() > 0) {
+            settings.setMatchTarget(entry.getMatchTarget());
+        }
+        if (entry.getUpgrades() != null) {
+            for (BeghouledUpgradeData upgrade : entry.getUpgrades()) {
+                if (upgrade != null) {
+                    settings.addUpgrade(upgrade.getFrom(), upgrade.getTo(), upgrade.getCost());
+                }
+            }
+        }
+        if (entry.getBeghouledZombies() != null) {
+            for (String zombie : entry.getBeghouledZombies()) {
+                settings.addZombie(zombie);
+            }
+        }
+        if (entry.getFirstSpawnDelaySeconds() > 0) {
+            settings.setFirstSpawnDelaySeconds(entry.getFirstSpawnDelaySeconds());
+        }
+        if (entry.getSpawnIntervalSeconds() > 0) {
+            settings.setSpawnIntervalSeconds(entry.getSpawnIntervalSeconds());
+        }
+        if (entry.getMinSpawnIntervalSeconds() > 0) {
+            settings.setMinSpawnIntervalSeconds(entry.getMinSpawnIntervalSeconds());
+        }
+        if (entry.getSpawnIntervalDecaySeconds() > 0) {
+            settings.setSpawnIntervalDecaySeconds(entry.getSpawnIntervalDecaySeconds());
+        }
+        return settings;
     }
 }

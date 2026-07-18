@@ -28,6 +28,7 @@ import model.zombie.instance.ZombieInstance;
 import java.util.ArrayList;
 import java.util.List;
 import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 
 /**
  * Controller for the in-game (gameplay) menu.
@@ -812,6 +813,55 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error(error);
         }
         return CommandResult.success("Placed '" + type + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * Beghouled: swaps the plant at (x, y) with its neighbour in the given
+     * direction, provided the swap creates a match of 3+. x = row, y = column.
+     */
+    public CommandResult<Void> swapPlant(int x, int y, String direction) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("Swapping plants is only possible in the Beghouled mini-game.");
+        }
+        String error = beghouled.swapPlant(model, x, y, direction);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Swapped. Matches: " + beghouled.getMatchesMade()
+                + "/" + beghouled.getSettings().getMatchTarget()
+                + ", sun: " + model.getSunAmount() + ".");
+    }
+
+    /** Beghouled: upgrades every plant of the given type on the board at once. */
+    public CommandResult<Void> upgradePlant(String type) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("Upgrading plants is only possible in the Beghouled mini-game.");
+        }
+        String error = beghouled.upgradePlant(model, type);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Upgraded every '" + type + "'. Sun left: " + model.getSunAmount() + ".");
+    }
+
+    /** Beghouled: shows match progress, craters and the upgrade price list. */
+    public CommandResult<Void> beghouledStatus() {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("This command is only available in the Beghouled mini-game.");
+        }
+        return CommandResult.success(beghouled.statusReport(model));
     }
 
     // ──────────────────────────────────────────────

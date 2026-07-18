@@ -103,4 +103,62 @@ public class MiniGameDataEntry extends LevelDataEntry {
 
     public String getSunZombie() { return sunZombie; }
     public void setSunZombie(String sunZombie) { this.sunZombie = sunZombie; }
+
+    // --- Beghouled specific keys ---
+
+    /** The five plant types that fill the Beghouled board. */
+    private List<String> beghouledPlants;
+
+    /** Matches (3+) needed to win a Beghouled stage. */
+    private int matchTarget;
+
+    /** Board-wide plant upgrades purchasable with sun. */
+    private List<BeghouledUpgradeData> upgrades;
+
+    /** Zombie pool for Beghouled's endless attack. */
+    private List<String> beghouledZombies;
+
+    /** Seconds before the first Beghouled zombie spawns. */
+    private float firstSpawnDelaySeconds;
+
+    /** Starting seconds between Beghouled zombie spawns. */
+    private float spawnIntervalSeconds;
+
+    /** Fastest the Beghouled spawn interval can get. */
+    private float minSpawnIntervalSeconds;
+
+    /** Seconds shaved off the Beghouled spawn interval after each spawn. */
+    private float spawnIntervalDecaySeconds;
+
+    public List<String> getBeghouledPlants() {
+        return beghouledPlants;
+    }
+
+    public int getMatchTarget() {
+        return matchTarget;
+    }
+
+    public List<BeghouledUpgradeData> getUpgrades() {
+        return upgrades;
+    }
+
+    public List<String> getBeghouledZombies() {
+        return beghouledZombies;
+    }
+
+    public float getFirstSpawnDelaySeconds() {
+        return firstSpawnDelaySeconds;
+    }
+
+    public float getSpawnIntervalSeconds() {
+        return spawnIntervalSeconds;
+    }
+
+    public float getMinSpawnIntervalSeconds() {
+        return minSpawnIntervalSeconds;
+    }
+
+    public float getSpawnIntervalDecaySeconds() {
+        return spawnIntervalDecaySeconds;
+    }
 }
