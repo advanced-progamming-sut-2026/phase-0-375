@@ -27,13 +27,25 @@ public class PlantLoader {
      * @throws IOException if the file cannot be read or parsed
      */
     public List<Plant> load(String classpathPath) throws IOException {
-        InputStream in = PlantLoader.class.getResourceAsStream(classpathPath);
-        if (in == null) {
-            throw new IOException("plants.json resource not found: " + classpathPath);
-        }
-        try (InputStream stream = in) {
+        try (InputStream stream = openPlantStream(classpathPath)) {
             return loadFromStream(stream);
         }
+    }
+
+    /**
+     * Opens the plant definition JSON, first from the classpath, then from
+     * the file system relative to the working directory.
+     */
+    private static InputStream openPlantStream(String path) throws IOException {
+        InputStream inputStream = PlantLoader.class.getResourceAsStream(path);
+        if (inputStream != null) return inputStream;
+
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        java.io.File file = new java.io.File(filePath);
+        if (!file.isFile()) {
+            throw new IOException("plants.json resource not found: " + path);
+        }
+        return new java.io.FileInputStream(file);
     }
 
     /**
