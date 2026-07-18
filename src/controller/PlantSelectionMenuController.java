@@ -8,28 +8,33 @@ import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.LevelConfig;
 import model.plant.PlantFactory;
+import model.plant.definition.Plant;
 import model.user.User;
+import model.zombie.ZombieFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class PlantSelectionMenuController extends AppMenuController {
-    private static PlantSelectionMenuController instance = null;
+    private static final String PLANTS_JSON = "/assets/data/plants/plants.json";
 
-    /**
-     * TODO: PlantRegistry integration.
-     * Stub list of all plant names. Replace with PlantRegistry lookup.
-     */
-    private static final List<String> ALL_PLANTS = java.util.Arrays.asList(
-            "Peashooter", "Sunflower", "Wall-nut", "Potato Mine", "Snow Pea",
-            "Chomper", "Repeater", "Cherry Bomb", "Tall-nut", "Spikeweed",
-            "Spikerock", "Torchwood", "Puff-shroom", "Fume-shroom", "Sun-shroom"
-    );
+    private static PlantSelectionMenuController instance = null;
 
     private static final int DEFAULT_MAX_SELECTION = 8;
 
-    private PlantSelectionMenuController() {}
+    private PlantSelectionMenuController() {
+        ensureDefinitionsLoaded();
+    }
+
+    private static List<String> getPlantsNames() {
+        return PlantFactory.getAllDefinitions()
+                .stream()
+                .map(Plant::getName)
+                .collect(Collectors.toList());
+    }
 
     public static PlantSelectionMenuController getInstance() {
         if (instance == null) instance = new PlantSelectionMenuController();
@@ -48,14 +53,30 @@ public class PlantSelectionMenuController extends AppMenuController {
     }
 
     public CommandResult<List<String>> showAllPlants() {
-        return CommandResult.successWithData("All plants:", new ArrayList<>(ALL_PLANTS));
+        return CommandResult.successWithData("All plants:", new ArrayList<>(getPlantsNames()));
+    }
+
+    private void ensureDefinitionsLoaded() {
+        try {
+            PlantFactory.getAllDefinitions();
+        } catch (IllegalStateException notLoaded) {
+            tryInitPlants();
+        }
+    }
+
+    private void tryInitPlants() {
+        try {
+            PlantFactory.init(PLANTS_JSON);
+        } catch (IOException e) {
+            System.err.println("[PlantSelectionMenuController] Could not load plant definitions: " + e.getMessage());
+        }
     }
 
     public CommandResult<List<String>> showAvailablePlants() {
         User user = App.getInstance().getCurrentUser();
         List<String> available = new ArrayList<>();
         if (user.getUnlockedPlants() != null) {
-            for (String name : ALL_PLANTS) {
+            for (String name : getPlantsNames()) {
                 if (user.getUnlockedPlants().contains(name)) {
                     available.add(name);
                 }
@@ -65,7 +86,7 @@ public class PlantSelectionMenuController extends AppMenuController {
     }
 
     public CommandResult<Void> addPlant(String type) {
-        if (!ALL_PLANTS.contains(type)) {
+        if (!getPlantsNames().contains(type)) {
             return CommandResult.error("Unknown plant: '" + type + "'.");
         }
         User user = App.getInstance().getCurrentUser();
@@ -117,7 +138,7 @@ public class PlantSelectionMenuController extends AppMenuController {
     }
 
     public CommandResult<Void> boostPlant(String type) {
-        if (!ALL_PLANTS.contains(type)) {
+        if (!getPlantsNames().contains(type)) {
             return CommandResult.error("Unknown plant: '" + type + "'.");
         }
         User user = App.getInstance().getCurrentUser();

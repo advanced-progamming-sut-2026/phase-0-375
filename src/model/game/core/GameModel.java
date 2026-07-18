@@ -77,8 +77,6 @@ public class GameModel implements BehaviorContext {
         this.chapter = levelConfig.getChapter();
         this.endGameCondition = levelConfig.getEndGameCondition();
 
-        this.waveManager = new WaveManager(levelConfig.getWaves());
-
         this.activeZombies = new ArrayList<>();
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
@@ -86,7 +84,14 @@ public class GameModel implements BehaviorContext {
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
-        this.eventBus = null;
+        this.waveManager = new WaveManager(levelConfig.getWaves(), this);
+
+        this.eventBus = new EventBus() {
+            @Override
+            public void dispatch(GameEvent event) {
+
+            }
+        };
     }
 
     public GameMap getMap() {
@@ -161,7 +166,7 @@ public class GameModel implements BehaviorContext {
         if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
             return false;
         }
-        Cell cell = gameMap.getCell(row, col);
+        Cell cell = gameMap.getCell(col, row);
         if (cell.getPlaceable(PlacableLayer.MAIN) != null) {
             return false;
         }
@@ -219,6 +224,7 @@ public class GameModel implements BehaviorContext {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
         recordZombieSeen(zombie.getName());
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
+        instance.setGridPosition(new Point(gameMap.getCols(), lane));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
@@ -241,7 +247,7 @@ public class GameModel implements BehaviorContext {
         instance.setState(ZombieState.SPAWNING);
 
         activeZombies.add(instance);
-        gameMap.addZombie(instance, clampedRow, clampedCol);
+        gameMap.addZombie(instance, clampedCol, clampedRow);
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
 
         return instance;
@@ -359,7 +365,7 @@ public class GameModel implements BehaviorContext {
         if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
             return null;
         }
-        Object placeable = gameMap.getCell(row, col).getPlaceable(PlacableLayer.MAIN);
+        Object placeable = gameMap.getCell(col, row).getPlaceable(PlacableLayer.MAIN);
         if (placeable instanceof PlantInstance) {
             return (PlantInstance) placeable;
         }
@@ -418,12 +424,12 @@ public class GameModel implements BehaviorContext {
             return false;
         }
 
-        Cell destinationCell = gameMap.getCell(row, col);
+        Cell destinationCell = gameMap.getCell(col, row);
         if (destinationCell.getPlaceable(PlacableLayer.MAIN) != null) {
             return false;
         }
 
-        Cell sourceCell = gameMap.getCell(currentPos.getY(), currentPos.getX());
+        Cell sourceCell = gameMap.getCell(currentPos.getX(), currentPos.getY());
         sourceCell.removePlaceable(plant);
         destinationCell.addPlaceable(plant);
         plant.setPosition(new Point(col, row));
@@ -499,11 +505,11 @@ public class GameModel implements BehaviorContext {
         if (oldRow == newRow) return true;
 
         // Update grid registration
-        Cell oldCell = gameMap.getCell(oldRow, col);
+        Cell oldCell = gameMap.getCell(col, oldRow);
         if (oldCell != null) {
             oldCell.removeZombie(zombie);
         }
-        Cell newCell = gameMap.getCell(newRow, col);
+        Cell newCell = gameMap.getCell(col, newRow);
         if (newCell != null) {
             newCell.addZombie(zombie);
         }
@@ -543,12 +549,12 @@ public class GameModel implements BehaviorContext {
             int row = gridPos.getY();
             int oldCol = gridPos.getX();
 
-            Cell oldCell = gameMap.getCell(row, oldCol);
+            Cell oldCell = gameMap.getCell(oldCol, row);
             if (oldCell != null) {
                 oldCell.removeZombie(zombie);
             }
             if (newGridX >= 0 && newGridX < gameMap.getCols()) {
-                Cell newCell = gameMap.getCell(row, newGridX);
+                Cell newCell = gameMap.getCell(newGridX, row);
                 if (newCell != null) {
                     newCell.addZombie(zombie);
                 }
@@ -586,7 +592,7 @@ public class GameModel implements BehaviorContext {
         if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
             return null;
         }
-        return gameMap.getCell(row, col);
+        return gameMap.getCell(col, row);
     }
 
     @Override
@@ -640,7 +646,7 @@ public class GameModel implements BehaviorContext {
         if (!activeZombies.contains(zombie)) {
             activeZombies.add(zombie);
         }
-        Cell cell = gameMap.getCell(row, col);
+        Cell cell = gameMap.getCell(col, row);
         if (cell != null && !cell.getZombies().contains(zombie)) {
             cell.addZombie(zombie);
         }

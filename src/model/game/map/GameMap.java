@@ -17,9 +17,9 @@ public class GameMap {
         this.lanes = IntStream.range(0, rows)
                 .mapToObj(i -> new Lane())
                 .toArray(Lane[]::new);
-        this.grid = IntStream.range(0, rows)
-                .mapToObj(i -> IntStream.range(0, cols)
-                        .mapToObj(j -> new Cell(i, j))
+        this.grid = IntStream.range(0, cols)
+                .mapToObj(j -> IntStream.range(0, rows)
+                        .mapToObj(i -> new Cell(i, j))
                         .toArray(Cell[]::new))
                 .toArray(Cell[][]::new);
     }
@@ -36,13 +36,13 @@ public class GameMap {
     }
 
     public void addZombie(ZombieInstance instance, int x, int y) {
-        if (x < 0 || y < 0 || x >= rows || y >= cols) return;
+        if (x < 0 || y < 0 || x >= cols || y >= rows) return;
 
         grid[x][y].addZombie(instance);
     }
 
     public void addProjectile(Projectile projectile, int x, int y) {
-        if (x < 0 || y < 0 || x >= rows || y >= cols) return;
+        if (x < 0 || y < 0 || x >= cols || y >= rows) return;
 
         grid[x][y].addProjectile(projectile);
     }

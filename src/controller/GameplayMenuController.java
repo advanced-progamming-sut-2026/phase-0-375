@@ -102,8 +102,8 @@ public class GameplayMenuController extends AppMenuController {
 
     private boolean inBounds(GameMap map, int x, int y) {
         return x >= 0 && y >= 0
-                && x < map.getRows()
-                && y < map.getCols();
+                && x < map.getCols()
+                && y < map.getRows();
     }
 
     /**
@@ -366,7 +366,7 @@ public class GameplayMenuController extends AppMenuController {
         int cleared = 0;
         for (int r = 0; r < map.getRows(); r++) {
             for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(r, c);
+                Cell cell = map.getCell(c, r);
                 if (cell == null) continue;
                 PlantInstance pi = plantAt(cell);
                 if (pi == null) continue;
@@ -473,7 +473,7 @@ public class GameplayMenuController extends AppMenuController {
         for (int r = 0; r < map.getRows(); r++) {
             StringBuilder row = new StringBuilder("  Row " + r + ": ");
             for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(r, c);
+                Cell cell = map.getCell(c, r);
                 char ch = '.';
                 if (cell != null) {
                     if (plantAt(cell) != null) ch = 'P';
@@ -483,10 +483,10 @@ public class GameplayMenuController extends AppMenuController {
                     // it 'Z', plant+ zombie = 'X'.
                     // Since Cell doesn't currently expose its zombie list, we
                     // also scan the model's active zombies and check if any
-                    // has grid coords (r,c).
+                    // has grid coords (c, r).
                     for (ZombieInstance z : model.getZombies()) {
                         var gp = z.getGridPosition();
-                        if (gp != null && gp.getX() == r && gp.getY() == c) {
+                        if (gp != null && gp.getX() == c && gp.getY() == r) {
                             ch = (ch == 'P') ? 'X' : 'Z';
                             break;
                         }
@@ -520,7 +520,7 @@ public class GameplayMenuController extends AppMenuController {
         int count = 0;
         for (int r = 0; r < map.getRows(); r++) {
             for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(r, c);
+                Cell cell = map.getCell(c, r);
                 if (cell == null) continue;
                 PlantInstance pi = plantAt(cell);
                 if (pi == null) continue;
