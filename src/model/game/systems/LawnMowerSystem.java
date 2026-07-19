@@ -34,6 +34,8 @@ public class LawnMowerSystem implements Tickable {
             LawnMower mower = lane.getLawnMower();
             if (mower == null || !mower.isTriggered()) continue;
 
+            gameModel.markLawnMowerUsed();
+
             boolean finished = mower.tick(deltaTime, colCount);
             killZombiesInPath(row, mower.getXPosition());
 

@@ -13,6 +13,7 @@ import model.game.level.LevelConfig;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
+import model.game.map.Lane;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.TerrainStrategy;
 import model.game.systems.TerrainSystem;
@@ -22,6 +23,7 @@ import model.game.wave.WaveManager;
 import model.item.Grave;
 import model.item.LootDrop;
 import model.item.Sun;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.user.User;
@@ -65,6 +67,16 @@ public class GameModel implements BehaviorContext {
     private int plantsLost;
     private float elapsedSeconds;
 
+    // Per-level stats used for quest tracking
+    private int sunCollected;
+    private boolean lawnMowerUsed;
+    private float firstZombieSpawnTime = -1f;
+    private int killsWithin30s;
+    private int noMowerFirstColumnKills;
+    private List<Plant> plantsPlaced;
+    private Set<Integer> rowsPlanted;
+    private Set<Integer> columnsPlanted;
+
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
         this.difficultyLevel = App.getInstance().getCurrentUser().getDifficultyLevel();
@@ -81,6 +93,9 @@ public class GameModel implements BehaviorContext {
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
+        this.plantsPlaced = new ArrayList<>();
+        this.rowsPlanted = new HashSet<>();
+        this.columnsPlanted = new HashSet<>();
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
@@ -176,6 +191,11 @@ public class GameModel implements BehaviorContext {
         }
         plant.setPosition(new Point(col, row));
         boolean added = cell.addPlaceable(plant);
+        if (added) {
+            plantsPlaced.add(plant.getDefinition());
+            rowsPlanted.add(row);
+            columnsPlanted.add(col);
+        }
         if (added && eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_PLACED));
         }
@@ -206,6 +226,9 @@ public class GameModel implements BehaviorContext {
 
     /** Records a zombie type as seen for the collection; saves only on first sighting. */
     public void recordZombieSeen(String zombieName) {
+        if (firstZombieSpawnTime < 0) {
+            firstZombieSpawnTime = elapsedSeconds;
+        }
         User user = App.getInstance().getCurrentUser();
         if (user == null || zombieName == null) {
             return;
@@ -278,6 +301,7 @@ public class GameModel implements BehaviorContext {
     public void collectSun(Sun sun) {
         activeSuns.remove(sun);
         sunAmount += sun.getValue();
+        sunCollected += sun.getValue();
     }
 
     public void tick(float deltaTime) {
@@ -309,6 +333,39 @@ public class GameModel implements BehaviorContext {
     public void incrementZombiesKilled() {
         zombiesKilled++;
     }
+
+    /** Records a kill with timing/position details for quest tracking. */
+    public void recordZombieKilled(ZombieInstance zombie) {
+        zombiesKilled++;
+        if (firstZombieSpawnTime >= 0 && elapsedSeconds - firstZombieSpawnTime <= 30f) {
+            killsWithin30s++;
+        }
+        if (zombie == null || zombie.getGridPosition() == null) return;
+        if (zombie.getGridX() <= 0) {
+            Lane lane = gameMap.getLane(zombie.getGridY());
+            if (lane == null || !lane.hasActiveLawnMower()) {
+                noMowerFirstColumnKills++;
+            }
+        }
+    }
+
+    public int getSunCollected() { return sunCollected; }
+
+    public void markLawnMowerUsed() { lawnMowerUsed = true; }
+
+    public boolean isLawnMowerUsed() { return lawnMowerUsed; }
+
+    public int getKillsWithin30s() { return killsWithin30s; }
+
+    public int getNoMowerFirstColumnKills() { return noMowerFirstColumnKills; }
+
+    public List<Plant> getPlantsPlaced() { return plantsPlaced; }
+
+    public Set<Integer> getRowsPlanted() { return rowsPlanted; }
+
+    public Set<Integer> getColumnsPlanted() { return columnsPlanted; }
+
+    public Chapter getChapter() { return chapter; }
 
     /** Number of plants that have died this level. */
     public int getPlantsLost() {
@@ -433,6 +490,8 @@ public class GameModel implements BehaviorContext {
         sourceCell.removePlaceable(plant);
         destinationCell.addPlaceable(plant);
         plant.setPosition(new Point(col, row));
+        rowsPlanted.add(row);
+        columnsPlanted.add(col);
         return true;
     }
 

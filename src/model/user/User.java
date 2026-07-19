@@ -50,6 +50,7 @@ public class User {
     private int completedMiniGames;
 
     private Map<String, Boolean> questStatus;
+    private Map<String, Integer> questProgress;
     private Map<String, Boolean> purchasedDailyDeals;
 
     // Daily offer persistence (plant + date)
@@ -292,6 +293,14 @@ public class User {
 
     public void setQuestStatus(Map<String, Boolean> questStatus) {
         this.questStatus = questStatus;
+    }
+
+    public Map<String, Integer> getQuestProgress() {
+        return questProgress;
+    }
+
+    public void setQuestProgress(Map<String, Integer> questProgress) {
+        this.questProgress = questProgress;
     }
 
     public String getDailyQuestRefreshDate() {

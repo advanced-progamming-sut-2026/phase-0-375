@@ -7,6 +7,7 @@ import model.game.level.LevelConfig;
 import model.game.rule.EndGameCondition;
 import model.game.systems.*;
 import model.game.wave.WaveManager;
+import model.quest.QuestTracker;
 
 public class PvZGameLoop implements GameLoop {
 
@@ -91,6 +92,8 @@ public class PvZGameLoop implements GameLoop {
         if (eventBus != null) {
             eventBus.dispatch(new GameEvent(eventType));
         }
+
+        QuestTracker.onLevelEnd(gameModel, result == GameState.WON);
     }
 
     @Override

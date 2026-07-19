@@ -17,9 +17,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public class TravelLogMenuController extends AppMenuController {
     private static final String QUESTS_JSON = "/assets/data/quests/quests.json";
@@ -65,21 +67,22 @@ public class TravelLogMenuController extends AppMenuController {
         String today = LocalDate.now().toString();
         boolean newDay = !today.equals(user.getDailyQuestRefreshDate());
         if (newDay) {
-            // completed dailies become available again on a new day
-            if (user.getQuestStatus() != null) {
-                for (Quest q : loadQuests()) {
-                    if (q.getCategory() == QuestCategory.DAILY) {
-                        user.getQuestStatus().remove(q.getName());
-                    }
+            // completed dailies become available again on a new day;
+            // also drop stale daily variants (any day's value) from status/progress
+            Set<String> dailyBases = new HashSet<>();
+            for (Quest q : loadQuests()) {
+                if (q.getCategory() == QuestCategory.DAILY) {
+                    dailyBases.add(baseName(q.getName()));
                 }
             }
+            removeDailyEntries(user.getQuestStatus(), dailyBases);
+            removeDailyEntries(user.getQuestProgress(), dailyBases);
             user.setDailyQuestRefreshDate(today);
             App.getInstance().getUserRepository().flush();
         }
 
-        if (userChanged || newDay) {
-            reloadForUser(user);
-        }
+        // always rebuild so progress saved at level end shows up immediately
+        reloadForUser(user);
     }
 
     /** Rebuilds active/completed lists from quests.json and the user's saved status. */
@@ -87,16 +90,38 @@ public class TravelLogMenuController extends AppMenuController {
         Map<String, Boolean> status = user.getQuestStatus();
         List<Quest> active = new ArrayList<>();
         List<Quest> completed = new ArrayList<>();
+        Map<String, Integer> savedProgress = user.getQuestProgress();
         for (Quest q : loadQuests()) {
             boolean done = status != null && Boolean.TRUE.equals(status.get(q.getName()));
             if (done) {
                 completed.add(q);
             } else {
+                applySavedProgress(q, savedProgress);
                 active.add(q);
             }
         }
         travelLog.setQuests(active);
         travelLog.setCompletedQuests(completed);
+    }
+
+    /** Applies progress persisted by QuestTracker to a freshly loaded quest. */
+    private static void applySavedProgress(Quest q, Map<String, Integer> saved) {
+        if (saved == null || q.getProgress() == null) return;
+        Integer value = saved.get(q.getName());
+        if (value != null && value > 0) {
+            q.getProgress().setCurrentValue(Math.min(value, q.getProgress().getTargetValue()));
+        }
+    }
+
+    /** "One Column Less (4)" -> "One Column Less". */
+    private static String baseName(String questName) {
+        int idx = questName.indexOf(" (");
+        return idx > 0 ? questName.substring(0, idx) : questName;
+    }
+
+    private static void removeDailyEntries(Map<String, ?> map, Set<String> dailyBases) {
+        if (map == null) return;
+        map.keySet().removeIf(key -> dailyBases.contains(baseName(key)));
     }
 
     // Menu navigation
@@ -229,6 +254,9 @@ public class TravelLogMenuController extends AppMenuController {
                 user.setQuestStatus(new HashMap<>());
             }
             user.getQuestStatus().put(q.getName(), true);
+            if (user.getQuestProgress() != null) {
+                user.getQuestProgress().remove(q.getName());
+            }
             App.getInstance().getUserRepository().flush();
         }
         return CommandResult.success("Quest '" + questName + "' completed! Reward granted.");

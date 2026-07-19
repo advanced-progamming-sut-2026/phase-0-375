@@ -354,7 +354,7 @@ public class ZombieSystem implements Tickable {
                 }
 
                 zombie.setState(ZombieState.DEAD);
-                gameModel.incrementZombiesKilled();
+                gameModel.recordZombieKilled(zombie);
 
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_KILLED));
