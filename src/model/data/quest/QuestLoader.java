@@ -2,6 +2,7 @@ package model.data.quest;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import model.enums.PlantCategory;
 import model.enums.QuestCategory;
 import model.enums.QuestPriority;
 import model.enums.QuestRewardType;
@@ -11,9 +12,11 @@ import model.quest.QuestReward;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Loads quest definitions from {@code quests.json} and builds
@@ -49,8 +52,9 @@ public class QuestLoader {
 
     /**
      * Builds one or more Quest objects from a single JSON entry.
-     * If the entry has a variable with dash-separated numeric values,
-     * it is expanded into multiple quests — one per variable value.
+     * Dash-separated variables (numeric or not) expand into one quest per value.
+     * Known keywords (plant_families, column/row counts) become one
+     * randomly-picked variant per day.
      */
     private List<Quest> buildQuests(QuestDataEntry entry) {
         List<Quest> quests = new ArrayList<>();
@@ -89,9 +93,7 @@ public class QuestLoader {
                 for (String part : parts) {
                     int value = Integer.parseInt(part.trim());
                     String questName = entry.getName() + " (" + value + ")";
-                    String condition = entry.getCondition()
-                            .replace("sun_amount", String.valueOf(value))
-                            .replaceAll("\\bn\\b", String.valueOf(value));
+                    String condition = substitute(entry.getCondition(), String.valueOf(value));
 
                     QuestReward variantReward = buildVariantReward(entry, value);
 
@@ -107,22 +109,101 @@ public class QuestLoader {
                     quests.add(quest);
                 }
             } else {
-                // Non-numeric variable (e.g. "each game chapter", "plant_families"):
-                // single quest with the variable stored as-is.
-                Quest quest = new Quest(
-                        entry.getName(),
-                        category,
-                        entry.getCondition(),
-                        reward,
-                        priority,
-                        variable,
-                        new QuestProgress(0, parseTarget(entry.getCondition()))
-                );
-                quests.add(quest);
+                String[] dailyValues = dailyValuesFor(variable);
+                if (dailyValues != null) {
+                    // Daily-random variable: one variant per day, stable within the day.
+                    String value = pickDaily(dailyValues, entry.getName());
+                    Quest quest = new Quest(
+                            entry.getName() + " (" + value + ")",
+                            category,
+                            substitute(entry.getCondition(), value),
+                            reward,
+                            priority,
+                            value,
+                            new QuestProgress(0, parseTarget(entry.getCondition()))
+                    );
+                    quests.add(quest);
+                } else if (parts.length > 1) {
+                    // Non-numeric dash list (e.g. chapter names): one quest per value.
+                    for (String part : parts) {
+                        String value = part.trim();
+                        Quest quest = new Quest(
+                                entry.getName() + " (" + value + ")",
+                                category,
+                                substitute(entry.getCondition(), value),
+                                reward,
+                                priority,
+                                value,
+                                new QuestProgress(0, parseTarget(entry.getCondition()))
+                        );
+                        quests.add(quest);
+                    }
+                } else {
+                    // Unknown variable: single quest with the variable stored as-is.
+                    Quest quest = new Quest(
+                            entry.getName(),
+                            category,
+                            entry.getCondition(),
+                            reward,
+                            priority,
+                            variable,
+                            new QuestProgress(0, parseTarget(entry.getCondition()))
+                    );
+                    quests.add(quest);
+                }
             }
         }
 
         return quests;
+    }
+
+    private static final int MAP_COLUMNS = 9;
+    private static final int MAP_ROWS = 5;
+
+    /** Known daily-random variables and their possible values; null if not one of them. */
+    private static String[] dailyValuesFor(String variable) {
+        switch (variable.trim()) {
+            case "plant_families": {
+                PlantCategory[] cats = PlantCategory.values();
+                String[] values = new String[cats.length];
+                for (int i = 0; i < cats.length; i++) {
+                    values[i] = cats[i].name();
+                }
+                return values;
+            }
+            case "column_count":
+                return numberRange(MAP_COLUMNS);
+            case "row_count":
+                return numberRange(MAP_ROWS);
+            case "min_row_and_column_count":
+                return numberRange(Math.min(MAP_ROWS, MAP_COLUMNS));
+            default:
+                return null;
+        }
+    }
+
+    /** ["1", "2", ..., max]. */
+    private static String[] numberRange(int max) {
+        String[] values = new String[max];
+        for (int i = 0; i < max; i++) {
+            values[i] = String.valueOf(i + 1);
+        }
+        return values;
+    }
+
+    /** Picks today's variant: stable within a day, changes every day. */
+    private static String pickDaily(String[] values, String questName) {
+        long seed = LocalDate.now().toEpochDay() * 31L + questName.hashCode();
+        return values[new Random(seed).nextInt(values.length)];
+    }
+
+    /** Replaces known condition placeholders with the variable value. */
+    private static String substitute(String condition, String value) {
+        return condition
+                .replace("sun_amount", value)
+                .replace("family_type", value)
+                .replaceAll("\\bchapter\\b", value)
+                .replaceAll("\\bn\\b", value);
     }
 
     /**
