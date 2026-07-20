@@ -104,9 +104,10 @@ public class SmashBehavior implements ZombieBehavior {
         float smashDuration = zombie.getDefinition().getBehaviorPropFloat(
                 "SmashDuration", DEFAULT_GARGANTUAR_SMASH_DURATION);
         if (smashDuration <= 0f) smashDuration = DEFAULT_GARGANTUAR_SMASH_DURATION;
-        int smashDamage = zombie.getDefinition().getBehaviorPropInt(
+        /* int smashDamage = zombie.getDefinition().getBehaviorPropInt(
                 "SmashDamage", DEFAULT_GARGANTUAR_SMASH_DAMAGE);
-        if (smashDamage <= 0) smashDamage = DEFAULT_GARGANTUAR_SMASH_DAMAGE;
+        if (smashDamage <= 0) smashDamage = DEFAULT_GARGANTUAR_SMASH_DAMAGE; */
+        int smashDamage = DEFAULT_GARGANTUAR_SMASH_DAMAGE;
 
         smashTimer += deltaTime;
         if (smashTimer >= smashDuration) {
@@ -138,9 +139,10 @@ public class SmashBehavior implements ZombieBehavior {
             return;
         }
 
-        int smashDamage = zombie.getDefinition().getBehaviorPropInt(
+        /* int smashDamage = zombie.getDefinition().getBehaviorPropInt(
                 "SmashDamage", ALL_STAR_SMASH_DAMAGE);
-        if (smashDamage <= 0) smashDamage = ALL_STAR_SMASH_DAMAGE;
+        if (smashDamage <= 0) smashDamage = ALL_STAR_SMASH_DAMAGE; */
+        int smashDamage = ALL_STAR_SMASH_DAMAGE;
 
         context.damagePlant(plant, smashDamage);
         float afterSmash = zombie.getDefinition().getBehaviorPropFloat(

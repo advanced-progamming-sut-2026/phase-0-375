@@ -294,6 +294,9 @@ public class GameplayMenuController extends AppMenuController {
         if (plantAt(cell) != null) {
             return CommandResult.error("A plant is already placed at (" + x + ", " + y + ").");
         }
+        if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
+            return CommandResult.error("An item is already placed at (" + x + ", " + y + ").");
+        }
 
         Plant definition = lookupPlantDefinition(type);
         if (definition == null) {
@@ -550,7 +553,7 @@ public class GameplayMenuController extends AppMenuController {
                 Plant p = pi.getDefinition();
                 count++;
                 sb.append("  ").append(p.getName())
-                        .append(" @ (").append(r).append(", ").append(c).append(")")
+                        .append(" @ (").append(c).append(", ").append(r).append(")")
                         .append(" cost=").append(p.getCost())
                         .append(" hp=").append(pi.getCurrentHP()).append("/").append(p.getBaseHP())
                         .append(" level=").append(pi.getLevel())

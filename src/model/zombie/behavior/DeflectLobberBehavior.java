@@ -18,7 +18,7 @@ public class DeflectLobberBehavior implements ZombieBehavior {
      * Distance ahead of the zombie at which a lobbed projectile is
      * considered "in range" of the parasol and gets deflected.
      */
-    public static final float DEFLECT_RANGE = 0.5f;
+    public static final float DEFLECT_RANGE = 0.8f;
 
     // --- State ---
 

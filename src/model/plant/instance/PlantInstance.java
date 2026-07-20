@@ -7,6 +7,7 @@ import model.enums.PlantState;
 import model.enums.PlantTags;
 import model.game.map.Point;
 import model.item.placeable.Placeable;
+import model.plant.PlantFactory;
 import model.plant.ability.PlantAbility;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.*;
@@ -99,9 +100,6 @@ public class PlantInstance implements Placeable {
         }
 
         // Imitater starts a short countdown before it morphs into its target.
-        // The actual target name is set externally via setImitateTarget(...)
-        // (e.g. by the plant-selection / placement flow). Until it is set,
-        // transformCountdown stays at -1 so execute() does nothing.
         this.imitateTarget = null;
         this.transformCountdown = -1f;
         if (isImitater(definition)) {
@@ -151,11 +149,7 @@ public class PlantInstance implements Placeable {
             executeAbility(context);
         }
 
-        // Imitater transform countdown is a lifecycle concern (like
-        // recharge / lifespan), so it ticks here rather than inside
-        // ModifierAbility.execute() — the ability interface has no
-        // deltaTime parameter. When the countdown hits zero the
-        // instance morphs into its imitate target.
+        // When the countdown hits zero the instance morphs into its imitate target.
         tickImitaterTransform(deltaTime);
     }
 
@@ -480,10 +474,8 @@ public class PlantInstance implements Placeable {
     // --- Imitater transform ---
 
     /**
-     * Tick the Imitater's transform countdown. Called by
-     * {@link ModifierAbility#execute} once per game tick while the
-     * instance is still an Imitater. When the countdown expires the
-     * instance morphs into its {@link #imitateTarget} via
+     * Tick the Imitater's transform countdown. When the countdown
+     * expires the instance morphs into its {@link #imitateTarget} via
      * {@link #transformIntoImitated()}.
      *
      * @param deltaTime seconds elapsed since the last tick
@@ -509,11 +501,11 @@ public class PlantInstance implements Placeable {
      */
     public void transformIntoImitated() {
         if (imitateTarget == null || imitateTarget.isEmpty()) return;
-        model.plant.definition.Plant newDef = null;
+        Plant newDef = null;
         try {
-            newDef = model.plant.PlantFactory.getDefinition(imitateTarget);
+            newDef = PlantFactory.getDefinition(imitateTarget);
         } catch (IllegalStateException ignored) {
-            // PlantFactory not initialised — leave the instance as-is.
+            // PlantFactory not initialized - leave the instance as-is.
         }
         if (newDef == null) return;
         transformInto(newDef);
@@ -521,7 +513,7 @@ public class PlantInstance implements Placeable {
 
     /**
      * Swaps this instance's definition to {@code newDefinition} and
-     * re-initialises every piece of derived runtime state so the
+     * re-initializes every piece of derived runtime state so the
      * instance behaves exactly like a freshly-placed instance of the
      * new plant (same HP, recharge, ability cooldowns, strategy cache).
      *

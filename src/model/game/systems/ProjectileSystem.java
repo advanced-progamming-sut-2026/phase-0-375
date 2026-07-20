@@ -1,6 +1,7 @@
 package model.game.systems;
 
 
+import model.enums.PlacableLayer;
 import model.enums.PlantCategory;
 import model.enums.PlantTags;
 import model.enums.ZombieBehaviorType;
@@ -8,6 +9,9 @@ import model.game.core.Tickable;
 import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.core.GameModel;
+import model.item.GridItem;
+import model.item.placeable.Placeable;
+import model.item.pushable.Pushable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Pellet;
@@ -62,6 +66,16 @@ public class ProjectileSystem implements Tickable {
                 gameModel.removeProjectile(projectile);
                 iceDamagedColumns.remove(projectile);
                 continue;
+            }
+
+            if (projectile instanceof Pellet && hitGridItemsIfAny(projectile)) {
+                gameModel.removeProjectile(projectile);
+                iceDamagedColumns.remove(projectile);
+
+                if (eventBus != null) {
+                    eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+                }
+                return;
             }
 
             ZombieInstance target = findCollision(projectile);
@@ -204,6 +218,31 @@ public class ProjectileSystem implements Tickable {
             }
         }
         return best;
+    }
+
+    /**
+     * Checks if there is any GridItem in the current cell of the projectile,
+     * if any exists, and it blocks the projectiles, the projectile would hit it
+     * and apply {@link Projectile#getDamage()} damage to it. However, Pushable
+     * items collisions with projectiles is handled via {@link ProjectileSystem}.
+     *
+     * @return {@code true} if the {@code projectile} has hit any grid items.
+     */
+    private boolean hitGridItemsIfAny(Projectile projectile) {
+        int lane = projectile.getRow();
+        float projX = projectile.getX();
+
+        Cell cell = gameModel.getCellAt(lane, (int) projX);
+        if (cell == null) return false;
+
+        Placeable placeable = cell.getPlaceable(PlacableLayer.GROUND);
+        if (!(placeable instanceof GridItem)) return false;
+
+        GridItem item = (GridItem) placeable;
+        if (!item.blocksProjectiles() || (item instanceof Pushable)) return false;
+
+        item.takeDamage(projectile.getDamage());
+        return true;
     }
 
     // --- Damage application ---
