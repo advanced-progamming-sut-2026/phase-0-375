@@ -56,6 +56,23 @@ public class Plant {
         this.levels = levels;
     }
 
+    /** Copy constructor: per-instance copy so level upgrades never touch the shared definition. */
+    public Plant(Plant other) {
+        this.id = other.id;
+        this.name = other.name;
+        this.category = other.category;
+        this.tags = new ArrayList<>(other.tags);
+        this.cost = other.cost;
+        this.baseHP = other.baseHP;
+        this.damage = other.damage;
+        this.rechargeTime = other.rechargeTime;
+        this.actionInterval = other.actionInterval;
+        this.abilityType = other.abilityType;
+        this.abilityValue = other.abilityValue;
+        this.plantFoodEffect = new PlantFoodEffect(other.getPlantFoodType(), other.getPlantFoodValue());
+        this.levels = other.levels;
+    }
+
     // --- Tag helpers ---
 
     public boolean hasTag(PlantTags tag) {

@@ -43,6 +43,7 @@ public class GameModel implements BehaviorContext {
     private long currentTick;
     private int sunAmount;
     private int plantFoodCount;
+    private int persistentPlantFood; // portion of plantFoodCount backed by the user profile
     private int difficultyLevel;
     private GameState gameState;
     private Chapter chapter;
@@ -85,7 +86,10 @@ public class GameModel implements BehaviorContext {
         this.currentLevel = currentLevel;
         LevelConfig levelConfig = this.currentLevel.getConfig();
         this.sunAmount = levelConfig.getRules().getInitialSun();
-        this.plantFoodCount = 0;
+        // load plant food bought from the shop (stored on the user profile)
+        User pfOwner = App.getInstance().getCurrentUser();
+        this.plantFoodCount = pfOwner != null ? Math.max(0, pfOwner.getPlantFoodCount()) : 0;
+        this.persistentPlantFood = this.plantFoodCount;
         this.chapter = levelConfig.getChapter();
         this.endGameCondition = levelConfig.getEndGameCondition();
 
@@ -221,6 +225,15 @@ public class GameModel implements BehaviorContext {
     public boolean usePlantFood() {
         if (plantFoodCount < 1) return false;
         plantFoodCount--;
+        // purchased plant food is consumed from the profile too
+        if (persistentPlantFood > 0) {
+            persistentPlantFood--;
+            User owner = App.getInstance().getCurrentUser();
+            if (owner != null && owner.getPlantFoodCount() > 0) {
+                owner.setPlantFoodCount(owner.getPlantFoodCount() - 1);
+                App.getInstance().getUserRepository().flush();
+            }
+        }
         return true;
     }
 

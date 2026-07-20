@@ -195,9 +195,12 @@ public class Shop {
             if (plantType == null || plantType.isEmpty()) {
                 return PurchaseResult.PLANT_TYPE_REQUIRED;
             }
-            if (!isPlantUnlocked(plantType)) {
+            // accept the plant name case-insensitively
+            String canonical = resolveUnlockedPlantName(plantType);
+            if (canonical == null) {
                 return PurchaseResult.PLANT_NOT_UNLOCKED;
             }
+            plantType = canonical;
         }
 
         if (!canAfford(item, count)) {
@@ -285,6 +288,13 @@ public class Shop {
         }
     }
 
+    // last plant picked by a random seed-packet purchase (for UI messages)
+    private String lastRandomSeedPlant;
+
+    public String getLastRandomSeedPlant() {
+        return lastRandomSeedPlant;
+    }
+
     private void applyItemEffect(ShopItem item, int count, String plantType) {
         switch (item.getItemType()) {
             case POT:
@@ -295,6 +305,7 @@ public class Shop {
                 break;
             case SEED_PACKET_RANDOM:
                 String randomPlant = pickRandomUnlockedPlant();
+                lastRandomSeedPlant = randomPlant;
                 if (randomPlant != null) {
                     applySeedPacketPurchase(randomPlant, RANDOM_SEED_PACKET_AMOUNT * count);
                 }
@@ -352,6 +363,20 @@ public class Shop {
     private boolean isPlantUnlocked(String plantName) {
         Set<String> unlocked = customer.getUnlockedPlants();
         return plantName != null && unlocked != null && unlocked.contains(plantName);
+    }
+
+    /** Finds the canonical unlocked plant name, ignoring case. */
+    private String resolveUnlockedPlantName(String plantName) {
+        Set<String> unlocked = customer != null ? customer.getUnlockedPlants() : null;
+        if (plantName == null || unlocked == null) {
+            return null;
+        }
+        for (String name : unlocked) {
+            if (name != null && name.equalsIgnoreCase(plantName.trim())) {
+                return name;
+            }
+        }
+        return null;
     }
 
     private String pickRandomUnlockedPlant() {

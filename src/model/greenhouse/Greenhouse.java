@@ -220,21 +220,37 @@ public class Greenhouse {
             return null;
         }
         Set<String> candidates = new HashSet<>();
+        List<Plant> all;
         try {
-            List<Plant> all = PlantFactory.getAllDefinitions();
-            for (Plant def : all) {
-                if (def.hasPlantFood() && unlocked.contains(def.getName())) {
-                    candidates.add(def.getName());
-                }
+            all = PlantFactory.getAllDefinitions();
+        } catch (IllegalStateException notInitialised) {
+            // greenhouse can be visited before any level initialises the factory
+            try {
+                PlantFactory.init("/assets/data/plants/plants.json");
+                all = PlantFactory.getAllDefinitions();
+            } catch (Exception ex) {
+                return null; // definitions unavailable -> marigold fallback
             }
-        } catch (IllegalStateException ignored) {
-            return null; // PlantFactory not initialised -> marigold fallback
+        }
+        for (Plant def : all) {
+            if (def.hasPlantFood() && isUnlocked(unlocked, def.getName())) {
+                candidates.add(def.getName());
+            }
         }
         if (candidates.isEmpty()) {
             return null;
         }
         List<String> list = new ArrayList<>(candidates);
         return list.get(random.nextInt(list.size()));
+    }
+
+    /** Case-insensitive membership test against unlocked plant names. */
+    private boolean isUnlocked(Set<String> unlocked, String name) {
+        if (name == null) return false;
+        for (String u : unlocked) {
+            if (name.equalsIgnoreCase(u)) return true;
+        }
+        return false;
     }
 
     /**

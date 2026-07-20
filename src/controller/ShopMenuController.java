@@ -71,6 +71,11 @@ public class ShopMenuController extends AppMenuController {
         // For pots, enrich the message with unlock progress.
         ShopItem item = shop.findItemById(itemId);
         String message = "Purchase successful!";
+        if (item != null && item.getItemType() == ShopItemType.SEED_PACKET_RANDOM
+                && shop.getLastRandomSeedPlant() != null) {
+            message = "Purchased " + (Shop.RANDOM_SEED_PACKET_AMOUNT * count)
+                    + " seed packet(s) for '" + shop.getLastRandomSeedPlant() + "'.";
+        }
         if (item != null && item.getItemType() == ShopItemType.POT) {
             Greenhouse greenhouse = Greenhouse.getInstance(App.getInstance().getCurrentUser());
             int[] next = greenhouse.nextPotToUnlock();

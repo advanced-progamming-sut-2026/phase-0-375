@@ -300,18 +300,19 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("Unknown plant type: '" + type + "'.");
         }
 
-        // Conveyor Belt levels: seed packets come from the belt and are free.
-        int cost = conveyor ? 0 : definition.getCost();
-        if (!model.spendSun(cost)) {
-            return CommandResult.error("Not enough sun. Need " + cost
-                    + ", have " + model.getSunAmount() + ".");
-        }
-
         PlantInstance instance = new PlantInstance(definition);
         // apply the user's saved upgrade level (bought in the collection menu)
         int level = plantLevelFor(definition.getName());
         if (level > 1) {
             instance.applyLevelUpgrade(level);
+        }
+
+        // Conveyor Belt levels: seed packets come from the belt and are free.
+        // Cost comes from the leveled instance so BUFF_COST upgrades apply.
+        int cost = conveyor ? 0 : instance.getDefinition().getCost();
+        if (!model.spendSun(cost)) {
+            return CommandResult.error("Not enough sun. Need " + cost
+                    + ", have " + model.getSunAmount() + ".");
         }
         instance.setPosition(new Point(x, y));
 
@@ -323,8 +324,30 @@ public class GameplayMenuController extends AppMenuController {
         if (conveyor) {
             selected.remove(type); // consume the seed packet from the belt
         }
+        String note = consumeBoostIfAny(instance) ? " Boost consumed: plant food activated!" : "";
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
-                + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + ".");
+                + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + "." + note);
+    }
+
+    /**
+     * Consumes a stored one-shot boost (greenhouse harvest or 'boost plant')
+     * for this plant type; the plant starts in its plant-food phase.
+     */
+    private boolean consumeBoostIfAny(PlantInstance instance) {
+        User user = App.getInstance().getCurrentUser();
+        if (user == null || user.getPlantBoosts() == null) {
+            return false;
+        }
+        String name = instance.getDefinition().getName();
+        for (Map.Entry<String, Boolean> e : user.getPlantBoosts().entrySet()) {
+            if (Boolean.TRUE.equals(e.getValue()) && e.getKey().equalsIgnoreCase(name)) {
+                e.setValue(false); // one-shot
+                App.getInstance().getUserRepository().flush();
+                instance.activatePlantFood();
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

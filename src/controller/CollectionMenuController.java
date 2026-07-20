@@ -230,14 +230,38 @@ public class CollectionMenuController extends AppMenuController {
                 : "LOCKED").append('\n');
         sb.append("Category: ").append(plant.getCategory()).append('\n');
         sb.append("Tags: ").append(plant.getTags()).append('\n');
-        sb.append("Cost: ").append(plant.getCost()).append(" sun | Base HP: ").append(plant.getBaseHP())
-                .append(" | Damage: ").append(plant.getDamage()).append('\n');
-        sb.append("Recharge: ").append(plant.getRechargeTime()).append("s | Action interval: ")
-                .append(plant.getActionInterval()).append("s\n");
+        int level = collection.getPlantLevel(plant.getName());
+        int hp = plant.getBaseHP();
+        int damage = plant.getDamage();
+        int cost = plant.getCost();
+        float recharge = plant.getRechargeTime();
+        float interval = plant.getActionInterval();
+        // apply cumulative upgrades so stats reflect the current level
+        if (owned && level > 1 && plant.getLevels() != null) {
+            for (LevelUpgrade up : plant.getLevels().cumulativeUpgrades(level).values()) {
+                if (up == null) continue;
+                switch (up.getType()) {
+                    case BUFF_HP: hp += (int) up.getValue(); break;
+                    case BUFF_DAMAGE: damage += (int) up.getValue(); break;
+                    case BUFF_COST: cost = Math.max(0, cost + (int) up.getValue()); break;
+                    case BUFF_RECHARGE: recharge = Math.max(0, recharge + up.getValue()); break;
+                    case BUFF_ACTION_INTERVAL: interval = Math.max(0, interval + up.getValue()); break;
+                    default: break;
+                }
+            }
+        }
+        sb.append("Cost: ").append(cost).append(" sun | HP: ").append(hp)
+                .append(" | Damage: ").append(damage).append('\n');
+        sb.append("Recharge: ").append(recharge).append("s | Action interval: ")
+                .append(interval).append("s\n");
         sb.append("Ability: ").append(plant.getAbilityType()).append(" (value ")
                 .append(plant.getAbilityValue()).append(")\n");
         sb.append("Plant Food: ").append(plant.getPlantFoodType()).append(" (value ")
                 .append(plant.getPlantFoodValue()).append(")\n");
+        User owner = App.getInstance().getCurrentUser();
+        int packets = owner != null && owner.getSeedPackets() != null
+                ? owner.getSeedPackets().getOrDefault(plant.getName(), 0) : 0;
+        sb.append("Seed packets owned: ").append(packets).append('\n');
         appendUpgradeInfo(sb, plant, collection, owned);
         return sb.toString();
     }

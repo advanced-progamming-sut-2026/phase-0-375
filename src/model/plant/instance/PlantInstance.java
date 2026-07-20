@@ -326,6 +326,8 @@ public class PlantInstance implements Placeable {
         int hpDelta = newHP - definition.getBaseHP();
         this.currentHP = Math.min(newHP, this.currentHP + Math.max(0, hpDelta));
 
+        // mutate a private per-instance copy; the shared factory definition stays pristine
+        this.definition = new Plant(definition);
         definition.setBaseHP(newHP);
         definition.setDamage(newDamage);
         definition.setCost(newCost);
