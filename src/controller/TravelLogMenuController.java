@@ -259,7 +259,15 @@ public class TravelLogMenuController extends AppMenuController {
             }
             App.getInstance().getUserRepository().flush();
         }
-        return CommandResult.success("Quest '" + questName + "' completed! Reward granted.");
+        String note = "";
+        QuestReward reward = q.getReward();
+        if (reward != null && reward.getLastSeedPacketPlant() != null) {
+            note += " Seed packets granted for '" + reward.getLastSeedPacketPlant() + "'.";
+        }
+        if (reward != null && reward.getLastUnlockedPlant() != null) {
+            note += " New plant unlocked: '" + reward.getLastUnlockedPlant() + "'!";
+        }
+        return CommandResult.success("Quest '" + questName + "' completed! Reward granted." + note);
     }
 
     // Helpers

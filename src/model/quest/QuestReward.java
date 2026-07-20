@@ -53,8 +53,16 @@ public class QuestReward {
             if (user.getSeedPackets() == null) {
                 user.setSeedPackets(new HashMap<>());
             }
-            int current = user.getSeedPackets().getOrDefault(inventoryItem, 0);
-            user.getSeedPackets().put(inventoryItem, current + inventoryItemAmount);
+            // generic "seed_packet" rewards go to a random unlocked plant
+            String packetPlant = inventoryItem;
+            if ("seed_packet".equalsIgnoreCase(inventoryItem)) {
+                packetPlant = pickRandomUnlockedPlant(user);
+            }
+            if (packetPlant != null) {
+                int current = user.getSeedPackets().getOrDefault(packetPlant, 0);
+                user.getSeedPackets().put(packetPlant, current + inventoryItemAmount);
+                lastSeedPacketPlant = packetPlant;
+            }
         }
         if (unlockableName != null && !unlockableName.isBlank()) {
             String resolved = resolveUnlockable(unlockableName, user);
@@ -63,8 +71,31 @@ public class QuestReward {
                     user.setUnlockedPlants(new HashSet<>());
                 }
                 user.getUnlockedPlants().add(resolved);
+                lastUnlockedPlant = resolved;
             }
         }
+    }
+
+    /** Last plant that received generic seed packets (for UI messages). */
+    private String lastSeedPacketPlant;
+    /** Last plant unlocked by this reward (for UI messages). */
+    private String lastUnlockedPlant;
+
+    public String getLastSeedPacketPlant() {
+        return lastSeedPacketPlant;
+    }
+
+    public String getLastUnlockedPlant() {
+        return lastUnlockedPlant;
+    }
+
+    /** Picks a random plant the user has already unlocked. */
+    private String pickRandomUnlockedPlant(User user) {
+        if (user.getUnlockedPlants() == null || user.getUnlockedPlants().isEmpty()) {
+            return null;
+        }
+        List<String> names = new ArrayList<>(user.getUnlockedPlants());
+        return names.get(new Random().nextInt(names.size()));
     }
 
     /** Resolves "random_*" placeholders to a real locked, kill-capable plant. */

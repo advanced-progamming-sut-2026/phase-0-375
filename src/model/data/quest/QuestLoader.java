@@ -2,13 +2,17 @@ package model.data.quest;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import model.app.App;
 import model.enums.PlantCategory;
 import model.enums.QuestCategory;
 import model.enums.QuestPriority;
 import model.enums.QuestRewardType;
 import model.quest.Quest;
 import model.quest.QuestProgress;
+import model.plant.PlantFactory;
+import model.plant.definition.Plant;
 import model.quest.QuestReward;
+import model.user.User;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Loads quest definitions from {@code quests.json} and builds
@@ -177,9 +182,43 @@ public class QuestLoader {
                 return numberRange(MAP_ROWS);
             case "min_row_and_column_count":
                 return numberRange(Math.min(MAP_ROWS, MAP_COLUMNS));
+            case "kill_capable_plant":
+                return killCapablePlantNames();
             default:
                 return null;
         }
+    }
+
+    /** Unlocked damage-dealing plants (falls back to all damage-dealing plants). */
+    private static String[] killCapablePlantNames() {
+        List<Plant> defs;
+        try {
+            defs = PlantFactory.getAllDefinitions();
+        } catch (IllegalStateException notInitialised) {
+            try {
+                PlantFactory.init("/assets/data/plants/plants.json");
+                defs = PlantFactory.getAllDefinitions();
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        User user = App.getInstance().getCurrentUser();
+        Set<String> unlocked = user != null ? user.getUnlockedPlants() : null;
+        List<String> owned = new ArrayList<>();
+        List<String> all = new ArrayList<>();
+        for (Plant def : defs) {
+            if (def == null || def.getDamage() <= 0) continue;
+            all.add(def.getName());
+            if (unlocked != null && unlocked.contains(def.getName())) {
+                owned.add(def.getName());
+            }
+        }
+        List<String> result = owned.isEmpty() ? all : owned;
+        if (result.isEmpty()) {
+            return null;
+        }
+        Collections.sort(result); // stable pick within the day
+        return result.toArray(new String[0]);
     }
 
     /** ["1", "2", ..., max]. */
@@ -202,6 +241,7 @@ public class QuestLoader {
         return condition
                 .replace("sun_amount", value)
                 .replace("family_type", value)
+                .replace("plant_type", value)
                 .replaceAll("\\bchapter\\b", value)
                 .replaceAll("\\bn\\b", value);
     }

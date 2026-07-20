@@ -71,7 +71,10 @@ public final class QuestTracker {
                 }
                 break;
             case "Professional Plant Opener":
-                if (plantsOnly) add(progress, name, model.getZombiesKilled(), target);
+                // daily variant: kill zombies using only today's plant
+                if (plantsOnly && allNamed(planted, value)) {
+                    add(progress, name, model.getZombiesKilled(), target);
+                }
                 break;
             case "Only Cactus":
                 if (plantsOnly && allNamed(planted, "Cactus")) {
@@ -118,7 +121,10 @@ public final class QuestTracker {
                 add(progress, name, model.getNoMowerFirstColumnKills(), target);
                 break;
             case "No OCD":
-                if (won && !planted.isEmpty() && !isGardenSymmetric(model)) markComplete(progress, name, target);
+                // no mirrored pair may hold the same plant (empty cells ignored)
+                if (won && !planted.isEmpty() && !hasAnySymmetricPair(model)) {
+                    markComplete(progress, name, target);
+                }
                 break;
             case "One Column Less":
                 if (won && !model.getColumnsPlanted().contains(parseInt(value, 0) - 1)) {
@@ -198,6 +204,20 @@ public final class QuestTracker {
             }
         }
         return true;
+    }
+
+    /** True if any mirrored cell pair (across the middle row) holds the same plant (empty cells ignored). */
+    private static boolean hasAnySymmetricPair(GameModel model) {
+        int rows = model.getRowCount();
+        int cols = model.getColumnCount();
+        for (int r = 0; r < rows / 2; r++) {
+            int mirror = rows - 1 - r;
+            for (int c = 0; c < cols; c++) {
+                String a = plantNameAt(model, r, c);
+                if (a != null && a.equals(plantNameAt(model, mirror, c))) return true;
+            }
+        }
+        return false;
     }
 
     private static String plantNameAt(GameModel model, int row, int col) {

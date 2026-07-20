@@ -30,7 +30,7 @@
   {
     "name": "Professional Plant Opener",
     "category": "DAILY",
-    "condition": "Kill 10 zombies using only plants",
+    "condition": "Kill 10 zombies using only plant_type",
     "rewardType": "UNLOCKABLE",
     "rewardCoinAmount": 0,
     "rewardGemAmount": 0,
@@ -38,7 +38,7 @@
     "rewardInventoryItem": null,
     "rewardInventoryItemAmount": 0,
     "priority": "HIGH",
-    "variable": "any plant with kill capability",
+    "variable": "kill_capable_plant",
     "rewardNote": "Random new plant"
   },
   {
