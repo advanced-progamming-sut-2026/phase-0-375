@@ -5,6 +5,7 @@ import model.game.core.Tickable;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.item.pushable.Pushable;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.*;
@@ -12,7 +13,9 @@ import model.zombie.behavior.zombotany.*;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The runtime representation of a zombie on the game field
@@ -57,6 +60,15 @@ public class ZombieInstance implements Tickable {
 
     /** Damage per second dealt by burning while {@link #burnTimer} > 0. */
     private int burnDPS = 0;
+
+    /** Names of plants that damaged this zombie (kill attribution for quests). */
+    private final Set<String> plantDamagers = new HashSet<>();
+
+    /** Families of plants that damaged this zombie. */
+    private final Set<PlantCategory> plantDamagerFamilies = new HashSet<>();
+
+    /** True if any non-plant source (mower, environment, zombie) damaged this zombie. */
+    private boolean nonPlantDamaged = false;
 
     public ZombieInstance(Zombie definition) {
         this.definition = definition;
@@ -155,6 +167,22 @@ public class ZombieInstance implements Tickable {
         }
         currentHP -= damage;
     }
+
+    // --- Kill attribution (quests) ---
+
+    public void recordPlantDamage(Plant source) {
+        if (source == null) { nonPlantDamaged = true; return; }
+        if (source.getName() != null) plantDamagers.add(source.getName());
+        if (source.getCategory() != null) plantDamagerFamilies.add(source.getCategory());
+    }
+
+    public void recordNonPlantDamage() { nonPlantDamaged = true; }
+
+    public Set<String> getPlantDamagers() { return plantDamagers; }
+
+    public Set<PlantCategory> getPlantDamagerFamilies() { return plantDamagerFamilies; }
+
+    public boolean isNonPlantDamaged() { return nonPlantDamaged; }
 
     /** Applies a chill stack to this zombie. Three stacks freezes it solid */
     public void applyChill() {

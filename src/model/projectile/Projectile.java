@@ -2,6 +2,7 @@ package model.projectile;
 
 import model.game.map.FloatPoint;
 import model.game.map.Point;
+import model.plant.definition.Plant;
 import model.zombie.instance.ZombieInstance;
 
 /**
@@ -50,6 +51,13 @@ public abstract class Projectile {
      * Caulipower, Electric Blueberry, and Cat-tail.
      */
     protected ZombieInstance homingTarget;
+
+    /** Definition of the plant that fired this projectile; null for non-plant sources. */
+    protected Plant sourcePlant;
+
+    public Plant getSourcePlant() { return sourcePlant; }
+
+    public void setSourcePlant(Plant sourcePlant) { this.sourcePlant = sourcePlant; }
 
     // --- Constructors ---
 

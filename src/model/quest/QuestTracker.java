@@ -71,15 +71,12 @@ public final class QuestTracker {
                 }
                 break;
             case "Professional Plant Opener":
-                // daily variant: kill zombies using only today's plant
-                if (plantsOnly && allNamed(planted, value)) {
-                    add(progress, name, model.getZombiesKilled(), target);
-                }
+                // daily variant: count kills dealt exclusively by today's plant
+                add(progress, name, model.getExclusivePlantKills(value), target);
                 break;
             case "Only Cactus":
-                if (plantsOnly && allNamed(planted, "Cactus")) {
-                    add(progress, name, model.getZombiesKilled(), target);
-                }
+                // count kills dealt exclusively by Cactus
+                add(progress, name, model.getExclusivePlantKills("Cactus"), target);
                 break;
             case "Economic Plant Eater":
                 if (won && model.getPlantsLost() <= parseInt(value, -1)) markComplete(progress, name, target);
@@ -97,7 +94,9 @@ public final class QuestTracker {
                 if (won && !planted.isEmpty() && isGardenSymmetric(model)) markComplete(progress, name, target);
                 break;
             case "Family Slaughter":
-                if (plantsOnly && model.getZombiesKilled() > 0 && allOfCategory(planted, value)) {
+                // every zombie killed this level must have died solely to today's family
+                if (model.getZombiesKilled() > 0
+                        && model.getExclusiveFamilyKills(value) == model.getZombiesKilled()) {
                     markComplete(progress, name, target);
                 }
                 break;
@@ -108,8 +107,8 @@ public final class QuestTracker {
                 if (won && !model.isNightLevel() && allShrooms(planted)) markComplete(progress, name, target);
                 break;
             case "Cloudy Day":
-                if (won && !planted.isEmpty()
-                        && countCategory(planted, PlantCategory.SUN_PRODUCER) <= 3) {
+                // never more than 3 sun producers on the field at the same time
+                if (won && !planted.isEmpty() && model.getMaxSunProducersAtOnce() <= 3) {
                     markComplete(progress, name, target);
                 }
                 break;

@@ -256,11 +256,13 @@ public class ProjectileSystem implements Tickable {
         }
 
         if (projectile.isFire()) {
+            gameModel.attributePlantDamage(zombie, projectile.getSourcePlant());
             zombie.takeFireDamage(damage);
         } else if (projectile.isPoison()) {
+            gameModel.attributePlantDamage(zombie, projectile.getSourcePlant());
             zombie.takePoisonDamage(damage);
         } else {
-            gameModel.damageZombie(zombie, damage);
+            gameModel.damageZombie(zombie, damage, projectile.getSourcePlant());
         }
     }
 
@@ -284,11 +286,13 @@ public class ProjectileSystem implements Tickable {
             if (splash.isFire() && zombie.isImmuneToFire()) continue;
 
             if (splash.isFire()) {
+                gameModel.attributePlantDamage(zombie, splash.getSourcePlant());
                 zombie.takeFireDamage(splash.getDamage());
             } else if (splash.isPoison()) {
+                gameModel.attributePlantDamage(zombie, splash.getSourcePlant());
                 zombie.takePoisonDamage(splash.getDamage());
             } else {
-                gameModel.damageZombie(zombie, splash.getDamage());
+                gameModel.damageZombie(zombie, splash.getDamage(), splash.getSourcePlant());
             }
         }
     }

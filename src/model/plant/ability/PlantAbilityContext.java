@@ -78,6 +78,11 @@ public interface PlantAbilityContext {
     /** Applies damage to a zombie (respects armor / elements on the zombie side). */
     void damageZombie(ZombieInstance zombie, int damage);
 
+    /** Fire-damage variant (respects the zombie's fire multiplier). Default is unattributed. */
+    default void damageZombieWithFire(ZombieInstance zombie, int damage) {
+        if (zombie != null) zombie.takeFireDamage(damage);
+    }
+
     /** Applies damage to a plant. */
     void damagePlant(PlantInstance plant, int damage);
 

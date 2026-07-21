@@ -22,7 +22,7 @@ public class PlantSystem implements Tickable {
 
     private final GameModel gameModel;
     private final EventBus eventBus;
-    private final PlantAbilityContext context;
+    private final GameModelPlantAbilityContext context;
 
     public PlantSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
@@ -35,6 +35,7 @@ public class PlantSystem implements Tickable {
         List<PlantInstance> snapshot = new ArrayList<>(gameModel.getAllPlants());
         for (PlantInstance plant : snapshot) {
             if (plant.getState() == PlantState.DYING) continue;
+            context.setCurrentPlant(plant); // attribute this tick's damage/projectiles
             plant.tick(deltaTime, context);
             if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING) {
                 // Explode-o-nut: trigger the death explosion before
@@ -44,6 +45,7 @@ public class PlantSystem implements Tickable {
                 gameModel.destroyPlant(plant);
             }
         }
+        context.setCurrentPlant(null);
     }
 
     /**
@@ -65,9 +67,16 @@ public class PlantSystem implements Tickable {
 
     private static class GameModelPlantAbilityContext implements PlantAbilityContext {
         private final GameModel gameModel;
+        private PlantInstance currentPlant; // plant currently ticking (kill attribution)
 
         GameModelPlantAbilityContext(GameModel gameModel) {
             this.gameModel = gameModel;
+        }
+
+        void setCurrentPlant(PlantInstance plant) { this.currentPlant = plant; }
+
+        private Plant currentDef() {
+            return currentPlant != null ? currentPlant.getDefinition() : null;
         }
 
         @Override public int getSunAmount() { return gameModel.getSunAmount(); }
@@ -129,6 +138,7 @@ public class PlantSystem implements Tickable {
 
         @Override
         public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
+            if (p != null && p.getSourcePlant() == null) p.setSourcePlant(currentDef());
             gameModel.spawnProjectile(p, (int) x, (int) y);
             return p;
         }
@@ -145,7 +155,14 @@ public class PlantSystem implements Tickable {
 
         @Override
         public void damageZombie(ZombieInstance zombie, int damage) {
-            gameModel.damageZombie(zombie, damage);
+            gameModel.damageZombie(zombie, damage, currentDef());
+        }
+
+        @Override
+        public void damageZombieWithFire(ZombieInstance zombie, int damage) {
+            if (zombie == null) return;
+            gameModel.attributePlantDamage(zombie, currentDef());
+            zombie.takeFireDamage(damage);
         }
 
         @Override

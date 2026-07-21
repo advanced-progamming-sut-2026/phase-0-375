@@ -5,6 +5,7 @@ import model.enums.Chapter;
 import model.enums.GameState;
 import model.enums.GroundType;
 import model.enums.PlacableLayer;
+import model.enums.PlantCategory;
 import model.enums.ZombieState;
 import model.event.EventBus;
 import model.event.GameEvent;
@@ -34,9 +35,11 @@ import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class GameModel implements BehaviorContext {
@@ -78,6 +81,9 @@ public class GameModel implements BehaviorContext {
     private List<Plant> plantsPlaced;
     private Set<Integer> rowsPlanted;
     private Set<Integer> columnsPlanted;
+    private int maxSunProducersAtOnce; // peak simultaneous sun producers on the field
+    private final Map<String, Integer> exclusivePlantKills = new HashMap<>();          // kills damaged only by one plant type
+    private final Map<PlantCategory, Integer> exclusiveFamilyKills = new HashMap<>();  // kills damaged only by one family
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
@@ -204,6 +210,7 @@ public class GameModel implements BehaviorContext {
             plantsPlaced.add(plant.getDefinition());
             rowsPlanted.add(row);
             columnsPlanted.add(col);
+            updateMaxSunProducers(); // count can only grow on placement
         }
         if (added && eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_PLACED));
@@ -369,7 +376,17 @@ public class GameModel implements BehaviorContext {
         if (firstZombieSpawnTime >= 0 && elapsedSeconds - firstZombieSpawnTime <= 30f) {
             killsWithin30s++;
         }
-        if (zombie == null || zombie.getGridPosition() == null) return;
+        if (zombie == null) return;
+        // exclusive-kill bookkeeping for plant/family quests
+        if (!zombie.isNonPlantDamaged()) {
+            if (zombie.getPlantDamagers().size() == 1) {
+                exclusivePlantKills.merge(zombie.getPlantDamagers().iterator().next(), 1, Integer::sum);
+            }
+            if (zombie.getPlantDamagerFamilies().size() == 1) {
+                exclusiveFamilyKills.merge(zombie.getPlantDamagerFamilies().iterator().next(), 1, Integer::sum);
+            }
+        }
+        if (zombie.getGridPosition() == null) return;
         if (zombie.getGridX() <= 0) {
             Lane lane = gameMap.getLane(zombie.getGridY());
             if (lane == null || !lane.hasActiveLawnMower()) {
@@ -388,7 +405,44 @@ public class GameModel implements BehaviorContext {
 
     public int getNoMowerFirstColumnKills() { return noMowerFirstColumnKills; }
 
+    /** Kills where the zombie was damaged exclusively by the named plant. */
+    public int getExclusivePlantKills(String plantName) {
+        if (plantName == null) return 0;
+        for (Map.Entry<String, Integer> e : exclusivePlantKills.entrySet()) {
+            if (plantName.equalsIgnoreCase(e.getKey())) return e.getValue();
+        }
+        return 0;
+    }
+
+    /** Kills where the zombie was damaged exclusively by plants of the named family. */
+    public int getExclusiveFamilyKills(String categoryName) {
+        if (categoryName == null) return 0;
+        for (Map.Entry<PlantCategory, Integer> e : exclusiveFamilyKills.entrySet()) {
+            if (e.getKey().name().equalsIgnoreCase(categoryName)) return e.getValue();
+        }
+        return 0;
+    }
+
     public List<Plant> getPlantsPlaced() { return plantsPlaced; }
+
+    public int getMaxSunProducersAtOnce() { return maxSunProducersAtOnce; }
+
+    /** Recounts sun producers on the field and updates the peak. */
+    private void updateMaxSunProducers() {
+        int count = 0;
+        for (int r = 0; r < gameMap.getRows(); r++) {
+            for (int c = 0; c < gameMap.getCols(); c++) {
+                PlantInstance p = getPlantAt(r, c);
+                if (p != null && p.getDefinition() != null
+                        && p.getDefinition().getCategory() == PlantCategory.SUN_PRODUCER) {
+                    count++;
+                }
+            }
+        }
+        if (count > maxSunProducersAtOnce) {
+            maxSunProducersAtOnce = count;
+        }
+    }
 
     public Set<Integer> getRowsPlanted() { return rowsPlanted; }
 
@@ -573,9 +627,21 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public void damageZombie(ZombieInstance zombie, int damage) {
+        damageZombie(zombie, damage, null); // no source = non-plant damage
+    }
+
+    /** Damage with kill attribution; null source marks non-plant damage (mower, zombies, cheats). */
+    public void damageZombie(ZombieInstance zombie, int damage, Plant source) {
         if (zombie == null || damage <= 0) return;
 
+        if (source != null) zombie.recordPlantDamage(source);
+        else zombie.recordNonPlantDamage();
         zombie.takeDamage(damage);
+    }
+
+    /** Attribution only, for damage applied outside damageZombie (fire/poison paths). */
+    public void attributePlantDamage(ZombieInstance zombie, Plant source) {
+        if (zombie != null && source != null) zombie.recordPlantDamage(source);
     }
 
     @Override
