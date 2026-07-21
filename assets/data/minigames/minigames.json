@@ -1,0 +1,1083 @@
+[
+  {
+    "miniGameType": "WALLNUT_BOWLING",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 150,
+    "rows": 5,
+    "columns": 9,
+    "deadLineColumn": 2,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 2
+    },
+    "conveyorPlants": [
+      "Wall-nut",
+      "Wall-nut",
+      "Wall-nut",
+      "Explode-o-nut",
+      "Wall-nut",
+      "Giant Wall-nut"
+    ],
+    "conveyorIntervalSeconds": 4,
+    "conveyorCapacity": 10,
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 5,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "WALLNUT_BOWLING",
+    "stage": 2,
+    "difficultyTier": 4,
+    "coinReward": 250,
+    "rows": 5,
+    "columns": 9,
+    "deadLineColumn": 2,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 2
+    },
+    "conveyorPlants": [
+      "Wall-nut",
+      "Wall-nut",
+      "Explode-o-nut",
+      "Wall-nut",
+      "Wall-nut",
+      "Giant Wall-nut",
+      "Explode-o-nut"
+    ],
+    "conveyorIntervalSeconds": 3.5,
+    "conveyorCapacity": 10,
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 5,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 3.0
+              },
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 12,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 2.0
+              }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 8,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "WALLNUT_BOWLING",
+    "stage": 3,
+    "difficultyTier": 5,
+    "coinReward": 400,
+    "rows": 5,
+    "columns": 9,
+    "deadLineColumn": 2,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 2
+    },
+    "conveyorPlants": [
+      "Wall-nut",
+      "Wall-nut",
+      "Explode-o-nut",
+      "Wall-nut",
+      "Giant Wall-nut",
+      "Wall-nut",
+      "Explode-o-nut"
+    ],
+    "conveyorIntervalSeconds": 3,
+    "conveyorCapacity": 10,
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 5,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 2.0
+              }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 7,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor2",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 6,
+            "maxCount": 8,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 7,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 10,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombieDefault",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor2",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieNewspaper",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 8,
+            "maxCount": 10,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 2,
+            "minSpawnInterval": 3,
+            "maxSpawnInterval": 6,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "VASE_BREAKER",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 150,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "vaseColumns": 6,
+    "randomVaseCount": 11,
+    "seedVaseCount": 8,
+    "giantVaseCount": 1,
+    "randomEmptyWeight": 3,
+    "randomZombieWeight": 8,
+    "randomSeedWeight": 0,
+    "seedPacketExpirySeconds": 20,
+    "giantVaseZombie": "ZombieGargantuar",
+    "vaseZombies": [
+      "ZombieDefault",
+      "ZombieDefault",
+      "ZombieArmor1"
+    ],
+    "vasePlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Repeater",
+      "Wall-nut",
+      "Squash",
+      "Cherry Bomb"
+    ]
+  },
+  {
+    "miniGameType": "VASE_BREAKER",
+    "stage": 2,
+    "difficultyTier": 4,
+    "coinReward": 250,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "vaseColumns": 7,
+    "randomVaseCount": 17,
+    "seedVaseCount": 7,
+    "giantVaseCount": 1,
+    "randomEmptyWeight": 3,
+    "randomZombieWeight": 10,
+    "randomSeedWeight": 2,
+    "seedPacketExpirySeconds": 15,
+    "giantVaseZombie": "ZombieGargantuar",
+    "vaseZombies": [
+      "ZombieDefault",
+      "ZombieArmor1",
+      "ZombieArmor2"
+    ],
+    "vasePlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Repeater",
+      "Wall-nut",
+      "Squash",
+      "Cherry Bomb",
+      "Jalapeno"
+    ]
+  },
+  {
+    "miniGameType": "VASE_BREAKER",
+    "stage": 3,
+    "difficultyTier": 5,
+    "coinReward": 400,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "vaseColumns": 8,
+    "randomVaseCount": 22,
+    "seedVaseCount": 6,
+    "giantVaseCount": 2,
+    "randomEmptyWeight": 2,
+    "randomZombieWeight": 12,
+    "randomSeedWeight": 2,
+    "seedPacketExpirySeconds": 12,
+    "giantVaseZombie": "ZombieGargantuar",
+    "vaseZombies": [
+      "ZombieDefault",
+      "ZombieArmor1",
+      "ZombieArmor2",
+      "ZombieNewspaper"
+    ],
+    "vasePlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Repeater",
+      "Wall-nut",
+      "Tall-nut",
+      "Squash",
+      "Cherry Bomb",
+      "Jalapeno"
+    ]
+  },
+  {
+    "miniGameType": "ZOMBOTANY",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 200,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150
+    },
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 3,
+            "maxCount": 5,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 5,
+            "minSpawnInterval": 8,
+            "maxSpawnInterval": 12,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyWallnut",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "ZOMBOTANY",
+    "stage": 2,
+    "difficultyTier": 4,
+    "coinReward": 300,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150
+    },
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyWallnut",
+                "weight": 1.0
+              },
+              {
+                "zombie": "ZombieDefault",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 7,
+            "maxSpawnInterval": 11,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 15,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyWallnut",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanySquash",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "ZOMBOTANY",
+    "stage": 3,
+    "difficultyTier": 5,
+    "coinReward": 450,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150
+    },
+    "waves": [
+      {
+        "waveNumber": 1,
+        "startDelay": 10,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyWallnut",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanySquash",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 4,
+            "maxCount": 6,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 6,
+            "maxSpawnInterval": 10,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 2,
+        "startDelay": 12,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyJalapeno",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanySquash",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor1",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 5,
+            "maxCount": 7,
+            "minSpawnDelay": 2,
+            "maxSpawnDelay": 4,
+            "minSpawnInterval": 5,
+            "maxSpawnInterval": 9,
+            "pattern": "SINGLE"
+          }
+        ]
+      },
+      {
+        "waveNumber": 3,
+        "startDelay": 12,
+        "hugeWave": true,
+        "finalWave": true,
+        "entries": [
+          {
+            "pool": [
+              {
+                "zombie": "ZombotanyPeashooter",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyWallnut",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanyJalapeno",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombotanySquash",
+                "weight": 2.0
+              },
+              {
+                "zombie": "ZombieArmor2",
+                "weight": 1.0
+              }
+            ],
+            "minCount": 7,
+            "maxCount": 9,
+            "minSpawnDelay": 1,
+            "maxSpawnDelay": 3,
+            "minSpawnInterval": 4,
+            "maxSpawnInterval": 8,
+            "pattern": "SINGLE"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "miniGameType": "I_ZOMBIE",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 200,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 3
+    },
+    "waves": [],
+    "placeableZombies": [
+      {
+        "zombie": "ZombieImp",
+        "cost": 25
+      },
+      {
+        "zombie": "ZombieDefault",
+        "cost": 50
+      },
+      {
+        "zombie": "ZombieArmor1",
+        "cost": 75
+      },
+      {
+        "zombie": "ZombieNewspaper",
+        "cost": 100
+      },
+      {
+        "zombie": "ZombieArmor2",
+        "cost": 125
+      }
+    ],
+    "prePlantedPlants": [
+      {
+        "plant": "Sunflower",
+        "row": 0,
+        "col": 0
+      },
+      {
+        "plant": "Peashooter",
+        "row": 0,
+        "col": 1
+      },
+      {
+        "plant": "Peashooter",
+        "row": 1,
+        "col": 1
+      },
+      {
+        "plant": "Wall-nut",
+        "row": 1,
+        "col": 2
+      },
+      {
+        "plant": "Sunflower",
+        "row": 2,
+        "col": 0
+      },
+      {
+        "plant": "Puff-shroom",
+        "row": 2,
+        "col": 2
+      },
+      {
+        "plant": "Peashooter",
+        "row": 3,
+        "col": 1
+      },
+      {
+        "plant": "Wall-nut",
+        "row": 4,
+        "col": 2
+      }
+    ],
+    "sunZombie": "ZombieIZombieSun"
+  },
+  {
+    "miniGameType": "I_ZOMBIE",
+    "stage": 2,
+    "difficultyTier": 4,
+    "coinReward": 350,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 3
+    },
+    "waves": [],
+    "placeableZombies": [
+      {
+        "zombie": "ZombieImp",
+        "cost": 25
+      },
+      {
+        "zombie": "ZombieExplorer",
+        "cost": 100
+      },
+      {
+        "zombie": "ZombieProspector",
+        "cost": 125
+      },
+      {
+        "zombie": "ZombieModernAllStar",
+        "cost": 150
+      },
+      {
+        "zombie": "ZombieArmor4",
+        "cost": 200
+      }
+    ],
+    "prePlantedPlants": [
+      {
+        "plant": "Snow Pea",
+        "row": 0,
+        "col": 1
+      },
+      {
+        "plant": "Wall-nut",
+        "row": 0,
+        "col": 2
+      },
+      {
+        "plant": "Cabbage-pult",
+        "row": 1,
+        "col": 0
+      },
+      {
+        "plant": "Peashooter",
+        "row": 1,
+        "col": 1
+      },
+      {
+        "plant": "Chomper",
+        "row": 2,
+        "col": 1
+      },
+      {
+        "plant": "Wall-nut",
+        "row": 2,
+        "col": 2
+      },
+      {
+        "plant": "Cabbage-pult",
+        "row": 3,
+        "col": 0
+      },
+      {
+        "plant": "Snow Pea",
+        "row": 3,
+        "col": 1
+      },
+      {
+        "plant": "Peashooter",
+        "row": 4,
+        "col": 1
+      },
+      {
+        "plant": "Wall-nut",
+        "row": 4,
+        "col": 2
+      }
+    ],
+    "sunZombie": "ZombieIZombieSun"
+  },
+  {
+    "miniGameType": "I_ZOMBIE",
+    "stage": 3,
+    "difficultyTier": 5,
+    "coinReward": 500,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 150,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false,
+      "deadLineColumn": 3
+    },
+    "waves": [],
+    "placeableZombies": [
+      {
+        "zombie": "ZombieDefault",
+        "cost": 50
+      },
+      {
+        "zombie": "ZombieDarkArmor3",
+        "cost": 150
+      },
+      {
+        "zombie": "ZombieWizard",
+        "cost": 150
+      },
+      {
+        "zombie": "ZombieDarkKing",
+        "cost": 200
+      },
+      {
+        "zombie": "ZombieGargantuar",
+        "cost": 300
+      }
+    ],
+    "prePlantedPlants": [
+      {
+        "plant": "Melon-pult",
+        "row": 0,
+        "col": 0
+      },
+      {
+        "plant": "Repeater",
+        "row": 0,
+        "col": 1
+      },
+      {
+        "plant": "Tall-nut",
+        "row": 0,
+        "col": 2
+      },
+      {
+        "plant": "Snow Pea",
+        "row": 1,
+        "col": 1
+      },
+      {
+        "plant": "Bonk Choy",
+        "row": 1,
+        "col": 2
+      },
+      {
+        "plant": "Melon-pult",
+        "row": 2,
+        "col": 0
+      },
+      {
+        "plant": "Repeater",
+        "row": 2,
+        "col": 1
+      },
+      {
+        "plant": "Tall-nut",
+        "row": 2,
+        "col": 2
+      },
+      {
+        "plant": "Snow Pea",
+        "row": 3,
+        "col": 1
+      },
+      {
+        "plant": "Bonk Choy",
+        "row": 3,
+        "col": 2
+      },
+      {
+        "plant": "Repeater",
+        "row": 4,
+        "col": 1
+      },
+      {
+        "plant": "Tall-nut",
+        "row": 4,
+        "col": 2
+      }
+    ],
+    "sunZombie": "ZombieIZombieSun"
+  },
+  {
+    "miniGameType": "BEGHOULED",
+    "stage": 1,
+    "difficultyTier": 3,
+    "coinReward": 250,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "beghouledPlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Wall-nut",
+      "Puff-shroom",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 10,
+    "upgrades": [
+      {
+        "from": "Peashooter",
+        "to": "Repeater",
+        "cost": 500
+      },
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Puff-shroom",
+        "to": "Fume-shroom",
+        "cost": 250
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieImp",
+      "ZombieArmor1"
+    ],
+    "firstSpawnDelaySeconds": 15.0,
+    "spawnIntervalSeconds": 12.0,
+    "minSpawnIntervalSeconds": 6.0,
+    "spawnIntervalDecaySeconds": 0.25
+  },
+  {
+    "miniGameType": "BEGHOULED",
+    "stage": 2,
+    "difficultyTier": 4,
+    "coinReward": 400,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "beghouledPlants": [
+      "Peashooter",
+      "Snow Pea",
+      "Wall-nut",
+      "Bonk Choy",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 15,
+    "upgrades": [
+      {
+        "from": "Peashooter",
+        "to": "Repeater",
+        "cost": 500
+      },
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Cabbage-pult",
+        "to": "Melon-pult",
+        "cost": 1000
+      },
+      {
+        "from": "Melon-pult",
+        "to": "Winter Melon",
+        "cost": 750
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieArmor1",
+      "ZombieNewspaper",
+      "ZombieArmor2"
+    ],
+    "firstSpawnDelaySeconds": 12.0,
+    "spawnIntervalSeconds": 10.0,
+    "minSpawnIntervalSeconds": 5.0,
+    "spawnIntervalDecaySeconds": 0.25
+  },
+  {
+    "miniGameType": "BEGHOULED",
+    "stage": 3,
+    "difficultyTier": 5,
+    "coinReward": 600,
+    "rows": 5,
+    "columns": 9,
+    "rules": {
+      "initialSun": 0,
+      "skyDropEnabled": false,
+      "sunFallsFromSky": false,
+      "allowsChoosingPlants": false,
+      "shovelEnabled": false,
+      "plantFoodDrops": false
+    },
+    "waves": [],
+    "beghouledPlants": [
+      "Repeater",
+      "Puff-shroom",
+      "Wall-nut",
+      "Bonk Choy",
+      "Cabbage-pult"
+    ],
+    "matchTarget": 20,
+    "upgrades": [
+      {
+        "from": "Repeater",
+        "to": "Mega Gatling Pea",
+        "cost": 1500
+      },
+      {
+        "from": "Wall-nut",
+        "to": "Tall-nut",
+        "cost": 500
+      },
+      {
+        "from": "Puff-shroom",
+        "to": "Fume-shroom",
+        "cost": 250
+      },
+      {
+        "from": "Cabbage-pult",
+        "to": "Melon-pult",
+        "cost": 1000
+      },
+      {
+        "from": "Melon-pult",
+        "to": "Winter Melon",
+        "cost": 750
+      }
+    ],
+    "beghouledZombies": [
+      "ZombieDefault",
+      "ZombieArmor2",
+      "ZombieExplorer",
+      "ZombieModernAllStar",
+      "ZombieArmor4"
+    ],
+    "firstSpawnDelaySeconds": 10.0,
+    "spawnIntervalSeconds": 8.0,
+    "minSpawnIntervalSeconds": 4.0,
+    "spawnIntervalDecaySeconds": 0.3
+  }
+]

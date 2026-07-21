@@ -8,6 +8,7 @@ import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.*;
+import model.zombie.behavior.zombotany.*;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
@@ -465,6 +466,10 @@ public class ZombieInstance implements Tickable {
             case ENRAGE: return new EnrageBehavior();
             case PIANO_SWAP: return new PianoSwapBehavior();
             case BARREL_ROLLER: return new BarrelRollerBehavior();
+            case ZOMBOTANY_PEASHOOTER: return new ZombotanyPeashooterBehavior();
+            case ZOMBOTANY_JALAPENO: return new ZombotanyJalapenoBehavior();
+            case ZOMBOTANY_SQUASH: return new ZombotanySquashBehavior();
+            case PRODUCE_SUN: return new ProduceSunBehavior();
             default: return null;
         }
     }

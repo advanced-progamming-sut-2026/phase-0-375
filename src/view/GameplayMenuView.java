@@ -48,6 +48,12 @@ public class GameplayMenuView extends AppMenuView {
             plant(type, x, y);
             return;
         }
+        if (GameplayMenuCommand.BREAK_VASE.matches(input)) {
+            int x = Integer.parseInt(GameplayMenuCommand.BREAK_VASE.getParameter("x"));
+            int y = Integer.parseInt(GameplayMenuCommand.BREAK_VASE.getParameter("y"));
+            breakVase(x, y);
+            return;
+        }
         if (GameplayMenuCommand.CHEAT_REMOVE_COOLDOWN.matches(input)) {
             cheatRemoveCooldown();
             return;
@@ -101,6 +107,29 @@ public class GameplayMenuView extends AppMenuView {
             cheatSpawnZombie(type, x, y);
             return;
         }
+        if (GameplayMenuCommand.PLACE_ZOMBIE.matches(input)) {
+            String type = GameplayMenuCommand.PLACE_ZOMBIE.getParameter("type");
+            int x = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("x"));
+            int y = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("y"));
+            placeZombie(type, x, y);
+            return;
+        }
+        if (GameplayMenuCommand.SWAP_PLANT.matches(input)) {
+            int x = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("x"));
+            int y = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("y"));
+            String direction = GameplayMenuCommand.SWAP_PLANT.getParameter("dir");
+            swapPlant(x, y, direction);
+            return;
+        }
+        if (GameplayMenuCommand.UPGRADE_PLANT.matches(input)) {
+            String type = GameplayMenuCommand.UPGRADE_PLANT.getParameter("type");
+            upgradePlant(type);
+            return;
+        }
+        if (GameplayMenuCommand.SHOW_BEGHOULED_STATUS.matches(input)) {
+            showBeghouledStatus();
+            return;
+        }
 
         displayError("Unknown gameplay command. Available commands:");
         displayError("  advance time -t <count> ticks");
@@ -109,6 +138,7 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  show sun amount");
         displayError("  cheat add -n <count> suns");
         displayError("  plant plant -t <type> -l (<x>, <y>)");
+        displayError("  break vase -l (<x>, <y>)");
         displayError("  cheat remove-cooldown");
         displayError("  pluck plant -l (<x>, <y>)");
         displayError("  feed plant -l (<x>, <y>)");
@@ -119,11 +149,40 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  release the nuke");
         displayError("  zombies info");
         displayError("  cheat spawn-zombie -t <type> -l <x>, <y>");
+        displayError("  place zombie -t <type> -l (<x>, <y>)");
+        displayError("  swap plant -l (<x>, <y>) -d <up|down|left|right>");
+        displayError("  upgrade plant -t <type>");
+        displayError("  show beghouled status");
         displayError("  menu exit");
     }
 
     public void advanceTime(int count) {
         CommandResult<Void> result = controller.advanceTime(count);
+        displayCommandResult(result);
+    }
+
+    public void breakVase(int x, int y) {
+        CommandResult<Void> result = controller.breakVase(x, y);
+        displayCommandResult(result);
+    }
+
+    public void placeZombie(String type, int x, int y) {
+        CommandResult<Void> result = controller.placeZombie(type, x, y);
+        displayCommandResult(result);
+    }
+
+    public void swapPlant(int x, int y, String direction) {
+        CommandResult<Void> result = controller.swapPlant(x, y, direction);
+        displayCommandResult(result);
+    }
+
+    public void upgradePlant(String type) {
+        CommandResult<Void> result = controller.upgradePlant(type);
+        displayCommandResult(result);
+    }
+
+    public void showBeghouledStatus() {
+        CommandResult<Void> result = controller.beghouledStatus();
         displayCommandResult(result);
     }
 

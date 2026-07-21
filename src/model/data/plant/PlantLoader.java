@@ -28,16 +28,14 @@ public class PlantLoader {
      * @throws IOException if the file cannot be read or parsed
      */
     public List<Plant> load(String classpathPath) throws IOException {
-        try (InputStream in = openPlantStream(classpathPath)) {
-            return loadFromStream(in);
+        try (InputStream stream = openPlantStream(classpathPath)) {
+            return loadFromStream(stream);
         }
     }
 
     /**
      * Opens the plant definition JSON, first from the classpath, then from
-     * the file system (relative to the working directory). Mirrors the
-     * fallback used by {@code LevelRegistry} so both registries behave the
-     * same when the assets folder is not on the classpath.
+     * the file system relative to the working directory.
      */
     private static InputStream openPlantStream(String path) throws IOException {
         InputStream inputStream = PlantLoader.class.getResourceAsStream(path);

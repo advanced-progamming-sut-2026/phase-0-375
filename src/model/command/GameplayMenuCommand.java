@@ -9,6 +9,7 @@ public enum GameplayMenuCommand implements CLICommand {
     SHOW_SUN_AMOUNT("show sun amount"),
     CHEAT_ADD_SUNS("cheat add -n (?<count>\\d+) suns"),
     PLANT("plant plant -t (?<type>\\S+) -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
+    BREAK_VASE("break vase -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     CHEAT_REMOVE_COOLDOWN("cheat remove-cooldown"),
     PLUCK("pluck plant -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     FEED("feed plant -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
@@ -19,7 +20,11 @@ public enum GameplayMenuCommand implements CLICommand {
     RELEASE_NUKE("release the nuke"),
     ZOMBIES_INFO("zombies info"),
     START_ZOMBIE_WAVES("start zombie waves"),
-    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombieType>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)");
+    CHEAT_SPAWN_ZOMBIE("cheat spawn-zombie -t (?<zombieType>\\S+) -l (?<x>\\d+),\\s*(?<y>\\d+)"),
+    PLACE_ZOMBIE("place zombie -t (?<type>\\S+) -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
+    SWAP_PLANT("swap plant -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\) -d (?<dir>up|down|left|right)"),
+    UPGRADE_PLANT("upgrade plant -t (?<type>.+)"),
+    SHOW_BEGHOULED_STATUS("show beghouled status");
 
     private final Pattern pattern;
     private Matcher matcher;

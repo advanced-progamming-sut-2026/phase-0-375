@@ -164,7 +164,7 @@ public class ZombieSystem implements Tickable {
             killSilently(zombie);
         } else {
             // No mower, the zombie got through.
-            gameModel.markHouseBreached();
+            gameModel.markHouseBreached(row);
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_REACHED_END));
                 eventBus.dispatch(new GameEvent(GameEvent.Type.GAME_LOST));
@@ -354,7 +354,7 @@ public class ZombieSystem implements Tickable {
                 }
 
                 zombie.setState(ZombieState.DEAD);
-                gameModel.recordZombieKilled(zombie);
+                gameModel.incrementZombiesKilled();
 
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_KILLED));

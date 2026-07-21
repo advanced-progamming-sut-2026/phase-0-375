@@ -147,6 +147,26 @@ public class ZombieDataEntry {
         @JsonProperty("FastMoveSpeed")
         private float fastMoveSpeed;
 
+        /** ZombotanyPeashooterProps – seconds between pea shots. */
+        @JsonProperty("ShotIntervalSeconds")
+        private float shotIntervalSeconds;
+
+        /** ZombotanyJalapenoProps – seconds on the lawn before igniting. */
+        @JsonProperty("FuseSeconds")
+        private float fuseSeconds;
+
+        /** IZombieSunProps - seconds between sun drops. */
+        @JsonProperty("SunProduceIntervalSeconds")
+        private float sunProduceIntervalSeconds;
+
+        /** IZombieSunProps - sun granted by the first drop. */
+        @JsonProperty("SunProduceBaseAmount")
+        private int sunProduceBaseAmount;
+
+        /** IZombieSunProps - extra sun added to every subsequent drop. */
+        @JsonProperty("SunProduceGrowthAmount")
+        private int sunProduceGrowthAmount;
+
         /** ZombieNewspaperProps – eat speed scale when enraged. */
         @JsonProperty("EnragedDamageScale")
         private float enragedDamageScale;
@@ -299,6 +319,26 @@ public class ZombieDataEntry {
         public float getFastMoveSpeed() {
             return fastMoveSpeed;
         }
+
+        public float getShotIntervalSeconds() {
+            return shotIntervalSeconds;
+        }
+
+        public float getFuseSeconds() {
+            return fuseSeconds;
+        }
+
+    public float getSunProduceIntervalSeconds() {
+        return sunProduceIntervalSeconds;
+    }
+
+    public int getSunProduceBaseAmount() {
+        return sunProduceBaseAmount;
+    }
+
+    public int getSunProduceGrowthAmount() {
+        return sunProduceGrowthAmount;
+    }
 
         public float getEnragedDamageScale() {
             return enragedDamageScale;

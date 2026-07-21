@@ -143,6 +143,16 @@ public class LevelRegistry {
         return new FileInputStream(filePath);
     }
 
+    /**
+     * Builds a LevelConfig from a raw data entry. Exposed so the mini-game
+     * registry can reuse the exact same rule/wave building pipeline as
+     * normal levels (including the zombie definition bootstrap).
+     */
+    public static LevelConfig toConfig(LevelDataEntry entry) throws IOException {
+        ensureZombieDefinitionsLoaded();
+        return buildConfig(entry);
+    }
+
     private static LevelConfig buildConfig(LevelDataEntry entry) {
         LevelConfig config = new LevelConfig();
         config.setChapter(resolveEnum(Chapter.class, entry.getChapter(), Chapter.ANCIENT_EGYPT));

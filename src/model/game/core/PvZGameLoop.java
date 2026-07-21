@@ -63,6 +63,11 @@ public class PvZGameLoop implements GameLoop {
         terrainSystem.tick(deltaTime);
         gameModel.tick(deltaTime);
 
+        // Level-specific per-tick logic (conveyor belts, mini-game physics, ...).
+        if (gameModel.getCurrentLevel() != null) {
+            gameModel.getCurrentLevel().tick(deltaTime);
+        }
+
         evaluateEndGame();
 
 

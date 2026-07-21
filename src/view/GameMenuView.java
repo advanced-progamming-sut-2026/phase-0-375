@@ -23,6 +23,10 @@ public class GameMenuView extends AppMenuView {
         if (GameMenuCommand.ENTER_CHAPTER.matches(input)) {
             String chapter = GameMenuCommand.ENTER_CHAPTER.getParameter("chaptername");
             enterChapter(chapter);
+        } else if (GameMenuCommand.ENTER_MINIGAME.matches(input)) {
+            String type = GameMenuCommand.ENTER_MINIGAME.getParameter("type");
+            int stage = Integer.parseInt(GameMenuCommand.ENTER_MINIGAME.getParameter("stage"));
+            enterMiniGame(type, stage);
         } else if (GameMenuCommand.GREENHOUSE.matches(input)) {
             greenhouse();
         } else if (GameMenuCommand.TRAVEL_LOG.matches(input)) {
@@ -40,6 +44,7 @@ public class GameMenuView extends AppMenuView {
         } else {
             displayError("Usage:");
             displayError("  menu enter chapter -c <name>");
+            displayError("  menu enter minigame -t <type> -s <stage>");
             displayError("  menu greenhouse");
             displayError("  menu travel-log");
             displayError("  menu leaderboard");
@@ -50,6 +55,11 @@ public class GameMenuView extends AppMenuView {
 
     public void enterChapter(String chapterName) {
         CommandResult<Void> result = controller.enterChapter(chapterName);
+        displayCommandResult(result);
+    }
+
+    public void enterMiniGame(String type, int stage) {
+        CommandResult<Void> result = controller.enterMiniGame(type, stage);
         displayCommandResult(result);
     }
 

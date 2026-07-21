@@ -4,5 +4,6 @@ public enum MiniGameType {
     VASE_BREAKER,
     WALLNUT_BOWLING,
     ZOMBOTANY,
-    BEGHOULED
+    BEGHOULED,
+    I_ZOMBIE
 }

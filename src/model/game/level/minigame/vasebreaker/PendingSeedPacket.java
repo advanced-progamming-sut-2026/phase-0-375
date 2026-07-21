@@ -43,6 +43,8 @@ public class PendingSeedPacket {
 
     /** Called every tick */
     public void tick(float deltaTime) {
-
+        if (timeToExpiry > 0) {
+            timeToExpiry -= deltaTime;
+        }
     }
 }

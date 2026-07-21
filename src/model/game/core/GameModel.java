@@ -64,6 +64,7 @@ public class GameModel implements BehaviorContext {
 
     // End-game bookkeeping (read by EndGameCondition implementations)
     private boolean houseBreached;
+    private final Set<Integer> breachedRows = new HashSet<>();
     private int zombiesKilled;
     private int plantsLost;
     private float elapsedSeconds;
@@ -337,6 +338,17 @@ public class GameModel implements BehaviorContext {
 
     public void markHouseBreached() {
         this.houseBreached = true;
+    }
+
+    /** Marks a breach in a specific lane. In I, Zombie this is an eaten brain. */
+    public void markHouseBreached(int row) {
+        this.houseBreached = true;
+        this.breachedRows.add(row);
+    }
+
+    /** Rows whose lane end has been breached at least once. */
+    public Set<Integer> getBreachedRows() {
+        return breachedRows;
     }
 
     public int getZombiesKilled() {

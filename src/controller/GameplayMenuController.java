@@ -8,7 +8,12 @@ import model.enums.PlacableLayer;
 import model.enums.WaveManagerPhase;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.PendingSeedPacket;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
@@ -24,6 +29,8 @@ import model.zombie.instance.ZombieInstance;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 
 /**
  * Controller for the in-game (gameplay) menu.
@@ -273,6 +280,19 @@ public class GameplayMenuController extends AppMenuController {
         if (guard != null) return guard;
 
         GameModel model = requireGame();
+
+        // Wall-nut Bowling: the plant command rolls a walnut from the
+        // leftmost column instead of placing a plant.
+        if (model.getCurrentLevel() instanceof WallnutBowlingLevel bowling) {
+            return rollWalnut(model, bowling, type, x, y);
+        }
+
+        // Vase Breaker: plants come from seed packets revealed by breaking
+        // vases and are planted for free on any free tile.
+        if (model.getCurrentLevel() instanceof VaseBreakerLevel vaseBreaker) {
+            return plantFromVase(model, vaseBreaker, type, x, y);
+        }
+
         boolean conveyor = model.getCurrentLevel() instanceof ConveyorBeltLevel;
         List<String> selected = model.getSelectedPlants();
         if (selected == null || !selected.contains(type)) {
@@ -311,8 +331,7 @@ public class GameplayMenuController extends AppMenuController {
         }
 
         // Conveyor Belt levels: seed packets come from the belt and are free.
-        // Cost comes from the leveled instance so BUFF_COST upgrades apply.
-        int cost = conveyor ? 0 : instance.getDefinition().getCost();
+        int cost = conveyor ? 0 : definition.getCost();
         if (!model.spendSun(cost)) {
             return CommandResult.error("Not enough sun. Need " + cost
                     + ", have " + model.getSunAmount() + ".");
@@ -351,6 +370,102 @@ public class GameplayMenuController extends AppMenuController {
             }
         }
         return false;
+    }
+
+    /**
+     * Wall-nut Bowling: consumes a walnut from the conveyor belt and rolls
+     * it from the leftmost column down the given lane.
+     */
+    private CommandResult<Void> rollWalnut(GameModel model, WallnutBowlingLevel bowling,
+                                           String type, int x, int y) {
+        BowlingWalnutType walnutType = WallnutBowlingLevel.parseWalnutType(type);
+        if (walnutType == null) {
+            return CommandResult.error("Unknown walnut type: '" + type + "'.");
+        }
+        List<String> belt = model.getSelectedPlants();
+        String beltEntry = findBeltEntry(belt, walnutType);
+        if (beltEntry == null) {
+            return CommandResult.error("Walnut '" + type + "' is not on the conveyor belt right now.");
+        }
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        if (y != 0) {
+            return CommandResult.error("Bowling walnuts must be launched from the leftmost column:"
+                    + " use -l (" + x + ",0).");
+        }
+        bowling.launchWalnut(walnutType, x);
+        belt.remove(beltEntry);
+        return CommandResult.success("Rolled " + beltEntry + " down lane " + x + ".");
+    }
+
+    /** First belt entry naming the same walnut type (aliases accepted). */
+    private String findBeltEntry(List<String> belt, BowlingWalnutType type) {
+        if (belt == null) return null;
+        for (String entry : belt) {
+            if (WallnutBowlingLevel.parseWalnutType(entry) == type) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Vase Breaker: plants are free but must come from a seed packet
+     * revealed by breaking a vase; it can then be planted on any free
+     * tile before it expires.
+     */
+    private CommandResult<Void> plantFromVase(GameModel model, VaseBreakerLevel level,
+                                              String type, int x, int y) {
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        if (level.vaseAt(x, y) != null) {
+            return CommandResult.error("There is an unbroken vase at (" + x + ", " + y + ")."
+                    + " Break it first: break vase -l (" + x + "," + y + ")");
+        }
+        Cell cell = map.getCell(x, y);
+        if (cell == null) {
+            return CommandResult.error("Cell (" + x + ", " + y + ") does not exist.");
+        }
+        if (plantAt(cell) != null) {
+            return CommandResult.error("A plant is already placed at (" + x + ", " + y + ").");
+        }
+        PendingSeedPacket packet = level.claimSeedPacket(type);
+        if (packet == null) {
+            return CommandResult.error("No '" + type + "' seed packet is available."
+                    + " Break a vase containing one and plant it before it expires.");
+        }
+        PlantInstance instance = new PlantInstance(packet.getPlant());
+        instance.setPosition(new Point(x, y));
+        cell.addPlaceable(instance);
+        return CommandResult.success("Planted " + packet.getPlant().getName()
+                + " at (" + x + ", " + y + ") for free.");
+    }
+
+    /** Vase Breaker: breaks the vase at (x, y) and reveals its contents. */
+    public CommandResult<Void> breakVase(int x, int y) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            return CommandResult.error("Breaking vases is only available in the Vase Breaker mini-game.");
+        }
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
+                    + "Map is " + map.getRows() + "x" + map.getCols() + ".");
+        }
+        Vase vase = level.vaseAt(x, y);
+        if (vase == null) {
+            return CommandResult.error("There is no unbroken vase at (" + x + ", " + y + ").");
+        }
+        return CommandResult.success(level.breakVase(model, vase));
     }
 
     /**
@@ -546,7 +661,7 @@ public class GameplayMenuController extends AppMenuController {
         int count = 0;
         for (int r = 0; r < map.getRows(); r++) {
             for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(c, r);
+                Cell cell = map.getCell(r, c);
                 if (cell == null) continue;
                 PlantInstance pi = plantAt(cell);
                 if (pi == null) continue;
@@ -711,6 +826,74 @@ public class GameplayMenuController extends AppMenuController {
         model.getZombies().add(instance);
         map.addZombie(instance, x, y);
         return CommandResult.success("Spawned '" + zombieType + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * I, Zombie: places a roster zombie on the lawn, spending sun.
+     * x is the row and y is the column, matching the plant command.
+     */
+    public CommandResult<Void> placeZombie(String type, int x, int y) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof IZombieLevel iZombie)) {
+            return CommandResult.error("Placing zombies is only possible in the I, Zombie mini-game.");
+        }
+        String error = iZombie.placeZombie(model, type, x, y);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Placed '" + type + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * Beghouled: swaps the plant at (x, y) with its neighbour in the given
+     * direction, provided the swap creates a match of 3+. x = row, y = column.
+     */
+    public CommandResult<Void> swapPlant(int x, int y, String direction) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("Swapping plants is only possible in the Beghouled mini-game.");
+        }
+        String error = beghouled.swapPlant(model, x, y, direction);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Swapped. Matches: " + beghouled.getMatchesMade()
+                + "/" + beghouled.getSettings().getMatchTarget()
+                + ", sun: " + model.getSunAmount() + ".");
+    }
+
+    /** Beghouled: upgrades every plant of the given type on the board at once. */
+    public CommandResult<Void> upgradePlant(String type) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("Upgrading plants is only possible in the Beghouled mini-game.");
+        }
+        String error = beghouled.upgradePlant(model, type);
+        if (error != null) {
+            return CommandResult.error(error);
+        }
+        return CommandResult.success("Upgraded every '" + type + "'. Sun left: " + model.getSunAmount() + ".");
+    }
+
+    /** Beghouled: shows match progress, craters and the upgrade price list. */
+    public CommandResult<Void> beghouledStatus() {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return CommandResult.error("This command is only available in the Beghouled mini-game.");
+        }
+        return CommandResult.success(beghouled.statusReport(model));
     }
 
     // ──────────────────────────────────────────────
