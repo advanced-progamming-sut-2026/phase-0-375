@@ -349,19 +349,20 @@ public class GameplayMenuController extends AppMenuController {
             }
         }
 
-        // --- Sun cost ---
-        int cost = conveyor ? 0 : definition.getCost();
-        if (!model.spendSun(cost)) {
-            return CommandResult.error("Not enough sun. Need " + cost
-                    + ", have " + model.getSunAmount() + ".");
-        }
-
-        // --- Build & place the instance ---
+        // --- Build the instance first so leveled stats (incl. cost) apply ---
         PlantInstance instance = new PlantInstance(definition);
         int level = plantLevelFor(definition.getName());
         if (level > 1) {
             instance.applyLevelUpgrade(level);
         }
+
+        // --- Sun cost (leveled definition may discount it) ---
+        int cost = conveyor ? 0 : instance.getDefinition().getCost();
+        if (!model.spendSun(cost)) {
+            return CommandResult.error("Not enough sun. Need " + cost
+                    + ", have " + model.getSunAmount() + ".");
+        }
+
         instance.setPosition(new Point(x, y));
 
         // Imitater: default the imitate target to the first non-Imitater
