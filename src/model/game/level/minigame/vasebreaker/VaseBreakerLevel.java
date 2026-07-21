@@ -238,13 +238,13 @@ public class VaseBreakerLevel extends MiniGameLevel {
 
     // --- Breaking vases ---
 
-    /** The unbroken vase at (row, col), or null. */
-    public Vase vaseAt(int row, int col) {
+    /** The unbroken vase at (x, y) = (column, row), or null. */
+    public Vase vaseAt(int x, int y) {
         for (Vase vase : vases) {
             if (!vase.isBroken()
                     && vase.getPosition() != null
-                    && vase.getPosition().getY() == row
-                    && vase.getPosition().getX() == col) {
+                    && vase.getPosition().getX() == x
+                    && vase.getPosition().getY() == y) {
                 return vase;
             }
         }
@@ -274,7 +274,7 @@ public class VaseBreakerLevel extends MiniGameLevel {
                 }
                 model.spawnZombieAt(hidden.getName(), row, col);
                 yield (vase.getContentType() == VaseContent.GIANT_VASE ? "A giant vase! " : "")
-                        + hidden.getName() + " woke up at (" + row + ", " + col + ")!";
+                        + hidden.getName() + " woke up at (" + col + ", " + row + ")!";
             }
             case SEED_PACKET -> {
                 Plant plant = vase.getHiddenPlant();

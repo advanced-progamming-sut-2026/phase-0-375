@@ -145,7 +145,7 @@ public class IZombieLevel extends MiniGameLevel {
         }
         if (row < 0 || row >= getConfig().getRows()
                 || col < 0 || col >= getConfig().getColumns()) {
-            return "Position (" + row + ", " + col + ") is out of bounds.";
+            return "Position (" + col + ", " + row + ") is out of bounds.";
         }
         int redLine = redLineColumn();
         if (col < redLine) {

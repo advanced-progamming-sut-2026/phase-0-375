@@ -477,13 +477,13 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
                     + "Map is " + map.getRows() + "x" + map.getCols() + ".");
         }
-        if (y != 0) {
+        if (x != 0) {
             return CommandResult.error("Bowling walnuts must be launched from the leftmost column:"
-                    + " use -l (" + x + ",0).");
+                    + " use -l (0," + y + ").");
         }
-        bowling.launchWalnut(walnutType, x);
+        bowling.launchWalnut(walnutType, y);
         belt.remove(beltEntry);
-        return CommandResult.success("Rolled " + beltEntry + " down lane " + x + ".");
+        return CommandResult.success("Rolled " + beltEntry + " down lane " + y + ".");
     }
 
     /** First belt entry naming the same walnut type (aliases accepted). */
@@ -972,7 +972,7 @@ public class GameplayMenuController extends AppMenuController {
 
     /**
      * I, Zombie: places a roster zombie on the lawn, spending sun.
-     * x is the row and y is the column, matching the plant command.
+     * x is the column and y is the row, matching the plant command.
      */
     public CommandResult<Void> placeZombie(String type, int x, int y) {
         CommandResult<Void> guard = guardGameRunning();
@@ -982,7 +982,7 @@ public class GameplayMenuController extends AppMenuController {
         if (!(model.getCurrentLevel() instanceof IZombieLevel iZombie)) {
             return CommandResult.error("Placing zombies is only possible in the I, Zombie mini-game.");
         }
-        String error = iZombie.placeZombie(model, type, x, y);
+        String error = iZombie.placeZombie(model, type, y, x);
         if (error != null) {
             return CommandResult.error(error);
         }
@@ -991,7 +991,7 @@ public class GameplayMenuController extends AppMenuController {
 
     /**
      * Beghouled: swaps the plant at (x, y) with its neighbour in the given
-     * direction, provided the swap creates a match of 3+. x = row, y = column.
+     * direction, provided the swap creates a match of 3+. x = column, y = row.
      */
     public CommandResult<Void> swapPlant(int x, int y, String direction) {
         CommandResult<Void> guard = guardGameRunning();
@@ -1001,7 +1001,7 @@ public class GameplayMenuController extends AppMenuController {
         if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
             return CommandResult.error("Swapping plants is only possible in the Beghouled mini-game.");
         }
-        String error = beghouled.swapPlant(model, x, y, direction);
+        String error = beghouled.swapPlant(model, y, x, direction);
         if (error != null) {
             return CommandResult.error(error);
         }
