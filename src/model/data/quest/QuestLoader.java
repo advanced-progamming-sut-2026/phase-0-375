@@ -225,7 +225,7 @@ public class QuestLoader {
     private static String[] numberRange(int max) {
         String[] values = new String[max];
         for (int i = 0; i < max; i++) {
-            values[i] = String.valueOf(i + 1);
+            values[i] = String.valueOf(i);
         }
         return values;
     }

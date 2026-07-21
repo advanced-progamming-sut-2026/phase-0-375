@@ -126,17 +126,17 @@ public final class QuestTracker {
                 }
                 break;
             case "One Column Less":
-                if (won && !model.getColumnsPlanted().contains(parseInt(value, 0) - 1)) {
+                if (won && !model.getColumnsPlanted().contains(parseInt(value, -1))) {
                     markComplete(progress, name, target);
                 }
                 break;
             case "Defenseless Row":
-                if (won && !model.getRowsPlanted().contains(parseInt(value, 0) - 1)) {
+                if (won && !model.getRowsPlanted().contains(parseInt(value, -1))) {
                     markComplete(progress, name, target);
                 }
                 break;
             case "Defenseless Cross": {
-                int index = parseInt(value, 0) - 1;
+                int index = parseInt(value, -1);
                 if (won && !model.getColumnsPlanted().contains(index)
                         && !model.getRowsPlanted().contains(index)) {
                     markComplete(progress, name, target);
