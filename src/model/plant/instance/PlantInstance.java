@@ -60,6 +60,8 @@ public class PlantInstance implements Placeable {
      */
     private float transformCountdown;
 
+    private int stackCount;
+
     /** Cached ability strategy. */
     private PlantAbility abilityStrategy;
 
@@ -77,6 +79,7 @@ public class PlantInstance implements Placeable {
         this.freezeHitCount = 0;
         this.stateBeforeFreeze = null;
         this.stateBeforeTransform = null;
+        this.stackCount = 1;
 
         if (definition.getAbilityType() != null) {
             AbilityState abilityState = new AbilityState(definition.getAbilityType());
@@ -567,7 +570,53 @@ public class PlantInstance implements Placeable {
     public int getFreezeHitCount() { return freezeHitCount; }
 
     @Override
-    public PlacableLayer getLayer() { return PlacableLayer.MAIN; }
+    public PlacableLayer getLayer() {
+        Plant def = definition;
+        if (def == null) return PlacableLayer.MAIN;
+        boolean stack = def.hasTag(PlantTags.STACK);
+        if (!stack) return PlacableLayer.MAIN;
+        if (def.hasTag(PlantTags.WATER)) {
+            return PlacableLayer.GROUND;
+        }
+        if (def.getCategory() == PlantCategory.WALL_NUT) {
+            return PlacableLayer.OVERLAY;
+        }
+        return PlacableLayer.MAIN;
+    }
+
+    // --- Stack helpers ---
+
+    /** @return current number of stacked heads on this instance (1 if not a stacker). */
+    public int getStackCount() { return stackCount; }
+
+    public void setStackCount(int stackCount) {
+        this.stackCount = Math.max(1, stackCount);
+    }
+
+    /**
+     * Adds one head to this instance, capping at the plant's stack limit.
+     *
+     * @return {@code true} if the head was added. {@code false} if the
+     *         instance was already at its stack limit
+     */
+    public boolean incrementStackCount() {
+        if (stackCount >= getStackLimit()) return false;
+        stackCount++;
+        currentHP += definition.getBaseHP();
+        return true;
+    }
+
+    /** @return the maximum number of heads this instance can hold. */
+    public int getStackLimit() {
+        if (definition == null || !definition.hasTag(PlantTags.STACK)) return 1;
+        int limit = (int) definition.getAbilityValue();
+        return limit > 0 ? limit : 1;
+    }
+
+    /** @return {@code true} if this instance can accept one more stacked head. */
+    public boolean canStackMore() {
+        return stackCount < getStackLimit();
+    }
 
     // --- Setters ---
 

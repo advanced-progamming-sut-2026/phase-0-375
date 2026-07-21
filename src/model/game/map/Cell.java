@@ -32,7 +32,7 @@ public class Cell {
     }
 
     public boolean canPlant(Plant plant) {
-        return placeables.isEmpty();
+        return placeables.get(PlacableLayer.MAIN) == null;
     }
 
     public boolean addPlaceable(Placeable placeable) {
@@ -55,6 +55,28 @@ public class Cell {
         return (Plant) placeables.get(PlacableLayer.MAIN);
     }
 
+    public PlantInstance getTopmostPlant() {
+        Placeable overlay = placeables.get(PlacableLayer.OVERLAY);
+        if (overlay instanceof PlantInstance) {
+            return (PlantInstance) overlay;
+        }
+        Placeable main = placeables.get(PlacableLayer.MAIN);
+        if (main instanceof PlantInstance) {
+            return (PlantInstance) main;
+        }
+        return null;
+    }
+
+    public List<PlantInstance> getAllPlants() {
+        List<PlantInstance> plants = new ArrayList<>(3);
+        for (Placeable placeable : placeables.values()) {
+            if (placeable instanceof PlantInstance) {
+                plants.add((PlantInstance) placeable);
+            }
+        }
+        return plants;
+    }
+
     // TODO: getGridItem
 
     public void addZombie(ZombieInstance zombie) {
@@ -70,7 +92,8 @@ public class Cell {
     }
 
     public boolean isPassableForZombie(ZombieInstance zombie) {
-        return placeables.get(PlacableLayer.MAIN) == null;
+        return placeables.get(PlacableLayer.MAIN) == null
+                && placeables.get(PlacableLayer.OVERLAY) == null;
     }
 
     public void onZombieEnter(ZombieInstance zombie) {}

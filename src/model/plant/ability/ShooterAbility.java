@@ -41,7 +41,12 @@ public class ShooterAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!shouldFire(plant, context)) return;
 
-        int pelletCount = (int) def.getAbilityValue();
+        int pelletCount;
+        if (def.hasTag(PlantTags.STACK)) {
+            pelletCount = plant.getStackCount();
+        } else {
+            pelletCount = (int) def.getAbilityValue();
+        }
         if (pelletCount <= 0) pelletCount = 1;
 
         Projectile.Element element = inferElement(def);
@@ -67,6 +72,9 @@ public class ShooterAbility implements PlantAbility {
             return;
         }
         int volley = (int) def.getPlantFoodValue();
+        if (def.hasTag(PlantTags.STACK)) {
+            volley = volley * plant.getStackCount();
+        }
         if (volley <= 0) return;
         Projectile.Element element = inferElement(def);
         int lane = plant.getPosition().getY();

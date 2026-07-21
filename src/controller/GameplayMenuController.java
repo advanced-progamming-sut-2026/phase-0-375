@@ -5,6 +5,8 @@ import model.app.App;
 import model.enums.GameState;
 import model.enums.MenuType;
 import model.enums.PlacableLayer;
+import model.enums.PlantCategory;
+import model.enums.PlantTags;
 import model.enums.WaveManagerPhase;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
@@ -19,6 +21,7 @@ import model.game.map.GameMap;
 import model.game.map.Point;
 import model.game.wave.WaveManager;
 import model.item.Sun;
+import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
@@ -264,13 +267,9 @@ public class GameplayMenuController extends AppMenuController {
      * <p>Validation:
      * <ul>
      *   <li>The plant type must be one of the player's selected plants for this level.</li>
-     *   <li>The cell must be empty and in-bounds.</li>
+     *   <li>The cell must be in-bounds.</li>
      *   <li>The player must have enough sun to pay the plant's cost.</li>
      * </ul>
-     *
-     * <p>Until the {@code PlantRegistry} is merged, plant lookup uses a
-     * small inline table of common starter plants so the gameplay loop
-     * remains testable.
      */
     public CommandResult<Void> plant(String type, int x, int y) {
         if (type == null || type.isBlank()) {
@@ -311,30 +310,57 @@ public class GameplayMenuController extends AppMenuController {
         if (cell == null) {
             return CommandResult.error("Cell (" + x + ", " + y + ") does not exist.");
         }
-        if (plantAt(cell) != null) {
-            return CommandResult.error("A plant is already placed at (" + x + ", " + y + ").");
-        }
-        if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
-            return CommandResult.error("An item is already placed at (" + x + ", " + y + ").");
-        }
 
         Plant definition = lookupPlantDefinition(type);
         if (definition == null) {
             return CommandResult.error("Unknown plant type: '" + type + "'.");
         }
 
-        PlantInstance instance = new PlantInstance(definition);
-        // apply the user's saved upgrade level (bought in the collection menu)
-        int level = plantLevelFor(definition.getName());
-        if (level > 1) {
-            instance.applyLevelUpgrade(level);
+        PlacableLayer targetLayer = computeLayer(definition);
+
+        // --- Same-type stacker (Pea Pod) ---
+        if (definition.hasTag(PlantTags.STACK) && targetLayer == PlacableLayer.MAIN) {
+            Placeable existingMain = cell.getPlaceable(PlacableLayer.MAIN);
+            if (existingMain instanceof PlantInstance existingPlant
+                    && existingPlant.getDefinition() != null
+                    && existingPlant.getDefinition().getName().equalsIgnoreCase(definition.getName())) {
+                return growStack(model, existingPlant, x, y, conveyor, selected, type);
+            }
         }
 
-        // Conveyor Belt levels: seed packets come from the belt and are free.
+        // --- Layer collision check ---
+        if (cell.getPlaceable(targetLayer) != null) {
+            String layerName = targetLayer.name().toLowerCase();
+            String hint = switch (targetLayer) {
+                case OVERLAY -> " A cover plant is already on this cell.";
+                case GROUND -> " A foundation is already on this cell.";
+                default -> "";
+            };
+            return CommandResult.error("Cannot place '" + type + "' on the " + layerName
+                    + " layer at (" + x + ", " + y + ") — already occupied." + hint);
+        }
+
+        // For MAIN-layer plants, also reject if the cell has a
+        // non-plant placeable on the GROUND layer.
+        if (targetLayer == PlacableLayer.MAIN && cell.getPlaceable(PlacableLayer.GROUND) != null) {
+            Placeable ground = cell.getPlaceable(PlacableLayer.GROUND);
+            if (!(ground instanceof PlantInstance)) {
+                return CommandResult.error("An item is already placed at (" + x + ", " + y + ").");
+            }
+        }
+
+        // --- Sun cost ---
         int cost = conveyor ? 0 : definition.getCost();
         if (!model.spendSun(cost)) {
             return CommandResult.error("Not enough sun. Need " + cost
                     + ", have " + model.getSunAmount() + ".");
+        }
+
+        // --- Build & place the instance ---
+        PlantInstance instance = new PlantInstance(definition);
+        int level = plantLevelFor(definition.getName());
+        if (level > 1) {
+            instance.applyLevelUpgrade(level);
         }
         instance.setPosition(new Point(x, y));
 
@@ -342,13 +368,72 @@ public class GameplayMenuController extends AppMenuController {
         // plant in the player's selection.
         wireImitateTargetIfNeeded(instance, definition, model.getSelectedPlants());
 
-        cell.addPlaceable(instance);
+        boolean placed = model.placePlant(instance, y, x);
+        if (!placed) {
+            model.addSun(cost);
+            return CommandResult.error("Cannot plant '" + type + "' at (" + x + ", " + y
+                    + "). The terrain rejected it (need a Lily Pad on water?).");
+        }
         if (conveyor) {
             selected.remove(type); // consume the seed packet from the belt
         }
         String note = consumeBoostIfAny(instance) ? " Boost consumed: plant food activated!" : "";
+        String stackNote = definition.hasTag(PlantTags.STACK)
+                ? " (STACK: layer=" + targetLayer + ")"
+                : "";
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
-                + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount() + "." + note);
+                + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount()
+                + "." + stackNote + note);
+    }
+
+    /**
+     * @return the cell layer this plant should occupy.
+     */
+    private PlacableLayer computeLayer(Plant definition) {
+        if (definition == null || !definition.hasTag(PlantTags.STACK)) {
+            return PlacableLayer.MAIN;
+        }
+        if (definition.hasTag(PlantTags.WATER)) {
+            return PlacableLayer.GROUND;
+        }
+        if (definition.getCategory() == PlantCategory.WALL_NUT) {
+            return PlacableLayer.OVERLAY;
+        }
+        return PlacableLayer.MAIN;
+    }
+
+    /**
+     * Adds one head to an existing same-type stacker (Pea Pod). Pays
+     * the cost, increments {@link PlantInstance#incrementStackCount()},
+     * and reports the new stack size. If the instance is already at its
+     * stack limit, the cost is not charged.
+     */
+    private CommandResult<Void> growStack(GameModel model, PlantInstance existing,
+                                          int x, int y, boolean conveyor,
+                                          List<String> selected, String type) {
+        if (!existing.canStackMore()) {
+            int limit = existing.getStackLimit();
+            return CommandResult.error("'" + type + "' at (" + x + ", " + y
+                    + ") is already at its max stack of " + limit + ".");
+        }
+        int cost = conveyor ? 0 : existing.getDefinition().getCost();
+        if (!model.spendSun(cost)) {
+            return CommandResult.error("Not enough sun. Need " + cost
+                    + ", have " + model.getSunAmount() + ".");
+        }
+        boolean grew = existing.incrementStackCount();
+        if (!grew) {
+            model.addSun(cost);
+            return CommandResult.error("'" + type + "' at (" + x + ", " + y
+                    + ") is already at its max stack.");
+        }
+        if (conveyor) {
+            selected.remove(type);
+        }
+        return CommandResult.success("Stacked another '" + type + "' at (" + x + ", " + y
+                + ") for " + cost + " sun. Stack: " + existing.getStackCount()
+                + "/" + existing.getStackLimit()
+                + ". Remaining sun: " + model.getSunAmount() + ".");
     }
 
     /**
@@ -524,7 +609,7 @@ public class GameplayMenuController extends AppMenuController {
     }
 
     /**
-     * Removes (plucks) the plant at the given grid position.
+     * Removes (plucks) the topmost plant at the given grid position.
      * Sun spent on the plant is not refunded.
      */
     public CommandResult<Void> pluck(int x, int y) {
@@ -537,20 +622,40 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds.");
         }
         Cell cell = map.getCell(x, y);
-        PlantInstance instance = plantAt(cell);
-        if (cell == null || instance == null) {
+        if (cell == null) {
+            return CommandResult.error("No plant at (" + x + ", " + y + ").");
+        }
+        PlantInstance instance = cell.getTopmostPlant();
+        if (instance == null) {
+            Placeable ground = cell.getPlaceable(PlacableLayer.GROUND);
+            if (ground instanceof PlantInstance groundPlant) {
+                instance = groundPlant;
+            }
+        }
+        if (instance == null) {
             return CommandResult.error("No plant at (" + x + ", " + y + ").");
         }
         String plantName = instance.getDefinition().getName();
+        PlacableLayer layer = instance.getLayer();
+        if (instance.getStackCount() > 1) {
+            instance.setStackCount(instance.getStackCount() - 1);
+            instance.setCurrentHP(Math.max(1,
+                    instance.getCurrentHP() - instance.getDefinition().getBaseHP()));
+            return CommandResult.success("Plucked one head of '" + plantName
+                    + "' at (" + x + ", " + y + "). Stack remaining: "
+                    + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
+        }
         // PlantInstance implements Placeable; remove via the cell API.
         cell.removePlaceable(instance);
         return CommandResult.success("Plucked plant '" + plantName
-                + "' from (" + x + ", " + y + ").");
+                + "' (layer=" + layer + ") from (" + x + ", " + y + ").");
     }
 
     /**
-     * Feeds plant food to the plant at the given grid position.
-     * Consumes one unit of stored plant food.
+     * Feeds plant food to the topmost plant at the given grid position.
+     * Consumes one unit of stored plant food. For stacked tiles, the
+     * OVERLAY plant is fed first; if absent, the MAIN plant
+     * (e.g. Pea Pod, Sunflower) is fed.
      */
     public CommandResult<Void> feed(int x, int y) {
         CommandResult<Void> guard = guardGameRunning();
@@ -562,7 +667,10 @@ public class GameplayMenuController extends AppMenuController {
             return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds.");
         }
         Cell cell = map.getCell(x, y);
-        PlantInstance instance = plantAt(cell);
+        if (cell == null) {
+            return CommandResult.error("No plant at (" + x + ", " + y + ") to feed.");
+        }
+        PlantInstance instance = cell.getTopmostPlant();
         if (instance == null) {
             return CommandResult.error("No plant at (" + x + ", " + y + ") to feed.");
         }
@@ -574,7 +682,7 @@ public class GameplayMenuController extends AppMenuController {
         // which fires on the next tick via the plant's ability strategy.
         instance.activatePlantFood();
         return CommandResult.success("Fed plant food to '" + instance.getDefinition().getName()
-                + "' at (" + x + ", " + y
+                + "' (layer=" + instance.getLayer() + ") at (" + x + ", " + y
                 + "). Plant food remaining: " + model.getPlantFoodCount() + ".");
     }
 
@@ -617,7 +725,17 @@ public class GameplayMenuController extends AppMenuController {
                 Cell cell = map.getCell(c, r);
                 char ch = '.';
                 if (cell != null) {
-                    if (plantAt(cell) != null) ch = 'P';
+                    // Render every plant layer so stacked tiles are
+                    // visible: GROUND (Lily Pad) -> 'G', MAIN (regular
+                    // plant) -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell
+                    // with both MAIN and OVERLAY becomes 'B' (both).
+                    boolean hasGround = cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance;
+                    boolean hasMain = cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance;
+                    boolean hasOverlay = cell.getPlaceable(PlacableLayer.OVERLAY) instanceof PlantInstance;
+                    if (hasMain && hasOverlay) ch = 'B';
+                    else if (hasMain) ch = 'P';
+                    else if (hasOverlay) ch = 'O';
+                    else if (hasGround) ch = 'G';
                     // Cell exposes zombies via getZombies() in a List<ZombieInstance>
                     // — but that field isn't directly exposed. We approximate
                     // with the project's convention: a zombie on the cell makes
@@ -628,7 +746,7 @@ public class GameplayMenuController extends AppMenuController {
                     for (ZombieInstance z : model.getZombies()) {
                         var gp = z.getGridPosition();
                         if (gp != null && gp.getX() == c && gp.getY() == r) {
-                            ch = (ch == 'P') ? 'X' : 'Z';
+                            ch = (ch == '.' || ch == 'G') ? 'Z' : 'X';
                             break;
                         }
                     }
@@ -649,7 +767,9 @@ public class GameplayMenuController extends AppMenuController {
     }
 
     /**
-     * Returns a textual status report for every plant currently on the field.
+     * Returns a textual status report for every plant currently on the
+     * field, across all layers (GROUND, MAIN, OVERLAY). Stacked plants
+     * on the same cell are listed separately with their layer tag.
      */
     public CommandResult<String> showPlantsStatus() {
         CommandResult<Void> guard = guardGameRunning();
@@ -663,17 +783,22 @@ public class GameplayMenuController extends AppMenuController {
             for (int c = 0; c < map.getCols(); c++) {
                 Cell cell = map.getCell(c, r);
                 if (cell == null) continue;
-                PlantInstance pi = plantAt(cell);
-                if (pi == null) continue;
-                Plant p = pi.getDefinition();
-                count++;
-                sb.append("  ").append(p.getName())
-                        .append(" @ (").append(c).append(", ").append(r).append(")")
-                        .append(" cost=").append(p.getCost())
-                        .append(" hp=").append(pi.getCurrentHP()).append("/").append(p.getBaseHP())
-                        .append(" level=").append(pi.getLevel())
-                        .append(" state=").append(pi.getState())
-                        .append('\n');
+                for (PlantInstance plant : cell.getAllPlants()) {
+                    Plant def = plant.getDefinition();
+                    count++;
+                    sb.append("  [").append(plant.getLayer()).append("] ")
+                            .append(def.getName())
+                            .append(" @ (").append(c).append(", ").append(r).append(")")
+                            .append(" cost=").append(def.getCost())
+                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP())
+                            .append(" level=").append(plant.getLevel())
+                            .append(" state=").append(plant.getState());
+                    if (plant.getStackCount() > 1) {
+                        sb.append(" stack=").append(plant.getStackCount())
+                                .append("/").append(plant.getStackLimit());
+                    }
+                    sb.append('\n');
+                }
             }
         }
         if (count == 0) {
@@ -685,7 +810,7 @@ public class GameplayMenuController extends AppMenuController {
 
     /**
      * Returns detailed information about the cell at (x, y): terrain,
-     * plant (if any), zombies, projectiles.
+     * every stacked plant (GROUND/MAIN/OVERLAY), zombies, projectiles.
      */
     public CommandResult<String> showTileStatus(int x, int y) {
         CommandResult<Void> guard = guardGameRunning();
@@ -702,8 +827,25 @@ public class GameplayMenuController extends AppMenuController {
         if (cell == null) {
             sb.append("  (cell not initialized)");
         } else {
-            PlantInstance pi = plantAt(cell);
-            sb.append("  Plant: ").append(pi == null ? "(none)" : pi.getDefinition().getName()).append('\n');
+            List<PlantInstance> plants = cell.getAllPlants();
+            if (plants.isEmpty()) {
+                sb.append("  Plants: (none)\n");
+            } else {
+                sb.append("  Plants (").append(plants.size()).append("):\n");
+                for (PlantInstance plant : plants) {
+                    Plant def = plant.getDefinition();
+                    sb.append("    [").append(plant.getLayer()).append("] ")
+                            .append(def.getName())
+                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP())
+                            .append(" level=").append(plant.getLevel())
+                            .append(" state=").append(plant.getState());
+                    if (plant.getStackCount() > 1) {
+                        sb.append(" stack=").append(plant.getStackCount())
+                                .append("/").append(plant.getStackLimit());
+                    }
+                    sb.append('\n');
+                }
+            }
             // Zombies on this tile
             List<ZombieInstance> here = new ArrayList<>();
             for (ZombieInstance z : model.getZombies()) {

@@ -179,7 +179,8 @@ public class GameModel implements BehaviorContext {
      * given grid cell.
      *
      * @return true if the plant was placed; false if the
-     *         cell is out of bounds or already occupied on the MAIN layer
+     *         cell is out of bounds, the target layer is already
+     *         occupied, or the cell's terrain strategy rejects the plant
      */
     public boolean placePlant(PlantInstance plant, int row, int col) {
         if (plant == null) return false;
@@ -187,12 +188,15 @@ public class GameModel implements BehaviorContext {
             return false;
         }
         Cell cell = gameMap.getCell(col, row);
-        if (cell.getPlaceable(PlacableLayer.MAIN) != null) {
+        PlacableLayer targetLayer = plant.getLayer();
+        if (cell.getPlaceable(targetLayer) != null) {
             return false;
         }
-        TerrainStrategy terrain = cell.getTerrainStrategy();
-        if (terrain != null && !terrain.canPlant(plant.getDefinition(), cell)) {
-            return false;
+        if (targetLayer == PlacableLayer.MAIN) {
+            TerrainStrategy terrain = cell.getTerrainStrategy();
+            if (terrain != null && !terrain.canPlant(plant.getDefinition(), cell)) {
+                return false;
+            }
         }
         plant.setPosition(new Point(col, row));
         boolean added = cell.addPlaceable(plant);
@@ -447,11 +451,14 @@ public class GameModel implements BehaviorContext {
         if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
             return null;
         }
-        Object placeable = gameMap.getCell(col, row).getPlaceable(PlacableLayer.MAIN);
-        if (placeable instanceof PlantInstance) {
-            return (PlantInstance) placeable;
+        return gameMap.getCell(col, row).getTopmostPlant();
+    }
+
+    public List<PlantInstance> getAllPlantsAt(int row, int col) {
+        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return Collections.emptyList();
         }
-        return null;
+        return gameMap.getCell(col, row).getAllPlants();
     }
 
     @Override
@@ -461,10 +468,7 @@ public class GameModel implements BehaviorContext {
         }
         List<PlantInstance> plants = new ArrayList<>();
         for (int col = 0; col < gameMap.getCols(); col++) {
-            PlantInstance plant = getPlantAt(lane, col);
-            if (plant != null) {
-                plants.add(plant);
-            }
+            plants.addAll(gameMap.getCell(col, lane).getAllPlants());
         }
         return plants;
     }
@@ -474,10 +478,7 @@ public class GameModel implements BehaviorContext {
         List<PlantInstance> plants = new ArrayList<>();
         for (int row = 0; row < gameMap.getRows(); row++) {
             for (int col = 0; col < gameMap.getCols(); col++) {
-                PlantInstance plant = getPlantAt(row, col);
-                if (plant != null) {
-                    plants.add(plant);
-                }
+                plants.addAll(gameMap.getCell(col, row).getAllPlants());
             }
         }
         return plants;
@@ -507,7 +508,7 @@ public class GameModel implements BehaviorContext {
         }
 
         Cell destinationCell = gameMap.getCell(col, row);
-        if (destinationCell.getPlaceable(PlacableLayer.MAIN) != null) {
+        if (destinationCell.getPlaceable(plant.getLayer()) != null) {
             return false;
         }
 
