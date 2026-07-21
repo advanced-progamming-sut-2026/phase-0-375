@@ -15,13 +15,13 @@ public class EnrageBehavior implements ZombieBehavior {
     // --- Constants ---
 
     /** Default movement-speed multiplier applied permanently once enraged. */
-    public static final float DEFAULT_ENRAGED_SPEED_SCALE = 3.0f;
+    public static final float DEFAULT_ENRAGED_SPEED_SCALE = 2.0f;
 
     /**
      * Default eat-damage multiplier applied permanently once enraged.
      * CombatSystem multiplies each bite by this factor.
      */
-    public static final float DEFAULT_ENRAGED_EAT_SCALE = 3.0f;
+    public static final float DEFAULT_ENRAGED_EAT_SCALE = 2.0f;
 
     // --- State ---
 

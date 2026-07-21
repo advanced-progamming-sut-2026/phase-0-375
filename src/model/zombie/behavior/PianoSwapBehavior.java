@@ -56,20 +56,21 @@ public class PianoSwapBehavior implements ZombieBehavior {
     // --- Core logic ---
 
     private void swapLanesOfNearbyZombies(ZombieInstance pianist, BehaviorContext context) {
-        int row = pianist.getGridY();
         int rows = context.getRowCount();
         if (rows <= 1) {
             return; // nothing to swap with
         }
 
-        List<ZombieInstance> zombiesInLane = context.getZombiesInLane(row);
-        for (ZombieInstance other : zombiesInLane) {
-            if (other == null || other == pianist || other.isDead()) {
-                continue;
-            }
-            int newRow = pickAdjacentRow(row, rows);
-            if (newRow != row) {
-                context.moveZombieToLane(other, newRow);
+        for (int lane = 0;  lane < rows; lane++) {
+            List<ZombieInstance> zombiesInLane = context.getZombiesInLane(lane);
+            for (ZombieInstance other : zombiesInLane) {
+                if (other == null || other == pianist || other.isDead()) {
+                    continue;
+                }
+                int newRow = pickAdjacentRow(lane, rows);
+                if (newRow != lane) {
+                    context.moveZombieToLane(other, newRow);
+                }
             }
         }
     }
@@ -79,16 +80,16 @@ public class PianoSwapBehavior implements ZombieBehavior {
      * adjacent row when {@code row} is on the field edge).
      */
     private int pickAdjacentRow(int row, int totalRows) {
-        boolean canUp = row > 0;
-        boolean canDown = row < totalRows - 1;
+        boolean canUp = row < totalRows - 1;
+        boolean canDown = row > 0;
         if (canUp && canDown) {
             return ThreadLocalRandom.current().nextBoolean() ? row - 1 : row + 1;
         }
         if (canUp) {
-            return row - 1;
+            return row + 1;
         }
         if (canDown) {
-            return row + 1;
+            return row - 1;
         }
         return row;
     }

@@ -138,11 +138,10 @@ public class JuggleBehavior implements ZombieBehavior {
             }
 
             float projCol = projectile.getX();
-            if (projCol < zombieCol) {
+            if (projCol < zombieCol - 1) {
                 continue;
             }
 
-            projectile.setX(zombieCol);
             projectile.reflect();
             reflectedCount++;
             reflectedAny = true;
@@ -185,7 +184,7 @@ public class JuggleBehavior implements ZombieBehavior {
             if (!isJuggleable(projectile)) {
                 continue;
             }
-            if (projectile.getX() >= zombieCol) {
+            if (projectile.getX() >= zombieCol - 1f) {
                 return projectile;
             }
         }

@@ -1,10 +1,7 @@
 package model.game.systems;
 
 
-import model.enums.PlacableLayer;
-import model.enums.PlantCategory;
-import model.enums.PlantTags;
-import model.enums.ZombieBehaviorType;
+import model.enums.*;
 import model.game.core.Tickable;
 import model.event.EventBus;
 import model.event.GameEvent;
@@ -301,7 +298,9 @@ public class ProjectileSystem implements Tickable {
     /** Applies on-hit status effects based on the projectile's element */
     private void applyOnHitEffects(Projectile projectile, ZombieInstance zombie) {
         if (projectile.isIce()) {
-            zombie.applyChill();
+            if (zombie.getDefinition().getChapter() != Chapter.FROSTBITE_CAVES) {
+                zombie.applyChill();
+            }
 
             // Prospector dynamite extinguish.
             JumpBehavior jump = (JumpBehavior) zombie.getBehavior(ZombieBehaviorType.JUMP);

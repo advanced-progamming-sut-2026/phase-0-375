@@ -2,6 +2,7 @@ package model.zombie.behavior;
 
 import model.enums.ArmorType;
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
 import model.zombie.ZombieFactory;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
@@ -57,6 +58,11 @@ public class BuffBehavior implements ZombieBehavior {
      * knighting area.
      */
     private void tickDarkKing(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (zombie.getGridPosition().getX() <= context.getColumnCount()
+                && zombie.getState() != ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.SPECIAL_ACTION);
+        }
+
         float delay = zombie.getDefinition().getBehaviorPropFloat(
                 "DelayBetweenKnightings", DEFAULT_DELAY_BETWEEN_KNIGHTINGS);
         if (delay <= 0f) delay = DEFAULT_DELAY_BETWEEN_KNIGHTINGS;

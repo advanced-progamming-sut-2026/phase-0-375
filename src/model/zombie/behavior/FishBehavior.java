@@ -1,6 +1,7 @@
 package model.zombie.behavior;
 
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
@@ -25,6 +26,11 @@ public class FishBehavior implements ZombieBehavior {
     public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         if (zombie == null || context == null || zombie.isDead()) {
             return;
+        }
+
+        if (zombie.getGridPosition().getX() <= context.getColumnCount()
+                && zombie.getState() != ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.SPECIAL_ACTION);
         }
 
         castTimer += deltaTime;
