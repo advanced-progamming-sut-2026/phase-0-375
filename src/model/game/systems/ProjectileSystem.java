@@ -255,6 +255,10 @@ public class ProjectileSystem implements Tickable {
             return;
         }
 
+        // Attribute the (possibly lethal) damage to this projectile so the
+        // Myopoint score level can detect multi-kills from a single source.
+        zombie.setLastDamageSource(projectile);
+
         if (projectile.isFire()) {
             gameModel.attributePlantDamage(zombie, projectile.getSourcePlant());
             zombie.takeFireDamage(damage);
@@ -284,6 +288,8 @@ public class ProjectileSystem implements Tickable {
             if (dist > radius) continue;
 
             if (splash.isFire() && zombie.isImmuneToFire()) continue;
+
+            zombie.setLastDamageSource(splash);
 
             if (splash.isFire()) {
                 gameModel.attributePlantDamage(zombie, splash.getSourcePlant());

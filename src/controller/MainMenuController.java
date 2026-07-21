@@ -3,6 +3,12 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
+import model.game.level.Level;
+import model.game.score.ScoreLevelGenerator;
+
+import java.io.IOException;
 
 public class MainMenuController extends AppMenuController {
     private static MainMenuController instance = null;
@@ -33,6 +39,7 @@ public class MainMenuController extends AppMenuController {
                 App.getInstance().setCurrentMenu(MenuType.PROFILE);
                 yield CommandResult.success("Entered profile menu.");
             }
+            case "score-game", "score_game", "scoregame" -> enterScoreGame();
             default -> CommandResult.error("Cannot go to '" + menuName + "' from main menu.");
         };
     }
@@ -40,6 +47,34 @@ public class MainMenuController extends AppMenuController {
     @Override
     public CommandResult<Void> menuExit() {
         return CommandResult.error("Use 'menu logout' to log out from the main menu.");
+    }
+
+    /**
+     * Starts today's Myopoint score game: a deterministic daily level where
+     * stylish kills earn points (see MyopointTracker). The best score is kept
+     * on the profile and shown on the leaderboard.
+     */
+    public CommandResult<Void> enterScoreGame() {
+        Level level;
+        try {
+            level = ScoreLevelGenerator.createDailyLevel();
+        } catch (IOException | RuntimeException buildError) {
+            return CommandResult.error("Could not build today's score level: " + buildError.getMessage());
+        }
+        if (!level.canStart()) {
+            return CommandResult.error("Today's score level cannot be started.");
+        }
+
+        GameModel model = new GameModel(level);
+        PvZGameLoop loop = new PvZGameLoop(model);
+
+        App.getInstance().setCurrentGameModel(model);
+        App.getInstance().setCurrentGameLoop(loop);
+
+        level.onStart();
+        App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
+
+        return CommandResult.success("Entering today's Myopoint score game. Good luck!");
     }
 
     public CommandResult<Void> logout() {

@@ -78,6 +78,10 @@ public class GameplayMenuView extends AppMenuView {
             showMap();
             return;
         }
+        if (GameplayMenuCommand.SHOW_SCORE.matches(input)) {
+            showScore();
+            return;
+        }
         if (GameplayMenuCommand.SHOW_PLANTS_STATUS.matches(input)) {
             showPlantsStatus();
             return;
@@ -193,6 +197,11 @@ public class GameplayMenuView extends AppMenuView {
 
     public void collectSun(int x, int y) {
         CommandResult<Void> result = controller.collectSun(x, y);
+        displayCommandResult(result);
+    }
+
+    public void showScore() {
+        CommandResult<Void> result = controller.showScore();
         displayCommandResult(result);
     }
 

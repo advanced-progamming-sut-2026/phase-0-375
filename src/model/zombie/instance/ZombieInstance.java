@@ -61,6 +61,10 @@ public class ZombieInstance implements Tickable {
     /** Damage per second dealt by burning while {@link #burnTimer} > 0. */
     private int burnDPS = 0;
 
+    /** The last thing that damaged this zombie (e.g. a projectile). Used by
+     *  the Myopoint score level to attribute kills to their sources. */
+    private Object lastDamageSource;
+
     /** Names of plants that damaged this zombie (kill attribution for quests). */
     private final Set<String> plantDamagers = new HashSet<>();
 
@@ -514,6 +518,15 @@ public class ZombieInstance implements Tickable {
 
     public int getCurrentHP() {
         return currentHP;
+    }
+
+    /** @return the last source that damaged this zombie, or null if unknown. */
+    public Object getLastDamageSource() {
+        return lastDamageSource;
+    }
+
+    public void setLastDamageSource(Object lastDamageSource) {
+        this.lastDamageSource = lastDamageSource;
     }
 
     public FloatPoint getContinuousPosition() {

@@ -4,7 +4,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public enum MainMenuCommand implements CLICommand {
-    LOGOUT("menu logout");
+    LOGOUT("menu logout"),
+    LEADERBOARD("menu leaderboard(?: -s (?<sort>\\S+))?(?: -o (?<order>\\S+))?");
 
     private final Pattern pattern;
     private Matcher matcher;

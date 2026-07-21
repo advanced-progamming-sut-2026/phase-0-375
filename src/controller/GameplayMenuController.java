@@ -12,6 +12,7 @@ import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
+import model.game.level.special.ScoreLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.vasebreaker.PendingSeedPacket;
 import model.game.level.minigame.vasebreaker.Vase;
@@ -82,6 +83,27 @@ public class GameplayMenuController extends AppMenuController {
         app.setCurrentGameModel(null);
         app.setCurrentGameLoop(null);
         return CommandResult.success("Returned to game menu.");
+    }
+
+    // ──────────────────────────────────────────────
+    // Myopoint score game
+    // ──────────────────────────────────────────────
+
+    /** Shows the current Myopoint score and its per-pattern breakdown. */
+    public CommandResult<Void> showScore() {
+        GameModel model = requireGame();
+        if (model == null) {
+            return CommandResult.error("No active game. Start a level from the game menu first.");
+        }
+        if (!(model.getCurrentLevel() instanceof ScoreLevel scoreLevel)) {
+            return CommandResult.error("The current level is not a Myopoint score game.");
+        }
+        StringBuilder text = new StringBuilder();
+        for (String line : scoreLevel.getTracker().getSummaryLines()) {
+            if (text.length() > 0) text.append(System.lineSeparator());
+            text.append(line);
+        }
+        return CommandResult.success(text.toString());
     }
 
     // ──────────────────────────────────────────────

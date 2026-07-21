@@ -20,6 +20,7 @@ import model.game.map.terrain.TerrainStrategy;
 import model.game.systems.TerrainSystem;
 import model.game.map.Point;
 import model.game.rule.EndGameCondition;
+import model.game.score.MyopointTracker;
 import model.game.wave.WaveManager;
 import model.item.Grave;
 import model.item.LootDrop;
@@ -71,6 +72,9 @@ public class GameModel implements BehaviorContext {
     private int zombiesKilled;
     private int plantsLost;
     private float elapsedSeconds;
+
+    // Optional scorer attached by the daily Myopoint score level
+    private MyopointTracker myopointTracker;
 
     // Per-level stats used for quest tracking
     private int sunCollected;
@@ -142,6 +146,11 @@ public class GameModel implements BehaviorContext {
     }
 
     public Level getCurrentLevel() { return currentLevel; }
+
+    /** Attaches the optional Myopoint scorer (set by the daily score level). */
+    public void setMyopointTracker(MyopointTracker tracker) { this.myopointTracker = tracker; }
+
+    public MyopointTracker getMyopointTracker() { return myopointTracker; }
 
     public GameState getState() {
         return gameState;
@@ -275,6 +284,9 @@ public class GameModel implements BehaviorContext {
         instance.setGridPosition(new Point(gameMap.getCols(), lane));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
+        if (myopointTracker != null) {
+            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
+        }
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
     }
 
@@ -296,6 +308,9 @@ public class GameModel implements BehaviorContext {
 
         activeZombies.add(instance);
         gameMap.addZombie(instance, clampedCol, clampedRow);
+        if (myopointTracker != null) {
+            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
+        }
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
 
         return instance;
@@ -368,6 +383,13 @@ public class GameModel implements BehaviorContext {
 
     public void incrementZombiesKilled() {
         zombiesKilled++;
+    }
+
+    /** Notifies the optional Myopoint scorer that a zombie has just died. */
+    public void notifyZombieKilledForScore(ZombieInstance zombie) {
+        if (myopointTracker != null) {
+            myopointTracker.onZombieKilled(zombie, elapsedSeconds, currentTick);
+        }
     }
 
     /** Records a kill with timing/position details for quest tracking. */
