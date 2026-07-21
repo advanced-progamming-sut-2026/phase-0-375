@@ -33,11 +33,20 @@ public class AppMenuView {
     private GreenhouseMenuView greenhouseMenuView;
     private TravelLogMenuView travelLogMenuVIew;
 
+    private MenuType previousMenu = null;
+
     private final Scanner scanner = new Scanner(System.in);
     private boolean running = true;
 
     public void run() {
         while (running && scanner.hasNextLine()) {
+            // Show the unread-news badge once when the user enters Main.
+            MenuType current = App.getInstance().getCurrentMenu();
+            if (current == MenuType.MAIN && previousMenu != MenuType.MAIN) {
+                mainMenuView().showNewsBadgeIfAny();
+            }
+            previousMenu = current;
+
             String command = scanner.nextLine().trim();
 
             // Phase 1: universal commands (work in any menu)
@@ -54,7 +63,7 @@ public class AppMenuView {
             }
 
             // Phase 2: delegate to current menu's specific handler
-            MenuType current = App.getInstance().getCurrentMenu();
+            current = App.getInstance().getCurrentMenu();
             switch (current) {
                 case MAIN -> mainMenuView().processInput(command);
                 case REGISTER -> registerMenuView().processInput(command);

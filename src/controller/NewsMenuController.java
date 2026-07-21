@@ -7,8 +7,8 @@ import model.news.NewsItem;
 import model.news.NewsRepository;
 import model.user.User;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 public class NewsMenuController extends AppMenuController {
     private static NewsMenuController instance = null;
@@ -45,23 +45,30 @@ public class NewsMenuController extends AppMenuController {
 
     public void markAsRead(String newsId) {
         User user = App.getInstance().getCurrentUser();
-        if (user != null && user.getReadNews() != null) {
+        if (user == null || newsId == null) {
+            return;
+        }
+        if (user.getReadNews() == null) {
+            user.setReadNews(new ArrayList<>());
+        }
+        if (!user.getReadNews().contains(newsId)) {
             user.getReadNews().add(newsId);
+            App.getInstance().getUserRepository().flush();
         }
     }
 
     public boolean isRead(String newsId) {
         User user = App.getInstance().getCurrentUser();
-        return user != null && user.getReadNews() != null && user.getReadNews().contains(newsId);
+        return user != null
+                && user.getReadNews() != null
+                && user.getReadNews().contains(newsId);
+    }
+
+    public int countUnread() {
+        return buildRepo().countUnread();
     }
 
     private NewsRepository buildRepo() {
-        User user = App.getInstance().getCurrentUser();
-        Set<String> readIdsSet = (user != null && user.getReadNews() != null)
-                ? new java.util.HashSet<>(user.getReadNews()) : java.util.Collections.emptySet();
-
-        List<NewsItem> allNews = List.of();
-
-        return new NewsRepository(allNews, readIdsSet);
+        return NewsRepository.fromUser(App.getInstance().getCurrentUser());
     }
 }

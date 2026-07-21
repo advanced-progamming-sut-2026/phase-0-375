@@ -1,6 +1,7 @@
 package view;
 
 import controller.MainMenuController;
+import controller.NewsMenuController;
 import controller.result.CommandResult;
 import model.command.MainMenuCommand;
 
@@ -28,5 +29,19 @@ public class MainMenuView extends AppMenuView {
     public void logout() {
         CommandResult<Void> result = controller.logout();
         displayCommandResult(result);
+    }
+
+    public void showNewsBadgeIfAny() {
+        int unread = NewsMenuController.getInstance().countUnread();
+        if (unread <= 0) {
+            return;
+        }
+        String redBold = "\u001B[31;1m";
+        String reset = "\u001B[0m";
+        String bullet = "\u25CF";
+        System.out.println(redBold
+                + bullet + " You have " + unread + " unread news! "
+                + "Type 'menu enter news' to view."
+                + reset);
     }
 }

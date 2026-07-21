@@ -1,6 +1,7 @@
 package model.game.level;
 
 import model.app.App;
+import model.data.level.LevelRegistry;
 import model.enums.Chapter;
 import model.game.core.GameModel;
 import model.game.map.Point;
@@ -10,6 +11,7 @@ import model.plant.PlantFactory;
 import model.user.User;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -64,11 +66,32 @@ public class RegularLevel extends Level {
         getConfig().setCompleted(true);
 
         User user = App.getInstance().getCurrentUser();
+        if (user == null) return;
+
         Chapter chapter = getConfig().getChapter();
-        Map<Chapter, Integer> progress = user == null ? null : user.getChapterProgress();
+        int completedId = getConfig().getLevelId();
+
+        Map<Chapter, Integer> progress = user.getChapterProgress();
         if (progress != null && chapter != null) {
             progress.merge(chapter, getConfig().getLevelId(), Math::max);
         }
+
+        if (user.getUnlockedLevels() == null) {
+            user.setUnlockedLevels(new HashSet<>());
+        }
+        if (chapter != null) {
+            try {
+                int nextId = completedId + 1;
+                LevelRegistry registry = LevelRegistry.getInstance();
+                if (registry.hasLevel(chapter, nextId)) {
+                    user.getUnlockedLevels().add(chapter.name() + "#" + nextId);
+                }
+            } catch (IllegalStateException notInitialised) {
+                // LevelRegistry not loaded yet, just skip the next-level peek.
+            }
+        }
+
+        App.getInstance().getUserRepository().flush();
     }
 
     @Override

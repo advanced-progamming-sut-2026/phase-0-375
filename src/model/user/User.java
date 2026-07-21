@@ -32,6 +32,7 @@ public class User {
     private Set<String> unlockedPlants;
     private Set<String> unlockedZombies;
     private Set<String> unlockedMiniGames;
+    private Set<String> unlockedLevels;
 
     private int plantFoodCount;
 
@@ -197,6 +198,14 @@ public class User {
 
     public void setUnlockedMiniGames(Set<String> unlockedMiniGames) {
         this.unlockedMiniGames = unlockedMiniGames;
+    }
+
+    public Set<String> getUnlockedLevels() {
+        return unlockedLevels;
+    }
+
+    public void setUnlockedLevels(Set<String> unlockedLevels) {
+        this.unlockedLevels = unlockedLevels;
     }
 
     public int getPlantFoodCount() {
