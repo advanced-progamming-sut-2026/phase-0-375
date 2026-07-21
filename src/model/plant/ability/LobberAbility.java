@@ -12,6 +12,7 @@ import model.plant.definition.PlantLevels;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.projectile.Splash;
+import model.zombie.instance.ZombieInstance;
 
 import java.util.Random;
 
@@ -25,6 +26,9 @@ public class LobberAbility implements PlantAbility {
 
     /** Base chance (0..1) that Kernel-pult throws a butter instead of a kernel. */
     private static final float BASE_BUTTER_CHANCE = 0.25f;
+
+    /** Butter. */
+    private boolean butter = false;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.LOBBER; }
@@ -60,38 +64,62 @@ public class LobberAbility implements PlantAbility {
                     new FloatPoint(origin.getX(), origin.getY()),
                     row,
                     LOB_VELOCITY,
-                    element,
+                    (butter) ? Projectile.Element.BUTTER : element,
                     +1,
                     splashRadius
             );
             context.spawnProjectile(splash, splash.getX(), splash.getY());
+            butter = false;
         }
     }
 
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
-        if (def.getPlantFoodType() != PlantFoodType.PROJECTILE_BURST) return;
+        if (def == null) return;
         int volley = (int) def.getPlantFoodValue();
         if (volley <= 0) return;
 
-        int row = plant.getPosition().getY();
-        FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
-        Projectile.Element element = inferElement(def, plant);
-        float splashRadius = inferSplashRadius(def, plant);
-        int damage = inferDamage(def, plant);
+        if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
+            int row = plant.getPosition().getY();
+            FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+            Projectile.Element element = inferElement(def, plant);
+            float splashRadius = inferSplashRadius(def, plant);
+            int damage = inferDamage(def, plant);
 
-        for (int i = 0; i < volley; i++) {
-            Splash splash = new Splash(
-                    damage * 2,
-                    new FloatPoint(origin.getX() + i * 0.2f, origin.getY()),
-                    row,
-                    LOB_VELOCITY * 1.2f,
-                    element,
-                    +1,
-                    Math.max(1.0f, splashRadius)
-            );
-            context.spawnProjectile(splash, splash.getX(), splash.getY());
+            for (int i = 0; i < volley; i++) {
+                Splash splash = new Splash(
+                        damage * 2,
+                        new FloatPoint(origin.getX() + i * 0.2f, origin.getY()),
+                        row,
+                        LOB_VELOCITY * 1.2f,
+                        element,
+                        +1,
+                        Math.max(1.0f, splashRadius)
+                );
+                context.spawnProjectile(splash, splash.getX(), splash.getY());
+            }
+        }
+
+        else if (def.getPlantFoodType() == PlantFoodType.MAP_WIDE_FREEZE) {
+            int row = plant.getPosition().getY();
+            FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+            float splashRadius = inferSplashRadius(def, plant);
+            for (int i = 0; i < context.getRowCount(); i++) {
+                for (ZombieInstance zombie : context.getZombiesInLane(i)) {
+                    Splash splash = new Splash(
+                            inferDamage(def, plant),
+                            new FloatPoint(origin.getX(), origin.getY()),
+                            row,
+                            LOB_VELOCITY,
+                            Projectile.Element.BUTTER,
+                            (zombie.getGridX() < plant.getPosition().getX()) ? -1 : +1,
+                            Math.max(1.0f, splashRadius)
+                    );
+                    splash.setHomingTarget(zombie);
+                    context.spawnProjectile(splash, splash.getX(), splash.getY());
+                }
+            }
         }
     }
 
@@ -125,6 +153,7 @@ public class LobberAbility implements PlantAbility {
             float butterChance = BASE_BUTTER_CHANCE
                     + cumulativeSpecialValue(plant, PlantSpecialTag.BUTTER_CHANCE_BUFF);
             if (RNG.nextFloat() < butterChance) {
+                butter = true;
                 return baseDamage * 2;
             }
         }

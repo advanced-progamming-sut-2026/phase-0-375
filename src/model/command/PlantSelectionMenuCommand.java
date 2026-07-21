@@ -6,9 +6,9 @@ import java.util.regex.Pattern;
 public enum PlantSelectionMenuCommand implements CLICommand {
     SHOW_ALL_PLANTS("show all plants"),
     SHOW_AVAILABLE_PLANTS("show available plants"),
-    ADD_PLANT("add plant -t (?<type>\\S+)"),
-    REMOVE_PLANT("remove plant -t (?<type>\\S+)"),
-    BOOST_PLANT("boost plant -t (?<type>\\S+)"),
+    ADD_PLANT("add plant -t (?<type>.+?)"),
+    REMOVE_PLANT("remove plant -t (?<type>.+?)"),
+    BOOST_PLANT("boost plant -t (?<type>.+?)"),
     START_GAME("start game");
 
     private final Pattern pattern;

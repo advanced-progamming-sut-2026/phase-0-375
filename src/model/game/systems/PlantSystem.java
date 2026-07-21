@@ -176,9 +176,6 @@ public class PlantSystem implements Tickable {
         @Override
         public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
             boolean resetCooldowns = false;
-            // Detect if any plant of this family has the RESET_FAMILY_COOLDOWNS upgrade.
-            // If so, after triggering plant-food on every family member, also clear their
-            // per-ability cooldowns so they can immediately act.
             for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                 if (plant.getDefinition().getCategory() == family) {
                     if (hasResetFamilyCooldownsUpgrade(plant)) {

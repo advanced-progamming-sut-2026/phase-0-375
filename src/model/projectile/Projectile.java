@@ -18,6 +18,8 @@ public abstract class Projectile {
         FIRE,
         /** Poison the target on hit. */
         POISON,
+        /** Butter. */
+        BUTTER,
     }
 
     /** Damage dealt on hit (before armor absorption). */
@@ -165,6 +167,11 @@ public abstract class Projectile {
     /** @return true if this projectile carries the {@link Element#POISON} affinity. */
     public boolean isPoison() {
         return element == Element.POISON;
+    }
+
+    /** Butter. */
+    public boolean isButter() {
+        return element == Element.BUTTER;
     }
 
     /** @return true if this projectile is traveling leftward. */

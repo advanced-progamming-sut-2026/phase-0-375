@@ -11,12 +11,16 @@ import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Strategy for the {@link PlantCategory#MELEE} family.
  */
 public class MeleeAbility implements PlantAbility {
+
+    /** Maximum number of zombies that chomper can digest when it's on plant food. */
+    private static final int DIGESTING_ZOMBIES = 3;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.MELEE; }
@@ -71,7 +75,7 @@ public class MeleeAbility implements PlantAbility {
     // --- Chomper swallow + digest cycle ---
 
     /** Default digestion time (seconds) after the Chomper swallows a zombie. */
-    private static final float CHOMPER_DIGEST_DURATION = 30.0f;
+    private static final float CHOMPER_DIGEST_DURATION = 40.0f;
     /** Damage dealt to the swallowed zombie (intentionally huge to one-shot). */
     private static final int CHOMPER_SWALLOW_DAMAGE = 6767;
 
@@ -132,15 +136,43 @@ public class MeleeAbility implements PlantAbility {
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
-        if (def.getPlantFoodType() != PlantFoodType.LOCAL_AOE_ATTACK) return;
-        if (plant.getPosition() == null) return;
+        if (def == null) return;
 
-        int radius = (int) def.getPlantFoodValue();
-        if (radius <= 0) radius = 1;
-        int row = plant.getPosition().getY();
-        int col = plant.getPosition().getX();
-        for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
-            context.damageZombie(zombie, def.getDamage() * 3);
+        if (def.getPlantFoodType() == PlantFoodType.LOCAL_AOE_ATTACK) {
+            int radius = (int) def.getPlantFoodValue();
+            if (radius <= 0) radius = 1;
+            int row = plant.getPosition().getY();
+            int col = plant.getPosition().getX();
+            for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
+                context.damageZombie(zombie, def.getDamage() * 3);
+            }
+        }
+
+        else if (def.getPlantFoodType() == PlantFoodType.PULL_UNDERWATER) {
+            AbilityState state = plant.getAbilityState(PlantAbilityType.DELAYED_EXPLOSIVE);
+            if (state == null) return;
+
+            int row = plant.getPosition().getY();
+            List<ZombieInstance> candidates = context.getZombiesInLane(row);
+            List<ZombieInstance> targets = new ArrayList<>();
+            for (ZombieInstance zombie : candidates) {
+                if (targets.size() >= 3) break;
+                if (zombie == null || zombie.isDead()) continue;
+                targets.add(zombie);
+            }
+            if (targets.isEmpty()) return;
+
+            for (ZombieInstance target : targets) {
+                context.damageZombie(target, CHOMPER_SWALLOW_DAMAGE);
+            }
+
+            float digestDuration = CHOMPER_DIGEST_DURATION;
+            float reduction = cumulativeDigestReduction(plant);
+            digestDuration = Math.max(5f, digestDuration - reduction);
+
+            state.setDigesting(true);
+            state.setDigestRemaining(digestDuration);
+            state.setCooldownRemaining(digestDuration);
         }
     }
 }

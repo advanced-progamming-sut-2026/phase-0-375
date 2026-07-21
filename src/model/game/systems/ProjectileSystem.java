@@ -323,6 +323,12 @@ public class ProjectileSystem implements Tickable {
                 shoot.igniteTorch();
             }
         }
+
+        if (projectile.isButter()) {
+            zombie.applyChill();
+            zombie.applyChill();
+            zombie.applyChill();
+        }
     }
     // --- Ice-terrain melting ---
 

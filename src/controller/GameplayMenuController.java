@@ -661,7 +661,7 @@ public class GameplayMenuController extends AppMenuController {
         int count = 0;
         for (int r = 0; r < map.getRows(); r++) {
             for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(r, c);
+                Cell cell = map.getCell(c, r);
                 if (cell == null) continue;
                 PlantInstance pi = plantAt(cell);
                 if (pi == null) continue;

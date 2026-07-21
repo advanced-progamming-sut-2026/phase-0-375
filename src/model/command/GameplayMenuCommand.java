@@ -8,7 +8,7 @@ public enum GameplayMenuCommand implements CLICommand {
     COLLECT_SUN("collect sun -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     SHOW_SUN_AMOUNT("show sun amount"),
     CHEAT_ADD_SUNS("cheat add -n (?<count>\\d+) suns"),
-    PLANT("plant plant -t (?<type>\\S+) -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
+    PLANT("plant plant -t (?<type>.+?) -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     BREAK_VASE("break vase -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     CHEAT_REMOVE_COOLDOWN("cheat remove-cooldown"),
     PLUCK("pluck plant -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),

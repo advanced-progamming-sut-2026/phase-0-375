@@ -12,14 +12,17 @@ import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.List;
+import java.util.Random;
 
 /**
  * Strategy for the {@link PlantCategory#SHOOTER} family.
  */
 public class ShooterAbility implements PlantAbility {
 
-    private static final float PELLET_VELOCITY = 1f;     // grid-units per second
-    private static final float PELLET_SPAWN_OFFSET = 0.5f; // tiles ahead of the plant
+    private static final Random RNG = new Random();
+
+    private static final float PELLET_VELOCITY = 1f;
+    private static final float PELLET_SPAWN_OFFSET = 0.5f;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.SHOOTER; }
@@ -69,9 +72,16 @@ public class ShooterAbility implements PlantAbility {
         int lane = plant.getPosition().getY();
         FloatPoint origin = pelletOrigin(plant);
         for (int i = 0; i < volley; i++) {
+            if (i % 5 == 0) {
+                origin.setX(origin.getX() + i * 0.08f);
+            }
+
+            float dx = (RNG.nextFloat() - 0.5f) * 0.4f;
+            float dy = (RNG.nextFloat() - 0.5f) * 0.4f;
+
             Pellet pellet = new Pellet(
                     def.getDamage(),
-                    new FloatPoint(origin.getX() + i * 0.1f, origin.getY()),
+                    new FloatPoint(origin.getX() + dx, origin.getY() + dy),
                     lane,
                     PELLET_VELOCITY * 1.25f,
                     element,

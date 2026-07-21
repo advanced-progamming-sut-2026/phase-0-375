@@ -23,6 +23,12 @@ public class StrikeThroughAbility implements PlantAbility {
     /** Distance (in grid units) that Fume-shroom's plant food pushes zombies back. */
     private static final float KNOCKBACK_TILES = 1.5f;
 
+    /** Cactus projectile damage when it's on plant food. */
+    private static final int BURST_DAMAGE = 100;
+
+    /** Cactus projectile count when it's on plant food. */
+    private static final int BURST_PROJ_COUNT = 3;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.STRIKE_THROUGH; }
 
@@ -41,36 +47,56 @@ public class StrikeThroughAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!context.hasZombieInLane(plant.getPosition().getY())) return;
 
-        int pelletsCount = (int) def.getAbilityValue();
-        if (pelletsCount <= 0) pelletsCount = 1;
-
         int row = plant.getPosition().getY();
         float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
         FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f + rangeBonus, row);
 
-        for (int i = 0; i < pelletsCount; i++) {
-            Pellet pellet = new Pellet(
-                    def.getDamage(),
-                    new FloatPoint(origin.getX() + i * 0.05f, origin.getY()),
-                    row,
-                    PELLET_VELOCITY,
-                    Projectile.Element.NONE,
-                    +1
-            );
-            pellet.setPierce(true);
-            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
-        }
+        Pellet pellet = new Pellet(
+                def.getDamage(),
+                new FloatPoint(origin.getX(), origin.getY()),
+                row,
+                PELLET_VELOCITY,
+                Projectile.Element.NONE,
+                +1
+        );
+        pellet.setPierce(true);
+        context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
     }
 
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
-        if (def.getPlantFoodType() != PlantFoodType.KNOCKBACK_BLAST) return;
         if (plant.getPosition() == null) return;
 
-        int row = plant.getPosition().getY();
-        for (ZombieInstance zombie : context.getZombiesInLane(row)) {
-            context.pushZombieBack(zombie, KNOCKBACK_TILES);
+        if (def.getPlantFoodType() == PlantFoodType.KNOCKBACK_BLAST) {
+            int row = plant.getPosition().getY();
+            for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+                context.pushZombieBack(zombie, KNOCKBACK_TILES);
+            }
+        }
+
+        else if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
+            int row = plant.getPosition().getY();
+            for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+                int damage = (int) def.getPlantFoodValue();
+                if (damage <= 0) {
+                    damage = BURST_DAMAGE;
+                }
+                float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
+                FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f + rangeBonus, row);
+                for (int i = 0; i < BURST_PROJ_COUNT; i++) {
+                    Pellet pellet = new Pellet(
+                            def.getDamage(),
+                            new FloatPoint(origin.getX() + i * 0.05f, origin.getY()),
+                            row,
+                            PELLET_VELOCITY,
+                            Projectile.Element.NONE,
+                            +1
+                    );
+                    pellet.setPierce(true);
+                    context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+                }
+            }
         }
     }
 

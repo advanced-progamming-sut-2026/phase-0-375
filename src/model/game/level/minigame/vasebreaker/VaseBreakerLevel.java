@@ -188,7 +188,7 @@ public class VaseBreakerLevel extends MiniGameLevel {
             Vase vase = new Vase(tile, contents.get(i));
             fillVase(vase);
             vases.add(vase);
-            Cell cell = map.getCell(tile.getY(), tile.getX()); // getCell(row, col)
+            Cell cell = map.getCell(tile.getX(), tile.getY()); // getCell(col, row)
             if (cell != null) {
                 cell.addPlaceable(vase);
             }
@@ -260,7 +260,7 @@ public class VaseBreakerLevel extends MiniGameLevel {
         vase.setBroken(true);
         int row = vase.getPosition().getY();
         int col = vase.getPosition().getX();
-        Cell cell = model.getMap().getCell(row, col);
+        Cell cell = model.getMap().getCell(col, row);
         if (cell != null) {
             cell.removePlaceable(vase);
         }

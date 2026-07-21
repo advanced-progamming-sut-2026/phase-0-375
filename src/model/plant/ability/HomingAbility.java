@@ -19,6 +19,8 @@ public class HomingAbility implements PlantAbility {
 
     private static final float PELLET_VELOCITY = 1.0f;
 
+    private static final int BURST_PROJ_DAMAGE = 6767;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.HOMING; }
 
@@ -58,6 +60,10 @@ public class HomingAbility implements PlantAbility {
                 // Magnet-shroom plant-food
                 pullMetalAndStunAll(context, (int) def.getPlantFoodValue());
                 break;
+            case PROJECTILE_BURST:
+                // cat-tail plant-food
+                burstProjectile(context, plant);
+                break;
             default:
                 break;
         }
@@ -82,10 +88,6 @@ public class HomingAbility implements PlantAbility {
                 Projectile.Element.NONE,
                 +1
         );
-        // Attach the target so ProjectileSystem steers the pellet toward
-        // it each tick. The pellet's row is initially set to the plant's
-        // lane but will be updated by the steering logic to follow the
-        // target across lanes if needed.
         pellet.setHomingTarget(target);
         context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
     }
@@ -191,9 +193,34 @@ public class HomingAbility implements PlantAbility {
                 zombie.setState(ZombieState.HYPNOTIZED);
                 zombie.setMovingBackward(true);
                 count--;
-            }        // If the plant has the PRIORITIZE_GARGANTUARS upgrade (Electric
-        // Blueberry L3), prefer Gargantuars over everything else.
+            }
         }
+    }
+
+    // --- cat-tail plant-food ---
+
+    private void burstProjectile(PlantAbilityContext context, PlantInstance plant) {
+        ZombieInstance target = pickTarget(plant, context);
+        if (target == null) return;
+
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+
+        FloatPoint origin = new FloatPoint(
+                plant.getPosition().getX() + 0.5f,
+                plant.getPosition().getY()
+        );
+
+        Pellet pellet = new Pellet(
+                BURST_PROJ_DAMAGE,
+                origin,
+                plant.getPosition().getY(),
+                PELLET_VELOCITY,
+                Projectile.Element.NONE,
+                +1
+        );
+        pellet.setHomingTarget(target);
+        context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
     }
 
     // --- Target selection ---

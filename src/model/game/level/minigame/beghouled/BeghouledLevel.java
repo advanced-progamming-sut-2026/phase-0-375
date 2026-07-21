@@ -205,8 +205,8 @@ public class BeghouledLevel extends MiniGameLevel {
             return "Illegal swap: it would not create a match of 3.";
         }
         // Physically swap the two plants on the map.
-        Cell firstCell = model.getMap().getCell(row, col);
-        Cell secondCell = model.getMap().getCell(targetRow, targetCol);
+        Cell firstCell = model.getMap().getCell(col, row);
+        Cell secondCell = model.getMap().getCell(targetCol, targetRow);
         firstCell.removePlaceable(first);
         secondCell.removePlaceable(second);
         firstCell.addPlaceable(second);
@@ -258,7 +258,7 @@ public class BeghouledLevel extends MiniGameLevel {
         for (int[] cell : targets) {
             int r = cell[0];
             int c = cell[1];
-            model.getMap().getCell(r, c).removePlaceable(board[r][c]);
+            model.getMap().getCell(c, r).removePlaceable(board[r][c]);
             board[r][c] = null;
             PlantInstance upgraded = PlantFactory.createInstance(rule.getTo());
             if (upgraded != null && model.placePlant(upgraded, r, c)) {
@@ -316,7 +316,7 @@ public class BeghouledLevel extends MiniGameLevel {
                 int r = key / cols();
                 int c = key % cols();
                 if (board[r][c] != null) {
-                    model.getMap().getCell(r, c).removePlaceable(board[r][c]);
+                    model.getMap().getCell(c, r).removePlaceable(board[r][c]);
                     board[r][c] = null;
                 }
             }
@@ -427,7 +427,7 @@ public class BeghouledLevel extends MiniGameLevel {
         for (int r = 0; r < rows(); r++) {
             for (int c = 0; c < cols(); c++) {
                 if (board[r][c] != null) {
-                    model.getMap().getCell(r, c).removePlaceable(board[r][c]);
+                    model.getMap().getCell(c, r).removePlaceable(board[r][c]);
                     board[r][c] = null;
                 }
             }
@@ -552,7 +552,7 @@ public class BeghouledLevel extends MiniGameLevel {
         boolean changed = false;
         for (int r = 0; r < rows(); r++) {
             for (int c = 0; c < cols(); c++) {
-                if (board[r][c] != null && model.getMap().getCell(r, c)
+                if (board[r][c] != null && model.getMap().getCell(c, r)
                         .getPlaceable(PlacableLayer.MAIN) != board[r][c]) {
                     board[r][c] = null;
                     craters[r][c] = true;
