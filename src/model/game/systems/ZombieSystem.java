@@ -149,13 +149,13 @@ public class ZombieSystem implements Tickable {
 
     /**
      * Handles a zombie reaching the end of its lane.
-     * If the lane has a lawn mower waiting, it triggers
-     * the mower and dies; otherwise the game is lost.
+     * If lawn mowers are enabled for this level and the lane has a mower
+     * waiting, it triggers the mower and dies; otherwise the game is lost.
      */
     private void onZombieReachedHouse(ZombieInstance zombie, BehaviorContext context) {
         int row = zombie.getGridY();
         Lane lane = gameModel.getMap().getLane(row);
-        if (lane != null && lane.hasActiveLawnMower()) {
+        if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
             lane.triggerLawnMower();
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
@@ -171,6 +171,14 @@ public class ZombieSystem implements Tickable {
             }
             zombie.setState(ZombieState.DYING);
         }
+    }
+
+    /** Lawn mowers only defend the house when the level's rules enable them. */
+    private boolean lawnMowersEnabled() {
+        return gameModel.getCurrentLevel() != null
+                && gameModel.getCurrentLevel().getConfig() != null
+                && gameModel.getCurrentLevel().getConfig().getRules() != null
+                && gameModel.getCurrentLevel().getConfig().getRules().isLawnMowersEnabled();
     }
 
     // --- Eating ---
