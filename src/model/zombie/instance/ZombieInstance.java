@@ -182,6 +182,13 @@ public class ZombieInstance implements Tickable {
 
     public void recordNonPlantDamage() { nonPlantDamaged = true; }
 
+    /** True if a lawn mower dealt the killing damage. */
+    private boolean killedByMower;
+
+    public void markKilledByMower() { killedByMower = true; }
+
+    public boolean isKilledByMower() { return killedByMower; }
+
     public Set<String> getPlantDamagers() { return plantDamagers; }
 
     public Set<PlantCategory> getPlantDamagerFamilies() { return plantDamagerFamilies; }

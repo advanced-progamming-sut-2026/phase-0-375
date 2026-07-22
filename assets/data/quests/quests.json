@@ -264,5 +264,19 @@
     "priority": "HIGH",
     "variable": "min_row_and_column_count",
     "rewardNote": "25 gems"
+  },
+  {
+    "name": "Mowing Time",
+    "category": "EPIC",
+    "condition": "Kill at least n zombies with the lawn mower",
+    "rewardType": "CURRENCY",
+    "rewardCoinAmount": 0,
+    "rewardGemAmount": 0,
+    "rewardUnlockableName": null,
+    "rewardInventoryItem": null,
+    "rewardInventoryItemAmount": 0,
+    "priority": "MEDIUM",
+    "variable": "10-20-30-40-50",
+    "rewardNote": "n gems"
   }
 ]

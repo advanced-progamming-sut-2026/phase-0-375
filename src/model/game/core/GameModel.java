@@ -82,6 +82,7 @@ public class GameModel implements BehaviorContext {
     private float firstZombieSpawnTime = -1f;
     private int killsWithin30s;
     private int noMowerFirstColumnKills;
+    private int mowerKills;
     private List<Plant> plantsPlaced;
     private Set<Integer> rowsPlanted;
     private Set<Integer> columnsPlanted;
@@ -399,6 +400,7 @@ public class GameModel implements BehaviorContext {
             killsWithin30s++;
         }
         if (zombie == null) return;
+        if (zombie.isKilledByMower()) mowerKills++;
         // exclusive-kill bookkeeping for plant/family quests
         if (!zombie.isNonPlantDamaged()) {
             if (zombie.getPlantDamagers().size() == 1) {
@@ -426,6 +428,8 @@ public class GameModel implements BehaviorContext {
     public int getKillsWithin30s() { return killsWithin30s; }
 
     public int getNoMowerFirstColumnKills() { return noMowerFirstColumnKills; }
+
+    public int getMowerKills() { return mowerKills; }
 
     /** Kills where the zombie was damaged exclusively by the named plant. */
     public int getExclusivePlantKills(String plantName) {

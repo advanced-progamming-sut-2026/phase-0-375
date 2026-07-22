@@ -317,6 +317,9 @@ public class QuestLoader {
         if (note != null && note.contains("20 - n")) {
             inventoryItemAmount = 20 - variableValue;
         }
+        if (note != null && note.contains("n gems")) {
+            gems = variableValue;
+        }
 
         return new QuestReward(
                 type, coins, gems,

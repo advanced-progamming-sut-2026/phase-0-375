@@ -163,6 +163,7 @@ public class ZombieSystem implements Tickable {
             // The mower kills the triggering zombie: mark non-plant damage
             // and route through the normal death path so kill stats see it.
             zombie.recordNonPlantDamage();
+            zombie.markKilledByMower();
             zombie.setState(ZombieState.DYING);
         } else {
             // No mower, the zombie got through.

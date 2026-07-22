@@ -839,6 +839,7 @@ public class GameplayMenuController extends AppMenuController {
         GameModel model = requireGame();
         StringBuilder sb = new StringBuilder("── Kill attribution ──\n");
         sb.append("Total zombies killed: ").append(model.getZombiesKilled()).append('\n');
+        sb.append("Mower kills (this level): ").append(model.getMowerKills()).append('\n');
         int exclusiveTotal = 0;
         sb.append("Exclusive kills per plant:\n");
         for (java.util.Map.Entry<String, Integer> e : model.getExclusivePlantKillsMap().entrySet()) {
