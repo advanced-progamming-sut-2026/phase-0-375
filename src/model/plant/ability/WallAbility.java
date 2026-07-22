@@ -106,7 +106,7 @@ public class WallAbility implements PlantAbility {
         Plant def = plant.getDefinition();
 
         // Damage reflect (Endurian)
-        if (def.getDamage() > 0) {
+        if (def.getDamage() > 0 && !def.hasTag(PlantTags.EXPLOSIVE)) {
             int reflectDamage = def.getDamage() + cumulativeReflectBuff(plant);
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 0, 0)) {
                 if (zombie.isEating() && zombie.getEatingTarget() == plant) {
