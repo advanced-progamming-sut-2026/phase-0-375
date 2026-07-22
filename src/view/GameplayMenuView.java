@@ -86,6 +86,10 @@ public class GameplayMenuView extends AppMenuView {
             showPlantsStatus();
             return;
         }
+        if (GameplayMenuCommand.SHOW_KILL_STATS.matches(input)) {
+            showKillStats();
+            return;
+        }
         if (GameplayMenuCommand.SHOW_TILE_STATUS.matches(input)) {
             int x = Integer.parseInt(GameplayMenuCommand.SHOW_TILE_STATUS.getParameter("x"));
             int y = Integer.parseInt(GameplayMenuCommand.SHOW_TILE_STATUS.getParameter("y"));
@@ -157,6 +161,7 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  swap plant -l (<x>, <y>) -d <up|down|left|right>");
         displayError("  upgrade plant -t <type>");
         displayError("  show beghouled status");
+        displayError("  show kill stats");
         displayError("  menu exit");
     }
 
@@ -255,6 +260,15 @@ public class GameplayMenuView extends AppMenuView {
 
     public void showPlantsStatus() {
         CommandResult<String> result = controller.showPlantsStatus();
+        if (result.isSuccess()) {
+            displayMessage(result.getData());
+        } else {
+            displayError(result.getMessage());
+        }
+    }
+
+    public void showKillStats() {
+        CommandResult<String> result = controller.showKillStats();
         if (result.isSuccess()) {
             displayMessage(result.getData());
         } else {

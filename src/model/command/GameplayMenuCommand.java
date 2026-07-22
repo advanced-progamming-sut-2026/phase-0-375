@@ -17,6 +17,7 @@ public enum GameplayMenuCommand implements CLICommand {
     SHOW_MAP("show map"),
     SHOW_PLANTS_STATUS("show plants status"),
     SHOW_SCORE("show score"),
+    SHOW_KILL_STATS("show kill stats"),
     SHOW_TILE_STATUS("show tile status -l \\((?<x>\\d+),\\s*(?<y>\\d+)\\)"),
     RELEASE_NUKE("release the nuke"),
     ZOMBIES_INFO("zombies info"),

@@ -445,6 +445,11 @@ public class GameModel implements BehaviorContext {
         return 0;
     }
 
+    /** Raw exclusive-kill maps (diagnostics). */
+    public Map<String, Integer> getExclusivePlantKillsMap() { return exclusivePlantKills; }
+
+    public Map<PlantCategory, Integer> getExclusiveFamilyKillsMap() { return exclusiveFamilyKills; }
+
     public List<Plant> getPlantsPlaced() { return plantsPlaced; }
 
     public int getMaxSunProducersAtOnce() { return maxSunProducersAtOnce; }

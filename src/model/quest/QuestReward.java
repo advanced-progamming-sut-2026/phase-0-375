@@ -98,7 +98,7 @@ public class QuestReward {
         return names.get(new Random().nextInt(names.size()));
     }
 
-    /** Resolves "random_*" placeholders to a real locked, kill-capable plant. */
+    /** Resolves "random_*" placeholders to a random plant not unlocked yet. */
     private String resolveUnlockable(String name, User user) {
         if (!name.toLowerCase().startsWith("random")) {
             return name;
@@ -108,7 +108,7 @@ public class QuestReward {
             for (Plant p : PlantFactory.getAllDefinitions()) {
                 boolean unlocked = user.getUnlockedPlants() != null
                         && user.getUnlockedPlants().contains(p.getName());
-                if (!unlocked && p.getDamage() > 0) {
+                if (!unlocked) {
                     candidates.add(p);
                 }
             }

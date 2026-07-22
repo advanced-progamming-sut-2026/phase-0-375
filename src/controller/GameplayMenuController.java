@@ -831,6 +831,30 @@ public class GameplayMenuController extends AppMenuController {
         return CommandResult.successWithData(sb.toString(), sb.toString());
     }
 
+    /** Diagnostic: kill-attribution stats used by exclusive-kill quests. */
+    public CommandResult<String> showKillStats() {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return retypeError(guard);
+
+        GameModel model = requireGame();
+        StringBuilder sb = new StringBuilder("── Kill attribution ──\n");
+        sb.append("Total zombies killed: ").append(model.getZombiesKilled()).append('\n');
+        int exclusiveTotal = 0;
+        sb.append("Exclusive kills per plant:\n");
+        for (java.util.Map.Entry<String, Integer> e : model.getExclusivePlantKillsMap().entrySet()) {
+            sb.append("  ").append(e.getKey()).append(" = ").append(e.getValue()).append('\n');
+            exclusiveTotal += e.getValue();
+        }
+        sb.append("Exclusive kills per family:\n");
+        for (java.util.Map.Entry<PlantCategory, Integer> e : model.getExclusiveFamilyKillsMap().entrySet()) {
+            sb.append("  ").append(e.getKey().name()).append(" = ").append(e.getValue()).append('\n');
+        }
+        sb.append("Non-exclusive kills (mixed families or non-plant damage like mowers): ")
+                .append(model.getZombiesKilled() - exclusiveTotal);
+        String out = sb.toString();
+        return CommandResult.successWithData(out, out);
+    }
+
     /**
      * Returns detailed information about the cell at (x, y): terrain,
      * every stacked plant (GROUND/MAIN/OVERLAY), zombies, projectiles.
