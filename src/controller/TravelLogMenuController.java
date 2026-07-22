@@ -319,7 +319,13 @@ public class TravelLogMenuController extends AppMenuController {
             sb.append(r.getInventoryItemAmount()).append("x ").append(r.getInventoryItem());
         }
         if (r.getUnlockableName() != null && !r.getUnlockableName().isBlank()) {
-            sb.append("unlock: ").append(r.getUnlockableName());
+            String unlockable = r.getUnlockableName();
+            if (unlockable.toLowerCase().startsWith("random")) {
+                // Placeholder resolves at claim time to a locked, kill-capable plant.
+                sb.append("unlock: a random plant you haven't unlocked yet");
+            } else {
+                sb.append("unlock: ").append(unlockable);
+            }
         }
         String s = sb.toString().trim();
         return s.isEmpty() ? "(none)" : s;

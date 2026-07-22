@@ -15,7 +15,9 @@ import model.user.User;
 import model.user.persistance.UserRepository;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class GameMenuController extends AppMenuController {
     private static GameMenuController instance = null;
@@ -151,9 +153,55 @@ public class GameMenuController extends AppMenuController {
     }
 
     public CommandResult<List<User>> leaderboard() {
+        return leaderboard(null, null);
+    }
+
+    /**
+     * Leaderboard sorted by any column. Sort keys: "score"/"myopoint"
+     * (default), "progress", "minigames", "daily-quests" and "quests"
+     * (non-daily). Order: "desc" (default) or "asc".
+     */
+    public CommandResult<List<User>> leaderboard(String sortKey, String order) {
+        String key = sortKey == null ? "score" : sortKey.toLowerCase();
+        Comparator<User> comparator = switch (key) {
+            case "progress" -> Comparator.comparingInt(GameMenuController::totalProgress);
+            case "minigames" -> Comparator.comparingInt(User::getCompletedMiniGames);
+            case "daily-quests", "dailyquests", "daily" -> Comparator.comparingInt(User::getCompletedDailyQuests);
+            case "quests", "other-quests" -> Comparator.comparingInt(User::getCompletedNonDailyQuests);
+            case "score", "myopoint" -> Comparator.comparingInt(User::getHighestMyopoint);
+            default -> null;
+        };
+        if (comparator == null) {
+            return errorTyped("Unknown sort column '" + sortKey
+                    + "'. Use: score, progress, minigames, daily-quests or quests.");
+        }
+        if (order != null && !order.equalsIgnoreCase("asc") && !order.equalsIgnoreCase("desc")) {
+            return errorTyped("Unknown sort order '" + order + "'. Use: asc or desc.");
+        }
+        if (order == null || order.equalsIgnoreCase("desc")) {
+            comparator = comparator.reversed();
+        }
+        comparator = comparator.thenComparing(User::getUsername, String.CASE_INSENSITIVE_ORDER);
+
         UserRepository repo = App.getInstance().getUserRepository();
-        List<User> sorted = repo.findAllOrderByMyopointDesc();
+        List<User> sorted = repo.findAll().stream().sorted(comparator).collect(Collectors.toList());
         return CommandResult.successWithData("Leaderboard (" + sorted.size() + " players).", sorted);
+    }
+
+    /** Total chapter progress across all chapters (leaderboard sort helper). */
+    private static int totalProgress(User user) {
+        if (user.getChapterProgress() == null) return 0;
+        int total = 0;
+        for (Integer level : user.getChapterProgress().values()) {
+            total += level == null ? 0 : level;
+        }
+        return total;
+    }
+
+    /** Adapts a Void error result to a typed one for data-carrying commands. */
+    @SuppressWarnings("unchecked")
+    private static <T> CommandResult<T> errorTyped(String message) {
+        return (CommandResult<T>) CommandResult.error(message);
     }
 
     public CommandResult<Void> coinWallet() {

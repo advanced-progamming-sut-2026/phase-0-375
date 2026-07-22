@@ -8,7 +8,7 @@ public enum GameMenuCommand implements CLICommand {
     ENTER_MINIGAME("menu enter minigame -t (?<type>\\S+) -s (?<stage>\\d+)"),
     GREENHOUSE("menu greenhouse"),
     TRAVEL_LOG("menu travel-log"),
-    LEADERBOARD("menu leaderboard"),
+    LEADERBOARD("menu leaderboard(?: -s (?<sort>\\S+))?(?: -o (?<order>\\S+))?"),
     COIN_WALLET("menu coin-wallet"),
     GEM_WALLET("menu gem-wallet"),
     CHEAT_ADD("menu cheat add (?<n>\\d+) (?<type>coin|diamond)");

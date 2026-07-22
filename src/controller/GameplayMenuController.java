@@ -12,6 +12,7 @@ import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
+import model.game.level.special.ScoreLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.vasebreaker.PendingSeedPacket;
 import model.game.level.minigame.vasebreaker.Vase;
@@ -82,6 +83,27 @@ public class GameplayMenuController extends AppMenuController {
         app.setCurrentGameModel(null);
         app.setCurrentGameLoop(null);
         return CommandResult.success("Returned to game menu.");
+    }
+
+    // ──────────────────────────────────────────────
+    // Myopoint score game
+    // ──────────────────────────────────────────────
+
+    /** Shows the current Myopoint score and its per-pattern breakdown. */
+    public CommandResult<Void> showScore() {
+        GameModel model = requireGame();
+        if (model == null) {
+            return CommandResult.error("No active game. Start a level from the game menu first.");
+        }
+        if (!(model.getCurrentLevel() instanceof ScoreLevel scoreLevel)) {
+            return CommandResult.error("The current level is not a Myopoint score game.");
+        }
+        StringBuilder text = new StringBuilder();
+        for (String line : scoreLevel.getTracker().getSummaryLines()) {
+            if (text.length() > 0) text.append(System.lineSeparator());
+            text.append(line);
+        }
+        return CommandResult.success(text.toString());
     }
 
     // ──────────────────────────────────────────────
@@ -349,19 +371,20 @@ public class GameplayMenuController extends AppMenuController {
             }
         }
 
-        // --- Sun cost ---
-        int cost = conveyor ? 0 : definition.getCost();
-        if (!model.spendSun(cost)) {
-            return CommandResult.error("Not enough sun. Need " + cost
-                    + ", have " + model.getSunAmount() + ".");
-        }
-
-        // --- Build & place the instance ---
+        // --- Build the instance first so leveled stats (incl. cost) apply ---
         PlantInstance instance = new PlantInstance(definition);
         int level = plantLevelFor(definition.getName());
         if (level > 1) {
             instance.applyLevelUpgrade(level);
         }
+
+        // --- Sun cost (leveled definition may discount it) ---
+        int cost = conveyor ? 0 : instance.getDefinition().getCost();
+        if (!model.spendSun(cost)) {
+            return CommandResult.error("Not enough sun. Need " + cost
+                    + ", have " + model.getSunAmount() + ".");
+        }
+
         instance.setPosition(new Point(x, y));
 
         // Imitater: default the imitate target to the first non-Imitater
@@ -806,6 +829,31 @@ public class GameplayMenuController extends AppMenuController {
         }
         sb.append("Total: ").append(count).append(" plant(s).");
         return CommandResult.successWithData(sb.toString(), sb.toString());
+    }
+
+    /** Diagnostic: kill-attribution stats used by exclusive-kill quests. */
+    public CommandResult<String> showKillStats() {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return retypeError(guard);
+
+        GameModel model = requireGame();
+        StringBuilder sb = new StringBuilder("── Kill attribution ──\n");
+        sb.append("Total zombies killed: ").append(model.getZombiesKilled()).append('\n');
+        sb.append("Mower kills (this level): ").append(model.getMowerKills()).append('\n');
+        int exclusiveTotal = 0;
+        sb.append("Exclusive kills per plant:\n");
+        for (java.util.Map.Entry<String, Integer> e : model.getExclusivePlantKillsMap().entrySet()) {
+            sb.append("  ").append(e.getKey()).append(" = ").append(e.getValue()).append('\n');
+            exclusiveTotal += e.getValue();
+        }
+        sb.append("Exclusive kills per family:\n");
+        for (java.util.Map.Entry<PlantCategory, Integer> e : model.getExclusiveFamilyKillsMap().entrySet()) {
+            sb.append("  ").append(e.getKey().name()).append(" = ").append(e.getValue()).append('\n');
+        }
+        sb.append("Non-exclusive kills (mixed families or non-plant damage like mowers): ")
+                .append(model.getZombiesKilled() - exclusiveTotal);
+        String out = sb.toString();
+        return CommandResult.successWithData(out, out);
     }
 
     /**

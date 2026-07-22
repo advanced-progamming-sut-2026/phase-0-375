@@ -65,6 +65,9 @@ public final class QuestTracker {
             case "Daily Sun Collector":
                 add(progress, name, model.getSunCollected(), target);
                 break;
+            case "Mowing Time":
+                add(progress, name, model.getMowerKills(), target);
+                break;
             case "Chapter Hunter":
                 if (model.getChapter() != null && model.getChapter().name().equalsIgnoreCase(value)) {
                     add(progress, name, model.getZombiesKilled(), target);

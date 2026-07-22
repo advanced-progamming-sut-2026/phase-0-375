@@ -21,8 +21,12 @@ public class MainMenuView extends AppMenuView {
     public void processInput(String input) {
         if (MainMenuCommand.LOGOUT.matches(input)) {
             logout();
+        } else if (MainMenuCommand.LEADERBOARD.matches(input)) {
+            GameMenuView.getInstance().leaderboard(
+                    MainMenuCommand.LEADERBOARD.getParameter("sort"),
+                    MainMenuCommand.LEADERBOARD.getParameter("order"));
         } else {
-            displayError("Unknown command. Try: menu logout, or menu enter <menu_name>");
+            displayError("Unknown command. Try: menu logout, menu leaderboard [-s <column>] [-o asc|desc], menu enter score-game, or menu enter <menu_name>");
         }
     }
 

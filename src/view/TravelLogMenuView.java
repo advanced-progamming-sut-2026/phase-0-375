@@ -198,7 +198,13 @@ public class TravelLogMenuView extends AppMenuView {
                         .append(r.getInventoryItem()).append(' ');
             }
             if (r.getUnlockableName() != null && !r.getUnlockableName().isBlank()) {
-                rb.append("unlock:").append(r.getUnlockableName());
+                String unlockable = r.getUnlockableName();
+                if (unlockable.toLowerCase().startsWith("random")) {
+                    // Placeholder resolves at claim time to a locked plant.
+                    rb.append("unlock: a random new plant");
+                } else {
+                    rb.append("unlock:").append(unlockable);
+                }
             }
             String rewardStr = rb.toString().trim();
             if (!rewardStr.isEmpty()) {

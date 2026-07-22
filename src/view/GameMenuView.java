@@ -32,7 +32,8 @@ public class GameMenuView extends AppMenuView {
         } else if (GameMenuCommand.TRAVEL_LOG.matches(input)) {
             travelLog();
         } else if (GameMenuCommand.LEADERBOARD.matches(input)) {
-            leaderboard();
+            leaderboard(GameMenuCommand.LEADERBOARD.getParameter("sort"),
+                    GameMenuCommand.LEADERBOARD.getParameter("order"));
         } else if (GameMenuCommand.COIN_WALLET.matches(input)) {
             coinWallet();
         } else if (GameMenuCommand.GEM_WALLET.matches(input)) {
@@ -47,7 +48,7 @@ public class GameMenuView extends AppMenuView {
             displayError("  menu enter minigame -t <type> -s <stage>");
             displayError("  menu greenhouse");
             displayError("  menu travel-log");
-            displayError("  menu leaderboard");
+            displayError("  menu leaderboard [-s score|progress|minigames|daily-quests|quests] [-o asc|desc]");
             displayError("  menu coin-wallet | menu gem-wallet");
             displayError("  menu cheat add <n> <coin|diamond>");
         }
@@ -74,7 +75,12 @@ public class GameMenuView extends AppMenuView {
     }
 
     public void leaderboard() {
-        CommandResult<List<User>> result = controller.leaderboard();
+        leaderboard(null, null);
+    }
+
+    /** Renders the leaderboard sorted by the given column and order. */
+    public void leaderboard(String sortKey, String order) {
+        CommandResult<List<User>> result = controller.leaderboard(sortKey, order);
         if (result.isSuccess()) {
             List<User> users = result.getData();
             if (users.isEmpty()) {
@@ -82,16 +88,16 @@ public class GameMenuView extends AppMenuView {
                 return;
             }
             displayMessage("── Leaderboard ──");
-            displayMessage(String.format("%-20s %-12s %-8s %-8s %s",
-                    "Username", "Progress", "MiniGames", "Quests", "MyoPoint"));
+            displayMessage(String.format("%-20s %-12s %-10s %-12s %-8s %s",
+                    "Username", "Progress", "MiniGames", "DailyQuests", "Quests", "MyoPoint"));
             for (int i = 0; i < users.size(); i++) {
                 User u = users.get(i);
                 String progress = formatProgress(u);
-                int totalQuests = u.getCompletedDailyQuests() + u.getCompletedNonDailyQuests();
-                displayMessage(String.format("%-20s %-12s %-8d %-8d %d",
+                displayMessage(String.format("%-20s %-12s %-10d %-12d %-8d %d",
                         u.getUsername(), progress,
                         u.getCompletedMiniGames(),
-                        totalQuests,
+                        u.getCompletedDailyQuests(),
+                        u.getCompletedNonDailyQuests(),
                         u.getHighestMyopoint()));
             }
         } else {

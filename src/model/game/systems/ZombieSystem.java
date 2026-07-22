@@ -160,8 +160,11 @@ public class ZombieSystem implements Tickable {
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
             }
-            // The mower immediately kills the triggering zombie.
-            killSilently(zombie);
+            // The mower kills the triggering zombie: mark non-plant damage
+            // and route through the normal death path so kill stats see it.
+            zombie.recordNonPlantDamage();
+            zombie.markKilledByMower();
+            zombie.setState(ZombieState.DYING);
         } else {
             // No mower, the zombie got through.
             gameModel.markHouseBreached(row);
@@ -362,7 +365,8 @@ public class ZombieSystem implements Tickable {
                 }
 
                 zombie.setState(ZombieState.DEAD);
-                gameModel.incrementZombiesKilled();
+                gameModel.recordZombieKilled(zombie);
+                gameModel.notifyZombieKilledForScore(zombie);
 
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_KILLED));

@@ -58,6 +58,7 @@ public class LawnMowerSystem implements Tickable {
             if (zombie.getGridPosition() == null) continue;
 
             if (zombie.getGridX() <= mowerX && !isBoss(zombie)) {
+                zombie.markKilledByMower();
                 gameModel.damageZombie(zombie, MOWER_DAMAGE);
             }
         }
