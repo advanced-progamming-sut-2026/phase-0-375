@@ -1,0 +1,42 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+version = '1.0.0'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    // same version as the jars in src/lib — databind pulls core + annotations
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src']
+            exclude 'lib/**'          // the vendored jars live inside src/
+        }
+        resources {
+            srcDirs = ['.']           // project root is the classpath root...
+            include 'assets/**'       // ...so "/assets/data/plants/plants.json" resolves
+        }
+    }
+}
+
+application { mainClass = 'Main' }    // Main.java has no package
+
+tasks.named('run') {
+    standardInput = System.in         // essential — it's a CLI game
+    workingDir = rootDir              // data/users.json keeps landing in project root
+}
+
+test { useJUnitPlatform() }

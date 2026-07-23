@@ -31,3 +31,7 @@ bin/
 
 ### Runtime Data ###
 data/users.json
+
+### Gradle ###
+.gradle/
+build/
