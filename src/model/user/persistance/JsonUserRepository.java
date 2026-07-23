@@ -40,6 +40,16 @@ public class JsonUserRepository implements UserRepository {
         } catch (IOException e) {
             users = new ArrayList<>();
         }
+        migrateStarterPlants();
+    }
+
+    private void migrateStarterPlants() {
+        for (User u : users) {
+            if (u.getUnlockedPlants() == null) {
+                u.setUnlockedPlants(new HashSet<>());
+            }
+            u.getUnlockedPlants().addAll(User.STARTER_PLANTS);
+        }
     }
 
     @Override
