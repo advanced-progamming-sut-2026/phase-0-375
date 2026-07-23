@@ -24,6 +24,15 @@ import java.util.List;
 
 public class ZombieSystem implements Tickable {
 
+    /**
+     * Maximum distance (in grid units) between two opposing zombies for
+     * them to start biting each other. Anything above this and they
+     * just walk past. Tuned to match the projectile-collision tolerance
+     * used by {@code ProjectileSystem} so a hypnotized zombie that has
+     * stopped to bite a plant-eating zombie doesn't get shot off it.
+     */
+    private static final float ZOMBIE_COMBAT_RANGE = 0.7f;
+
     private final GameModel gameModel;
     private final EventBus eventBus;
 
@@ -203,6 +212,37 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
+        ZombieInstance enemy = findOpposingZombieNearby(zombie, context, row);
+        if (enemy != null) {
+            if (!zombie.isEating() || zombie.getCombatTargetZombie() != enemy) {
+                zombie.startFightingZombie(enemy);
+            }
+
+            float eatDPS = zombie.getDefinition().getEatDPS();
+            eatDPS *= getEatDamageScale(zombie);
+
+            int damage = (int) (eatDPS * deltaTime);
+            if (damage > 0) {
+                context.damageZombie(enemy, damage);
+            }
+
+            if (enemy.isDead()) {
+                zombie.stopEating();
+            }
+            return;
+        }
+
+        if (zombie.getCombatTargetZombie() != null) {
+            zombie.stopEating();
+        }
+
+        if (zombie.isHypnotized()) {
+            if (zombie.isEating() && zombie.getEatingTarget() != null) {
+                zombie.stopEating();
+            }
+            return;
+        }
+
         PlantInstance plant = context.getPlantAt(row, col);
         if (plant == null || plant.getCurrentHP() <= 0 || plant.isTransformed()) {
             if (zombie.isEating()) {
@@ -236,6 +276,34 @@ public class ZombieSystem implements Tickable {
             }
             zombie.stopEating();
         }
+    }
+
+    /**
+     * Searches the zombie's lane for the closest opposing zombie within
+     * {@link #ZOMBIE_COMBAT_RANGE} grid units.
+     */
+    private ZombieInstance findOpposingZombieNearby(ZombieInstance zombie,
+                                                    BehaviorContext context,
+                                                    int row) {
+        ZombieInstance best = null;
+        float bestDist = Float.MAX_VALUE;
+        boolean hypnotized = zombie.isHypnotized();
+
+        for (ZombieInstance other : context.getZombiesInLane(row)) {
+            if (other == null || other == zombie || other.isDead()) continue;
+            if (other.isHypnotized() == hypnotized) continue;
+            if (other.isFlying() || other.isSubmerged()) continue;
+            if (other.getState() == ZombieState.SPAWNING) continue;
+
+            float dist = Math.abs(other.getContinuousX() - zombie.getContinuousX());
+            if (dist > ZOMBIE_COMBAT_RANGE) continue;
+
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = other;
+            }
+        }
+        return best;
     }
 
     /** @return true if the given plant is a Sun Bean (WALL_NUT with SUN tag). */
@@ -344,6 +412,16 @@ public class ZombieSystem implements Tickable {
             }
             @Override public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
                 gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
+            }
+
+            @Override
+            public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
+                return gameModel.spawnZombieAt(zombieDefinitionName, row, col);
+            }
+
+            @Override
+            public void removeZombie(ZombieInstance zombie) {
+                gameModel.removeZombie(zombie);
             }
         };
     }

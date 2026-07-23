@@ -206,6 +206,7 @@ public class ProjectileSystem implements Tickable {
         int lane = projectile.getRow();
         float projX = projectile.getX();
         float tolerance = 0.5f;
+        boolean isPlantFired = projectile.getSourcePlant() != null;
 
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(lane);
         ZombieInstance best = null;
@@ -213,6 +214,10 @@ public class ProjectileSystem implements Tickable {
 
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
+
+            if (isPlantFired && zombie.isHypnotized()) {
+                continue;
+            }
 
             if (zombie.isSubmerged() && !(projectile instanceof Splash)) {
                 continue;

@@ -235,5 +235,15 @@ public class PlantSystem implements Tickable {
         public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
             gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
         }
+
+        @Override
+        public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
+            return gameModel.spawnZombieAt(zombieDefinitionName, row, col);
+        }
+
+        @Override
+        public void removeZombie(ZombieInstance zombie) {
+            gameModel.removeZombie(zombie);
+        }
     }
 }

@@ -126,4 +126,15 @@ public interface PlantAbilityContext {
      * centred on ({@code row}, {@code col}) with the given half-extents.
      */
     void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage);
+
+    /**
+     * Spawns a zombie at the ({@code col}, {@code row}) coords
+     * based on the given {@code zombieDefinitionName}.
+     */
+    ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col);
+
+    /**
+     * Removes the given {@code zombie} from the map.
+     */
+    void removeZombie(ZombieInstance zombie);
 }

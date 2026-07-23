@@ -1,15 +1,14 @@
 package model.plant.ability;
 
-import model.enums.PlantAbilityType;
-import model.enums.PlantCategory;
-import model.enums.PlantFoodType;
-import model.enums.ZombieState;
+import model.enums.*;
+import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
+import model.zombie.ZombieFactory;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 
@@ -65,8 +64,9 @@ public class ModifierAbility implements PlantAbility {
                 firePeaBurst(plant, context);
                 break;
             case RANDOM_HYPNOTIZE:
-                // Hypno-shroom plant-food: hypnotise a random zombie.
-                hypnotiseRandomZombie(plant, context);
+                // Hypno-shroom plant-food: hypnotize the eater zombie and
+                // transform it to a gargantuar.
+                hypnotiseTheEater(plant, context);
                 break;
             case SPAWN_CLONES:
                 // Lily Pad plant-food: spawn clones on adjacent water tiles.
@@ -110,14 +110,24 @@ public class ModifierAbility implements PlantAbility {
     // --- Hypno-shroom plant-food ---
 
     /**
-     * Hypnotizes a single random alive zombie on the field. The hypnotized
-     * zombie switches sides and walks back toward the zombie spawn point,
-     * attacking other zombies in its path.
+     * transform the zombie that eats him into a Gargantuar
+     * with increased health from a regular one.
      */
-    private void hypnotiseRandomZombie(PlantInstance plant, PlantAbilityContext context) {
-        ZombieInstance target = pickFirstAliveZombie(plant, context);
-        if (target == null) return;
-        hypnotise(target);
+    private void hypnotiseTheEater(PlantInstance plant, PlantAbilityContext context) {
+        ZombieInstance eater = getEaterOf(plant, context);
+        if (eater == null) return;
+
+        if(eater.getDefinition().getSize() == ZombieSize.LARGE) {
+            hypnotise(eater);
+            return;
+        }
+
+        ZombieInstance newGargantuar = context.spawnZombieAt(
+                "ZombieGargantuar", eater.getGridY(), eater.getGridX()
+                );
+        if(newGargantuar == null) return;
+        hypnotise(newGargantuar);
+        context.removeZombie(eater);
     }
 
     /** Flips a zombie to the player's side. */
@@ -126,27 +136,17 @@ public class ModifierAbility implements PlantAbility {
         zombie.setMovingBackward(true);
     }
 
-    /** Picks the closest alive zombie to the plant. */
-    private ZombieInstance pickFirstAliveZombie(PlantInstance plant, PlantAbilityContext context) {
+    /** @return the zombie that is eating the {@code plant}. {@code null} if none. */
+    private ZombieInstance getEaterOf(PlantInstance plant, PlantAbilityContext context) {
         int plantRow = plant.getPosition().getY();
         int plantCol = plant.getPosition().getX();
-        ZombieInstance best = null;
-        double bestDist = Double.MAX_VALUE;
-
-        for (int lane = 0; lane < context.getRowCount(); lane++) {
-            for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
-                if (zombie == null || zombie.isDead()) continue;
-                if (zombie.getState() == ZombieState.HYPNOTIZED) continue;
-
-                int zCol = zombie.getGridPosition() != null ? zombie.getGridPosition().getX() : 0;
-                double dist = Math.abs(zCol - plantCol) + Math.abs(lane - plantRow);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    best = zombie;
-                }
+        List<ZombieInstance> zombies = context.getZombiesInArea(plantRow, plantCol, 0, 0);
+        for (ZombieInstance zombie : zombies) {
+            if (zombie.getEatingTarget() == plant) {
+                return zombie;
             }
         }
-        return best;
+        return null;
     }
 
     // --- Lily Pad plant-food ---

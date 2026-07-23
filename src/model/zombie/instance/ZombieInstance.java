@@ -42,6 +42,7 @@ public class ZombieInstance implements Tickable, Placeable {
     private float fireDamageMultiplier = 1.0f;
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
+    private ZombieInstance combatTargetZombie;             // The opposing zombie this zombie is currently biting.
 
     // --- Status-effect timers (driven by CombatSystem) ---
 
@@ -104,6 +105,13 @@ public class ZombieInstance implements Tickable, Placeable {
         this(definition);
         this.armors = new ArrayList<>(armors);
         this.pushableItem = pushableItem;
+    }
+
+    // --- Hypnosis helpers ---
+
+    /** @return true if this zombie has been hypnotized. */
+    public boolean isHypnotized() {
+        return state == ZombieState.HYPNOTIZED;
     }
 
     // --- Tick & lifecycle ---
@@ -326,16 +334,29 @@ public class ZombieInstance implements Tickable, Placeable {
      */
     public void startEating(PlantInstance target) {
         this.eatingTarget = target;
+        this.combatTargetZombie = null;
         this.state = ZombieState.EATING;
     }
 
     /**
-     * Called when the plant being eaten is destroyed.
+     * Called when the zombie meets an opposing zombie (one of the two is
+     * hypnotized, the other isn't) and starts biting it.
+     */
+    public void startFightingZombie(ZombieInstance target) {
+        this.combatTargetZombie = target;
+        this.eatingTarget = null;
+        this.state = ZombieState.EATING;
+    }
+
+    /**
+     * Called when the plant being eaten is destroyed, or when the
+     * opposing zombie being fought has died / moved away.
      */
     public void stopEating() {
         this.eatingTarget = null;
+        this.combatTargetZombie = null;
         if (state == ZombieState.EATING) {
-            state = ZombieState.WALKING;
+            state = movingBackward ? ZombieState.HYPNOTIZED : ZombieState.WALKING;
         }
     }
 
@@ -582,6 +603,11 @@ public class ZombieInstance implements Tickable, Placeable {
         return eatingTarget;
     }
 
+    /** @return the opposing zombie this zombie is currently biting, or {@code null}. */
+    public ZombieInstance getCombatTargetZombie() {
+        return combatTargetZombie;
+    }
+
     // --- Setters ---
 
     public void setDefinition(Zombie definition) {
@@ -649,6 +675,10 @@ public class ZombieInstance implements Tickable, Placeable {
 
     public void setEatingTarget(PlantInstance eatingTarget) {
         this.eatingTarget = eatingTarget;
+    }
+
+    public void setCombatTargetZombie(ZombieInstance combatTargetZombie) {
+        this.combatTargetZombie = combatTargetZombie;
     }
 
     public void setFireDamageMultiplier(float fireDamageMultiplier) {
