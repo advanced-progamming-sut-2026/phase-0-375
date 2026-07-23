@@ -37,6 +37,7 @@ public abstract class Projectile {
 
     /** World-units per second. */
     protected float velocity;
+    protected float yVelocity;
 
     /** True if this projectile pierces through zombies and doesn't get destroyed. */
     protected boolean pierce;
@@ -71,6 +72,7 @@ public abstract class Projectile {
         this.currentPosition = position;
         this.row = row;
         this.velocity = velocity;
+        this.yVelocity = 0f;
         this.pierce = false;
         this.element = element == null ? Element.NONE : element;
         this.direction = direction >= 0 ? +1 : -1;
@@ -121,6 +123,14 @@ public abstract class Projectile {
         }
     }
 
+    public void setY(float y) {
+        if (currentPosition == null) {
+            currentPosition = new FloatPoint(0, y);
+        } else {
+            currentPosition.setY(y);
+        }
+    }
+
     public int getRow() {
         return row;
     }
@@ -142,8 +152,16 @@ public abstract class Projectile {
         return velocity;
     }
 
+    public float getYVelocity() {
+        return yVelocity;
+    }
+
     public void setVelocity(float velocity) {
         this.velocity = velocity;
+    }
+
+    public void setYVelocity(float yVelocity) {
+        this.yVelocity = yVelocity;
     }
 
     public boolean pierce() {

@@ -24,6 +24,8 @@ public class ShooterAbility implements PlantAbility {
     private static final float PELLET_VELOCITY = 1f;
     private static final float PELLET_SPAWN_OFFSET = 0.5f;
 
+    private static final int GIANT_PEA_DAMAGE_MULTIPLIER = 20;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.SHOOTER; }
 
@@ -52,16 +54,16 @@ public class ShooterAbility implements PlantAbility {
         Projectile.Element element = inferElement(def);
         FloatPoint origin = pelletOrigin(plant);
 
-        for (int i = 0; i < pelletCount; i++) {
-            Pellet pellet = new Pellet(
-                    def.getDamage(),
-                    new FloatPoint(origin.getX() + i * 0.05f, origin.getY()),
-                    plant.getPosition().getY(),
-                    PELLET_VELOCITY,
-                    element,
-                    +1
-            );
-            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+        if (isThreepeater(def)) {
+            shootThreepeater(context, plant, pelletCount, origin, element);
+        } else if (isSplitPea(def)) {
+            shootSplitPea(context, plant, pelletCount, origin, element);
+        } else if (isRotobaga(def)) {
+            shootRotobaga(context, plant, pelletCount, origin, element);
+        } else if (isStarfruit(def)) {
+            shootStarfruit(context, plant, pelletCount, origin, element);
+        } else {
+            shootDefault(context, plant, pelletCount, origin, element);
         }
     }
 
@@ -81,21 +83,25 @@ public class ShooterAbility implements PlantAbility {
         FloatPoint origin = pelletOrigin(plant);
         for (int i = 0; i < volley; i++) {
             if (i % 5 == 0) {
-                origin.setX(origin.getX() + i * 0.08f);
+                origin.setX(origin.getX() + i * 0.1f);
             }
 
             float dx = (RNG.nextFloat() - 0.5f) * 0.4f;
             float dy = (RNG.nextFloat() - 0.5f) * 0.4f;
 
-            Pellet pellet = new Pellet(
-                    def.getDamage(),
-                    new FloatPoint(origin.getX() + dx, origin.getY() + dy),
-                    lane,
-                    PELLET_VELOCITY * 1.25f,
-                    element,
-                    +1
-            );
-            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + dx, origin.getY() + dy);
+
+            shootOne(context, def.getDamage(), pelletOrigin, lane,
+                    PELLET_VELOCITY * 1.25f,  element, +1, 0f);
+        }
+
+        if (shootsGiantPea(def)) {
+            for (int i = 0; i < plant.getStackCount(); i++) {
+                float offset = Math.powExact(-1, i) * 0.1f * ((i + 1) / 2);
+                FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
+                shootOne(context, plant.getDefinition().getDamage() * GIANT_PEA_DAMAGE_MULTIPLIER,
+                        pelletOrigin, plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
+            }
         }
     }
 
@@ -117,5 +123,102 @@ public class ShooterAbility implements PlantAbility {
         if (def.hasTag(PlantTags.FIRE)) return Projectile.Element.FIRE;
         if (def.hasTag(PlantTags.POISON)) return Projectile.Element.POISON;
         return Projectile.Element.NONE;
+    }
+
+    private boolean shootsGiantPea(Plant def) {
+        return def.getName().toLowerCase().contains("repeater") ||
+                def.getName().toLowerCase().contains("pea pod");
+    }
+
+    private boolean isThreepeater(Plant def) {
+        return def.getName().toLowerCase().contains("threepeater");
+    }
+
+    private boolean isSplitPea(Plant def) {
+        return def.getName().toLowerCase().contains("split pea");
+    }
+
+    private boolean isRotobaga(Plant def) {
+        return def.getName().toLowerCase().contains("rotobaga");
+    }
+
+    private boolean isStarfruit(Plant def) {
+        return def.getName().toLowerCase().contains("starfruit");
+    }
+
+    private void shootOne(PlantAbilityContext context, int damage, FloatPoint origin, int row,
+                          float velocity, Projectile.Element element, int direction, float yVelocity) {
+        Pellet pellet = new Pellet(
+                damage,
+                new FloatPoint(origin.getX(), origin.getY()),
+                row,
+                velocity,
+                element,
+                direction
+        );
+        pellet.setYVelocity(yVelocity);
+        context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+    }
+
+    private void shootDefault(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+                              FloatPoint origin, Projectile.Element element) {
+        for (int i = 0; i < pelletCount; i++) {
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.1f, origin.getY());
+            shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
+                    plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
+        }
+    }
+
+    private void shootThreepeater(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+                                  FloatPoint origin, Projectile.Element element) {
+        for (int i = 0; i < pelletCount; i++) {
+            float offset = Math.powExact(-1, i) * 0.1f * ((i + 1) / 2);
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
+            shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
+                    plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
+        }
+    }
+
+    private void shootSplitPea(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+                                  FloatPoint origin, Projectile.Element element) {
+        for (int i = 0; i < pelletCount; i++) {
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.1f, origin.getY());
+            shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
+                    plant.getPosition().getY(), PELLET_VELOCITY, element,
+                    (i % 3 == 0) ? +1 : -1, 0);
+        }
+    }
+
+    private void shootRotobaga(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+                               FloatPoint origin, Projectile.Element element) {
+        for (int i = 0; i < pelletCount; i++) {
+            float yVelocity = (i % 4 < 2) ? PELLET_VELOCITY : -PELLET_VELOCITY;
+            shootOne(context, plant.getDefinition().getDamage(), origin,
+                    plant.getPosition().getY(), PELLET_VELOCITY, element,
+                    (i % 4 == 0 || i % 4 == 3) ? +1 : -1, yVelocity);
+        }
+    }
+
+    private void shootStarfruit(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+                               FloatPoint origin, Projectile.Element element) {
+        shootOne(context, plant.getDefinition().getDamage(), origin,
+                plant.getPosition().getY(), PELLET_VELOCITY, element,
+                -1, 0);
+
+        shootOne(context, plant.getDefinition().getDamage(), origin,
+                plant.getPosition().getY(), 0, element,
+                1, PELLET_VELOCITY);
+
+        shootOne(context, plant.getDefinition().getDamage(), origin,
+                plant.getPosition().getY(), 0, element,
+                1, -PELLET_VELOCITY);
+
+        shootOne(context, plant.getDefinition().getDamage(), origin,
+                plant.getPosition().getY(), PELLET_VELOCITY, element,
+                1, PELLET_VELOCITY);
+
+        shootOne(context, plant.getDefinition().getDamage(), origin,
+                plant.getPosition().getY(), PELLET_VELOCITY, element,
+                1, -PELLET_VELOCITY);
     }
 }

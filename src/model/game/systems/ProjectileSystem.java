@@ -106,7 +106,14 @@ public class ProjectileSystem implements Tickable {
             return;
         }
         float newX = projectile.getX() + projectile.getVelocity() * projectile.getDirection() * deltaTime;
+        float newY = projectile.getY() + projectile.getYVelocity() * deltaTime;
         projectile.setX(newX);
+        projectile.setY(newY);
+
+        int newRow = Math.round(newY);
+        if (newRow != projectile.getRow()) {
+            projectile.setRow(newRow);
+        }
     }
 
     /** Steers a homing projectile toward its target. */
@@ -115,7 +122,15 @@ public class ProjectileSystem implements Tickable {
         if (target == null || target.isDead() || target.getContinuousPosition() == null) {
             float newX = projectile.getX()
                     + projectile.getVelocity() * projectile.getDirection() * deltaTime;
+            float newY = projectile.getY()
+                    + projectile.getYVelocity() * deltaTime;
             projectile.setX(newX);
+            projectile.setY(newY);
+
+            int newRow = Math.round(newY);
+            if (newRow != projectile.getRow()) {
+                projectile.setRow(newRow);
+            }
             return;
         }
 
