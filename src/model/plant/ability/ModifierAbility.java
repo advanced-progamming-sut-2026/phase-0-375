@@ -22,6 +22,8 @@ public class ModifierAbility implements PlantAbility {
     /** Velocity of plant-food fire peas. */
     private static final float PF_FIRE_PEA_VELOCITY = 1.25f;
 
+    private float torchwoodDamageMultiplier = 2f;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.MODIFIER; }
 
@@ -59,9 +61,9 @@ public class ModifierAbility implements PlantAbility {
 
         switch (def.getPlantFoodType()) {
             case PROJECTILE_BURST:
-                // Torchwood plant-food: launch a burst of fire peas that
-                // travel down the lane, roasting every zombie in the way.
-                firePeaBurst(plant, context);
+                // Torchwood plant-food: increases the damage multiplier
+                // which affects the projectiles that pass through it
+                applyTorchwoodPlantFoodBuff();
                 break;
             case RANDOM_HYPNOTIZE:
                 // Hypno-shroom plant-food: hypnotize the eater zombie and
@@ -79,32 +81,12 @@ public class ModifierAbility implements PlantAbility {
 
     // --- Torchwood plant-food ---
 
-    /**
-     * Spawns a volley of fire peas traveling forward (toward the zombies)
-     * in the Torchwood's lane. The volley size comes from the plant-food
-     * value; each pea deals the Torchwood's own damage (which is boosted
-     * by the fire element on hit).
-     */
-    private void firePeaBurst(PlantInstance plant, PlantAbilityContext context) {
-        Plant def = plant.getDefinition();
-        int volley = (int) def.getPlantFoodValue();
-        if (volley <= 0) volley = 3;
+    public void applyTorchwoodPlantFoodBuff() {
+        this.torchwoodDamageMultiplier = 3f;
+    }
 
-        int row = plant.getPosition().getY();
-        float originX = plant.getPosition().getX() + 0.5f;
-        int damage = Math.max(1, def.getDamage() > 0 ? def.getDamage() : 20);
-
-        for (int i = 0; i < volley; i++) {
-            Pellet pea = new Pellet(
-                    damage,
-                    new FloatPoint(originX + i * 0.15f, row),
-                    row,
-                    PF_FIRE_PEA_VELOCITY,
-                    Projectile.Element.FIRE,
-                    +1
-            );
-            context.spawnProjectile(pea, pea.getX(), pea.getY());
-        }
+    public float getTorchwoodDamageMultiplier() {
+        return torchwoodDamageMultiplier;
     }
 
     // --- Hypno-shroom plant-food ---

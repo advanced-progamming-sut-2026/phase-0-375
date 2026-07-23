@@ -1,6 +1,7 @@
 package model.zombie.behavior;
 
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
@@ -89,7 +90,7 @@ public class SmashBehavior implements ZombieBehavior {
         currentTarget = plant;
         smashTimer = 0f;
         gargantuarPhase = GargantuarPhase.SMASHING;
-        zombie.startEating(plant); // Gargantuar eatDPS is zero so this just makes it stop moving.
+        zombie.setState(ZombieState.SPECIAL_ACTION);
     }
 
     /**
@@ -121,7 +122,7 @@ public class SmashBehavior implements ZombieBehavior {
         currentTarget = null;
         smashTimer = 0f;
         gargantuarPhase = GargantuarPhase.WALKING;
-        zombie.stopEating();
+        zombie.setState(ZombieState.WALKING);
     }
 
     // --- All Star ---

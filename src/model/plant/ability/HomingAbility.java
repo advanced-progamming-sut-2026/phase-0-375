@@ -21,6 +21,8 @@ public class HomingAbility implements PlantAbility {
 
     private static final int BURST_PROJ_DAMAGE = 6767;
 
+    private static final int ONE_HIT_DAMAGE = BURST_PROJ_DAMAGE;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.HOMING; }
 
@@ -54,7 +56,11 @@ public class HomingAbility implements PlantAbility {
         Plant def = plant.getDefinition();
         switch (def.getPlantFoodType()) {
             case RANDOM_HYPNOTIZE:
-                hypnotiseRandomZombies(context, (int) def.getPlantFoodValue());
+                if (plant.getDefinition().hasTag(PlantTags.MAGIC)) {
+                    hypnotiseRandomZombies(context, (int) def.getPlantFoodValue());
+                } else {
+                    killRandomZombies(context, (int) def.getPlantFoodValue());
+                }
                 break;
             case KNOCKBACK_BLAST:
                 // Magnet-shroom plant-food
@@ -192,6 +198,19 @@ public class HomingAbility implements PlantAbility {
                 if (count <= 0) break;
                 zombie.setState(ZombieState.HYPNOTIZED);
                 zombie.setMovingBackward(true);
+                count--;
+            }
+        }
+    }
+
+    // --- Electric Blueberry plant-food ---
+
+    private void killRandomZombies(PlantAbilityContext context, int count) {
+        for (int lane = 0; lane < context.getRowCount() && count > 0; lane++) {
+            List<ZombieInstance> zombiesInLine = context.getZombiesInLane(lane);
+            for (ZombieInstance zombie : zombiesInLine) {
+                if (count <= 0) break;
+                zombie.takeDamage(ONE_HIT_DAMAGE);
                 count--;
             }
         }

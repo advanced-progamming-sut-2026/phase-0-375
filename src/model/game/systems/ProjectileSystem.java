@@ -9,6 +9,7 @@ import model.game.core.GameModel;
 import model.item.GridItem;
 import model.item.placeable.Placeable;
 import model.item.pushable.Pushable;
+import model.plant.ability.ModifierAbility;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.BowlingBulb;
@@ -207,6 +208,9 @@ public class ProjectileSystem implements Tickable {
 
         // Boost damage by the Torchwood's ability value
         float multiplier = def.getAbilityValue();
+        if (plant.getAbilityStrategy() instanceof ModifierAbility) {
+            multiplier = ((ModifierAbility) plant.getAbilityStrategy()).getTorchwoodDamageMultiplier();
+        }
         if (multiplier <= 0f) multiplier = 2.0f;
         int boosted = Math.max(projectile.getDamage(), Math.round(projectile.getDamage() * multiplier));
         projectile.setDamage(boosted);

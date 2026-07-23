@@ -200,9 +200,13 @@ public class ZombieSystem implements Tickable {
      * is not currently in a special-action, the zombie eats the plant.
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return;
-        if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return;
-        if (zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()) return;
+        boolean hypnotized = zombie.isHypnotized();
+
+        if (!hypnotized) {
+            if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return;
+            if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return;
+            if (zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()) return;
+        }
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
@@ -236,7 +240,8 @@ public class ZombieSystem implements Tickable {
             zombie.stopEating();
         }
 
-        if (zombie.isHypnotized()) {
+        if (hypnotized) {
+            // Hypnotized zombies never eat plants.
             if (zombie.isEating() && zombie.getEatingTarget() != null) {
                 zombie.stopEating();
             }

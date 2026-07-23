@@ -117,13 +117,10 @@ public class WallAbility implements PlantAbility {
 
         // Lane redirect (Garlic, Sweet Potato)
         if (def.hasTag(PlantTags.MOVE_ZOMBIE)) {
-            for (ZombieInstance zombie : context.getZombiesInArea(row, col, 0, 0)) {
-                if (zombie.isEating() && zombie.getEatingTarget() == plant) {
-                    int targetLane = pickAdjacentLane(row, context);
-                    if (targetLane != row) {
-                        context.moveZombieToLane(zombie, targetLane);
-                    }
-                }
+            if (isSweepPotato(def)) {
+                attractZombiesTo(plant, context);
+            } else {
+                redirectZombiesFrom(plant, context);
             }
         }
     }
@@ -253,5 +250,35 @@ public class WallAbility implements PlantAbility {
             }
         }
         return total;
+    }
+
+    public boolean isSweepPotato(Plant def) {
+        if (def.getCategory() != PlantCategory.WALL_NUT) return false;
+        if (!def.hasTag(PlantTags.MOVE_ZOMBIE)) return false;
+        return def.getName().toLowerCase().contains("sweet potato");
+    }
+
+    /** Attracts the given {@code zombie} to the given {@code plant}. */
+    public void attractZombiesTo(PlantInstance plant, PlantAbilityContext context) {
+        int row = plant.getPosition().getY();
+        int col = plant.getPosition().getX();
+        for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
+            if (zombie.getGridPosition().getY() == row) continue;
+            context.moveZombieToLane(zombie, row);
+        }
+    }
+
+    /** Redirects zombies that are eating the given {@code plant}. */
+    public void redirectZombiesFrom(PlantInstance plant, PlantAbilityContext context) {
+        int row = plant.getPosition().getY();
+        int col = plant.getPosition().getX();
+        for (ZombieInstance zombie : context.getZombiesInArea(row, col, 0, 0)) {
+            if (zombie.isEating() && zombie.getEatingTarget() == plant) {
+                int targetLane = pickAdjacentLane(row, context);
+                if (targetLane != row) {
+                    context.moveZombieToLane(zombie, targetLane);
+                }
+            }
+        }
     }
 }

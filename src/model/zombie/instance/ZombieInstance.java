@@ -14,10 +14,7 @@ import model.zombie.behavior.*;
 import model.zombie.behavior.zombotany.*;
 import model.zombie.definition.Zombie;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * The runtime representation of a zombie on the game field
@@ -38,30 +35,15 @@ public class ZombieInstance implements Tickable, Placeable {
     private Pushable pushableItem;                         // null if not a pusher
     private List<ZombieBehavior> behaviors;                // zombie behaviors
 
-    /** Multiplier applied to incoming FIRE-elemental damage. */
-    private float fireDamageMultiplier = 1.0f;
+    private float fireDamageMultiplier = 1.0f;             // Multiplier applied to incoming FIRE-elemental damage.
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
     private ZombieInstance combatTargetZombie;             // The opposing zombie this zombie is currently biting.
 
-    // --- Status-effect timers (driven by CombatSystem) ---
-
-    /** Seconds remaining on the current chill stack. When this hits 0,
-     *  one chill stack is removed and the timer resets (if any chill remains). */
     private float chillStackTimer = 0f;
-
-    /** Seconds of poison damage remaining. While > 0 the zombie takes
-     *  {@link #poisonDPS} damage per second. */
     private float poisonTimer = 0f;
-
-    /** Damage per second dealt by poison while {@link #poisonTimer} > 0. */
     private int poisonDPS = 0;
-
-    /** Seconds of burn damage remaining. While > 0 the zombie takes
-     *  {@link #burnDPS} damage per second. */
     private float burnTimer = 0f;
-
-    /** Damage per second dealt by burning while {@link #burnTimer} > 0. */
     private int burnDPS = 0;
 
     /** The last thing that damaged this zombie (e.g. a projectile). Used by
@@ -83,7 +65,7 @@ public class ZombieInstance implements Tickable, Placeable {
         this.currentHP = definition.getBaseHP();
         this.currentSpeed = definition.getSpeed();
         this.speedModifier = 1.0f;
-        this.isGlowing = false;
+        this.isGlowing = shouldSpawnGlowing();
         this.chillLevel = 0;
         this.movingBackward = false;
         this.armors = new ArrayList<>();
@@ -107,12 +89,18 @@ public class ZombieInstance implements Tickable, Placeable {
         this.pushableItem = pushableItem;
     }
 
+    // --- Glowing ---
+
+    public boolean shouldSpawnGlowing() {
+        float glowingChance = 0.1f;
+        Random rng = new Random();
+        return rng.nextFloat() <= glowingChance;
+    }
+
     // --- Hypnosis helpers ---
 
     /** @return true if this zombie has been hypnotized. */
-    public boolean isHypnotized() {
-        return state == ZombieState.HYPNOTIZED;
-    }
+    public boolean isHypnotized() { return state == ZombieState.HYPNOTIZED; }
 
     // --- Tick & lifecycle ---
 
@@ -131,10 +119,8 @@ public class ZombieInstance implements Tickable, Placeable {
     }
 
     /**
-     * Applies damage to this zombie instance.
-     * Damage is first absorbed by armor,
+     * Applies damage to this zombie instance. Damage is first absorbed by armor,
      * then overflow hits the zombie's HP.
-     * Triggers reactive behaviors.
      */
     public void takeDamage(int damage) {
         if (damage <= 0 || state == ZombieState.DEAD || state == ZombieState.DYING) {
@@ -182,29 +168,6 @@ public class ZombieInstance implements Tickable, Placeable {
         currentHP -= damage;
     }
 
-    // --- Kill attribution (quests) ---
-
-    public void recordPlantDamage(Plant source) {
-        if (source == null) { nonPlantDamaged = true; return; }
-        if (source.getName() != null) plantDamagers.add(source.getName());
-        if (source.getCategory() != null) plantDamagerFamilies.add(source.getCategory());
-    }
-
-    public void recordNonPlantDamage() { nonPlantDamaged = true; }
-
-    /** True if a lawn mower dealt the killing damage. */
-    private boolean killedByMower;
-
-    public void markKilledByMower() { killedByMower = true; }
-
-    public boolean isKilledByMower() { return killedByMower; }
-
-    public Set<String> getPlantDamagers() { return plantDamagers; }
-
-    public Set<PlantCategory> getPlantDamagerFamilies() { return plantDamagerFamilies; }
-
-    public boolean isNonPlantDamaged() { return nonPlantDamaged; }
-
     /** Applies a chill stack to this zombie. Three stacks freezes it solid */
     public void applyChill() {
         if (isFrozen()) return;
@@ -230,6 +193,23 @@ public class ZombieInstance implements Tickable, Placeable {
             state = ZombieState.WALKING;
         }
     }
+
+    // --- Kill attribution (quests) ---
+
+    public void recordPlantDamage(Plant source) {
+        if (source == null) { nonPlantDamaged = true; return; }
+        if (source.getName() != null) plantDamagers.add(source.getName());
+        if (source.getCategory() != null) plantDamagerFamilies.add(source.getCategory());
+    }
+
+    public void recordNonPlantDamage() { nonPlantDamaged = true; }
+    /** True if a lawn mower dealt the killing damage. */
+    private boolean killedByMower;
+    public void markKilledByMower() { killedByMower = true; }
+    public boolean isKilledByMower() { return killedByMower; }
+    public Set<String> getPlantDamagers() { return plantDamagers; }
+    public Set<PlantCategory> getPlantDamagerFamilies() { return plantDamagerFamilies; }
+    public boolean isNonPlantDamaged() { return nonPlantDamaged; }
 
     /**
      * Advances status-effect timers by {@code deltaTime} seconds and
@@ -283,32 +263,6 @@ public class ZombieInstance implements Tickable, Placeable {
     }
 
     /**
-     * Applies a poison damage-over-time effect to this zombie. Stacks
-     * with any existing poison by taking the higher DPS and longer
-     * remaining duration.
-     */
-    public void applyPoison(int dps, float duration) {
-        if (dps <= 0 || duration <= 0f) return;
-        if (dps >= poisonDPS) {
-            poisonDPS = dps;
-        }
-        poisonTimer = Math.max(poisonTimer, duration);
-    }
-
-    /**
-     * Applies a burn damage-over-time effect to this zombie. Fire-immune
-     * zombies ignore burn entirely. Stacks by taking the higher DPS and
-     * longer remaining duration.
-     */
-    public void applyBurn(int dps, float duration) {
-        if (dps <= 0 || duration <= 0f || isImmuneToFire()) return;
-        if (dps >= burnDPS) {
-            burnDPS = dps;
-        }
-        burnTimer = Math.max(burnTimer, duration);
-    }
-
-    /**
      * Notifies every behavior on this zombie that the zombie has died.
      * The ZombieSystem calls this exactly once per zombie, right before
      * removing it from the field.
@@ -324,6 +278,9 @@ public class ZombieInstance implements Tickable, Placeable {
      * own state and decides whether to act.
      */
     public void tickBehaviors(float deltaTime, BehaviorContext context) {
+        if (isHypnotized()) {
+            return;
+        }
         for(ZombieBehavior behavior : behaviors) {
             behavior.execute(this, context, deltaTime);
         }
@@ -363,25 +320,11 @@ public class ZombieInstance implements Tickable, Placeable {
     /**
      * @return true if this zombie is eating a plant
      */
-    public boolean isEating() {
-        return state == ZombieState.EATING;
-    }
-
-    public boolean isDead() {
-        return state == ZombieState.DEAD || state == ZombieState.DYING;
-    }
-
-    public boolean isAlive() {
-        return currentHP > 0 && !isDead();
-    }
-
-    public boolean isFrozen() {
-        return chillLevel >= 3;
-    }
-
-    public boolean isChilled() {
-        return chillLevel > 0 && chillLevel < 3;
-    }
+    public boolean isEating() { return state == ZombieState.EATING; }
+    public boolean isDead() { return state == ZombieState.DEAD || state == ZombieState.DYING; }
+    public boolean isAlive() { return currentHP > 0 && !isDead(); }
+    public boolean isFrozen() { return chillLevel >= 3; }
+    public boolean isChilled() { return chillLevel > 0 && chillLevel < 3; }
 
     /** @return true if this zombie is currently flying. */
     public boolean isFlying() {
@@ -389,41 +332,16 @@ public class ZombieInstance implements Tickable, Placeable {
         return flyBehavior != null && flyBehavior.isFlying();
     }
 
-    /**
-     * @return true while this zombie is submerged underwater (e.g. a Snorkel
-     *         swimming under a water tile). Combat / projectile systems use
-     *         this to restrict which damage sources can hit the zombie.
-     *         only lobber plants can damage a submerged zombie.
-     */
+    /** @return true while this zombie is submerged underwater */
     public boolean isSubmerged() {
         SwimBehavior swimBehavior = (SwimBehavior) getBehavior(ZombieBehaviorType.SWIM);
         return swimBehavior != null && swimBehavior.isSubmerged();
     }
 
-    /**
-     * @return true while this zombie is actively pushing a {@link Pushable}.
-     *         Combat systems can use this to skip the normal eat-plant loop,
-     *         since the pushable itself instantly crushes any plant it touches.
-     */
+    /** @return true while this zombie is actively pushing a {@link Pushable}. */
     public boolean isPushing() {
         PushBehavior pushBehavior = (PushBehavior) getBehavior(ZombieBehaviorType.PUSH);
         return pushBehavior != null && pushBehavior.isPushing();
-    }
-
-    /**
-     * @return true while this zombie is spinning.
-     */
-    public boolean isSpinning() {
-        JuggleBehavior juggleBehavior = (JuggleBehavior) getBehavior(ZombieBehaviorType.JUGGLE);
-        return juggleBehavior != null && juggleBehavior.isSpinning();
-    }
-
-    /**
-     * @return true while this zombie is actively holding up a parasol
-     *         that deflects lobbed plant projectiles.
-     */
-    public boolean isDeflectingLobbed() {
-        return hasBehavior(ZombieBehaviorType.DEFLECT_LOBBER);
     }
 
     /** @return true while this zombie is walking away from the house instead of toward it. */
@@ -538,177 +456,40 @@ public class ZombieInstance implements Tickable, Placeable {
 
     // --- Getters ---
 
-    public Zombie getDefinition() {
-        return definition;
-    }
-
-    public ZombieState getState() {
-        return state;
-    }
-
-    public int getCurrentHP() {
-        return currentHP;
-    }
-
+    public Zombie getDefinition() { return definition; }
+    public ZombieState getState() { return state; }
+    public int getCurrentHP() { return currentHP; }
     /** @return the last source that damaged this zombie, or null if unknown. */
-    public Object getLastDamageSource() {
-        return lastDamageSource;
-    }
-
-    public void setLastDamageSource(Object lastDamageSource) {
-        this.lastDamageSource = lastDamageSource;
-    }
-
-    public FloatPoint getContinuousPosition() {
-        return continuousPosition;
-    }
-
+    public Object getLastDamageSource() { return lastDamageSource; }
+    public void setLastDamageSource(Object lastDamageSource) { this.lastDamageSource = lastDamageSource;}
+    public FloatPoint getContinuousPosition() { return continuousPosition; }
     public float getContinuousX() { return continuousPosition.getX(); }
-
     public float getContinuousY() { return continuousPosition.getY(); }
-
     public Point getGridPosition() { return gridPosition; }
     public int getGridX() { return gridPosition.getX(); }
     public int getGridY() { return gridPosition.getY(); }
-
-    public float getCurrentSpeed() {
-        return currentSpeed;
-    }
-
-    public float getSpeedModifier() {
-        return speedModifier;
-    }
-
-    public boolean isGlowing() {
-        return isGlowing;
-    }
-
-    public int getChillLevel() {
-        return chillLevel;
-    }
-
-    public List<Armor> getArmors() {
-        return armors;
-    }
-
-    public Pushable getPushableItem() {
-        return pushableItem;
-    }
-
-    public List<ZombieBehavior> getBehaviors() {
-        return behaviors;
-    }
-
-    public PlantInstance getEatingTarget() {
-        return eatingTarget;
-    }
-
+    public float getCurrentSpeed() { return currentSpeed; }
+    public float getSpeedModifier() { return speedModifier; }
+    public boolean isGlowing() { return isGlowing; }
+    public int getChillLevel() { return chillLevel; }
+    public List<Armor> getArmors() { return armors; }
+    public Pushable getPushableItem() { return pushableItem; }
+    public List<ZombieBehavior> getBehaviors() { return behaviors; }
+    public PlantInstance getEatingTarget() { return eatingTarget; }
     /** @return the opposing zombie this zombie is currently biting, or {@code null}. */
-    public ZombieInstance getCombatTargetZombie() {
-        return combatTargetZombie;
-    }
+    public ZombieInstance getCombatTargetZombie() { return combatTargetZombie; }
 
     // --- Setters ---
 
-    public void setDefinition(Zombie definition) {
-        this.definition = definition;
-    }
-
-    public void setState(ZombieState state) {
-        this.state = state;
-    }
-
-    public void setCurrentHP(int currentHP) {
-        this.currentHP = currentHP;
-    }
-
-    public void setContinuousPosition(FloatPoint position) {
-        this.continuousPosition = position;
-    }
-
+    public void setDefinition(Zombie definition) { this.definition = definition; }
+    public void setState(ZombieState state) { this.state = state; }
+    public void setCurrentHP(int currentHP) { this.currentHP = currentHP; }
+    public void setContinuousPosition(FloatPoint position) { this.continuousPosition = position; }
     public void setContinuousX(float x) { this.continuousPosition.setX(x); }
-
-    public void setContinuousY(float y) { this.continuousPosition.setY(y); }
-
-    /**
-     * Zombies frozen inside ice terrain are stored as the ice block's
-     * contained entity; they conceptually occupy the MAIN layer.
-     */
-    @Override
-    public PlacableLayer getLayer() {
-        return PlacableLayer.MAIN;
-    }
-
-    public void setGridPosition(Point gridPosition) {
-        this.gridPosition = gridPosition;
-    }
+    @Override  public PlacableLayer getLayer() { return PlacableLayer.MAIN; }
+    public void setGridPosition(Point gridPosition) { this.gridPosition = gridPosition; }
     public void setGridX(int gridX) { this.gridPosition.setX(gridX); }
-    public void setGridY(int gridY) { this.gridPosition.setY(gridY); }
-
-    public void setCurrentSpeed(float currentSpeed) {
-        this.currentSpeed = currentSpeed;
-    }
-
-    public void setSpeedModifier(float speedModifier) {
-        this.speedModifier = speedModifier;
-    }
-
-    public void setGlowing(boolean glowing) {
-        isGlowing = glowing;
-    }
-
-    public void setChillLevel(int chillLevel) {
-        this.chillLevel = Math.max(0, Math.min(3, chillLevel));
-    }
-
-    public void setArmors(List<Armor> armors) {
-        this.armors = armors;
-    }
-
-    public void setPushableItem(Pushable pushableItem) {
-        this.pushableItem = pushableItem;
-    }
-
-    public void setBehaviors(List<ZombieBehavior> behaviors) {
-        this.behaviors = behaviors;
-    }
-
-    public void setEatingTarget(PlantInstance eatingTarget) {
-        this.eatingTarget = eatingTarget;
-    }
-
-    public void setCombatTargetZombie(ZombieInstance combatTargetZombie) {
-        this.combatTargetZombie = combatTargetZombie;
-    }
-
-    public void setFireDamageMultiplier(float fireDamageMultiplier) {
-        this.fireDamageMultiplier = fireDamageMultiplier;
-    }
-
-    // --- Damage modifiers ---
-
-    /** @return multiplier applied to incoming FIRE-elemental damage (0..1). */
-    public float getFireDamageMultiplier() {
-        return fireDamageMultiplier;
-    }
-
+    public void setPushableItem(Pushable pushableItem) { this.pushableItem = pushableItem; }
     /** @return true if this zombie takes no damage from FIRE-elemental sources. */
-    public boolean isImmuneToFire() {
-        return fireDamageMultiplier <= 0f;
-    }
-
-    // --- Status-effect accessors ---
-
-    public float getChillStackTimer() { return chillStackTimer; }
-    public void setChillStackTimer(float chillStackTimer) { this.chillStackTimer = chillStackTimer; }
-
-    public float getPoisonTimer() { return poisonTimer; }
-    public int getPoisonDPS() { return poisonDPS; }
-    public void setPoisonTimer(float poisonTimer) { this.poisonTimer = poisonTimer; }
-    public void setPoisonDPS(int poisonDPS) { this.poisonDPS = poisonDPS; }
-
-    public float getBurnTimer() { return burnTimer; }
-    public int getBurnDPS() { return burnDPS; }
-    public void setBurnTimer(float burnTimer) { this.burnTimer = burnTimer; }
-    public void setBurnDPS(int burnDPS) { this.burnDPS = burnDPS; }
+    public boolean isImmuneToFire() { return fireDamageMultiplier <= 0f; }
 }

@@ -382,7 +382,7 @@
       "CanBeFlickedOff": false,
       "CanSpawnPlantFood": false,
       "Cost": 150,
-      "EatDPS": 0,
+      "EatDPS": 9999,
       "ExplodesWhenMowed": true,
       "FlickIsLaneRestricted": true,
       "GroundTrackName": "ground_swatch",

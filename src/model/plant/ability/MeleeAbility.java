@@ -1,9 +1,6 @@
 package model.plant.ability;
 
-import model.enums.PlantAbilityType;
-import model.enums.PlantCategory;
-import model.enums.PlantFoodType;
-import model.enums.PlantSpecialTag;
+import model.enums.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.definition.PlantLevels;
@@ -54,7 +51,7 @@ public class MeleeAbility implements PlantAbility {
             // Big swipe - 3x3 around the plant
             List<ZombieInstance> targets = context.getZombiesInArea(row, col, 1, 1);
             for (ZombieInstance zombie : targets) {
-                context.damageZombie(zombie, def.getDamage());
+                context.damageZombie(zombie, computePlantDamage(plant));
             }
             return;
         }
@@ -174,5 +171,21 @@ public class MeleeAbility implements PlantAbility {
             state.setDigestRemaining(digestDuration);
             state.setCooldownRemaining(digestDuration);
         }
+    }
+
+    /** Computes the damage that the given {@code plant} applies to zombies in this tick. */
+    public int computePlantDamage(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def == null) return 0;
+
+        int base = def.getDamage();
+        if (!def.hasTag(PlantTags.WARM_UP)) {
+            return base;
+        }
+
+        AbilityState state = plant.getAbilityState(PlantAbilityType.MELEE_ATTACK);
+        if (state == null) return 0;
+        int stage = Math.min(2, state.getGrowthStage());
+        return base * (1 + stage);
     }
 }
