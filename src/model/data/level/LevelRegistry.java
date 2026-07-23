@@ -182,6 +182,8 @@ public class LevelRegistry {
         config.setConveyorIntervalSeconds(entry.getConveyorIntervalSeconds());
         config.setConveyorCapacity(entry.getConveyorCapacity());
         config.setWaterTiles(points(entry.getWaterTiles()));
+        config.setLowTideTiles(points(entry.getLowTideTiles()));
+        config.setTideLimitColumn(entry.getTideLimitColumn());
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
         return config;

@@ -1,5 +1,6 @@
 package model.game.wave;
 
+import model.enums.Chapter;
 import model.enums.WaveState;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
@@ -12,6 +13,13 @@ import java.util.List;
  * Represents a single model.game.wave in a level.
  */
 public class Wave implements Tickable {
+
+    /** Ancient Egypt: chance that a final-wave zombie arrives by tornado. */
+    public static final double TORNADO_CHANCE = 0.2;
+
+    /** Ancient Egypt: max columns ahead a tornado can drop a zombie. */
+    public static final int TORNADO_MAX_COLUMNS_AHEAD = 4;
+
     private int waveNumber;
     private WaveState state;
     private int zombieIndex;
@@ -226,6 +234,15 @@ public class Wave implements Tickable {
         if (gameModel == null) return;   // not wired up yet — silently skip
         Zombie z = rng.rollZombiePool(entry.getPool());
         if (z == null) return;
+        // Ancient Egypt: final-wave zombies may ride in on a tornado and
+        // touch down 1-4 columns ahead of the normal entry point.
+        if (isFinalWave
+                && gameModel.getChapter() == Chapter.ANCIENT_EGYPT
+                && rng.nextBoolean(TORNADO_CHANCE)) {
+            gameModel.spawnZombieWithTornado(z, lane,
+                    rng.nextInt(1, TORNADO_MAX_COLUMNS_AHEAD));
+            return;
+        }
         gameModel.spawnZombie(z, lane);
     }
 

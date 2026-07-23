@@ -56,6 +56,7 @@ public class ProjectileSystem implements Tickable {
 
             // Fire peas melt ice terrain they cross (Frostbite Caves).
             damageIceIfPresent(projectile);
+            thawFrozenPlantIfPresent(projectile);
 
             float x = projectile.getX();
             if (x < 0f || x >= gameModel.getColumnCount()) {
@@ -321,7 +322,10 @@ public class ProjectileSystem implements Tickable {
     /** Applies on-hit status effects based on the projectile's element */
     private void applyOnHitEffects(Projectile projectile, ZombieInstance zombie) {
         if (projectile.isIce()) {
-            if (zombie.getDefinition().getChapter() != Chapter.FROSTBITE_CAVES) {
+            // Frostbite Caves levels: zombies never chill from ice shots
+            // (chapter rule). Frostbite-native zombies are immune anywhere.
+            if (gameModel.getChapter() != Chapter.FROSTBITE_CAVES
+                    && zombie.getDefinition().getChapter() != Chapter.FROSTBITE_CAVES) {
                 zombie.applyChill();
             }
 
@@ -382,6 +386,26 @@ public class ProjectileSystem implements Tickable {
             IceTerrainStrategy ice = (IceTerrainStrategy) cell.getTerrainStrategy();
             ice.takeDamage(projectile.getDamage());
             iceDamagedColumns.put(projectile, col);
+        }
+    }
+
+    /**
+     * A fire-elemental projectile passing over a frozen plant instantly
+     * melts the ice coating it (Frostbite Caves spec).
+     */
+    private void thawFrozenPlantIfPresent(Projectile projectile) {
+        if (!projectile.isFire()) {
+            return;
+        }
+        int row = projectile.getRow();
+        int col = (int) Math.floor(projectile.getX());
+        Cell cell = gameModel.getCellAt(row, col);
+        if (cell == null) {
+            return;
+        }
+        model.plant.instance.PlantInstance plant = cell.getTopmostPlant();
+        if (plant != null && plant.isFrozen()) {
+            plant.unfreeze();
         }
     }
 }

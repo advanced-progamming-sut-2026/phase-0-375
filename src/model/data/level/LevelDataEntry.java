@@ -24,6 +24,8 @@ public class LevelDataEntry {
     private float conveyorIntervalSeconds = 5f;
     private int conveyorCapacity = 10;
     private List<PointData> waterTiles;
+    private List<PointData> lowTideTiles;
+    private int tideLimitColumn = -1;
     private int deadLineColumn = -1;
     private boolean hasNightEffect;
     private List<WaveData> waves;
@@ -186,6 +188,22 @@ public class LevelDataEntry {
 
     public void setWaterTiles(List<PointData> waterTiles) {
         this.waterTiles = waterTiles;
+    }
+
+    public List<PointData> getLowTideTiles() {
+        return lowTideTiles;
+    }
+
+    public void setLowTideTiles(List<PointData> lowTideTiles) {
+        this.lowTideTiles = lowTideTiles;
+    }
+
+    public int getTideLimitColumn() {
+        return tideLimitColumn;
+    }
+
+    public void setTideLimitColumn(int tideLimitColumn) {
+        this.tideLimitColumn = tideLimitColumn;
     }
 
     public int getDeadLineColumn() {

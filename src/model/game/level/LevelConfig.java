@@ -40,6 +40,8 @@ public class LevelConfig {
     private float conveyorIntervalSeconds;         // for Conveyor Belt: seconds between deliveries
     private int conveyorCapacity;                  // for Conveyor Belt: max seed packets waiting on the belt
     private List<Point> waterTiles;                // explicit water tile positions
+    private List<Point> lowTideTiles;              // Big Wave Beach: cells that may ambush when submerged
+    private int tideLimitColumn = -1;              // Big Wave Beach: max columns (from right) the tide may flood (-1 = static water only)
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
 
     // --- Getters ---
@@ -142,6 +144,14 @@ public class LevelConfig {
 
     public List<Point> getWaterTiles() {
         return waterTiles;
+    }
+
+    public List<Point> getLowTideTiles() {
+        return lowTideTiles;
+    }
+
+    public int getTideLimitColumn() {
+        return tideLimitColumn;
     }
 
     public boolean isHasNightEffect() {
@@ -248,6 +258,14 @@ public class LevelConfig {
 
     public void setWaterTiles(List<Point> waterTiles) {
         this.waterTiles = waterTiles;
+    }
+
+    public void setLowTideTiles(List<Point> lowTideTiles) {
+        this.lowTideTiles = lowTideTiles;
+    }
+
+    public void setTideLimitColumn(int tideLimitColumn) {
+        this.tideLimitColumn = tideLimitColumn;
     }
 
     public void setHasNightEffect(boolean hasNightEffect) {

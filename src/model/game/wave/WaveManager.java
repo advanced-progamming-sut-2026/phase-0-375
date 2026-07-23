@@ -88,6 +88,9 @@ public class WaveManager implements Tickable {
         Wave next = waves.get(currentWaveIndex);
         next.startWave();
         phase = WaveManagerPhase.ACTIVE_WAVE;
+        if (gameModel != null) {
+            gameModel.onWaveStarted(next);
+        }
     }
 
     public Wave getCurrentWave() {

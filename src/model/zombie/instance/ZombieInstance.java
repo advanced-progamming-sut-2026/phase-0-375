@@ -1,5 +1,7 @@
 package model.zombie.instance;
 
+import model.enums.PlacableLayer;
+import model.item.placeable.Placeable;
 import model.enums.*;
 import model.game.core.Tickable;
 import model.game.map.FloatPoint;
@@ -20,7 +22,7 @@ import java.util.Set;
 /**
  * The runtime representation of a zombie on the game field
  */
-public class ZombieInstance implements Tickable {
+public class ZombieInstance implements Tickable, Placeable {
     private Zombie definition;
     private ZombieState state;
     private int currentHP;
@@ -601,6 +603,15 @@ public class ZombieInstance implements Tickable {
     public void setContinuousX(float x) { this.continuousPosition.setX(x); }
 
     public void setContinuousY(float y) { this.continuousPosition.setY(y); }
+
+    /**
+     * Zombies frozen inside ice terrain are stored as the ice block's
+     * contained entity; they conceptually occupy the MAIN layer.
+     */
+    @Override
+    public PlacableLayer getLayer() {
+        return PlacableLayer.MAIN;
+    }
 
     public void setGridPosition(Point gridPosition) {
         this.gridPosition = gridPosition;

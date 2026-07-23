@@ -21,7 +21,9 @@ import model.game.systems.TerrainSystem;
 import model.game.map.Point;
 import model.game.rule.EndGameCondition;
 import model.game.score.MyopointTracker;
+import model.game.wave.Wave;
 import model.game.wave.WaveManager;
+import model.game.systems.ChapterEffectsSystem;
 import model.item.Grave;
 import model.item.LootDrop;
 import model.item.Sun;
@@ -76,6 +78,9 @@ public class GameModel implements BehaviorContext {
     // Optional scorer attached by the daily Myopoint score level
     private MyopointTracker myopointTracker;
 
+    // Chapter-specific ambient effects (tornado, ice wind, tide)
+    private ChapterEffectsSystem chapterEffects;
+
     // Per-level stats used for quest tracking
     private int sunCollected;
     private boolean lawnMowerUsed;
@@ -116,6 +121,8 @@ public class GameModel implements BehaviorContext {
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
         this.waveManager = new WaveManager(levelConfig.getWaves(), this);
+
+        this.chapterEffects = new ChapterEffectsSystem(this);
 
         this.eventBus = new EventBus() {
             @Override
@@ -291,6 +298,34 @@ public class GameModel implements BehaviorContext {
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
     }
 
+    /**
+     * Ancient Egypt tornado entry (final wave): the zombie is carried in by a
+     * tornado and touches down 1-4 columns ahead of the normal entry edge.
+     */
+    public void spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
+        ZombieInstance instance = ZombieFactory.createInstance(zombie);
+        recordZombieSeen(zombie.getName());
+        int col = Math.max(0, gameMap.getCols() - Math.max(1, columnsAhead));
+        instance.setContinuousPosition(new FloatPoint(col, lane));
+        instance.setGridPosition(new Point(col, lane));
+        activeZombies.add(instance);
+        gameMap.addZombie(instance, col, lane);
+        if (myopointTracker != null) {
+            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
+        }
+        System.out.println("[Tornado] A " + zombie.getName()
+                + " is carried in by a tornado and lands " + columnsAhead
+                + " column(s) ahead in lane " + (lane + 1) + "!");
+        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+    }
+
+    /** Hook invoked by the wave manager when a new wave begins. */
+    public void onWaveStarted(Wave wave) {
+        if (chapterEffects != null) {
+            chapterEffects.onWaveStarted(wave);
+        }
+    }
+
     @Override
     public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
         ZombieInstance instance = ZombieFactory.createInstance(zombieDefinitionName);
@@ -348,6 +383,9 @@ public class GameModel implements BehaviorContext {
     public void tick(float deltaTime) {
         currentTick += 1;
         elapsedSeconds += deltaTime;
+        if (chapterEffects != null) {
+            chapterEffects.tick(deltaTime);
+        }
     }
 
     public void setGameState(GameState gameState) {
