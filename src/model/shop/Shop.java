@@ -72,8 +72,7 @@ public class Shop {
                 2000,
                 CurrencyType.COIN,
                 MAX_POTS,
-                null,
-                "Opens a greenhouse pot slot (max 20 pots)"
+                null, "Opens a greenhouse pot slot (max 20 pots)"
         ));
         permanentItems.add(new ShopItem(
                 ITEM_ID_PLANT_FOOD,
@@ -82,8 +81,7 @@ public class Shop {
                 3,
                 CurrencyType.GEM,
                 MAX_PLANT_FOOD,
-                null,
-                "Plant Food usable at level start (max 3 stored)"
+                null, "Plant Food usable at level start (max 3 stored)"
         ));
         permanentItems.add(new ShopItem(
                 ITEM_ID_SEED_RANDOM,
@@ -92,8 +90,7 @@ public class Shop {
                 1000,
                 CurrencyType.COIN,
                 Integer.MAX_VALUE,
-                null,
-                "5 seed packets for a random unlocked plant"
+                null, "5 seed packets for a random unlocked plant"
         ));
         permanentItems.add(new ShopItem(
                 ITEM_ID_SEED_CHOSEN,
@@ -102,8 +99,7 @@ public class Shop {
                 5,
                 CurrencyType.GEM,
                 Integer.MAX_VALUE,
-                null,
-                "10 seed packets for a chosen unlocked plant"
+                null, "10 seed packets for a chosen unlocked plant"
         ));
         permanentItems.add(new ShopItem(
                 ITEM_ID_CURRENCY_CONVERSION,
@@ -112,8 +108,7 @@ public class Shop {
                 5,
                 CurrencyType.GEM,
                 Integer.MAX_VALUE,
-                null,
-                "Convert 5 gems to 500 coins"
+                null, "Convert 5 gems to 500 coins"
         ));
     }
 

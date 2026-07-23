@@ -58,117 +58,87 @@ public final class QuestTracker {
         String base = baseName(name);
         String value = quest.getVariable();
         int target = quest.getProgress() != null ? quest.getProgress().getTargetValue() : 1;
-        boolean plantsOnly = !model.isLawnMowerUsed();
         List<Plant> planted = model.getPlantsPlaced();
 
         switch (base) {
-            case "Daily Sun Collector":
-                add(progress, name, model.getSunCollected(), target);
-                break;
-            case "Mowing Time":
-                add(progress, name, model.getMowerKills(), target);
-                break;
-            case "Chapter Hunter":
+            case "Daily Sun Collector" -> add(progress, name, model.getSunCollected(), target);
+            case "Mowing Time" -> add(progress, name, model.getMowerKills(), target);
+            case "Chapter Hunter" -> {
                 if (model.getChapter() != null && model.getChapter().name().equalsIgnoreCase(value)) {
                     add(progress, name, model.getZombiesKilled(), target);
                 }
-                break;
-            case "Professional Plant Opener":
+            }
+            case "Professional Plant Opener" ->
                 // daily variant: count kills dealt exclusively by today's plant
-                add(progress, name, model.getExclusivePlantKills(value), target);
-                break;
-            case "Only Cactus":
+                    add(progress, name, model.getExclusivePlantKills(value), target);
+            case "Only Cactus" ->
                 // count kills dealt exclusively by Cactus
-                add(progress, name, model.getExclusivePlantKills("Cactus"), target);
-                break;
-            case "Economic Plant Eater":
+                    add(progress, name, model.getExclusivePlantKills("Cactus"), target);
+            case "Economic Plant Eater" -> {
                 if (won && model.getPlantsLost() <= parseInt(value, -1)) markComplete(progress, name, target);
-                break;
-            case "Defense Master":
+            }
+            case "Defense Master" -> {
                 if (won && model.getSunAmount() == 0) markComplete(progress, name, target);
-                break;
-            case "Speed of Action":
-                best(progress, name, model.getKillsWithin30s(), target);
-                break;
-            case "Professional Destroyer":
-                best(progress, name, countCategory(planted, PlantCategory.EXPLOSIVE), target);
-                break;
-            case "Symmetry":
+            }
+            case "Speed of Action" -> best(progress, name, model.getKillsWithin30s(), target);
+            case "Professional Destroyer" ->
+                    best(progress, name, countCategory(planted, PlantCategory.EXPLOSIVE), target);
+            case "Symmetry" -> {
                 if (won && !planted.isEmpty() && isGardenSymmetric(model)) markComplete(progress, name, target);
-                break;
-            case "Family Slaughter":
+            }
+            case "Family Slaughter" -> {
                 // every zombie killed this level must have died solely to today's family
                 if (model.getZombiesKilled() > 0
                         && model.getExclusiveFamilyKills(value) == model.getZombiesKilled()) {
                     markComplete(progress, name, target);
                 }
-                break;
-            case "Bloom in Constraints":
+            }
+            case "Bloom in Constraints" -> {
                 if (won && countCategoryName(planted, value) == 0) markComplete(progress, name, target);
-                break;
-            case "Night or Morning":
+            }
+            case "Night or Morning" -> {
                 if (won && !model.isNightLevel() && allShrooms(planted)) markComplete(progress, name, target);
-                break;
-            case "Cloudy Day":
+            }
+            case "Cloudy Day" -> {
                 // never more than 3 sun producers on the field at the same time
                 if (won && !planted.isEmpty() && model.getMaxSunProducersAtOnce() <= 3) {
                     markComplete(progress, name, target);
                 }
-                break;
-            case "Win Streak":
+            }
+            case "Win Streak" -> {
                 if (won && model.getDifficulty() >= MAX_DIFFICULTY) add(progress, name, 1, target);
                 else progress.put(name, 0); // streak broken
-                break;
-            case "Almost Victorious":
-                add(progress, name, model.getNoMowerFirstColumnKills(), target);
-                break;
-            case "No OCD":
+            }
+            case "Almost Victorious" -> add(progress, name, model.getNoMowerFirstColumnKills(), target);
+            case "No OCD" -> {
                 // no mirrored pair may hold the same plant (empty cells ignored)
                 if (won && !planted.isEmpty() && !hasAnySymmetricPair(model)) {
                     markComplete(progress, name, target);
                 }
-                break;
-            case "One Column Less":
+            }
+            case "One Column Less" -> {
                 if (won && !model.getColumnsPlanted().contains(parseInt(value, -1))) {
                     markComplete(progress, name, target);
                 }
-                break;
-            case "Defenseless Row":
+            }
+            case "Defenseless Row" -> {
                 if (won && !model.getRowsPlanted().contains(parseInt(value, -1))) {
                     markComplete(progress, name, target);
                 }
-                break;
-            case "Defenseless Cross": {
+            }
+            case "Defenseless Cross" -> {
                 int index = parseInt(value, -1);
                 if (won && !model.getColumnsPlanted().contains(index)
                         && !model.getRowsPlanted().contains(index)) {
                     markComplete(progress, name, target);
                 }
-                break;
             }
-            default:
-                break;
+            default -> {
+            }
         }
     }
 
     // ---- plant list helpers ----
-
-    private static boolean allNamed(List<Plant> planted, String plantName) {
-        if (planted == null || planted.isEmpty()) return false;
-        for (Plant p : planted) {
-            if (p == null || p.getName() == null || !p.getName().equalsIgnoreCase(plantName)) return false;
-        }
-        return true;
-    }
-
-    private static boolean allOfCategory(List<Plant> planted, String category) {
-        if (planted == null || planted.isEmpty() || category == null) return false;
-        for (Plant p : planted) {
-            if (p == null || p.getCategory() == null
-                    || !p.getCategory().name().equalsIgnoreCase(category)) return false;
-        }
-        return true;
-    }
 
     private static boolean allShrooms(List<Plant> planted) {
         if (planted == null || planted.isEmpty()) return false;
