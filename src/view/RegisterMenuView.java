@@ -39,7 +39,9 @@ public class RegisterMenuView extends AppMenuView {
                 register(username, password, passwordConfirm, nickname, email, gender);
             } else {
                 displayError("Usage:");
-                displayError("  register -u <username> -p <password> <password_confirm> -n <nickname> -e <email> -g <gender>");
+                displayError(
+                     "  register -u <username> -p <password> <password_confirm> -n <nickname> -e <email> -g <gender>"
+                );
                 displayError("  menu enter login");
             }
         }

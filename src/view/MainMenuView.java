@@ -26,7 +26,10 @@ public class MainMenuView extends AppMenuView {
                     MainMenuCommand.LEADERBOARD.getParameter("sort"),
                     MainMenuCommand.LEADERBOARD.getParameter("order"));
         } else {
-            displayError("Unknown command. Try: menu logout, menu leaderboard [-s <column>] [-o asc|desc], menu enter score-game, or menu enter <menu_name>");
+            displayError(
+                "Unknown command. Try: menu logout, menu leaderboard [-s <column>] [-o asc|desc], " +
+                        "menu enter score-game, or menu enter <menu_name>"
+            );
         }
     }
 

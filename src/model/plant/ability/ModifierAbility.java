@@ -167,8 +167,10 @@ public class ModifierAbility implements PlantAbility {
                 if (rowDist == 0 && colDist == 0) continue;
                 int targetRow = row + rowDist;
                 int targetCol = col + colDist;
-                if (targetRow < 0 || targetCol < 0 || targetRow >= context.getRowCount() || targetCol >= context.getColumnCount()) {
-                    continue;
+                if (targetRow < 0 || targetCol < 0 ||
+                    targetRow >= context.getRowCount() ||
+                    targetCol >= context.getColumnCount()) {
+                        continue;
                 }
                 if (!context.isWaterTile(targetRow, targetCol)) continue;
                 if (context.getPlantAt(targetRow, targetCol) != null) continue;

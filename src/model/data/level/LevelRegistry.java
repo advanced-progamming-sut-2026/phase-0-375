@@ -248,7 +248,9 @@ public class LevelRegistry {
             List<SpawnPatternType> patternTypes = new ArrayList<>();
             if (rawWave.getEntries() != null) {
                 for (LevelDataEntry.WaveEntryData rawEntry : rawWave.getEntries()) {
-                    SpawnPatternType patternType = resolveEnum(SpawnPatternType.class, rawEntry.getPattern(), SpawnPatternType.SINGLE);
+                    SpawnPatternType patternType = resolveEnum(
+                            SpawnPatternType.class, rawEntry.getPattern(), SpawnPatternType.SINGLE
+                    );
                     WaveZombieEntry entry = buildWaveEntry(rawEntry, patternType);
                     if (entry != null) {
                         runtimes.add(new EntryRuntime(entry));
@@ -256,7 +258,9 @@ public class LevelRegistry {
                     }
                 }
             }
-            Wave wave = new Wave(rawWave.getWaveNumber(), runtimes, rawWave.getStartDelay(), rawWave.isHugeWave(), rawWave.isFinalWave());
+            Wave wave = new Wave(
+                rawWave.getWaveNumber(), runtimes, rawWave.getStartDelay(), rawWave.isHugeWave(), rawWave.isFinalWave()
+            );
             for (int i = 0; i < runtimes.size(); i++) {
                 EntryRuntime runtime = runtimes.get(i);
                 runtime.getWaveZombieEntry().setPattern(spawnStrategy(patternTypes.get(i), runtime, wave));
@@ -345,11 +349,15 @@ public class LevelRegistry {
         return Collections.unmodifiableSet(result);
     }
 
-    private static Map<Point, SlideDirection> slideTiles(List<LevelDataEntry.SlideTileData> rawTiles) {
+    private static Map<Point, SlideDirection> slideTiles(
+            List<LevelDataEntry.SlideTileData> rawTiles
+    ) {
         if (rawTiles == null) return Collections.emptyMap();
         Map<Point, SlideDirection> result = new HashMap<>();
         for (LevelDataEntry.SlideTileData tile : rawTiles) {
-            result.put(new Point(tile.getX(), tile.getY()), resolveEnum(SlideDirection.class, tile.getDirection(), SlideDirection.UP));
+            result.put(new Point(
+                    tile.getX(), tile.getY()), resolveEnum(SlideDirection.class, tile.getDirection(), SlideDirection.UP)
+            );
         }
         return Collections.unmodifiableMap(result);
     }

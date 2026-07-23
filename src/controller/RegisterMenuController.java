@@ -41,7 +41,9 @@ public class RegisterMenuController extends AppMenuController {
     public CommandResult<Void> menuEnter(String menuName) {
         if (menuName.equalsIgnoreCase("login")) {
             if (pendingUsername != null) {
-                return CommandResult.error("Complete your security question first, or start over with a new register command.");
+                return CommandResult.error(
+                        "Complete your security question first, or start over with a new register command."
+                );
             }
             App.getInstance().setCurrentMenu(MenuType.LOGIN);
             return CommandResult.success("Entered login menu.");

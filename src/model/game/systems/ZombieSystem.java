@@ -191,16 +191,9 @@ public class ZombieSystem implements Tickable {
      * is not currently in a special-action, the zombie eats the plant.
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        if (zombie.hasBehavior(ZombieBehaviorType.SMASH)
-                && !isAllStar(zombie)) {
-            return;
-        }
-        if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) {
-            return;
-        }
-        if (zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()) {
-            return;
-        }
+        if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return;
+        if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return;
+        if (zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()) return;
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
@@ -267,7 +260,7 @@ public class ZombieSystem implements Tickable {
             @Override public PlantInstance getPlantAt(int row, int col) { return gameModel.getPlantAt(row, col); }
             @Override public List<PlantInstance> getPlantsInLane(int lane) { return gameModel.getPlantsInLane(lane); }
             @Override public List<PlantInstance> getAllPlants() { return gameModel.getAllPlants(); }
-            @Override public List<ZombieInstance> getZombiesInLane(int lane) { return gameModel.getZombiesInLane(lane); }
+            @Override public List<ZombieInstance> getZombiesInLane(int lane) { return gameModel.getZombiesInLane(lane);}
             @Override public List<ZombieInstance> getZombiesInArea(int row, int col, int rowRadius, int colRadius) {
                 return gameModel.getZombiesInArea(row, col, rowRadius, colRadius);
             }
@@ -285,20 +278,63 @@ public class ZombieSystem implements Tickable {
                 }
                 return false;
             }
-            @Override public boolean isNightLevel() { return gameModel.isNightLevel(); }
-            @Override public boolean isWaterTile(int row, int col) { return gameModel.isWaterTile(row, col); }
-            @Override public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
+
+            @Override
+            public boolean isNightLevel() {
+                return gameModel.isNightLevel();
+            }
+
+            @Override
+            public boolean isWaterTile(int row, int col) {
+                return gameModel.isWaterTile(row, col);
+            }
+
+            @Override
+            public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
                 gameModel.spawnProjectile(p, (int) x, (int) y);
                 return p;
             }
-            @Override public void spawnSun(model.item.Sun sun) { gameModel.spawnSun(sun); }
-            @Override public void addSun(int amount) { gameModel.addSun(amount); }
-            @Override public void damageZombie(ZombieInstance zombie, int damage) { gameModel.damageZombie(zombie, damage); }
-            @Override public void damagePlant(PlantInstance plant, int damage) { gameModel.damagePlant(plant, damage); }
-            @Override public void destroyPlant(PlantInstance plant) { gameModel.destroyPlant(plant); }
-            @Override public boolean placePlant(PlantInstance plant, int row, int col) { return gameModel.placePlant(plant, row, col); }
-            @Override public boolean moveZombieToLane(ZombieInstance zombie, int newRow) { return gameModel.moveZombieToLane(zombie, newRow); }
-            @Override public void pushZombieBack(ZombieInstance zombie, float tiles) { gameModel.pushZombieBack(zombie, tiles); }
+
+            @Override
+            public void spawnSun(model.item.Sun sun) {
+                gameModel.spawnSun(sun);
+            }
+
+            @Override
+            public void addSun(int amount) {
+                gameModel.addSun(amount);
+            }
+
+            @Override
+            public void damageZombie(ZombieInstance zombie, int damage) {
+                gameModel.damageZombie(zombie, damage);
+            }
+
+            @Override
+            public void damagePlant(PlantInstance plant, int damage) {
+                gameModel.damagePlant(plant, damage);
+            }
+
+            @Override
+            public void destroyPlant(PlantInstance plant) {
+                gameModel.destroyPlant(plant);
+            }
+
+            @Override
+            public boolean placePlant(PlantInstance plant, int row, int col) {
+                return gameModel.placePlant(plant, row, col);
+            }
+
+            @Override
+            public boolean moveZombieToLane(ZombieInstance zombie, int newRow) {
+                return gameModel.moveZombieToLane(zombie, newRow);
+            }
+
+            @Override
+            public void pushZombieBack(ZombieInstance zombie, float tiles) {
+                gameModel.pushZombieBack(zombie, tiles);
+            }
+
             @Override public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
                 for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                     if (plant.getDefinition().getCategory() == family) {

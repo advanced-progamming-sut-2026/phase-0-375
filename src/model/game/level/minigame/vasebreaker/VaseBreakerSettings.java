@@ -31,48 +31,99 @@ public class VaseBreakerSettings {
     /** Plant definition names drawn from for seed packets. */
     private List<String> plantPool = new ArrayList<>();
 
-    public int getVaseColumns() { return vaseColumns; }
-    public void setVaseColumns(int vaseColumns) { this.vaseColumns = vaseColumns; }
+    public int getVaseColumns() {
+        return vaseColumns;
+    }
 
-    public int getRandomVaseCount() { return randomVaseCount; }
-    public void setRandomVaseCount(int randomVaseCount) { this.randomVaseCount = randomVaseCount; }
+    public void setVaseColumns(int vaseColumns) {
+        this.vaseColumns = vaseColumns;
+    }
 
-    public int getSeedVaseCount() { return seedVaseCount; }
-    public void setSeedVaseCount(int seedVaseCount) { this.seedVaseCount = seedVaseCount; }
+    public int getRandomVaseCount() {
+        return randomVaseCount;
+    }
 
-    public int getGiantVaseCount() { return giantVaseCount; }
-    public void setGiantVaseCount(int giantVaseCount) { this.giantVaseCount = giantVaseCount; }
+    public void setRandomVaseCount(int randomVaseCount) {
+        this.randomVaseCount = randomVaseCount;
+    }
 
-    public float getRandomEmptyWeight() { return randomEmptyWeight; }
-    public void setRandomEmptyWeight(float randomEmptyWeight) { this.randomEmptyWeight = Math.max(0f, randomEmptyWeight); }
+    public int getSeedVaseCount() {
+        return seedVaseCount;
+    }
 
-    public float getRandomZombieWeight() { return randomZombieWeight; }
-    public void setRandomZombieWeight(float randomZombieWeight) { this.randomZombieWeight = Math.max(0f, randomZombieWeight); }
+    public void setSeedVaseCount(int seedVaseCount) {
+        this.seedVaseCount = seedVaseCount;
+    }
 
-    public float getRandomSeedWeight() { return randomSeedWeight; }
-    public void setRandomSeedWeight(float randomSeedWeight) { this.randomSeedWeight = Math.max(0f, randomSeedWeight); }
+    public int getGiantVaseCount() {
+        return giantVaseCount;
+    }
 
-    /** Sum of the random-vase outcome weights. */
+    public void setGiantVaseCount(int giantVaseCount) {
+        this.giantVaseCount = giantVaseCount;
+    }
+
+    public float getRandomEmptyWeight() {
+        return randomEmptyWeight;
+    }
+
+    public void setRandomEmptyWeight(float randomEmptyWeight) {
+        this.randomEmptyWeight = Math.max(0f, randomEmptyWeight);
+    }
+
+    public float getRandomZombieWeight() {
+        return randomZombieWeight;
+    }
+
+    public void setRandomZombieWeight(float randomZombieWeight) {
+        this.randomZombieWeight = Math.max(0f, randomZombieWeight);
+    }
+
+    public float getRandomSeedWeight() {
+        return randomSeedWeight;
+    }
+
+    public void setRandomSeedWeight(float randomSeedWeight) {
+        this.randomSeedWeight = Math.max(0f, randomSeedWeight);
+    }
+
+    /**
+     * Sum of the random-vase outcome weights.
+     */
     public float totalRandomWeight() {
         return randomEmptyWeight + randomZombieWeight + randomSeedWeight;
     }
 
-    public float getSeedPacketExpirySeconds() { return seedPacketExpirySeconds; }
-    public void setSeedPacketExpirySeconds(float seedPacketExpirySeconds) { this.seedPacketExpirySeconds = seedPacketExpirySeconds; }
+    public float getSeedPacketExpirySeconds() {
+        return seedPacketExpirySeconds;
+    }
 
-    public String getGiantVaseZombie() { return giantVaseZombie; }
+    public void setSeedPacketExpirySeconds(float seedPacketExpirySeconds) {
+        this.seedPacketExpirySeconds = seedPacketExpirySeconds;
+    }
+
+    public String getGiantVaseZombie() {
+        return giantVaseZombie;
+    }
+
     public void setGiantVaseZombie(String giantVaseZombie) {
         if (giantVaseZombie != null && !giantVaseZombie.isBlank()) {
             this.giantVaseZombie = giantVaseZombie;
         }
     }
 
-    public List<String> getZombiePool() { return zombiePool; }
+    public List<String> getZombiePool() {
+        return zombiePool;
+    }
+
     public void setZombiePool(List<String> zombiePool) {
         this.zombiePool = zombiePool == null ? new ArrayList<>() : new ArrayList<>(zombiePool);
     }
 
-    public List<String> getPlantPool() { return plantPool; }
+    public List<String> getPlantPool() {
+        return plantPool;
+    }
+
     public void setPlantPool(List<String> plantPool) {
         this.plantPool = plantPool == null ? new ArrayList<>() : new ArrayList<>(plantPool);
     }

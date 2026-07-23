@@ -197,7 +197,6 @@ public class ExplosiveAbility implements PlantAbility {
                     context.getRowCount(), context.getColumnCount(), damage);
             return;
         }
-
         // Lane-clearing explosion (Jalapeno).
         if (isFire && radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInLane(row)) {
@@ -209,7 +208,6 @@ public class ExplosiveAbility implements PlantAbility {
                     0, context.getColumnCount(), damage);
             return;
         }
-
         // 3x3 AoE (Cherry Bomb, Grapeshot, Primal Potato Mine).
         if (radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
@@ -219,7 +217,6 @@ public class ExplosiveAbility implements PlantAbility {
             context.damageIceInArea(row, col, 1, 1, damage);
             return;
         }
-
         // Localised explosion (Potato Mine).
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
             applyExplosionDamage(context, zombie, damage, isFire);

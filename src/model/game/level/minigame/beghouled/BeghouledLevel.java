@@ -168,9 +168,7 @@ public class BeghouledLevel extends MiniGameLevel {
      * @return null on success, otherwise a user-facing error message
      */
     public String swapPlant(GameModel model, int row, int col, String direction) {
-        if (model == null || board == null) {
-            return "No active game.";
-        }
+        if (model == null || board == null) {return "No active game.";}
         detectEatenPlants(model);
         int targetRow = row;
         int targetCol = col;

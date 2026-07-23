@@ -52,7 +52,6 @@ public class ProjectileSystem implements Tickable {
             if (projectile == null) continue;
 
             moveProjectile(projectile, deltaTime);
-
             applyTorchwood(projectile);
 
             // Fire peas melt ice terrain they cross (Frostbite Caves).
@@ -74,7 +73,6 @@ public class ProjectileSystem implements Tickable {
                 }
                 return;
             }
-
             ZombieInstance target = findCollision(projectile);
             if (target == null) {
                 continue;

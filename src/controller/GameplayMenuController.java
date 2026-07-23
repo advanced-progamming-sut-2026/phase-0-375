@@ -748,10 +748,8 @@ public class GameplayMenuController extends AppMenuController {
                 Cell cell = map.getCell(c, r);
                 char ch = '.';
                 if (cell != null) {
-                    // Render every plant layer so stacked tiles are
-                    // visible: GROUND (Lily Pad) -> 'G', MAIN (regular
-                    // plant) -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell
-                    // with both MAIN and OVERLAY becomes 'B' (both).
+                    // Render every plant layer so stacked tiles are visible: GROUND (Lily Pad) -> 'G', (regular plant)
+                    // -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell with both MAIN and OVERLAY becomes 'B' (both).
                     boolean hasGround = cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance;
                     boolean hasMain = cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance;
                     boolean hasOverlay = cell.getPlaceable(PlacableLayer.OVERLAY) instanceof PlantInstance;
@@ -759,13 +757,7 @@ public class GameplayMenuController extends AppMenuController {
                     else if (hasMain) ch = 'P';
                     else if (hasOverlay) ch = 'O';
                     else if (hasGround) ch = 'G';
-                    // Cell exposes zombies via getZombies() in a List<ZombieInstance>
-                    // — but that field isn't directly exposed. We approximate
-                    // with the project's convention: a zombie on the cell makes
-                    // it 'Z', plant+ zombie = 'X'.
-                    // Since Cell doesn't currently expose its zombie list, we
-                    // also scan the model's active zombies and check if any
-                    // has grid coords (c, r).
+
                     for (ZombieInstance z : model.getZombies()) {
                         var gp = z.getGridPosition();
                         if (gp != null && gp.getX() == c && gp.getY() == r) {
@@ -866,9 +858,7 @@ public class GameplayMenuController extends AppMenuController {
 
         GameModel model = requireGame();
         GameMap map = model.getMap();
-        if (!inBounds(map, x, y)) {
-            return errorTyped("Position (" + x + ", " + y + ") is out of bounds.");
-        }
+        if (!inBounds(map, x, y)) { return errorTyped("Position (" + x + ", " + y + ") is out of bounds."); }
         Cell cell = map.getCell(x, y);
         StringBuilder sb = new StringBuilder();
         sb.append("── Tile (").append(x).append(", ").append(y).append(") ──\n");
@@ -925,7 +915,9 @@ public class GameplayMenuController extends AppMenuController {
         GameModel model = requireGame();
         int killed = model.getZombies().size();
         if (killed == 0) {
-            return CommandResult.success("Dear humanz, zis is not done yet; we will come back to eat your brainz, humanz. (No zombies to nuke.)");
+            return CommandResult.success(
+                "Dear humanz, zis is not done yet; we will come back to eat your brainz, humanz. (No zombies to nuke.)"
+            );
         }
         // Snapshot to avoid ConcurrentModificationException while removing
         List<ZombieInstance> snapshot = new ArrayList<>(model.getZombies());

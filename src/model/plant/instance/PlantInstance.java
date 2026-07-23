@@ -25,13 +25,14 @@ public class PlantInstance implements Placeable {
     private Plant definition;
     private PlantState state;
     private int currentHP;
-    private int level;                                          // 1-4
-    private Point position;                                     // grid (col, row); null if not yet placed
-    private float currentRecharge;                              // seconds remaining before the seed is available again
+    private int level;                                 // 1-4
+    private Point position;                            // grid (col, row); null if not yet placed
+    private float currentRecharge;                     // seconds remaining before the seed is available again
     private boolean isPlantFoodActive;
+    private float lifespanRemaining;                   // -1 = infinite
     private float plantFoodDurationRemaining;
-    private boolean pendingPlantFoodEffect;                     // true when activatePlantFood() (no-arg) was called and the effect still needs to fire on the next tick
-    private float lifespanRemaining;                            // -1 = infinite
+    private boolean pendingPlantFoodEffect;            // true when activatePlantFood() (no-arg) was called and
+                                                       // the effect still needs to fire on the next tick
 
     /** Per-ability runtime state. Keyed by ability type from the definition. */
     private final Map<PlantAbilityType, AbilityState> abilityStates;
@@ -318,7 +319,6 @@ public class PlantInstance implements Placeable {
                     break;
             }
         }
-
         // Adjust currentHP delta to match the new max.
         int hpDelta = newHP - definition.getBaseHP();
         this.currentHP = Math.min(newHP, this.currentHP + Math.max(0, hpDelta));

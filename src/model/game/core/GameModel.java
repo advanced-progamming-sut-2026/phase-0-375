@@ -87,8 +87,8 @@ public class GameModel implements BehaviorContext {
     private Set<Integer> rowsPlanted;
     private Set<Integer> columnsPlanted;
     private int maxSunProducersAtOnce; // peak simultaneous sun producers on the field
-    private final Map<String, Integer> exclusivePlantKills = new HashMap<>();          // kills damaged only by one plant type
-    private final Map<PlantCategory, Integer> exclusiveFamilyKills = new HashMap<>();  // kills damaged only by one family
+    private final Map<String, Integer> exclusivePlantKills = new HashMap<>();
+    private final Map<PlantCategory, Integer> exclusiveFamilyKills = new HashMap<>();
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;

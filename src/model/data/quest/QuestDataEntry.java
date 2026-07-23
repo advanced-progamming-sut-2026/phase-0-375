@@ -65,31 +65,101 @@ public class QuestDataEntry {
 
     // --- Getters ---
 
-    public String getName() { return name; }
-    public String getCategory() { return category; }
-    public String getCondition() { return condition; }
-    public String getRewardType() { return rewardType; }
-    public int getRewardCoinAmount() { return rewardCoinAmount; }
-    public int getRewardGemAmount() { return rewardGemAmount; }
-    public String getRewardUnlockableName() { return rewardUnlockableName; }
-    public String getRewardInventoryItem() { return rewardInventoryItem; }
-    public int getRewardInventoryItemAmount() { return rewardInventoryItemAmount; }
-    public String getPriority() { return priority; }
-    public String getVariable() { return variable; }
-    public String getRewardNote() { return rewardNote; }
+    public String getName() {
+        return name;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public String getCondition() {
+        return condition;
+    }
+
+    public String getRewardType() {
+        return rewardType;
+    }
+
+    public int getRewardCoinAmount() {
+        return rewardCoinAmount;
+    }
+
+    public int getRewardGemAmount() {
+        return rewardGemAmount;
+    }
+
+    public String getRewardUnlockableName() {
+        return rewardUnlockableName;
+    }
+
+    public String getRewardInventoryItem() {
+        return rewardInventoryItem;
+    }
+
+    public int getRewardInventoryItemAmount() {
+        return rewardInventoryItemAmount;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public String getVariable() {
+        return variable;
+    }
+
+    public String getRewardNote() {
+        return rewardNote;
+    }
 
     // --- Setters ---
 
-    public void setName(String name) { this.name = name; }
-    public void setCategory(String category) { this.category = category; }
-    public void setCondition(String condition) { this.condition = condition; }
-    public void setRewardType(String rewardType) { this.rewardType = rewardType; }
-    public void setRewardCoinAmount(int rewardCoinAmount) { this.rewardCoinAmount = rewardCoinAmount; }
-    public void setRewardGemAmount(int rewardGemAmount) { this.rewardGemAmount = rewardGemAmount; }
-    public void setRewardUnlockableName(String rewardUnlockableName) { this.rewardUnlockableName = rewardUnlockableName; }
-    public void setRewardInventoryItem(String rewardInventoryItem) { this.rewardInventoryItem = rewardInventoryItem; }
-    public void setRewardInventoryItemAmount(int rewardInventoryItemAmount) { this.rewardInventoryItemAmount = rewardInventoryItemAmount; }
-    public void setPriority(String priority) { this.priority = priority; }
-    public void setVariable(String variable) { this.variable = variable; }
-    public void setRewardNote(String rewardNote) { this.rewardNote = rewardNote; }
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public void setCondition(String condition) {
+        this.condition = condition;
+    }
+
+    public void setRewardType(String rewardType) {
+        this.rewardType = rewardType;
+    }
+
+    public void setRewardCoinAmount(int rewardCoinAmount) {
+        this.rewardCoinAmount = rewardCoinAmount;
+    }
+
+    public void setRewardGemAmount(int rewardGemAmount) {
+        this.rewardGemAmount = rewardGemAmount;
+    }
+
+    public void setRewardUnlockableName(String rewardUnlockableName) {
+        this.rewardUnlockableName = rewardUnlockableName;
+    }
+
+    public void setRewardInventoryItem(String rewardInventoryItem) {
+        this.rewardInventoryItem = rewardInventoryItem;
+    }
+
+    public void setRewardInventoryItemAmount(int rewardInventoryItemAmount) {
+        this.rewardInventoryItemAmount = rewardInventoryItemAmount;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public void setVariable(String variable) {
+        this.variable = variable;
+    }
+
+    public void setRewardNote(String rewardNote) {
+        this.rewardNote = rewardNote;
+    }
 }

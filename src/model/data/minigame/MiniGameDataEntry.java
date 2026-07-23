@@ -41,50 +41,125 @@ public class MiniGameDataEntry extends LevelDataEntry {
     /** Plant definition names drawn from for seed packets. */
     private List<String> vasePlants;
 
-    public String getMiniGameType() { return miniGameType; }
-    public void setMiniGameType(String miniGameType) { this.miniGameType = miniGameType; }
+    public String getMiniGameType() {
+        return miniGameType;
+    }
 
-    public int getStage() { return stage; }
-    public void setStage(int stage) { this.stage = stage; }
+    public void setMiniGameType(String miniGameType) {
+        this.miniGameType = miniGameType;
+    }
 
-    public int getDifficultyTier() { return difficultyTier; }
-    public void setDifficultyTier(int difficultyTier) { this.difficultyTier = difficultyTier; }
+    public int getStage() {
+        return stage;
+    }
 
-    public int getCoinReward() { return coinReward; }
-    public void setCoinReward(int coinReward) { this.coinReward = coinReward; }
+    public void setStage(int stage) {
+        this.stage = stage;
+    }
 
-    public int getVaseColumns() { return vaseColumns; }
-    public void setVaseColumns(int vaseColumns) { this.vaseColumns = vaseColumns; }
+    public int getDifficultyTier() {
+        return difficultyTier;
+    }
 
-    public int getRandomVaseCount() { return randomVaseCount; }
-    public void setRandomVaseCount(int randomVaseCount) { this.randomVaseCount = randomVaseCount; }
+    public void setDifficultyTier(int difficultyTier) {
+        this.difficultyTier = difficultyTier;
+    }
 
-    public int getSeedVaseCount() { return seedVaseCount; }
-    public void setSeedVaseCount(int seedVaseCount) { this.seedVaseCount = seedVaseCount; }
+    public int getCoinReward() {
+        return coinReward;
+    }
 
-    public int getGiantVaseCount() { return giantVaseCount; }
-    public void setGiantVaseCount(int giantVaseCount) { this.giantVaseCount = giantVaseCount; }
+    public void setCoinReward(int coinReward) {
+        this.coinReward = coinReward;
+    }
 
-    public float getRandomEmptyWeight() { return randomEmptyWeight; }
-    public void setRandomEmptyWeight(float randomEmptyWeight) { this.randomEmptyWeight = randomEmptyWeight; }
+    public int getVaseColumns() {
+        return vaseColumns;
+    }
 
-    public float getRandomZombieWeight() { return randomZombieWeight; }
-    public void setRandomZombieWeight(float randomZombieWeight) { this.randomZombieWeight = randomZombieWeight; }
+    public void setVaseColumns(int vaseColumns) {
+        this.vaseColumns = vaseColumns;
+    }
 
-    public float getRandomSeedWeight() { return randomSeedWeight; }
-    public void setRandomSeedWeight(float randomSeedWeight) { this.randomSeedWeight = randomSeedWeight; }
+    public int getRandomVaseCount() {
+        return randomVaseCount;
+    }
 
-    public float getSeedPacketExpirySeconds() { return seedPacketExpirySeconds; }
-    public void setSeedPacketExpirySeconds(float seedPacketExpirySeconds) { this.seedPacketExpirySeconds = seedPacketExpirySeconds; }
+    public void setRandomVaseCount(int randomVaseCount) {
+        this.randomVaseCount = randomVaseCount;
+    }
 
-    public String getGiantVaseZombie() { return giantVaseZombie; }
-    public void setGiantVaseZombie(String giantVaseZombie) { this.giantVaseZombie = giantVaseZombie; }
+    public int getSeedVaseCount() {
+        return seedVaseCount;
+    }
 
-    public List<String> getVaseZombies() { return vaseZombies; }
-    public void setVaseZombies(List<String> vaseZombies) { this.vaseZombies = vaseZombies; }
+    public void setSeedVaseCount(int seedVaseCount) {
+        this.seedVaseCount = seedVaseCount;
+    }
 
-    public List<String> getVasePlants() { return vasePlants; }
-    public void setVasePlants(List<String> vasePlants) { this.vasePlants = vasePlants; }
+    public int getGiantVaseCount() {
+        return giantVaseCount;
+    }
+
+    public void setGiantVaseCount(int giantVaseCount) {
+        this.giantVaseCount = giantVaseCount;
+    }
+
+    public float getRandomEmptyWeight() {
+        return randomEmptyWeight;
+    }
+
+    public void setRandomEmptyWeight(float randomEmptyWeight) {
+        this.randomEmptyWeight = randomEmptyWeight;
+    }
+
+    public float getRandomZombieWeight() {
+        return randomZombieWeight;
+    }
+
+    public void setRandomZombieWeight(float randomZombieWeight) {
+        this.randomZombieWeight = randomZombieWeight;
+    }
+
+    public float getRandomSeedWeight() {
+        return randomSeedWeight;
+    }
+
+    public void setRandomSeedWeight(float randomSeedWeight) {
+        this.randomSeedWeight = randomSeedWeight;
+    }
+
+    public float getSeedPacketExpirySeconds() {
+        return seedPacketExpirySeconds;
+    }
+
+    public void setSeedPacketExpirySeconds(float seedPacketExpirySeconds) {
+        this.seedPacketExpirySeconds = seedPacketExpirySeconds;
+    }
+
+    public String getGiantVaseZombie() {
+        return giantVaseZombie;
+    }
+
+    public void setGiantVaseZombie(String giantVaseZombie) {
+        this.giantVaseZombie = giantVaseZombie;
+    }
+
+    public List<String> getVaseZombies() {
+        return vaseZombies;
+    }
+
+    public void setVaseZombies(List<String> vaseZombies) {
+        this.vaseZombies = vaseZombies;
+    }
+
+    public List<String> getVasePlants() {
+        return vasePlants;
+    }
+
+    public void setVasePlants(List<String> vasePlants) {
+        this.vasePlants = vasePlants;
+    }
 
     // --- I, Zombie specific keys ---
 
@@ -95,14 +170,29 @@ public class MiniGameDataEntry extends LevelDataEntry {
     /** Definition name of the stationary sun-producing zombie. */
     private String sunZombie = "ZombieIZombieSun";
 
-    public List<IZombieZombieData> getPlaceableZombies() { return placeableZombies; }
-    public void setPlaceableZombies(List<IZombieZombieData> placeableZombies) { this.placeableZombies = placeableZombies; }
+    public List<IZombieZombieData> getPlaceableZombies() {
+        return placeableZombies;
+    }
 
-    public List<IZombiePlantData> getPrePlantedPlants() { return prePlantedPlants; }
-    public void setPrePlantedPlants(List<IZombiePlantData> prePlantedPlants) { this.prePlantedPlants = prePlantedPlants; }
+    public void setPlaceableZombies(List<IZombieZombieData> placeableZombies) {
+        this.placeableZombies = placeableZombies;
+    }
 
-    public String getSunZombie() { return sunZombie; }
-    public void setSunZombie(String sunZombie) { this.sunZombie = sunZombie; }
+    public List<IZombiePlantData> getPrePlantedPlants() {
+        return prePlantedPlants;
+    }
+
+    public void setPrePlantedPlants(List<IZombiePlantData> prePlantedPlants) {
+        this.prePlantedPlants = prePlantedPlants;
+    }
+
+    public String getSunZombie() {
+        return sunZombie;
+    }
+
+    public void setSunZombie(String sunZombie) {
+        this.sunZombie = sunZombie;
+    }
 
     // --- Beghouled specific keys ---
 
