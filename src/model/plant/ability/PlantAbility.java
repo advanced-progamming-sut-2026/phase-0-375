@@ -23,4 +23,12 @@ public interface PlantAbility extends Ability {
      * activates plant food on this plant.
      */
     void onPlantFood(PlantInstance plant, PlantAbilityContext context);
+
+    /**
+     * Optional per-shot cooldown override. Called by
+     * {@code PlantInstance.executeAbility} after {@link #execute} returns.
+     */
+    default float getNextActionCooldown(PlantInstance plant) {
+        return -1f;
+    }
 }

@@ -11,6 +11,7 @@ import model.item.placeable.Placeable;
 import model.item.pushable.Pushable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
+import model.projectile.BowlingBulb;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.projectile.Splash;
@@ -20,6 +21,8 @@ import model.zombie.instance.ZombieInstance;
 
 import model.game.map.Cell;
 import model.game.map.terrain.IceTerrainStrategy;
+
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,9 @@ public class ProjectileSystem implements Tickable {
 
     private final GameModel gameModel;
     private final EventBus eventBus;
+
+    private static final float DIAGONAL = (float) (1.0 / Math.sqrt(2.0));
+    private static final int BULB_EXPLOSION_RADIUS = 1;
 
     /**
      * Tracks the last ice-cell column each projectile has already damaged,
@@ -52,6 +58,10 @@ public class ProjectileSystem implements Tickable {
             if (projectile == null) continue;
 
             moveProjectile(projectile, deltaTime);
+
+            if (projectile instanceof BowlingBulb) {
+                bounceOffLaneEdges((BowlingBulb) projectile);
+            }
             applyTorchwood(projectile);
 
             // Fire peas melt ice terrain they cross (Frostbite Caves).
@@ -85,6 +95,12 @@ public class ProjectileSystem implements Tickable {
             // Splash projectiles apply AoE damage around the impact point.
             if (projectile instanceof Splash) {
                 applySplashDamage((Splash) projectile, target);
+            }
+
+            // Bowling Bulbs either detonate or deflect and keep rolling.
+            if (projectile instanceof BowlingBulb) {
+                handleBulbCollision((BowlingBulb) projectile, target);
+                continue;
             }
 
             if (!projectile.pierce()) {
@@ -207,6 +223,8 @@ public class ProjectileSystem implements Tickable {
         float projX = projectile.getX();
         float tolerance = 0.5f;
         boolean isPlantFired = projectile.getSourcePlant() != null;
+        boolean isBowlingBulb = projectile instanceof BowlingBulb;
+        BowlingBulb bulb = isBowlingBulb ? (BowlingBulb) projectile : null;
 
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(lane);
         ZombieInstance best = null;
@@ -214,6 +232,9 @@ public class ProjectileSystem implements Tickable {
 
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
+
+            // Bowling Bulbs never damage the same zombie twice.
+            if (bulb != null && bulb.hasAlreadyHit(zombie)) continue;
 
             if (isPlantFired && zombie.isHypnotized()) {
                 continue;
@@ -359,6 +380,93 @@ public class ProjectileSystem implements Tickable {
             zombie.applyChill();
             zombie.applyChill();
             zombie.applyChill();
+        }
+    }
+
+    // --- Bowling Bulb physics ---
+
+    private void handleBulbCollision(BowlingBulb bulb, ZombieInstance target) {
+        bulb.markHit(target);
+        bulb.incrementHitCount();
+
+        if (bulb.isExplosive()) {
+            explodeBulb(bulb, target);
+            gameModel.removeProjectile(bulb);
+            iceDamagedColumns.remove(bulb);
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+            }
+            return;
+        }
+
+        bulb.consumeBounce();
+        if (bulb.canBounce()) {
+            deflectBulb(bulb);
+            return;
+        }
+        // Bounces exhausted: bulb is consumed on this hit.
+        gameModel.removeProjectile(bulb);
+        iceDamagedColumns.remove(bulb);
+        if (eventBus != null) {
+            eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+        }
+    }
+
+    /** Reflects a Bowling Bulb when it crosses the top or bottom edge of the lawn. */
+    private void bounceOffLaneEdges(BowlingBulb bulb) {
+        int rows = gameModel.getRowCount();
+        if (rows <= 0) return;
+        float y = bulb.getY();
+        if (y < 0f) {
+            bulb.setY(-y);
+            bulb.setYVelocity(-bulb.getYVelocity());
+        } else if (y > rows - 1) {
+            bulb.setY(2 * (rows - 1) - y);
+            bulb.setYVelocity(-bulb.getYVelocity());
+        }
+        int newRow = Math.round(bulb.getY());
+        if (newRow != bulb.getRow()) {
+            bulb.setRow(newRow);
+        }
+    }
+
+    private void deflectBulb(BowlingBulb bulb) {
+        float speed = bulb.getVelocity();
+        if (bulb.getYVelocity() != 0f) {
+            speed = (float) Math.sqrt(
+                    bulb.getVelocity() * bulb.getVelocity() + bulb.getYVelocity() * bulb.getYVelocity()
+            );
+        }
+        if (bulb.getHitCount() <= 1 || bulb.getYVelocity() == 0f) {
+            int rows = gameModel.getRowCount();
+            float sign = (rows <= 1)
+                    ? 1f
+                    : (bulb.getY() <= (rows - 1) / 2f ? 1f : -1f);
+            bulb.setVelocity(speed * DIAGONAL);
+            bulb.setYVelocity(sign * speed * DIAGONAL);
+        } else {
+            bulb.setYVelocity(-bulb.getYVelocity());
+        }
+    }
+
+    private void explodeBulb(BowlingBulb bulb, ZombieInstance primaryTarget) {
+        int centerRow = bulb.getRow();
+        int centerCol = Math.round(bulb.getX());
+        int damage = bulb.getDamage();
+        if (damage <= 0) return;
+
+        List<ZombieInstance> zombies = gameModel.getZombies();
+        if (zombies == null) return;
+        for (ZombieInstance zombie : new ArrayList<>(zombies)) {
+            if (zombie == null || zombie.isDead()) continue;
+            if (zombie == primaryTarget) continue;
+            int zRow = Math.round(zombie.getContinuousY());
+            int zCol = Math.round(zombie.getContinuousX());
+            if (Math.abs(zRow - centerRow) <= BULB_EXPLOSION_RADIUS
+                    && Math.abs(zCol - centerCol) <= BULB_EXPLOSION_RADIUS) {
+                zombie.setLastDamageSource(bulb);
+                gameModel.damageZombie(zombie, damage, bulb.getSourcePlant());
+            }
         }
     }
     // --- Ice-terrain melting ---

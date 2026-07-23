@@ -32,7 +32,7 @@ public class PlantInstance implements Placeable {
     private float lifespanRemaining;                   // -1 = infinite
     private float plantFoodDurationRemaining;
     private boolean pendingPlantFoodEffect;            // true when activatePlantFood() (no-arg) was called and
-                                                       // the effect still needs to fire on the next tick
+    // the effect still needs to fire on the next tick
 
     /** Per-ability runtime state. Keyed by ability type from the definition. */
     private final Map<PlantAbilityType, AbilityState> abilityStates;
@@ -229,7 +229,10 @@ public class PlantInstance implements Placeable {
             if (definition.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE && state.isArmed()) {
                 state.setCooldownRemaining(0);
             } else {
-                state.setCooldownRemaining(definition.getActionInterval());
+                float custom = strategy.getNextActionCooldown(this);
+                state.setCooldownRemaining(custom >= 0f
+                        ? Math.max(0f, custom)
+                        : definition.getActionInterval());
             }
         }
     }

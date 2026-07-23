@@ -1,17 +1,18 @@
 package model.plant.ability;
 
+import model.enums.BowlingBulbType;
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.enums.PlantFoodType;
 import model.enums.PlantTags;
 import model.game.map.FloatPoint;
 import model.plant.definition.Plant;
+import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
+import model.projectile.BowlingBulb;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
-import model.zombie.instance.ZombieInstance;
 
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -25,6 +26,12 @@ public class ShooterAbility implements PlantAbility {
     private static final float PELLET_SPAWN_OFFSET = 0.5f;
 
     private static final int GIANT_PEA_DAMAGE_MULTIPLIER = 20;
+
+    // --- Bowling Bulb constants ---
+
+    private static final float BULB_VELOCITY = 2.0f;
+    private static final float BULB_BASE_ACTION_INTERVAL = 2.0f;
+    private static final int BULB_PLANT_FOOD_BOUNCES = 3;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.SHOOTER; }
@@ -43,6 +50,14 @@ public class ShooterAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!shouldFire(plant, context)) return;
 
+        Projectile.Element element = inferElement(def);
+        FloatPoint origin = pelletOrigin(plant);
+
+        if (isBowlingBulb(def)) {
+            shootBowlingBulb(context, plant, origin);
+            return;
+        }
+
         int pelletCount;
         if (def.hasTag(PlantTags.STACK)) {
             pelletCount = plant.getStackCount();
@@ -50,9 +65,6 @@ public class ShooterAbility implements PlantAbility {
             pelletCount = (int) def.getAbilityValue();
         }
         if (pelletCount <= 0) pelletCount = 1;
-
-        Projectile.Element element = inferElement(def);
-        FloatPoint origin = pelletOrigin(plant);
 
         if (isThreepeater(def)) {
             shootThreepeater(context, plant, pelletCount, origin, element);
@@ -68,11 +80,28 @@ public class ShooterAbility implements PlantAbility {
     }
 
     @Override
+    public float getNextActionCooldown(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def == null || !isBowlingBulb(def)) return -1f;
+
+        AbilityState state = plant.getAbilityState(def.getAbilityType());
+        int cycleIndex = (state != null) ? state.getGrowthStage() : 0;
+        BowlingBulbType firedType = bulbTypeForCycleIndex((cycleIndex - 1 + 3) % 3);
+        return bulbCooldown(plant, firedType);
+    }
+
+    @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
         if (def.getPlantFoodType() != PlantFoodType.PROJECTILE_BURST) {
             return;
         }
+
+        if (isBowlingBulb(def)) {
+            bowlingBulbPlantFood(plant, context);
+            return;
+        }
+
         int volley = (int) def.getPlantFoodValue();
         if (def.hasTag(PlantTags.STACK)) {
             volley = volley * plant.getStackCount();
@@ -146,6 +175,86 @@ public class ShooterAbility implements PlantAbility {
         return def.getName().toLowerCase().contains("starfruit");
     }
 
+    private boolean isBowlingBulb(Plant def) {
+        return def.getName() != null
+                && def.getName().toLowerCase().contains("bowling bulb");
+    }
+
+    // --- Bowling Bulb ---
+
+    private void shootBowlingBulb(PlantAbilityContext context, PlantInstance plant,
+                                  FloatPoint origin) {
+        Plant def = plant.getDefinition();
+        AbilityState state = plant.getAbilityState(def.getAbilityType());
+        if (state == null) {
+            state = new AbilityState(def.getAbilityType());
+            plant.getAbilityStates().put(def.getAbilityType(), state);
+        }
+
+        int cycleIndex = state.getGrowthStage() % 3;
+        if (cycleIndex < 0) cycleIndex = 0;
+        BowlingBulbType type = bulbTypeForCycleIndex(cycleIndex);
+
+        int damage = bulbDamage(plant, type);
+        int row = plant.getPosition().getY();
+
+        BowlingBulb bulb = new BowlingBulb(
+                damage,
+                new FloatPoint(origin.getX(), origin.getY()),
+                row,
+                BULB_VELOCITY,
+                type,
+                type.getMaxBounces());
+        context.spawnProjectile(bulb, bulb.getX(), bulb.getY());
+        state.setGrowthStage((cycleIndex + 1) % 3);
+    }
+
+    private void bowlingBulbPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return;
+        Plant def = plant.getDefinition();
+        int row = plant.getPosition().getY();
+        float originX = plant.getPosition().getX() + PELLET_SPAWN_OFFSET;
+        int damage = (int) def.getPlantFoodValue();
+        if (damage <= 0) damage = def.getDamage() * 3;
+
+        for (int i = 0; i < 3; i++) {
+            if (row < 0 || row >= context.getRowCount()) continue;
+
+            BowlingBulb bulb = new BowlingBulb(
+                    damage,
+                    new FloatPoint(originX + i * 0.2f, row),
+                    row,
+                    BULB_VELOCITY,
+                    BowlingBulbType.ORANGE,
+                    BULB_PLANT_FOOD_BOUNCES);
+            bulb.setExplosive(true);
+            context.spawnProjectile(bulb, bulb.getX(), bulb.getY());
+        }
+    }
+
+    /** Maps a cycle index (0..2) to its bulb type. */
+    private BowlingBulbType bulbTypeForCycleIndex(int cycleIndex) {
+        switch (cycleIndex) {
+            case 1: return BowlingBulbType.BLUE;
+            case 2: return BowlingBulbType.ORANGE;
+            default: return BowlingBulbType.CYAN;
+        }
+    }
+
+    /** Resolves a bulb's damage. */
+    private int bulbDamage(PlantInstance plant, BowlingBulbType type) {
+        Plant def = plant.getDefinition();
+        int buffDelta = def.getDamage() - BowlingBulbType.CYAN.getBaseDamage();
+        return type.getBaseDamage() + Math.max(0, buffDelta);
+    }
+
+    /** Resolves a bulb's regenerate cooldown. */
+    private float bulbCooldown(PlantInstance plant, BowlingBulbType type) {
+        Plant def = plant.getDefinition();
+        float reduction = BULB_BASE_ACTION_INTERVAL - def.getActionInterval();
+        return Math.max(0f, type.getBaseCooldownSeconds() - Math.max(0f, reduction));
+    }
+
     private void shootOne(PlantAbilityContext context, int damage, FloatPoint origin, int row,
                           float velocity, Projectile.Element element, int direction, float yVelocity) {
         Pellet pellet = new Pellet(
@@ -180,7 +289,7 @@ public class ShooterAbility implements PlantAbility {
     }
 
     private void shootSplitPea(PlantAbilityContext context, PlantInstance plant, int pelletCount,
-                                  FloatPoint origin, Projectile.Element element) {
+                               FloatPoint origin, Projectile.Element element) {
         for (int i = 0; i < pelletCount; i++) {
             FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.1f, origin.getY());
             shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
@@ -200,7 +309,7 @@ public class ShooterAbility implements PlantAbility {
     }
 
     private void shootStarfruit(PlantAbilityContext context, PlantInstance plant, int pelletCount,
-                               FloatPoint origin, Projectile.Element element) {
+                                FloatPoint origin, Projectile.Element element) {
         shootOne(context, plant.getDefinition().getDamage(), origin,
                 plant.getPosition().getY(), PELLET_VELOCITY, element,
                 -1, 0);
