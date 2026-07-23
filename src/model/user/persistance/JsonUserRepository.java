@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import model.enums.Chapter;
+import model.plant.PlantFactory;
+import model.shop.Shop;
 import model.user.User;
 
 import java.io.File;
@@ -15,6 +17,7 @@ public class JsonUserRepository implements UserRepository {
 
     private static final String DATA_DIR = "data";
     private static final String FILE_PATH = DATA_DIR + "/users.json";
+    private static final String PLANTS_JSON = "/assets/data/plants/plants.json";
 
     private final ObjectMapper mapper;
     private List<User> users;
@@ -43,6 +46,11 @@ public class JsonUserRepository implements UserRepository {
         migrateStarterPlants();
     }
 
+    /**
+     * Accounts registered before the starter kit existed may miss (some of)
+     * the starter plants; merge them in so the shop is usable for everyone.
+     * Idempotent: already-unlocked plants are untouched.
+     */
     private void migrateStarterPlants() {
         for (User u : users) {
             if (u.getUnlockedPlants() == null) {
@@ -260,59 +268,105 @@ public class JsonUserRepository implements UserRepository {
     }
 
     /**
-     * TODO: PlantFood cost validation — stub returns true.
+     * Returns false when the user does not exist or the cap is already reached
      */
     @Override
     public boolean addPlantFood(String username) {
-        findByUsername(username).ifPresent(u -> u.setPlantFoodCount(u.getPlantFoodCount() + 1));
+        Optional<User> opt = findByUsername(username);
+        if (opt.isEmpty()) {
+            return false;
+        }
+        User u = opt.get();
+        int current = Math.max(0, u.getPlantFoodCount());
+        if (current >= Shop.MAX_PLANT_FOOD) {
+            return false;
+        }
+        u.setPlantFoodCount(current + 1);
         flush();
         return true;
     }
 
-    /**
-     * TODO: PlantFood count validation — stub checks > 0.
-     */
     @Override
     public boolean usePlantFood(String username) {
         Optional<User> opt = findByUsername(username);
-        if (opt.isPresent()) {
-            User u = opt.get();
-            if (u.getPlantFoodCount() > 0) {
-                u.setPlantFoodCount(u.getPlantFoodCount() - 1);
-                flush();
-                return true;
-            }
+        if (opt.isEmpty()) {
+            return false;
         }
-        return false;
+        User u = opt.get();
+        int current = u.getPlantFoodCount();
+        if (current <= 0) {
+            if (current < 0) {
+                u.setPlantFoodCount(0);
+                flush();
+            }
+            return false;
+        }
+        u.setPlantFoodCount(current - 1);
+        flush();
+        return true;
     }
 
-    /**
-     * TODO: PlantRegistry integration — stub stores boost.
-     */
     @Override
     public void storePlantBoost(String username, String plantName) {
+        String canonical = resolvePlantName(plantName);
+        if (canonical == null) {
+            return; // unknown plant — nothing to store
+        }
         findByUsername(username).ifPresent(u -> {
-            if (u.getPlantBoosts() != null) u.getPlantBoosts().put(plantName, true);
+            if (u.getPlantBoosts() == null) {
+                u.setPlantBoosts(new HashMap<>());
+            }
+            u.getPlantBoosts().put(canonical, true);
+            flush();
         });
-        flush();
     }
 
-    /**
-     * TODO: PlantRegistry integration — stub checks + consumes.
-     */
     @Override
     public boolean consumePlantBoost(String username, String plantName) {
+        String canonical = resolvePlantName(plantName);
+        if (canonical == null) {
+            return false;
+        }
         Optional<User> opt = findByUsername(username);
         if (opt.isPresent()) {
             User u = opt.get();
-            Boolean boost = u.getPlantBoosts() != null ? u.getPlantBoosts().get(plantName) : null;
+            Boolean boost = u.getPlantBoosts() != null ? u.getPlantBoosts().get(canonical) : null;
             if (Boolean.TRUE.equals(boost)) {
-                u.getPlantBoosts().put(plantName, false);
+                u.getPlantBoosts().put(canonical, false);
                 flush();
                 return true;
             }
         }
         return false;
+    }
+
+    private String resolvePlantName(String plantName) {
+        if (plantName == null || plantName.trim().isEmpty()) {
+            return null;
+        }
+        String trimmed = plantName.trim();
+        try {
+            ensurePlantDefinitionsLoaded();
+            if (PlantFactory.hasDefinition(trimmed)) {
+                return trimmed;
+            }
+            for (var definition : PlantFactory.getAllDefinitions()) {
+                if (definition.getName().equalsIgnoreCase(trimmed)) {
+                    return definition.getName();
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            // Definitions unavailable — treat every name as unknown.
+        }
+        return null;
+    }
+
+    private void ensurePlantDefinitionsLoaded() throws IOException {
+        try {
+            PlantFactory.getAllDefinitions();
+        } catch (RuntimeException notLoaded) {
+            PlantFactory.init(PLANTS_JSON);
+        }
     }
 
     @Override
