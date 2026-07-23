@@ -4,9 +4,14 @@ import model.enums.Chapter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 public class User {
+    public static final Set<String> STARTER_PLANTS = Set.of("Sunflower", "Peashooter", "Wall-nut", "Potato Mine");
+
     private String username;
     private String passwordHash;
     private String nickname;

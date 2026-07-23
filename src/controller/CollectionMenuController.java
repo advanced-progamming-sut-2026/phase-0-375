@@ -67,7 +67,8 @@ public class CollectionMenuController extends AppMenuController {
         ensureDefinitionsLoaded();
         // old saves may miss these sets; init them so purchases persist
         if (user.getUnlockedPlants() == null) {
-            user.setUnlockedPlants(new HashSet<>());
+            // Old saves miss this set; seed it with the starter kit.
+            user.setUnlockedPlants(new HashSet<>(User.STARTER_PLANTS));
         }
         if (user.getUnlockedZombies() == null) {
             user.setUnlockedZombies(new HashSet<>());

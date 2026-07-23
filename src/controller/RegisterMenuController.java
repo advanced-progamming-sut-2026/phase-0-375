@@ -142,7 +142,7 @@ public class RegisterMenuController extends AppMenuController {
         user.setUnlockedPots(Greenhouse.DEFAULT_UNLOCKED_POTS);
 
         user.setChapterProgress(new HashMap<>());
-        user.setUnlockedPlants(new HashSet<>());
+        user.setUnlockedPlants(new HashSet<>(User.STARTER_PLANTS));
         user.setUnlockedZombies(new HashSet<>());
         user.setUnlockedMiniGames(new HashSet<>());
         user.setSeedPackets(new HashMap<>());
