@@ -77,7 +77,10 @@ public final class TuiShell {
 
     private TuiShell(Terminal terminal) {
         this.terminal = terminal;
-        this.lineReader = LineReaderBuilder.builder().terminal(terminal).build();
+        this.lineReader = LineReaderBuilder.builder()
+                .terminal(terminal)
+                .option(LineReader.Option.ERASE_LINE_ON_FINISH, true)
+                .build();
         this.display = new Display(terminal, true);
         terminal.puts(InfoCmp.Capability.enter_ca_mode); // alternate screen buffer
         terminal.flush();
@@ -136,7 +139,8 @@ public final class TuiShell {
         } catch (UserInterruptException | EndOfFileException e) {
             return null;
         } finally {
-            // The line reader drew over our frame; force a full repaint next time.
+            terminal.puts(InfoCmp.Capability.clear_screen);
+            terminal.flush();
             display.reset();
         }
     }
