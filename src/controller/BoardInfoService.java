@@ -86,52 +86,57 @@ final class BoardInfoService {
             StringBuilder row = new StringBuilder("  Row " + r + ": ");
             for (int c = 0; c < map.getCols(); c++) {
                 Cell cell = map.getCell(c, r);
-                char ch = '.';
-                if (cell != null) {
-                    // Terrain first (lowest layer): water, low tide, slides, necromancy, ice.
-                    ch = terrainChar(cell.getGroundType());
-
-                    // Graves sit on the field and hide the terrain under them.
-                    for (PlacableLayer layer : PlacableLayer.values()) {
-                        if (cell.getPlaceable(layer) instanceof Grave) {
-                            ch = 'T';
-                            break;
-                        }
-                    }
-
-                    // Render every plant layer so stacked tiles are visible: GROUND (Lily Pad) -> 'G', (regular plant)
-                    // -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell with both MAIN and OVERLAY becomes 'B' (both).
-                    boolean hasGround = cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance;
-                    boolean hasMain = cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance;
-                    boolean hasOverlay = cell.getPlaceable(PlacableLayer.OVERLAY) instanceof PlantInstance;
-                    if (hasMain && hasOverlay) ch = 'B';
-                    else if (hasMain) ch = 'P';
-                    else if (hasOverlay) ch = 'O';
-                    else if (hasGround) ch = 'G';
-
-                    for (ZombieInstance z : model.getZombies()) {
-                        var gp = z.getGridPosition();
-                        if (gp != null && gp.getX() == c && gp.getY() == r) {
-                            ch = (ch == 'P' || ch == 'O' || ch == 'B') ? 'X' : 'Z';
-                            break;
-                        }
-                    }
-                }
-                row.append(ch).append(' ');
+                row.append(cell != null ? cellChar(model, cell, c, r) : '.').append(' ');
             }
             sb.append(row).append('\n');
         }
         sb.append("Legend: P plant  O overlay plant  B both  G ground plant  Z zombie  X zombie on plant\n");
         sb.append("        T grave  ~ water  _ low tide  ^ slide up  v slide down  N necromancy  * ice  . empty\n");
-        // Sun tokens on the ground
-        if (!model.getActiveSuns().isEmpty()) {
-            sb.append("Sun tokens on the ground:\n");
-            for (Sun s : model.getActiveSuns()) {
-                sb.append("  (").append(s.getX()).append(", ").append(s.getY())
-                        .append(") value=").append(s.getValue()).append('\n');
+        appendSunTokens(sb, model);
+        return CommandResult.successWithData(sb.toString(), sb.toString());
+    }
+
+    /** Resolves the single map symbol for one cell: terrain, then grave, then plants, then zombies. */
+    private char cellChar(GameModel model, Cell cell, int c, int r) {
+        // Terrain first (lowest layer): water, low tide, slides, necromancy, ice.
+        char ch = terrainChar(cell.getGroundType());
+
+        // Graves sit on the field and hide the terrain under them.
+        for (PlacableLayer layer : PlacableLayer.values()) {
+            if (cell.getPlaceable(layer) instanceof Grave) {
+                ch = 'T';
+                break;
             }
         }
-        return CommandResult.successWithData(sb.toString(), sb.toString());
+
+        // Render every plant layer so stacked tiles are visible: GROUND (Lily Pad) -> 'G', (regular plant)
+        // -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell with both MAIN and OVERLAY becomes 'B' (both).
+        boolean hasGround = cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance;
+        boolean hasMain = cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance;
+        boolean hasOverlay = cell.getPlaceable(PlacableLayer.OVERLAY) instanceof PlantInstance;
+        if (hasMain && hasOverlay) ch = 'B';
+        else if (hasMain) ch = 'P';
+        else if (hasOverlay) ch = 'O';
+        else if (hasGround) ch = 'G';
+
+        for (ZombieInstance z : model.getZombies()) {
+            var gp = z.getGridPosition();
+            if (gp != null && gp.getX() == c && gp.getY() == r) {
+                ch = (ch == 'P' || ch == 'O' || ch == 'B') ? 'X' : 'Z';
+                break;
+            }
+        }
+        return ch;
+    }
+
+    /** Lists any uncollected sun tokens lying on the field. */
+    private void appendSunTokens(StringBuilder sb, GameModel model) {
+        if (model.getActiveSuns().isEmpty()) return;
+        sb.append("Sun tokens on the ground:\n");
+        for (Sun s : model.getActiveSuns()) {
+            sb.append("  (").append(s.getX()).append(", ").append(s.getY())
+                    .append(") value=").append(s.getValue()).append('\n');
+        }
     }
 
     /** Maps a cell's ground type to its map symbol. */

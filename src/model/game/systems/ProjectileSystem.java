@@ -54,64 +54,76 @@ public class ProjectileSystem implements Tickable {
         if (projectiles == null || projectiles.isEmpty()) return;
 
         Projectile[] snapshot = projectiles.toArray(new Projectile[0]);
-
         for (Projectile projectile : snapshot) {
             if (projectile == null) continue;
+            if (tickProjectile(projectile, deltaTime)) return;
+        }
+    }
 
-            moveProjectile(projectile, deltaTime);
+    /**
+     * Advances one projectile: movement, terrain interactions, bounds check
+     * and collision handling.
+     *
+     * @return true if the whole tick must stop early (a pellet consumed the
+     *         frame by hitting a grid item), preserving the original behavior
+     */
+    private boolean tickProjectile(Projectile projectile, float deltaTime) {
+        moveProjectile(projectile, deltaTime);
 
-            if (projectile instanceof BowlingBulb) {
-                bounceOffLaneEdges((BowlingBulb) projectile);
-            }
-            applyTorchwood(projectile);
+        if (projectile instanceof BowlingBulb) {
+            bounceOffLaneEdges((BowlingBulb) projectile);
+        }
+        applyTorchwood(projectile);
 
-            // Fire peas melt ice terrain they cross (Frostbite Caves).
-            damageIceIfPresent(projectile);
-            thawFrozenPlantIfPresent(projectile);
+        // Fire peas melt ice terrain they cross (Frostbite Caves).
+        damageIceIfPresent(projectile);
+        thawFrozenPlantIfPresent(projectile);
 
-            float x = projectile.getX();
-            if (x < 0f || x >= gameModel.getColumnCount()) {
-                gameModel.removeProjectile(projectile);
-                iceDamagedColumns.remove(projectile);
-                continue;
-            }
+        float x = projectile.getX();
+        if (x < 0f || x >= gameModel.getColumnCount()) {
+            discard(projectile, false);
+            return false;
+        }
 
-            if (projectile instanceof Pellet && hitGridItemsIfAny(projectile)) {
-                gameModel.removeProjectile(projectile);
-                iceDamagedColumns.remove(projectile);
+        if (projectile instanceof Pellet && hitGridItemsIfAny(projectile)) {
+            discard(projectile, true);
+            return true;
+        }
 
-                if (eventBus != null) {
-                    eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
-                }
-                return;
-            }
-            ZombieInstance target = findCollision(projectile);
-            if (target == null) {
-                continue;
-            }
+        ZombieInstance target = findCollision(projectile);
+        if (target != null) {
+            handleZombieHit(projectile, target);
+        }
+        return false;
+    }
 
-            applyDamage(projectile, target);
-            applyOnHitEffects(projectile, target);
+    /** Applies damage and on-hit effects once a projectile reaches a zombie. */
+    private void handleZombieHit(Projectile projectile, ZombieInstance target) {
+        applyDamage(projectile, target);
+        applyOnHitEffects(projectile, target);
 
-            // Splash projectiles apply AoE damage around the impact point.
-            if (projectile instanceof Splash) {
-                applySplashDamage((Splash) projectile, target);
-            }
+        // Splash projectiles apply AoE damage around the impact point.
+        if (projectile instanceof Splash) {
+            applySplashDamage((Splash) projectile, target);
+        }
 
-            // Bowling Bulbs either detonate or deflect and keep rolling.
-            if (projectile instanceof BowlingBulb) {
-                handleBulbCollision((BowlingBulb) projectile, target);
-                continue;
-            }
+        // Bowling Bulbs either detonate or deflect and keep rolling.
+        if (projectile instanceof BowlingBulb) {
+            handleBulbCollision((BowlingBulb) projectile, target);
+            return;
+        }
 
-            if (!projectile.pierce()) {
-                gameModel.removeProjectile(projectile);
-                iceDamagedColumns.remove(projectile);
+        if (!projectile.pierce()) {
+            discard(projectile, true);
+        }
+    }
 
-                if (eventBus != null) {
-                    eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
-                }
-            }
+    /** Removes a projectile from play, optionally announcing the hit. */
+    private void discard(Projectile projectile, boolean dispatchHitEvent) {
+        gameModel.removeProjectile(projectile);
+        iceDamagedColumns.remove(projectile);
+        if (dispatchHitEvent && eventBus != null) {
+            eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
         }
     }
 

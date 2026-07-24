@@ -35,6 +35,7 @@ import model.zombie.ZombieFactory;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
+import view.tui.TuiShell;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +52,11 @@ public class GameModel implements BehaviorContext {
     private int difficultyLevel;
     private GameState gameState;
     private Chapter chapter;
+
+    /** Per-plant-type seed packet cooldowns (seconds remaining). Empty = all seeds ready. */
+    private final Map<String, Float> seedCooldowns = new HashMap<>();
+    /** Set by `cheat remove-cooldown` — disables seed cooldowns for the rest of the level. */
+    private boolean seedCooldownsDisabled = false;
 
     private Level currentLevel;
     private WaveManager waveManager;
@@ -134,6 +140,38 @@ public class GameModel implements BehaviorContext {
 
     public int getDifficulty() {
         return difficultyLevel;
+    }
+
+    public float difficultyBoost() {
+        return difficultyLevel / 3.0f;
+    }
+
+    public float difficultyPenalty() {
+        return 3.0f / difficultyLevel;
+    }
+
+    // Seed packet cooldowns
+
+    public boolean isSeedReady(String plantName) {
+        if (seedCooldownsDisabled) return true;
+        Float remaining = seedCooldowns.get(plantName);
+        return remaining == null || remaining <= 0f;
+    }
+
+    public float getSeedCooldown(String plantName) {
+        if (seedCooldownsDisabled) return 0f;
+        Float remaining = seedCooldowns.get(plantName);
+        return remaining == null ? 0f : remaining;
+    }
+
+    public void startSeedRecharge(String plantName, float seconds) {
+        if (seedCooldownsDisabled || seconds <= 0f) return;
+        seedCooldowns.put(plantName, seconds);
+    }
+
+    public void disableSeedCooldowns() {
+        seedCooldownsDisabled = true;
+        seedCooldowns.clear();
     }
 
     public Level getCurrentLevel() { return currentLevel; }
@@ -252,6 +290,7 @@ public class GameModel implements BehaviorContext {
 
     public void spawnZombie(Zombie zombie, int lane) {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
+        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         recordZombieSeen(zombie.getName());
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
         instance.setGridPosition(new Point(gameMap.getCols(), lane));
@@ -269,6 +308,7 @@ public class GameModel implements BehaviorContext {
      */
     public void spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
+        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         recordZombieSeen(zombie.getName());
         int col = Math.max(0, gameMap.getCols() - Math.max(1, columnsAhead));
         instance.setContinuousPosition(new FloatPoint(col, lane));
@@ -298,11 +338,13 @@ public class GameModel implements BehaviorContext {
             return;
         }
         if (wave.isFinalWave()) {
-            System.out.println("[Wave] FINAL WAVE (wave " + wave.getWaveNumber() + ") is approaching!");
+            TuiShell.getActive().log("[Wave] FINAL WAVE (wave " + wave.getWaveNumber() + ") is approaching!");
         } else if (wave.isHugeWave()) {
-            System.out.println("[Wave] A HUGE wave of zombies (wave " + wave.getWaveNumber() + ") is approaching!");
+            TuiShell.getActive().log(
+                    "[Wave] A HUGE wave of zombies (wave " + wave.getWaveNumber() + ") is approaching!"
+            );
         } else {
-            System.out.println("[Wave] Wave " + wave.getWaveNumber() + " started!");
+            TuiShell.getActive().log("[Wave] Wave " + wave.getWaveNumber() + " started!");
         }
     }
 
@@ -312,6 +354,7 @@ public class GameModel implements BehaviorContext {
         if (instance == null) {
             return null;
         }
+        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         recordZombieSeen(instance.getDefinition() != null
                 ? instance.getDefinition().getName() : zombieDefinitionName);
 
@@ -365,6 +408,15 @@ public class GameModel implements BehaviorContext {
         elapsedSeconds += deltaTime;
         if (chapterEffects != null) {
             chapterEffects.tick(deltaTime);
+        }
+        if (!seedCooldowns.isEmpty()) {
+            Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, Float> e = it.next();
+                float remaining = e.getValue() - deltaTime;
+                if (remaining <= 0f) it.remove();
+                else e.setValue(remaining);
+            }
         }
     }
 

@@ -75,7 +75,7 @@ final class PlantingService {
             return CommandResult.error(conveyor
                     ? "Plant '" + type + "' is not on the conveyor belt right now."
                     : "Plant '" + type + "' is not in your selection."
-                            + " Add it from the plant selection menu.");
+                    + " Add it from the plant selection menu.");
         }
 
         return plantSelected(model, conveyor, selected, type, x, y);
@@ -154,6 +154,12 @@ final class PlantingService {
             instance.applyLevelUpgrade(level);
         }
 
+        // --- Seed packet recharge (skipped for conveyor — seeds come from the belt) ---
+        if (!conveyor && !model.isSeedReady(definition.getName())) {
+            return CommandResult.error("'" + type + "' is recharging. "
+                    + String.format("%.1f", model.getSeedCooldown(definition.getName())) + "s left.");
+        }
+
         // --- Sun cost (leveled definition may discount it) ---
         int cost = conveyor ? 0 : instance.getDefinition().getCost();
         if (!model.spendSun(cost)) {
@@ -175,6 +181,8 @@ final class PlantingService {
         }
         if (conveyor) {
             selected.remove(type); // consume the seed packet from the belt
+        } else {
+            model.startSeedRecharge(definition.getName(), instance.getDefinition().getRechargeTime());
         }
         String note = consumeBoostIfAny(instance) ? " Boost consumed: plant food activated!" : "";
         String stackNote = definition.hasTag(PlantTags.STACK)
@@ -212,6 +220,10 @@ final class PlantingService {
             return CommandResult.error("'" + type + "' at (" + x + ", " + y
                     + ") is already at its max stack of " + limit + ".");
         }
+        if (!conveyor && !model.isSeedReady(existing.getDefinition().getName())) {
+            return CommandResult.error("'" + type + "' is recharging. "
+                    + String.format("%.1f", model.getSeedCooldown(existing.getDefinition().getName())) + "s left.");
+        }
         int cost = conveyor ? 0 : existing.getDefinition().getCost();
         if (!model.spendSun(cost)) {
             return CommandResult.error("Not enough sun. Need " + cost
@@ -225,6 +237,8 @@ final class PlantingService {
         }
         if (conveyor) {
             selected.remove(type);
+        } else {
+            model.startSeedRecharge(existing.getDefinition().getName(), existing.getDefinition().getRechargeTime());
         }
         return CommandResult.success("Stacked another '" + type + "' at (" + x + ", " + y
                 + ") for " + cost + " sun. Stack: " + existing.getStackCount()
@@ -376,32 +390,16 @@ final class PlantingService {
     }
 
     /**
-     * Cheat: clears the recharge (cooldown) of all currently placed
-     * plants so they can immediately act again.
+     * Cheat: disables all seed-packet cooldowns for the rest of the level,
+     * so the player can plant any seed at any time without waiting for recharge.
      */
     public CommandResult<Void> cheatRemoveCooldown() {
         CommandResult<Void> guard = guardGameRunning();
         if (guard != null) return guard;
 
         GameModel model = requireGame();
-        GameMap map = model.getMap();
-        int cleared = 0;
-        for (int r = 0; r < map.getRows(); r++) {
-            for (int c = 0; c < map.getCols(); c++) {
-                Cell cell = map.getCell(c, r);
-                if (cell == null) continue;
-                PlantInstance pi = plantAt(cell);
-                if (pi == null) continue;
-                // Reset this instance's recharge so the next ability tick fires
-                // immediately. PlantInstance exposes a setter for currentRecharge.
-                pi.setCurrentRecharge(0f);
-                cleared++;
-            }
-        }
-        if (cleared == 0) {
-            return CommandResult.error("No plants on the field to recharge.");
-        }
-        return CommandResult.success("Removed cooldown for " + cleared + " plant(s).");
+        model.disableSeedCooldowns();
+        return CommandResult.success("Seed cooldowns disabled for the rest of the level.");
     }
 
     /**

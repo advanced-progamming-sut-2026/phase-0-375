@@ -112,30 +112,45 @@ public class MyopointTracker {
     public void onZombieKilled(ZombieInstance zombie, float timeSeconds, long tick) {
         if (zombie == null || finished) return;
 
-        // Base points, scaled by the victim's toughness.
+        awardBaseKill(zombie);
+        awardQuickKillIfAny(zombie, timeSeconds);
+        Object source = zombie.getLastDamageSource();
+        awardMultiKillIfAny(source);
+        awardSimultaneousKills(tick, source);
+        awardComboStreak(timeSeconds);
+    }
+
+    /** Base points, scaled by the victim's toughness. */
+    private void awardBaseKill(ZombieInstance zombie) {
         int toughnessBonus = 0;
         if (zombie.getDefinition() != null) {
             toughnessBonus = Math.max(0, zombie.getDefinition().getBaseHP() / TOUGHNESS_HP_PER_POINT);
         }
         award(KEY_KILLS, BASE_KILL_POINTS + toughnessBonus);
+    }
 
-        // Quick kill: died shortly after spawning.
+    /** Quick kill: died shortly after spawning. */
+    private void awardQuickKillIfAny(ZombieInstance zombie, float timeSeconds) {
         Float spawnTime = spawnTimes.remove(zombie);
         if (spawnTime != null && timeSeconds - spawnTime <= QUICK_KILL_WINDOW_SECONDS) {
             award(KEY_QUICK, QUICK_KILL_BONUS);
         }
+    }
 
-        // Multi-kill: the same source killed more than one zombie.
-        Object source = zombie.getLastDamageSource();
-        if (source != null) {
-            int kills = killsBySource.merge(source, 1, Integer::sum);
-            if (kills >= 2) {
-                award(KEY_MULTI, MULTI_KILL_BONUS);
-            }
+    /** Multi-kill: the same source killed more than one zombie. */
+    private void awardMultiKillIfAny(Object source) {
+        if (source == null) return;
+        int kills = killsBySource.merge(source, 1, Integer::sum);
+        if (kills >= 2) {
+            award(KEY_MULTI, MULTI_KILL_BONUS);
         }
+    }
 
-        // Simultaneous kills: deaths within a small tick window whose sources
-        // are not provably the same (same non-null source is a multi-kill).
+    /**
+     * Simultaneous kills: deaths within a small tick window whose sources
+     * are not provably the same (same non-null source is a multi-kill).
+     */
+    private void awardSimultaneousKills(long tick, Object source) {
         while (!recentKills.isEmpty()
                 && tick - recentKills.peekFirst().tick > SIMULTANEOUS_WINDOW_TICKS) {
             recentKills.removeFirst();
@@ -155,8 +170,10 @@ public class MyopointTracker {
             award(KEY_SIMULTANEOUS, SIMULTANEOUS_BONUS);
         }
         recentKills.addLast(current);
+    }
 
-        // Combo streak: keep killing without a pause.
+    /** Combo streak: keep killing without a pause. */
+    private void awardComboStreak(float timeSeconds) {
         if (timeSeconds - lastKillTime <= COMBO_WINDOW_SECONDS) {
             comboStreak++;
             int step = Math.min(comboStreak, COMBO_MAX_STREAK) - 1;

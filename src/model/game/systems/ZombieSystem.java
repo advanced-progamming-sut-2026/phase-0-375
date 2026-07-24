@@ -201,12 +201,7 @@ public class ZombieSystem implements Tickable {
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         boolean hypnotized = zombie.isHypnotized();
-
-        if (!hypnotized) {
-            if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return;
-            if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return;
-            if (zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()) return;
-        }
+        if (!hypnotized && isEatingSuppressed(zombie)) return;
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
@@ -216,25 +211,7 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
-        ZombieInstance enemy = findOpposingZombieNearby(zombie, context, row);
-        if (enemy != null) {
-            if (!zombie.isEating() || zombie.getCombatTargetZombie() != enemy) {
-                zombie.startFightingZombie(enemy);
-            }
-
-            float eatDPS = zombie.getDefinition().getEatDPS();
-            eatDPS *= getEatDamageScale(zombie);
-
-            int damage = (int) (eatDPS * deltaTime);
-            if (damage > 0) {
-                context.damageZombie(enemy, damage);
-            }
-
-            if (enemy.isDead()) {
-                zombie.stopEating();
-            }
-            return;
-        }
+        if (fightOpposingZombieIfAny(zombie, context, row, deltaTime)) return;
 
         if (zombie.getCombatTargetZombie() != null) {
             zombie.stopEating();
@@ -248,6 +225,52 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
+        eatPlantAt(zombie, context, row, col, deltaTime);
+    }
+
+    /** Special actions and movement modes during which a zombie cannot eat. */
+    private boolean isEatingSuppressed(ZombieInstance zombie) {
+        if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return true;
+        return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing();
+    }
+
+    /**
+     * Hypnotized-vs-normal zombie combat: if an opposing zombie is in bite
+     * range, bite it instead of any plant.
+     *
+     * @return true if an opposing zombie was engaged this tick
+     */
+    private boolean fightOpposingZombieIfAny(ZombieInstance zombie, BehaviorContext context,
+                                             int row, float deltaTime) {
+        ZombieInstance enemy = findOpposingZombieNearby(zombie, context, row);
+        if (enemy == null) return false;
+
+        if (!zombie.isEating() || zombie.getCombatTargetZombie() != enemy) {
+            zombie.startFightingZombie(enemy);
+        }
+
+        int damage = biteDamage(zombie, deltaTime);
+        if (damage > 0) {
+            context.damageZombie(enemy, damage);
+        }
+
+        if (enemy.isDead()) {
+            zombie.stopEating();
+        }
+        return true;
+    }
+
+    /** Damage of one tick's worth of biting, scaled by status effects. */
+    private int biteDamage(ZombieInstance zombie, float deltaTime) {
+        float eatDPS = zombie.getDefinition().getEatDPS();
+        eatDPS *= getEatDamageScale(zombie);
+        return (int) (eatDPS * deltaTime);
+    }
+
+    /** Bites the plant on the zombie's cell, if there is a live one. */
+    private void eatPlantAt(ZombieInstance zombie, BehaviorContext context,
+                            int row, int col, float deltaTime) {
         PlantInstance plant = context.getPlantAt(row, col);
         if (plant == null || plant.getCurrentHP() <= 0 || plant.isTransformed()) {
             if (zombie.isEating()) {
@@ -260,10 +283,7 @@ public class ZombieSystem implements Tickable {
             zombie.startEating(plant);
         }
 
-        float eatDPS = zombie.getDefinition().getEatDPS();
-        eatDPS *= getEatDamageScale(zombie);
-
-        int damage = (int) (eatDPS * deltaTime);
+        int damage = biteDamage(zombie, deltaTime);
         if (damage > 0) {
             context.damagePlant(plant, damage);
 
@@ -326,109 +346,7 @@ public class ZombieSystem implements Tickable {
      * context, we build a thin adapter that forwards to the game model.
      */
     private PlantAbilityContext sunBeanContext() {
-        return new PlantAbilityContext() {
-            @Override public int getSunAmount() { return gameModel.getSunAmount(); }
-            @Override public int getRowCount() { return gameModel.getRowCount(); }
-            @Override public int getColumnCount() { return gameModel.getColumnCount(); }
-            @Override public PlantInstance getPlantAt(int row, int col) { return gameModel.getPlantAt(row, col); }
-            @Override public List<PlantInstance> getPlantsInLane(int lane) { return gameModel.getPlantsInLane(lane); }
-            @Override public List<PlantInstance> getAllPlants() { return gameModel.getAllPlants(); }
-            @Override public List<ZombieInstance> getZombiesInLane(int lane) { return gameModel.getZombiesInLane(lane);}
-            @Override public List<ZombieInstance> getZombiesInArea(int row, int col, int rowRadius, int colRadius) {
-                return gameModel.getZombiesInArea(row, col, rowRadius, colRadius);
-            }
-            @Override public boolean hasZombieInLane(int lane) {
-                return !gameModel.getZombiesInLane(lane).isEmpty();
-            }
-            @Override public boolean hasAdjacentZombie(int row, int col) {
-                for (int rowDist = -1; rowDist <= 1; rowDist++) {
-                    for (int colDist = -1; colDist <= 1; colDist++) {
-                        if (rowDist == 0 && colDist == 0) continue;
-                        if (!gameModel.getZombiesInArea(row + rowDist, col + colDist, 0, 0).isEmpty()) {
-                            return true;
-                        }
-                    }
-                }
-                return false;
-            }
-
-            @Override
-            public boolean isNightLevel() {
-                return gameModel.isNightLevel();
-            }
-
-            @Override
-            public boolean isWaterTile(int row, int col) {
-                return gameModel.isWaterTile(row, col);
-            }
-
-            @Override
-            public model.projectile.Projectile spawnProjectile(model.projectile.Projectile p, float x, float y) {
-                gameModel.spawnProjectile(p, (int) x, (int) y);
-                return p;
-            }
-
-            @Override
-            public void spawnSun(model.item.Sun sun) {
-                gameModel.spawnSun(sun);
-            }
-
-            @Override
-            public void addSun(int amount) {
-                gameModel.addSun(amount);
-            }
-
-            @Override
-            public void damageZombie(ZombieInstance zombie, int damage) {
-                gameModel.damageZombie(zombie, damage);
-            }
-
-            @Override
-            public void damagePlant(PlantInstance plant, int damage) {
-                gameModel.damagePlant(plant, damage);
-            }
-
-            @Override
-            public void destroyPlant(PlantInstance plant) {
-                gameModel.destroyPlant(plant);
-            }
-
-            @Override
-            public boolean placePlant(PlantInstance plant, int row, int col) {
-                return gameModel.placePlant(plant, row, col);
-            }
-
-            @Override
-            public boolean moveZombieToLane(ZombieInstance zombie, int newRow) {
-                return gameModel.moveZombieToLane(zombie, newRow);
-            }
-
-            @Override
-            public void pushZombieBack(ZombieInstance zombie, float tiles) {
-                gameModel.pushZombieBack(zombie, tiles);
-            }
-
-            @Override public void triggerFamilyPlantFood(model.enums.PlantCategory family) {
-                for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
-                    if (plant.getDefinition().getCategory() == family) {
-                        plant.activatePlantFood();
-                    }
-                }
-            }
-            @Override public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
-                gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
-            }
-
-            @Override
-            public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
-                return gameModel.spawnZombieAt(zombieDefinitionName, row, col);
-            }
-
-            @Override
-            public void removeZombie(ZombieInstance zombie) {
-                gameModel.removeZombie(zombie);
-            }
-        };
+        return new GameModelAbilityContext(gameModel);
     }
 
     /** @return true if the given plant is a Hypno-shroom. */

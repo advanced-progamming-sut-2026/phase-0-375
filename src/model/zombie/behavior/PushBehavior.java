@@ -57,42 +57,14 @@ public class PushBehavior implements ZombieBehavior {
         if (zombie == null || context == null || zombie.isDead()) {
             return;
         }
-
-        if (!pushableReserveInitialized) {
-            int total = zombie.getDefinition().getBehaviorPropInt(
-                    "NumberOfIceblocksToSpawnWith", 1);
-            sparePushablesRemaining = Math.max(0, total - 1);
-            pushableReserveInitialized = true;
-        }
+        initPushableReserveIfNeeded(zombie);
 
         Pushable pushable = zombie.getPushableItem();
 
         // If the pushable was destroyed, drop it and either spawn the
         // next spare or let the zombie walk freely.
         if (pushable == null || pushable.isDestroyed()) {
-            if (pushable != null && pushable.isDestroyed()) {
-                pushable.onDestroyed(); // idempotent notification
-            }
-            if (sparePushablesRemaining > 0) {
-                // Spawn the next ice block in front of the zombie.
-                Pushable next = createSparePushable(zombie);
-                if (next != null) {
-                    sparePushablesRemaining--;
-                    zombie.setPushableItem(next);
-                    next.setPusher(zombie);
-                    if (zombie.getState() == ZombieState.PUSHING) {
-                        zombie.setState(ZombieState.WALKING);
-                    }
-                    phase = PushPhase.WALKING;
-                    pushTimer = 0f;
-                    return;
-                }
-            }
-            if (zombie.getState() == ZombieState.PUSHING) {
-                zombie.setState(ZombieState.WALKING);
-            }
-            phase = PushPhase.WALKING;
-            pushTimer = 0f;
+            handleLostPushable(zombie, pushable);
             return;
         }
 
@@ -112,6 +84,47 @@ public class PushBehavior implements ZombieBehavior {
             default:
                 break;
         }
+    }
+
+    /** Reads the zombie's spare-pushable reserve from its definition once. */
+    private void initPushableReserveIfNeeded(ZombieInstance zombie) {
+        if (pushableReserveInitialized) return;
+        int total = zombie.getDefinition().getBehaviorPropInt(
+                "NumberOfIceblocksToSpawnWith", 1);
+        sparePushablesRemaining = Math.max(0, total - 1);
+        pushableReserveInitialized = true;
+    }
+
+    /**
+     * Called when the current pushable is gone: notifies its destruction,
+     * attaches the next spare ice block if one remains, and otherwise
+     * resets the zombie to plain walking.
+     */
+    private void handleLostPushable(ZombieInstance zombie, Pushable pushable) {
+        if (pushable != null && pushable.isDestroyed()) {
+            pushable.onDestroyed(); // idempotent notification
+        }
+        if (sparePushablesRemaining > 0) {
+            // Spawn the next ice block in front of the zombie.
+            Pushable next = createSparePushable(zombie);
+            if (next != null) {
+                sparePushablesRemaining--;
+                zombie.setPushableItem(next);
+                next.setPusher(zombie);
+                resetToWalking(zombie);
+                return;
+            }
+        }
+        resetToWalking(zombie);
+    }
+
+    /** Leaves the PUSHING state and restarts the walk cycle. */
+    private void resetToWalking(ZombieInstance zombie) {
+        if (zombie.getState() == ZombieState.PUSHING) {
+            zombie.setState(ZombieState.WALKING);
+        }
+        phase = PushPhase.WALKING;
+        pushTimer = 0f;
     }
 
     /** Constructs a fresh ice block for the Troglobite's spare-reserve mechanic. */

@@ -62,103 +62,98 @@ public class QuestLoader {
      * randomly-picked variant per day.
      */
     private List<Quest> buildQuests(QuestDataEntry entry) {
-        List<Quest> quests = new ArrayList<>();
-
         QuestCategory category = resolveCategory(entry.getCategory());
         QuestPriority priority = resolvePriority(entry.getPriority());
         QuestReward reward = buildReward(entry);
         String variable = entry.getVariable();
 
         if (variable == null || variable.isEmpty()) {
-            // No variable — single quest instance.
-            Quest quest = new Quest(
-                    entry.getName(),
-                    category,
-                    entry.getCondition(),
-                    reward,
-                    priority,
-                    null,
-                    new QuestProgress(0, parseTarget(entry.getCondition()))
-            );
-            quests.add(quest);
-        } else {
-            String[] parts = variable.split("-");
-            boolean allNumeric = true;
-            for (String part : parts) {
-                try {
-                    Integer.parseInt(part.trim());
-                } catch (NumberFormatException e) {
-                    allNumeric = false;
-                    break;
-                }
-            }
-
-            if (allNumeric) {
-                // Numeric variables: create one quest per value.
-                for (String part : parts) {
-                    int value = Integer.parseInt(part.trim());
-                    String questName = entry.getName() + " (" + value + ")";
-                    String condition = substitute(entry.getCondition(), String.valueOf(value));
-
-                    QuestReward variantReward = buildVariantReward(entry, value);
-
-                    Quest quest = new Quest(
-                            questName,
-                            category,
-                            condition,
-                            variantReward,
-                            priority,
-                            String.valueOf(value),
-                            new QuestProgress(0, Math.max(1, value))
-                    );
-                    quests.add(quest);
-                }
-            } else {
-                String[] dailyValues = dailyValuesFor(variable);
-                if (dailyValues != null) {
-                    // Daily-random variable: one variant per day, stable within the day.
-                    String value = pickDaily(dailyValues, entry.getName());
-                    Quest quest = new Quest(
-                            entry.getName() + " (" + value + ")",
-                            category,
-                            substitute(entry.getCondition(), value),
-                            reward,
-                            priority,
-                            value,
-                            new QuestProgress(0, parseTarget(entry.getCondition()))
-                    );
-                    quests.add(quest);
-                } else if (parts.length > 1) {
-                    // Non-numeric dash list (e.g. chapter names): one quest per value.
-                    for (String part : parts) {
-                        String value = part.trim();
-                        Quest quest = new Quest(
-                                entry.getName() + " (" + value + ")",
-                                category,
-                                substitute(entry.getCondition(), value),
-                                reward,
-                                priority,
-                                value,
-                                new QuestProgress(0, parseTarget(entry.getCondition()))
-                        );
-                        quests.add(quest);
-                    }
-                } else {
-                    // Unknown variable: single quest with the variable stored as-is.
-                    Quest quest = new Quest(
-                            entry.getName(),
-                            category,
-                            entry.getCondition(),
-                            reward,
-                            priority,
-                            variable,
-                            new QuestProgress(0, parseTarget(entry.getCondition()))
-                    );
-                    quests.add(quest);
-                }
-            }
+            // No variable: single quest instance.
+            return List.of(plainQuest(entry, category, priority, reward, null));
         }
 
+        String[] parts = variable.split("-");
+        if (isAllNumeric(parts)) {
+            // Numeric variables: create one quest per value.
+            return numericVariants(entry, category, priority, parts);
+        }
+
+        String[] dailyValues = dailyValuesFor(variable);
+        if (dailyValues != null) {
+            // Daily-random variable: one variant per day, stable within the day.
+            String value = pickDaily(dailyValues, entry.getName());
+            return List.of(variantQuest(entry, category, priority, reward, value));
+        }
+
+        if (parts.length > 1) {
+            // Non-numeric dash list (e.g. chapter names): one quest per value.
+            List<Quest> quests = new ArrayList<>();
+            for (String part : parts) {
+                quests.add(variantQuest(entry, category, priority, reward, part.trim()));
+            }
+            return quests;
+        }
+
+        // Unknown variable: single quest with the variable stored as-is.
+        return List.of(plainQuest(entry, category, priority, reward, variable));
+    }
+
+    /** @return true when every dash-separated part parses as an integer */
+    private boolean isAllNumeric(String[] parts) {
+        for (String part : parts) {
+            try {
+                Integer.parseInt(part.trim());
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** A quest built directly from the entry, with an optional stored variable. */
+    private Quest plainQuest(QuestDataEntry entry, QuestCategory category,
+                             QuestPriority priority, QuestReward reward, String variable) {
+        return new Quest(
+                entry.getName(),
+                category,
+                entry.getCondition(),
+                reward,
+                priority,
+                variable,
+                new QuestProgress(0, parseTarget(entry.getCondition()))
+        );
+    }
+
+    /** A named variant quest whose condition has the value substituted in. */
+    private Quest variantQuest(QuestDataEntry entry, QuestCategory category,
+                               QuestPriority priority, QuestReward reward, String value) {
+        return new Quest(
+                entry.getName() + " (" + value + ")",
+                category,
+                substitute(entry.getCondition(), value),
+                reward,
+                priority,
+                value,
+                new QuestProgress(0, parseTarget(entry.getCondition()))
+        );
+    }
+
+    /** One quest per numeric value, each with its own scaled reward and target. */
+    private List<Quest> numericVariants(QuestDataEntry entry, QuestCategory category,
+                                        QuestPriority priority, String[] parts) {
+        List<Quest> quests = new ArrayList<>();
+        for (String part : parts) {
+            int value = Integer.parseInt(part.trim());
+            quests.add(new Quest(
+                    entry.getName() + " (" + value + ")",
+                    category,
+                    substitute(entry.getCondition(), String.valueOf(value)),
+                    buildVariantReward(entry, value),
+                    priority,
+                    String.valueOf(value),
+                    new QuestProgress(0, Math.max(1, value))
+            ));
+        }
         return quests;
     }
 
