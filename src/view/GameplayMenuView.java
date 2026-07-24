@@ -4,6 +4,9 @@ import controller.GameplayMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.command.GameplayMenuCommand;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import static model.command.GameplayMenuCommand.*;
 import model.enums.GameState;
 import model.game.core.GameModel;
 import view.tui.TuiShell;
@@ -24,125 +27,59 @@ public class GameplayMenuView extends AppMenuView {
             displayError("Empty command.");
             return;
         }
+        for (Map.Entry<GameplayMenuCommand, Runnable> entry : handlers.entrySet()) {
+            if (entry.getKey().matches(input)) {
+                entry.getValue().run();
+                return;
+            }
+        }
+        printUnknownCommandHelp();
+    }
 
-        if (GameplayMenuCommand.ADVANCE_TIME.matches(input)) {
-            int count = Integer.parseInt(GameplayMenuCommand.ADVANCE_TIME.getParameter("count"));
-            advanceTime(count);
-            return;
-        }
-        if (GameplayMenuCommand.COLLECT_SUN.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.COLLECT_SUN.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.COLLECT_SUN.getParameter("y"));
-            collectSun(x, y);
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_SUN_AMOUNT.matches(input)) {
-            showSunAmount();
-            return;
-        }
-        if (GameplayMenuCommand.CHEAT_ADD_SUNS.matches(input)) {
-            int count = Integer.parseInt(GameplayMenuCommand.CHEAT_ADD_SUNS.getParameter("count"));
-            cheatAddSuns(count);
-            return;
-        }
-        if (GameplayMenuCommand.PLANT.matches(input)) {
-            String type = GameplayMenuCommand.PLANT.getParameter("type");
-            int x = Integer.parseInt(GameplayMenuCommand.PLANT.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.PLANT.getParameter("y"));
-            plant(type, x, y);
-            return;
-        }
-        if (GameplayMenuCommand.BREAK_VASE.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.BREAK_VASE.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.BREAK_VASE.getParameter("y"));
-            breakVase(x, y);
-            return;
-        }
-        if (GameplayMenuCommand.CHEAT_REMOVE_COOLDOWN.matches(input)) {
-            cheatRemoveCooldown();
-            return;
-        }
-        if (GameplayMenuCommand.PLUCK.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.PLUCK.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.PLUCK.getParameter("y"));
-            pluck(x, y);
-            return;
-        }
-        if (GameplayMenuCommand.FEED.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.FEED.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.FEED.getParameter("y"));
-            feed(x, y);
-            return;
-        }
-        if (GameplayMenuCommand.CHEAT_ADD_PLANT_FOOD.matches(input)) {
-            cheatAddPlantFood();
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_MAP.matches(input)) {
-            showMap();
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_SCORE.matches(input)) {
-            showScore();
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_PLANTS_STATUS.matches(input)) {
-            showPlantsStatus();
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_KILL_STATS.matches(input)) {
-            showKillStats();
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_TILE_STATUS.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.SHOW_TILE_STATUS.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.SHOW_TILE_STATUS.getParameter("y"));
-            showTileStatus(x, y);
-            return;
-        }
-        if (GameplayMenuCommand.RELEASE_NUKE.matches(input)) {
-            releaseNuke();
-            return;
-        }
-        if (GameplayMenuCommand.ZOMBIES_INFO.matches(input)) {
-            zombiesInfo();
-            return;
-        }
-        if (GameplayMenuCommand.START_ZOMBIE_WAVES.matches(input)) {
-            startZombieWaves();
-            return;
-        }
-        if (GameplayMenuCommand.CHEAT_SPAWN_ZOMBIE.matches(input)) {
-            String type = GameplayMenuCommand.CHEAT_SPAWN_ZOMBIE.getParameter("zombieType");
-            int x = Integer.parseInt(GameplayMenuCommand.CHEAT_SPAWN_ZOMBIE.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.CHEAT_SPAWN_ZOMBIE.getParameter("y"));
-            cheatSpawnZombie(type, x, y);
-            return;
-        }
-        if (GameplayMenuCommand.PLACE_ZOMBIE.matches(input)) {
-            String type = GameplayMenuCommand.PLACE_ZOMBIE.getParameter("type");
-            int x = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.PLACE_ZOMBIE.getParameter("y"));
-            placeZombie(type, x, y);
-            return;
-        }
-        if (GameplayMenuCommand.SWAP_PLANT.matches(input)) {
-            int x = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("x"));
-            int y = Integer.parseInt(GameplayMenuCommand.SWAP_PLANT.getParameter("y"));
-            String direction = GameplayMenuCommand.SWAP_PLANT.getParameter("dir");
-            swapPlant(x, y, direction);
-            return;
-        }
-        if (GameplayMenuCommand.UPGRADE_PLANT.matches(input)) {
-            String type = GameplayMenuCommand.UPGRADE_PLANT.getParameter("type");
-            upgradePlant(type);
-            return;
-        }
-        if (GameplayMenuCommand.SHOW_BEGHOULED_STATUS.matches(input)) {
-            showBeghouledStatus();
-            return;
-        }
+    /**
+     * Command dispatch table (Command pattern)
+     */
+    private final Map<GameplayMenuCommand, Runnable> handlers = buildHandlers();
 
+    /** Parses a named integer parameter from the command that just matched. */
+    private static int intArg(GameplayMenuCommand cmd, String name) {
+        return Integer.parseInt(cmd.getParameter(name));
+    }
+
+    /** Registers one handler per gameplay command. */
+    private Map<GameplayMenuCommand, Runnable> buildHandlers() {
+        Map<GameplayMenuCommand, Runnable> map = new LinkedHashMap<>();
+        map.put(ADVANCE_TIME, () -> advanceTime(intArg(ADVANCE_TIME, "count")));
+        map.put(COLLECT_SUN, () -> collectSun(intArg(COLLECT_SUN, "x"), intArg(COLLECT_SUN, "y")));
+        map.put(SHOW_SUN_AMOUNT, this::showSunAmount);
+        map.put(CHEAT_ADD_SUNS, () -> cheatAddSuns(intArg(CHEAT_ADD_SUNS, "count")));
+        map.put(PLANT, () -> plant(PLANT.getParameter("type"), intArg(PLANT, "x"), intArg(PLANT, "y")));
+        map.put(BREAK_VASE, () -> breakVase(intArg(BREAK_VASE, "x"), intArg(BREAK_VASE, "y")));
+        map.put(CHEAT_REMOVE_COOLDOWN, this::cheatRemoveCooldown);
+        map.put(PLUCK, () -> pluck(intArg(PLUCK, "x"), intArg(PLUCK, "y")));
+        map.put(FEED, () -> feed(intArg(FEED, "x"), intArg(FEED, "y")));
+        map.put(CHEAT_ADD_PLANT_FOOD, this::cheatAddPlantFood);
+        map.put(SHOW_MAP, this::showMap);
+        map.put(SHOW_SCORE, this::showScore);
+        map.put(SHOW_PLANTS_STATUS, this::showPlantsStatus);
+        map.put(SHOW_KILL_STATS, this::showKillStats);
+        map.put(SHOW_TILE_STATUS, () -> showTileStatus(intArg(SHOW_TILE_STATUS, "x"), intArg(SHOW_TILE_STATUS, "y")));
+        map.put(RELEASE_NUKE, this::releaseNuke);
+        map.put(ZOMBIES_INFO, this::zombiesInfo);
+        map.put(START_ZOMBIE_WAVES, this::startZombieWaves);
+        map.put(CHEAT_SPAWN_ZOMBIE, () -> cheatSpawnZombie(CHEAT_SPAWN_ZOMBIE.getParameter("zombieType"),
+                intArg(CHEAT_SPAWN_ZOMBIE, "x"), intArg(CHEAT_SPAWN_ZOMBIE, "y")));
+        map.put(PLACE_ZOMBIE, () -> placeZombie(PLACE_ZOMBIE.getParameter("type"),
+                intArg(PLACE_ZOMBIE, "x"), intArg(PLACE_ZOMBIE, "y")));
+        map.put(SWAP_PLANT, () -> swapPlant(intArg(SWAP_PLANT, "x"), intArg(SWAP_PLANT, "y"),
+                SWAP_PLANT.getParameter("dir")));
+        map.put(UPGRADE_PLANT, () -> upgradePlant(UPGRADE_PLANT.getParameter("type")));
+        map.put(SHOW_BEGHOULED_STATUS, this::showBeghouledStatus);
+        return map;
+    }
+
+    /** Prints the command reference shown for unrecognized input. */
+    private void printUnknownCommandHelp() {
         displayError("Unknown gameplay command. Available commands:");
         displayError("  advance time -t <count> ticks");
         displayError("  start zombie waves");

@@ -47,9 +47,7 @@ import java.util.Set;
 
 public class GameModel implements BehaviorContext {
     private long currentTick;
-    private int sunAmount;
-    private int plantFoodCount;
-    private int persistentPlantFood; // portion of plantFoodCount backed by the user profile
+    private final ResourceBank resources; // sun / plant-food economy (composition)
     private int difficultyLevel;
     private GameState gameState;
     private Chapter chapter;
@@ -81,19 +79,8 @@ public class GameModel implements BehaviorContext {
     // Chapter-specific ambient effects (tornado, ice wind, tide)
     private ChapterEffectsSystem chapterEffects;
 
-    // Per-level stats used for quest tracking
-    private int sunCollected;
-    private boolean lawnMowerUsed;
-    private float firstZombieSpawnTime = -1f;
-    private int killsWithin30s;
-    private int noMowerFirstColumnKills;
-    private int mowerKills;
-    private List<Plant> plantsPlaced;
-    private Set<Integer> rowsPlanted;
-    private Set<Integer> columnsPlanted;
-    private int maxSunProducersAtOnce; // peak simultaneous sun producers on the field
-    private final Map<String, Integer> exclusivePlantKills = new HashMap<>();
-    private final Map<PlantCategory, Integer> exclusiveFamilyKills = new HashMap<>();
+    // Per-level stats used for quest tracking (extracted component)
+    private final LevelQuestStats questStats = new LevelQuestStats();
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
@@ -102,11 +89,10 @@ public class GameModel implements BehaviorContext {
 
         this.currentLevel = currentLevel;
         LevelConfig levelConfig = this.currentLevel.getConfig();
-        this.sunAmount = levelConfig.getRules().getInitialSun();
         // load plant food bought from the shop (stored on the user profile)
         User pfOwner = App.getInstance().getCurrentUser();
-        this.plantFoodCount = pfOwner != null ? Math.max(0, pfOwner.getPlantFoodCount()) : 0;
-        this.persistentPlantFood = this.plantFoodCount;
+        this.resources = new ResourceBank(levelConfig.getRules().getInitialSun(),
+                pfOwner != null ? pfOwner.getPlantFoodCount() : 0);
         this.chapter = levelConfig.getChapter();
         this.endGameCondition = levelConfig.getEndGameCondition();
 
@@ -114,9 +100,6 @@ public class GameModel implements BehaviorContext {
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
-        this.plantsPlaced = new ArrayList<>();
-        this.rowsPlanted = new HashSet<>();
-        this.columnsPlanted = new HashSet<>();
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
@@ -142,11 +125,11 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public int getSunAmount() {
-        return sunAmount;
+        return resources.getSunAmount();
     }
 
     public int getPlantFoodCount() {
-        return plantFoodCount;
+        return resources.getPlantFoodCount();
     }
 
     public int getDifficulty() {
@@ -224,10 +207,7 @@ public class GameModel implements BehaviorContext {
         plant.setPosition(new Point(col, row));
         boolean added = cell.addPlaceable(plant);
         if (added) {
-            plantsPlaced.add(plant.getDefinition());
-            rowsPlanted.add(row);
-            columnsPlanted.add(col);
-            updateMaxSunProducers(); // count can only grow on placement
+            questStats.onPlantPlaced(this, plant.getDefinition(), row, col);
         }
         if (added && eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_PLACED));
@@ -237,40 +217,25 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public void addSun(int amount) {
-        sunAmount += amount;
+        resources.addSun(amount);
     }
 
     @Override
     public boolean spendSun(int amount) {
-        if (sunAmount < amount) return false;
-        sunAmount -= amount;
-        return true;
+        return resources.spendSun(amount);
     }
 
     public void addPlantFood() {
-        plantFoodCount++;
+        resources.addPlantFood();
     }
 
     public boolean usePlantFood() {
-        if (plantFoodCount < 1) return false;
-        plantFoodCount--;
-        // purchased plant food is consumed from the profile too
-        if (persistentPlantFood > 0) {
-            persistentPlantFood--;
-            User owner = App.getInstance().getCurrentUser();
-            if (owner != null && owner.getPlantFoodCount() > 0) {
-                owner.setPlantFoodCount(owner.getPlantFoodCount() - 1);
-                App.getInstance().getUserRepository().flush();
-            }
-        }
-        return true;
+        return resources.usePlantFood();
     }
 
     /** Records a zombie type as seen for the collection; saves only on first sighting. */
     public void recordZombieSeen(String zombieName) {
-        if (firstZombieSpawnTime < 0) {
-            firstZombieSpawnTime = elapsedSeconds;
-        }
+        questStats.onZombieSpawned(elapsedSeconds);
         User user = App.getInstance().getCurrentUser();
         if (user == null || zombieName == null) {
             return;
@@ -391,8 +356,8 @@ public class GameModel implements BehaviorContext {
 
     public void collectSun(Sun sun) {
         activeSuns.remove(sun);
-        sunAmount += sun.getValue();
-        sunCollected += sun.getValue();
+        resources.addSun(sun.getValue());
+        questStats.onSunCollected(sun.getValue());
     }
 
     public void tick(float deltaTime) {
@@ -449,88 +414,39 @@ public class GameModel implements BehaviorContext {
     /** Records a kill with timing/position details for quest tracking. */
     public void recordZombieKilled(ZombieInstance zombie) {
         zombiesKilled++;
-        if (firstZombieSpawnTime >= 0 && elapsedSeconds - firstZombieSpawnTime <= 30f) {
-            killsWithin30s++;
-        }
-        if (zombie == null) return;
-        if (zombie.isKilledByMower()) mowerKills++;
-        // exclusive-kill bookkeeping for plant/family quests
-        if (!zombie.isNonPlantDamaged()) {
-            if (zombie.getPlantDamagers().size() == 1) {
-                exclusivePlantKills.merge(zombie.getPlantDamagers().iterator().next(), 1, Integer::sum);
-            }
-            if (zombie.getPlantDamagerFamilies().size() == 1) {
-                exclusiveFamilyKills.merge(zombie.getPlantDamagerFamilies().iterator().next(), 1, Integer::sum);
-            }
-        }
-        if (zombie.getGridPosition() == null) return;
-        if (zombie.getGridX() <= 0) {
-            Lane lane = gameMap.getLane(zombie.getGridY());
-            if (lane == null || !lane.hasActiveLawnMower()) {
-                noMowerFirstColumnKills++;
-            }
-        }
+        questStats.onZombieKilled(zombie, elapsedSeconds, gameMap);
     }
 
-    public int getSunCollected() { return sunCollected; }
+    public int getSunCollected() { return questStats.getSunCollected(); }
 
-    public void markLawnMowerUsed() { lawnMowerUsed = true; }
+    public void markLawnMowerUsed() { questStats.markLawnMowerUsed(); }
 
-    public boolean isLawnMowerUsed() { return lawnMowerUsed; }
+    public boolean isLawnMowerUsed() { return questStats.isLawnMowerUsed(); }
 
-    public int getKillsWithin30s() { return killsWithin30s; }
+    public int getKillsWithin30s() { return questStats.getKillsWithin30s(); }
 
-    public int getNoMowerFirstColumnKills() { return noMowerFirstColumnKills; }
+    public int getNoMowerFirstColumnKills() { return questStats.getNoMowerFirstColumnKills(); }
 
-    public int getMowerKills() { return mowerKills; }
+    public int getMowerKills() { return questStats.getMowerKills(); }
 
     /** Kills where the zombie was damaged exclusively by the named plant. */
-    public int getExclusivePlantKills(String plantName) {
-        if (plantName == null) return 0;
-        for (Map.Entry<String, Integer> e : exclusivePlantKills.entrySet()) {
-            if (plantName.equalsIgnoreCase(e.getKey())) return e.getValue();
-        }
-        return 0;
-    }
+    public int getExclusivePlantKills(String plantName) { return questStats.getExclusivePlantKills(plantName); }
 
     /** Kills where the zombie was damaged exclusively by plants of the named family. */
-    public int getExclusiveFamilyKills(String categoryName) {
-        if (categoryName == null) return 0;
-        for (Map.Entry<PlantCategory, Integer> e : exclusiveFamilyKills.entrySet()) {
-            if (e.getKey().name().equalsIgnoreCase(categoryName)) return e.getValue();
-        }
-        return 0;
-    }
+    public int getExclusiveFamilyKills(String categoryName) { return questStats.getExclusiveFamilyKills(categoryName); }
 
     /** Raw exclusive-kill maps (diagnostics). */
-    public Map<String, Integer> getExclusivePlantKillsMap() { return exclusivePlantKills; }
+    public Map<String, Integer> getExclusivePlantKillsMap() { return questStats.getExclusivePlantKillsMap(); }
 
-    public Map<PlantCategory, Integer> getExclusiveFamilyKillsMap() { return exclusiveFamilyKills; }
+    public Map<PlantCategory, Integer> getExclusiveFamilyKillsMap() { return questStats.getExclusiveFamilyKillsMap(); }
 
-    public List<Plant> getPlantsPlaced() { return plantsPlaced; }
+    public List<Plant> getPlantsPlaced() { return questStats.getPlantsPlaced(); }
 
-    public int getMaxSunProducersAtOnce() { return maxSunProducersAtOnce; }
+    public int getMaxSunProducersAtOnce() { return questStats.getMaxSunProducersAtOnce(); }
 
-    /** Recounts sun producers on the field and updates the peak. */
-    private void updateMaxSunProducers() {
-        int count = 0;
-        for (int r = 0; r < gameMap.getRows(); r++) {
-            for (int c = 0; c < gameMap.getCols(); c++) {
-                PlantInstance p = getPlantAt(r, c);
-                if (p != null && p.getDefinition() != null
-                        && p.getDefinition().getCategory() == PlantCategory.SUN_PRODUCER) {
-                    count++;
-                }
-            }
-        }
-        if (count > maxSunProducersAtOnce) {
-            maxSunProducersAtOnce = count;
-        }
-    }
+    public Set<Integer> getRowsPlanted() { return questStats.getRowsPlanted(); }
 
-    public Set<Integer> getRowsPlanted() { return rowsPlanted; }
-
-    public Set<Integer> getColumnsPlanted() { return columnsPlanted; }
+    public Set<Integer> getColumnsPlanted() { return questStats.getColumnsPlanted(); }
 
     public Chapter getChapter() { return chapter; }
 
@@ -654,8 +570,7 @@ public class GameModel implements BehaviorContext {
         sourceCell.removePlaceable(plant);
         destinationCell.addPlaceable(plant);
         plant.setPosition(new Point(col, row));
-        rowsPlanted.add(row);
-        columnsPlanted.add(col);
+        questStats.markRowColumnPlanted(row, col);
         return true;
     }
 

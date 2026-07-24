@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Loads every zombie definition from {@code zombies.json} and builds the
@@ -248,126 +249,41 @@ public class ZombieLoader {
     }
 
     /**
-     * Derives the list of special behaviors for a zombie based on its
-     * {@code objclass} and numeric-data fields.
+     * Special behaviors per property-sheet objclass.
+     */
+    private static final Map<String, List<ZombieBehaviorType>> BEHAVIORS_BY_OBJCLASS = Map.ofEntries(
+            Map.entry("ZombieRaProps", List.of(ZombieBehaviorType.STEAL_SUN)),
+            Map.entry("ZombieExplorerProps", List.of(ZombieBehaviorType.SHOOT)),
+            Map.entry("ZombieTombRaiserProps", List.of(ZombieBehaviorType.SUMMON)),
+            Map.entry("ZombieGargantuarProps", List.of(ZombieBehaviorType.SMASH, ZombieBehaviorType.THROW_IMP)),
+            Map.entry("ZombieIceAgeDodoProps", List.of(ZombieBehaviorType.FLY)),
+            Map.entry("ZombieIceAgeHunterProps", List.of(ZombieBehaviorType.SHOOT)),
+            Map.entry("ZombieIceAgeTroglobiteProps", List.of(ZombieBehaviorType.PUSH)),
+            Map.entry("ZombieBeachFishermanProps", List.of(ZombieBehaviorType.FISH)),
+            Map.entry("ZombieBeachOctopusProps", List.of(ZombieBehaviorType.SHOOT)),
+            Map.entry("ZombieBeachSnorkelProps", List.of(ZombieBehaviorType.SWIM)),
+            Map.entry("ZombieDarkJugglerProps", List.of(ZombieBehaviorType.JUGGLE)),
+            Map.entry("ZombieLostCityJaneProps", List.of(ZombieBehaviorType.DEFLECT_LOBBER)),
+            Map.entry("ZombieDarkWizardProps", List.of(ZombieBehaviorType.TRANSFORM)),
+            Map.entry("ZombieDarkKingProps", List.of(ZombieBehaviorType.BUFF)),
+            Map.entry("ZombieCrystalSkullProps", List.of(ZombieBehaviorType.STEAL_SUN)),
+            Map.entry("ZombieProspectorProps", List.of(ZombieBehaviorType.JUMP)),
+            Map.entry("ZombieModernAllStarProps", List.of(ZombieBehaviorType.SMASH)),
+            Map.entry("ZombiePianoProps", List.of(ZombieBehaviorType.PUSH, ZombieBehaviorType.PIANO_SWAP)),
+            Map.entry("ZombieNewspaperProps", List.of(ZombieBehaviorType.ENRAGE)),
+            Map.entry("ZombieArcadeProps", List.of(ZombieBehaviorType.PUSH)),
+            Map.entry("ZombieBarrelRollerProps", List.of(ZombieBehaviorType.PUSH, ZombieBehaviorType.BARREL_ROLLER)),
+            Map.entry("ZombotanyPeashooterProps", List.of(ZombieBehaviorType.ZOMBOTANY_PEASHOOTER)),
+            Map.entry("ZombotanyJalapenoProps", List.of(ZombieBehaviorType.ZOMBOTANY_JALAPENO)),
+            Map.entry("ZombotanySquashProps", List.of(ZombieBehaviorType.ZOMBOTANY_SQUASH)),
+            Map.entry("IZombieSunProps", List.of(ZombieBehaviorType.PRODUCE_SUN)));
+
+    /**
+     * Derives the list of special behaviors for the given objclass via the
+     * registry above. Returns a mutable list, as callers may append to it.
      */
     private List<ZombieBehaviorType> resolveBehaviors(String objclass, ZombieDataEntry.ZombieObjData zombieData) {
-        List<ZombieBehaviorType> behaviors = new ArrayList<>();
-        if (objclass == null) return behaviors;
-
-        switch (objclass) {
-            case "ZombieRaProps":
-                behaviors.add(ZombieBehaviorType.STEAL_SUN);
-                break;
-
-            case "ZombieExplorerProps":
-                behaviors.add(ZombieBehaviorType.SHOOT);
-                break;
-
-            case "ZombieTombRaiserProps":
-                behaviors.add(ZombieBehaviorType.SUMMON);
-                break;
-
-            case "ZombieGargantuarProps":
-                behaviors.add(ZombieBehaviorType.SMASH);
-                behaviors.add(ZombieBehaviorType.THROW_IMP);
-                break;
-
-            case "ZombieIceAgeDodoProps":
-                behaviors.add(ZombieBehaviorType.FLY);
-                break;
-
-            case "ZombieIceAgeHunterProps":
-                behaviors.add(ZombieBehaviorType.SHOOT);
-                break;
-
-            case "ZombieIceAgeTroglobiteProps":
-                behaviors.add(ZombieBehaviorType.PUSH);
-                break;
-
-            case "ZombieBeachFishermanProps":
-                behaviors.add(ZombieBehaviorType.FISH);
-                break;
-
-            case "ZombieBeachOctopusProps":
-                behaviors.add(ZombieBehaviorType.SHOOT);
-                break;
-
-            case "ZombieBeachSnorkelProps":
-                behaviors.add(ZombieBehaviorType.SWIM);
-                break;
-
-            case "ZombieDarkJugglerProps":
-                behaviors.add(ZombieBehaviorType.JUGGLE);
-                break;
-
-            case "ZombieLostCityJaneProps":
-                behaviors.add(ZombieBehaviorType.DEFLECT_LOBBER);
-                break;
-
-            case "ZombieDarkWizardProps":
-                behaviors.add(ZombieBehaviorType.TRANSFORM);
-                break;
-
-            case "ZombieDarkKingProps":
-                behaviors.add(ZombieBehaviorType.BUFF);
-                break;
-
-            case "ZombieCrystalSkullProps":
-                behaviors.add(ZombieBehaviorType.STEAL_SUN);
-                break;
-
-            case "ZombieProspectorProps":
-                behaviors.add(ZombieBehaviorType.JUMP);
-                break;
-
-            case "ZombieModernAllStarProps":
-                behaviors.add(ZombieBehaviorType.SMASH);
-                break;
-
-            case "ZombiePianoProps":
-                behaviors.add(ZombieBehaviorType.PUSH);
-                behaviors.add(ZombieBehaviorType.PIANO_SWAP);
-                break;
-
-            case "ZombieNewspaperProps":
-                behaviors.add(ZombieBehaviorType.ENRAGE);
-                break;
-
-            case "ZombieArcadeProps":
-                behaviors.add(ZombieBehaviorType.PUSH);
-                break;
-
-            case "ZombieBarrelRollerProps":
-                behaviors.add(ZombieBehaviorType.PUSH);
-                behaviors.add(ZombieBehaviorType.BARREL_ROLLER);
-                break;
-
-            case "ZombotanyPeashooterProps":
-                behaviors.add(ZombieBehaviorType.ZOMBOTANY_PEASHOOTER);
-                break;
-
-            case "ZombotanyWallnutProps":
-                // Passive: its wall-nut toughness comes from Hitpoints alone.
-                break;
-
-            case "ZombotanyJalapenoProps":
-                behaviors.add(ZombieBehaviorType.ZOMBOTANY_JALAPENO);
-                break;
-
-            case "ZombotanySquashProps":
-                behaviors.add(ZombieBehaviorType.ZOMBOTANY_SQUASH);
-                break;
-            case "IZombieSunProps":
-                behaviors.add(ZombieBehaviorType.PRODUCE_SUN);
-                break;
-
-            case "ZombiePropertySheet":
-            default:
-                // No special behaviors.
-                break;
-        }
-
-        return behaviors;
+        if (objclass == null) return new ArrayList<>();
+        return new ArrayList<>(BEHAVIORS_BY_OBJCLASS.getOrDefault(objclass, List.of()));
     }
 }

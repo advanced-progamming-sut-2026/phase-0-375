@@ -70,17 +70,7 @@ public class TravelLogMenuView extends AppMenuView {
             return;
         }
 
-        displayError("Unknown travel log command. Available commands:");
-        displayError("  travel log page <daily|main|epic>");
-        displayError("  show current page");
-        displayError("  show daily quests");
-        displayError("  show main quests");
-        displayError("  show epic quests");
-        displayError("  show all quests");
-        displayError("  show completed quests");
-        displayError("  show quest progress -n <quest name>");
-        displayError("  complete quest -n <quest name>");
-        displayError("  menu exit");
+        printHelp();
     }
 
     // Per-command view methods
@@ -227,5 +217,19 @@ public class TravelLogMenuView extends AppMenuView {
     private String categoryLabel(QuestCategory c) {
         if (c == null) return "?";
         return c.name().toLowerCase();
+    }
+
+    private void printHelp() {
+        displayError("Unknown travel log command. Available commands:");
+        displayError("  travel log page <daily|main|epic>");
+        displayError("  show current page");
+        displayError("  show daily quests");
+        displayError("  show main quests");
+        displayError("  show epic quests");
+        displayError("  show all quests");
+        displayError("  show completed quests");
+        displayError("  show quest progress -n <quest name>");
+        displayError("  complete quest -n <quest name>");
+        displayError("  menu exit");
     }
 }

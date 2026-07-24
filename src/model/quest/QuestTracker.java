@@ -53,89 +53,101 @@ public final class QuestTracker {
         App.getInstance().getUserRepository().flush();
     }
 
-    private static void evaluate(Quest quest, GameModel model, boolean won, Map<String, Integer> progress) {
-        String name = quest.getName();
-        String base = baseName(name);
-        String value = quest.getVariable();
-        int target = quest.getProgress() != null ? quest.getProgress().getTargetValue() : 1;
-        List<Plant> planted = model.getPlantsPlaced();
+    /** A single quest's evaluation rule (Strategy pattern). */
+    @FunctionalInterface
+    private interface QuestRule {
+        void apply(QuestContext c);
+    }
 
-        switch (base) {
-            case "Daily Sun Collector" -> add(progress, name, model.getSunCollected(), target);
-            case "Mowing Time" -> add(progress, name, model.getMowerKills(), target);
-            case "Chapter Hunter" -> {
-                if (model.getChapter() != null && model.getChapter().name().equalsIgnoreCase(value)) {
-                    add(progress, name, model.getZombiesKilled(), target);
-                }
+    /** Everything a rule needs to evaluate one quest at level end. */
+    private record QuestContext(String name, String value, int target, GameModel model,
+                                boolean won, Map<String, Integer> progress) {
+        List<Plant> planted() { return model.getPlantsPlaced(); }
+        int intValue() { return QuestTracker.parseInt(value, -1); }
+        boolean wonWithPlants() { return won && !planted().isEmpty(); }
+        void add(int delta) { QuestTracker.add(progress, name, delta, target); }
+        void best(int candidate) { QuestTracker.best(progress, name, candidate, target); }
+        void complete() { QuestTracker.markComplete(progress, name, target); }
+        void completeIf(boolean condition) { if (condition) complete(); }
+    }
+
+    /** Rule registry: quest base name -> evaluation strategy. */
+    private static final Map<String, QuestRule> RULES = buildRules();
+
+    private static Map<String, QuestRule> buildRules() {
+        Map<String, QuestRule> rules = new HashMap<>();
+        registerCounterRules(rules);
+        registerCompletionRules(rules);
+        return rules;
+    }
+
+    /** Quests that accumulate a counter or track a best run. */
+    private static void registerCounterRules(Map<String, QuestRule> rules) {
+        rules.put("Daily Sun Collector",
+                c -> c.add(c.model().getSunCollected()));
+        rules.put("Mowing Time",
+                c -> c.add(c.model().getMowerKills()));
+        rules.put("Chapter Hunter", c -> {
+            if (c.model().getChapter() != null && c.model().getChapter().name().equalsIgnoreCase(c.value())) {
+                c.add(c.model().getZombiesKilled());
             }
-            case "Professional Plant Opener" ->
-                // daily variant: count kills dealt exclusively by today's plant
-                    add(progress, name, model.getExclusivePlantKills(value), target);
-            case "Only Cactus" ->
-                // count kills dealt exclusively by Cactus
-                    add(progress, name, model.getExclusivePlantKills("Cactus"), target);
-            case "Economic Plant Eater" -> {
-                if (won && model.getPlantsLost() <= parseInt(value, -1)) markComplete(progress, name, target);
-            }
-            case "Defense Master" -> {
-                if (won && model.getSunAmount() == 0) markComplete(progress, name, target);
-            }
-            case "Speed of Action" -> best(progress, name, model.getKillsWithin30s(), target);
-            case "Professional Destroyer" ->
-                    best(progress, name, countCategory(planted, PlantCategory.EXPLOSIVE), target);
-            case "Symmetry" -> {
-                if (won && !planted.isEmpty() && isGardenSymmetric(model)) markComplete(progress, name, target);
-            }
-            case "Family Slaughter" -> {
-                // every zombie killed this level must have died solely to today's family
-                if (model.getZombiesKilled() > 0
-                        && model.getExclusiveFamilyKills(value) == model.getZombiesKilled()) {
-                    markComplete(progress, name, target);
-                }
-            }
-            case "Bloom in Constraints" -> {
-                if (won && countCategoryName(planted, value) == 0) markComplete(progress, name, target);
-            }
-            case "Night or Morning" -> {
-                if (won && !model.isNightLevel() && allShrooms(planted)) markComplete(progress, name, target);
-            }
-            case "Cloudy Day" -> {
-                // never more than 3 sun producers on the field at the same time
-                if (won && !planted.isEmpty() && model.getMaxSunProducersAtOnce() <= 3) {
-                    markComplete(progress, name, target);
-                }
-            }
-            case "Win Streak" -> {
-                if (won && model.getDifficulty() >= MAX_DIFFICULTY) add(progress, name, 1, target);
-                else progress.put(name, 0); // streak broken
-            }
-            case "Almost Victorious" -> add(progress, name, model.getNoMowerFirstColumnKills(), target);
-            case "No OCD" -> {
-                // no mirrored pair may hold the same plant (empty cells ignored)
-                if (won && !planted.isEmpty() && !hasAnySymmetricPair(model)) {
-                    markComplete(progress, name, target);
-                }
-            }
-            case "One Column Less" -> {
-                if (won && !model.getColumnsPlanted().contains(parseInt(value, -1))) {
-                    markComplete(progress, name, target);
-                }
-            }
-            case "Defenseless Row" -> {
-                if (won && !model.getRowsPlanted().contains(parseInt(value, -1))) {
-                    markComplete(progress, name, target);
-                }
-            }
-            case "Defenseless Cross" -> {
-                int index = parseInt(value, -1);
-                if (won && !model.getColumnsPlanted().contains(index)
-                        && !model.getRowsPlanted().contains(index)) {
-                    markComplete(progress, name, target);
-                }
-            }
-            default -> {
-            }
-        }
+        });
+        // daily variant: count kills dealt exclusively by today's plant
+        rules.put("Professional Plant Opener",
+                c -> c.add(c.model().getExclusivePlantKills(c.value())));
+        // count kills dealt exclusively by Cactus
+        rules.put("Only Cactus",
+                c -> c.add(c.model().getExclusivePlantKills("Cactus")));
+        rules.put("Speed of Action",
+                c -> c.best(c.model().getKillsWithin30s()));
+        rules.put("Professional Destroyer",
+                c -> c.best(countCategory(c.planted(), PlantCategory.EXPLOSIVE)));
+        rules.put("Almost Victorious",
+                c -> c.add(c.model().getNoMowerFirstColumnKills()));
+        rules.put("Win Streak", c -> {
+            if (c.won() && c.model().getDifficulty() >= MAX_DIFFICULTY) c.add(1);
+            else c.progress().put(c.name(), 0); // streak broken
+        });
+    }
+
+    /** Quests that complete outright when their condition holds at level end. */
+    private static void registerCompletionRules(Map<String, QuestRule> rules) {
+        rules.put("Economic Plant Eater",
+                c -> c.completeIf(c.won() && c.model().getPlantsLost() <= c.intValue()));
+        rules.put("Defense Master",
+                c -> c.completeIf(c.won() && c.model().getSunAmount() == 0));
+        rules.put("Symmetry",
+                c -> c.completeIf(c.wonWithPlants() && isGardenSymmetric(c.model())));
+        // every zombie killed this level must have died solely to today's family
+        rules.put("Family Slaughter",
+                c -> c.completeIf(c.model().getZombiesKilled() > 0
+                && c.model().getExclusiveFamilyKills(c.value()) == c.model().getZombiesKilled()));
+        rules.put("Bloom in Constraints",
+                c -> c.completeIf(c.won() && countCategoryName(c.planted(), c.value()) == 0));
+        rules.put("Night or Morning",
+                c -> c.completeIf(c.won() && !c.model().isNightLevel() && allShrooms(c.planted())));
+        // never more than 3 sun producers on the field at the same time
+        rules.put("Cloudy Day",
+                c -> c.completeIf(c.wonWithPlants() && c.model().getMaxSunProducersAtOnce() <= 3));
+        // no mirrored pair may hold the same plant (empty cells ignored)
+        rules.put("No OCD",
+                c -> c.completeIf(c.wonWithPlants() && !hasAnySymmetricPair(c.model())));
+        rules.put("One Column Less",
+                c -> c.completeIf(c.won() && !c.model().getColumnsPlanted().contains(c.intValue())));
+        rules.put("Defenseless Row",
+                c -> c.completeIf(c.won() && !c.model().getRowsPlanted().contains(c.intValue())));
+        rules.put("Defenseless Cross",
+                c -> c.completeIf(c.won()
+                && !c.model().getColumnsPlanted().contains(c.intValue())
+                && !c.model().getRowsPlanted().contains(c.intValue())));
+    }
+
+    /** Looks up the quest's rule by base name and applies it (unknown quests are ignored). */
+    private static void evaluate(Quest quest, GameModel model, boolean won, Map<String, Integer> progress) {
+        QuestRule rule = RULES.get(baseName(quest.getName()));
+        if (rule == null) return;
+        int target = quest.getProgress() != null ? quest.getProgress().getTargetValue() : 1;
+        rule.apply(new QuestContext(quest.getName(), quest.getVariable(), target, model, won, progress));
     }
 
     // ---- plant list helpers ----
