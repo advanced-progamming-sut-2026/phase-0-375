@@ -221,18 +221,25 @@ public class PlantSelectionMenuController extends AppMenuController {
                 || model.getCurrentLevel().getConfig().getRules().isAllowsChoosingPlants();
     }
 
-    /**
-     * TODO: Once LevelConfig construction is properly implemented,
-     * this will create the GameModel and game loop properly.
-     */
     public CommandResult<Void> startGame() {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model == null) {
             return CommandResult.error("No level loaded. Enter a chapter first.");
         }
 
-        PvZGameLoop loop = new PvZGameLoop(model);
-        App.getInstance().setCurrentGameLoop(loop);
+        List<String> selected = model.getSelectedPlants();
+        if (plantChoiceAllowed(model) && (selected == null || selected.isEmpty())) {
+            return CommandResult.error("Select at least one plant before starting.");
+        }
+        if (selected == null) {
+            model.setSelectedPlants(new ArrayList<>());
+        }
+
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop == null) {
+            loop = new PvZGameLoop(model);
+            App.getInstance().setCurrentGameLoop(loop);
+        }
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         return CommandResult.success("Game started!");
     }
