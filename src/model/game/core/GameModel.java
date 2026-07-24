@@ -321,8 +321,23 @@ public class GameModel implements BehaviorContext {
 
     /** Hook invoked by the wave manager when a new wave begins. */
     public void onWaveStarted(Wave wave) {
+        announceWave(wave);
         if (chapterEffects != null) {
             chapterEffects.onWaveStarted(wave);
+        }
+    }
+
+    /** Prints a banner so the player always knows a new wave has begun. */
+    private void announceWave(Wave wave) {
+        if (wave == null) {
+            return;
+        }
+        if (wave.isFinalWave()) {
+            System.out.println("[Wave] FINAL WAVE (wave " + wave.getWaveNumber() + ") is approaching!");
+        } else if (wave.isHugeWave()) {
+            System.out.println("[Wave] A HUGE wave of zombies (wave " + wave.getWaveNumber() + ") is approaching!");
+        } else {
+            System.out.println("[Wave] Wave " + wave.getWaveNumber() + " started!");
         }
     }
 

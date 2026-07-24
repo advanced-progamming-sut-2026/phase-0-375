@@ -174,6 +174,10 @@ public class Wave implements Tickable {
         return startDelay;
     }
 
+    public boolean isHugeWave() {
+        return isHugeWave;
+    }
+
     public boolean isFinalWave() {
         return isFinalWave;
     }

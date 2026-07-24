@@ -3,6 +3,7 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.GameState;
+import model.enums.GroundType;
 import model.enums.MenuType;
 import model.enums.PlacableLayer;
 import model.enums.PlantCategory;
@@ -21,6 +22,7 @@ import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
 import model.game.wave.WaveManager;
+import model.item.Grave;
 import model.item.Sun;
 import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
@@ -748,6 +750,17 @@ public class GameplayMenuController extends AppMenuController {
                 Cell cell = map.getCell(c, r);
                 char ch = '.';
                 if (cell != null) {
+                    // Terrain first (lowest layer): water, low tide, slides, necromancy, ice.
+                    ch = terrainChar(cell.getGroundType());
+
+                    // Graves sit on the field and hide the terrain under them.
+                    for (PlacableLayer layer : PlacableLayer.values()) {
+                        if (cell.getPlaceable(layer) instanceof Grave) {
+                            ch = 'T';
+                            break;
+                        }
+                    }
+
                     // Render every plant layer so stacked tiles are visible: GROUND (Lily Pad) -> 'G', (regular plant)
                     // -> 'P', OVERLAY (Pumpkin) -> 'O'. A cell with both MAIN and OVERLAY becomes 'B' (both).
                     boolean hasGround = cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance;
@@ -761,7 +774,7 @@ public class GameplayMenuController extends AppMenuController {
                     for (ZombieInstance z : model.getZombies()) {
                         var gp = z.getGridPosition();
                         if (gp != null && gp.getX() == c && gp.getY() == r) {
-                            ch = (ch == '.' || ch == 'G') ? 'Z' : 'X';
+                            ch = (ch == 'P' || ch == 'O' || ch == 'B') ? 'X' : 'Z';
                             break;
                         }
                     }
@@ -770,6 +783,8 @@ public class GameplayMenuController extends AppMenuController {
             }
             sb.append(row).append('\n');
         }
+        sb.append("Legend: P plant  O overlay plant  B both  G ground plant  Z zombie  X zombie on plant\n");
+        sb.append("        T grave  ~ water  _ low tide  ^ slide up  v slide down  N necromancy  * ice  . empty\n");
         // Sun tokens on the ground
         if (!model.getActiveSuns().isEmpty()) {
             sb.append("Sun tokens on the ground:\n");
@@ -779,6 +794,22 @@ public class GameplayMenuController extends AppMenuController {
             }
         }
         return CommandResult.successWithData(sb.toString(), sb.toString());
+    }
+
+    /** Maps a cell's ground type to its map symbol. */
+    private char terrainChar(GroundType ground) {
+        if (ground == null) {
+            return '.';
+        }
+        switch (ground) {
+            case WATER: return '~';
+            case LOW_TIDE: return '_';
+            case SLIDE_UP: return '^';
+            case SLIDE_DOWN: return 'v';
+            case NECROMANCY: return 'N';
+            case ICE: return '*';
+            default: return '.';
+        }
     }
 
     /**
