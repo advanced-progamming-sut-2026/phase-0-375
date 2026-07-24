@@ -6,6 +6,8 @@ import model.app.App;
 import model.command.CommonCommand;
 import model.enums.MenuType;
 
+import view.tui.TuiShell;
+
 import java.util.Scanner;
 
 public class AppMenuView {
@@ -39,7 +41,7 @@ public class AppMenuView {
     private boolean running = true;
 
     public void run() {
-        while (running && scanner.hasNextLine()) {
+        while (running) {
             // Show the unread-news badge once when the user enters Main.
             MenuType current = App.getInstance().getCurrentMenu();
             if (current == MenuType.MAIN && previousMenu != MenuType.MAIN) {
@@ -47,7 +49,12 @@ public class AppMenuView {
             }
             previousMenu = current;
 
-            String command = scanner.nextLine().trim();
+            String rawCommand = readCommandLine();
+            if (rawCommand == null) break; // EOF or Ctrl-C
+            String command = rawCommand.trim();
+            // In TUI mode an empty submit just repaints; plain mode keeps
+            // the original "Empty command." behavior of each menu view.
+            if (TuiShell.getActive() != null && command.isEmpty()) continue;
 
             // Phase 1: universal commands (work in any menu)
             if (CommonCommand.MENU_ENTER.matches(command)) {
@@ -81,6 +88,19 @@ public class AppMenuView {
             }
         }
         scanner.close();
+    }
+
+    /**
+     * Reads one command line: from the TUI input box when the shell is
+     * active, otherwise from stdin like the original CLI.
+     */
+    private String readCommandLine() {
+        TuiShell shell = TuiShell.getActive();
+        if (shell != null) {
+            return shell.readCommand();
+        }
+        if (!scanner.hasNextLine()) return null;
+        return scanner.nextLine();
     }
 
     // Lazy accessors for menu views
@@ -186,11 +206,21 @@ public class AppMenuView {
     // ── Display helpers ──
 
     public void displayMessage(String message) {
-        System.out.println(message);
+        TuiShell shell = TuiShell.getActive();
+        if (shell != null) {
+            shell.log(message);
+        } else {
+            System.out.println(message);
+        }
     }
 
     public void displayError(String error) {
-        System.err.println(error);
+        TuiShell shell = TuiShell.getActive();
+        if (shell != null) {
+            shell.logError(error);
+        } else {
+            System.err.println(error);
+        }
     }
 
     public void displayCommandResult(CommandResult<?> result) {

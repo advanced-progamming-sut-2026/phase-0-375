@@ -15,6 +15,9 @@ dependencies {
     // same version as the jars in src/lib — databind pulls core + annotations
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.2'
 
+    // Terminal UI shell (alternate screen, line editing, colored rendering)
+    implementation 'org.jline:jline:3.26.3'
+
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }
@@ -32,7 +35,10 @@ sourceSets {
     }
 }
 
-application { mainClass = 'Main' }    // Main.java has no package
+application {
+    mainClass = 'Main'
+    applicationDefaultJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+}
 
 tasks.named('run') {
     standardInput = System.in         // essential — it's a CLI game

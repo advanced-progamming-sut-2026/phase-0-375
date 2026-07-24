@@ -2,7 +2,11 @@ package view;
 
 import controller.GameplayMenuController;
 import controller.result.CommandResult;
+import model.app.App;
 import model.command.GameplayMenuCommand;
+import model.enums.GameState;
+import model.game.core.GameModel;
+import view.tui.TuiShell;
 
 public class GameplayMenuView extends AppMenuView {
     private static GameplayMenuView instance = null;
@@ -165,9 +169,42 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  menu exit");
     }
 
+    /** Delay between rendered ticks in TUI mode - faster than the 0.1s sim tick. */
+    private static final long TICK_RENDER_MS = 30;
+
     public void advanceTime(int count) {
-        CommandResult<Void> result = controller.advanceTime(count);
-        displayCommandResult(result);
+        TuiShell shell = TuiShell.getActive();
+        if (shell == null) {
+            // Plain CLI mode: advance silently and print the final result.
+            CommandResult<Void> result = controller.advanceTime(count);
+            displayCommandResult(result);
+            return;
+        }
+
+        // TUI mode: advance one tick at a time and repaint the live map
+        // after each tick, so the simulation is visibly animated.
+        for (int i = 0; i < count; i++) {
+            CommandResult<Void> result = controller.advanceTime(1);
+            if (!result.isSuccess()) {
+                displayCommandResult(result);
+                return;
+            }
+            shell.renderFrame();
+
+            GameModel model = App.getInstance().getCurrentGameModel();
+            if (model == null || model.getState() != GameState.RUNNING) {
+                // Win/lose verdict message produced by the controller.
+                displayCommandResult(result);
+                return;
+            }
+            try {
+                Thread.sleep(TICK_RENDER_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        displayMessage("Advanced " + count + " ticks.");
     }
 
     public void breakVase(int x, int y) {
