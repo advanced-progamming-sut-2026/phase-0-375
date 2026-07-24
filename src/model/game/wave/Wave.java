@@ -22,12 +22,10 @@ public class Wave implements Tickable {
 
     private int waveNumber;
     private WaveState state;
-    private int zombieIndex;
     private float spawnInterval; // seconds between zombie spawns within the model.game.wave
     private float startDelay; // delay before this model.game.wave starts after previous model.game.wave is cleared
     private boolean isFinalWave; // last model.game.wave of the level
     private boolean isHugeWave; // triggers the "huge wave" banner
-    private float spawnTimer;
 
     /** These objects encapsulate {@link WaveZombieEntry} in a wrapper class that stores other non-related
      *  data that {@link WaveZombieEntry} wouldn't concern.

@@ -38,7 +38,7 @@ public class PvZGameLoop implements GameLoop {
         boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled();
         this.sunFallSystem = new SunFallSystem(gameModel, sunDropRateModifier, skyDropEnabled);
 
-        this.plantSystem = new PlantSystem(gameModel, eventBus);
+        this.plantSystem = new PlantSystem(gameModel);
         this.projectileSystem = new ProjectileSystem(gameModel, eventBus);
         this.zombieSystem = new ZombieSystem(gameModel, eventBus);
         this.combatSystem = new CombatSystem(gameModel, eventBus);

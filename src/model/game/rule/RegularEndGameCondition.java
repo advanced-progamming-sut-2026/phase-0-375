@@ -7,9 +7,5 @@ import model.game.level.RegularLevel;
  * lose when a zombie reaches the house.
  */
 public class RegularEndGameCondition extends AbstractEndGameCondition {
-    private final RegularLevel regularLevel;
 
-    public RegularEndGameCondition(RegularLevel regularLevel) {
-        this.regularLevel = regularLevel;
-    }
 }

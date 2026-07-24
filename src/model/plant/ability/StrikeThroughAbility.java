@@ -77,17 +77,13 @@ public class StrikeThroughAbility implements PlantAbility {
 
         else if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
             int row = plant.getPosition().getY();
-            for (ZombieInstance zombie : context.getZombiesInLane(row)) {
-                int damage = (int) def.getPlantFoodValue();
-                if (damage <= 0) {
-                    damage = BURST_DAMAGE;
-                }
+            for (int i = 0; i < context.getZombiesInLane(row).size(); i++) {
                 float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
                 FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f + rangeBonus, row);
-                for (int i = 0; i < BURST_PROJ_COUNT; i++) {
+                for (int j = 0; j < BURST_PROJ_COUNT; j++) {
                     Pellet pellet = new Pellet(
                             def.getDamage(),
-                            new FloatPoint(origin.getX() + i * 0.05f, origin.getY()),
+                            new FloatPoint(origin.getX() + j * 0.05f, origin.getY()),
                             row,
                             PELLET_VELOCITY,
                             Projectile.Element.NONE,

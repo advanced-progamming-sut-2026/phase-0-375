@@ -1,10 +1,8 @@
 package model.game.systems;
 
-import model.enums.PlacableLayer;
 import model.enums.PlantCategory;
 import model.enums.PlantState;
 import model.enums.PlantTags;
-import model.event.EventBus;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.plant.ability.PlantAbilityContext;
@@ -21,12 +19,10 @@ import java.util.List;
 public class PlantSystem implements Tickable {
 
     private final GameModel gameModel;
-    private final EventBus eventBus;
     private final GameModelPlantAbilityContext context;
 
-    public PlantSystem(GameModel gameModel, EventBus eventBus) {
+    public PlantSystem(GameModel gameModel) {
         this.gameModel = gameModel;
-        this.eventBus = eventBus;
         this.context = new GameModelPlantAbilityContext(gameModel);
     }
 

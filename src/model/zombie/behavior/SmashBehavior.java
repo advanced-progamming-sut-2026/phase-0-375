@@ -168,7 +168,6 @@ public class SmashBehavior implements ZombieBehavior {
     public boolean isGargantuar(ZombieInstance zombie) {
         String name = zombie.getDefinition().getName();
         if (name == null) return false;
-        String lower = name.toLowerCase();
         return name.toLowerCase().contains("gargantuar");
     }
 

@@ -31,9 +31,9 @@ public class LevelConfig {
     // Additional configuration for special levels
     private int deadLineColumn;                    // for Dead Line levels (-1 = no dead line)
     private List<Point> protectedPlantPositions;   // for Save Our Seeds: positions of pre-placed plants
-    private String protectedPlantName;             // for Save Our Seeds: plant pre-placed on protected tiles (null = default)
+    private String protectedPlantName;             // Save Our Seeds: (null = default)
     private List<ProtectedPlantTile> protectedPlants;  // for Save Our Seeds: which plant sits on which tile
-    private List<String> forcedPlants;             // for Locked Plants (forced set): the seeds the player must start with
+    private List<String> forcedPlants;             // Locked Plants (forced set): the seeds the player must start with
     private Set<String> restrictedFamilies;        // for Locked Plants (family pick): families limited to one pick
     private boolean allFamiliesRestricted;         // for Locked Plants (family pick): every family limited to one pick
     private List<String> conveyorPlants;           // for Conveyor Belt: delivery pool, cycled in order
@@ -41,7 +41,8 @@ public class LevelConfig {
     private int conveyorCapacity;                  // for Conveyor Belt: max seed packets waiting on the belt
     private List<Point> waterTiles;                // explicit water tile positions
     private List<Point> lowTideTiles;              // Big Wave Beach: cells that may ambush when submerged
-    private int tideLimitColumn = -1;              // Big Wave Beach: max columns (from right) the tide may flood (-1 = static water only)
+    /// Big Wave Beach: max columns (from right) the tide may flood (-1 = static water only)
+    private int tideLimitColumn = -1;
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
 
     // --- Getters ---

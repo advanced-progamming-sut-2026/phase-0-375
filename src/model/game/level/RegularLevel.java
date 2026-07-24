@@ -35,7 +35,7 @@ public class RegularLevel extends Level {
 
     public RegularLevel(LevelConfig config) {
         super(config);
-        config.setEndGameCondition(new RegularEndGameCondition(this));
+        config.setEndGameCondition(new RegularEndGameCondition());
     }
 
     @Override
