@@ -3,6 +3,7 @@ package view;
 import controller.MainMenuController;
 import controller.NewsMenuController;
 import controller.result.CommandResult;
+import model.command.CommonCommand;
 import model.command.MainMenuCommand;
 
 public class MainMenuView extends AppMenuView {
@@ -25,11 +26,11 @@ public class MainMenuView extends AppMenuView {
             GameMenuView.getInstance().leaderboard(
                     MainMenuCommand.LEADERBOARD.getParameter("sort"),
                     MainMenuCommand.LEADERBOARD.getParameter("order"));
+        } else if (CommonCommand.HELP.matches(input)) {
+            displayHelp();
         } else {
-            displayError(
-                "Unknown command. Try: menu logout, menu leaderboard [-s <column>] [-o asc|desc], " +
-                        "menu enter score-game, or menu enter <menu_name>"
-            );
+            displayError("Unknown command");
+            displayHelp();
         }
     }
 
@@ -50,5 +51,16 @@ public class MainMenuView extends AppMenuView {
                 + bullet + " You have " + unread + " unread news! "
                 + "Type 'menu enter news' to view."
                 + reset);
+    }
+
+    private void displayHelp() {
+        displayError("Usage:");
+        displayError("  menu logout");
+        displayError("  menu leaderboard [-s <column>] [-o asc|desc]");
+        displayError("  menu enter game");
+        displayError("  menu enter score-game");
+        displayError("  menu enter settings");
+        displayError("  menu enter news");
+        displayError("  menu enter profile");
     }
 }

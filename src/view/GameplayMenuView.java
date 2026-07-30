@@ -80,7 +80,7 @@ public class GameplayMenuView extends AppMenuView {
 
     /** Prints the command reference shown for unrecognized input. */
     private void printUnknownCommandHelp() {
-        displayError("Unknown gameplay command. Available commands:");
+        displayError("Available commands:");
         displayError("  advance time -t <count> ticks");
         displayError("  start zombie waves");
         displayError("  collect sun -l (<x>, <y>)");
