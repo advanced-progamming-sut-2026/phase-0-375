@@ -46,6 +46,7 @@ public class MainMenuController extends AppMenuController {
 
     @Override
     public CommandResult<Void> menuExit() {
+        System.exit(0);
         return CommandResult.error("Use 'menu logout' to log out from the main menu.");
     }
 
