@@ -11,6 +11,7 @@ import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 import model.game.level.special.ConveyorBeltLevel;
 import model.item.Grave;
 import model.item.Sun;
@@ -22,7 +23,9 @@ import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Renders the live game map as colored terminal lines.
@@ -35,6 +38,29 @@ final class MapView {
     private static final AttributedStyle SUN_STYLE =
             AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW);
 
+    /**
+     * Sensible emoji for each Beghouled board plant and its upgraded form.
+     * Keyed by the plant definition name, lower-cased.
+     */
+    private static final Map<String, String> BEGHOULED_PLANT_EMOJI = new HashMap<>();
+    static {
+        BEGHOULED_PLANT_EMOJI.put("peashooter", "\uD83D\uDFE2");        // 🟢 single pea
+        BEGHOULED_PLANT_EMOJI.put("repeater", "\uD83D\uDD3B");          // 🔻 double-shot upgrade
+        BEGHOULED_PLANT_EMOJI.put("mega gatling pea", "\uD83D\uDD25");  // 🔥 quad-shot heavy upgrade
+        BEGHOULED_PLANT_EMOJI.put("snow pea", "\u2744\uFE0F");          // ❄️ frozen pea
+        BEGHOULED_PLANT_EMOJI.put("wall-nut", "\uD83E\uDD5C");          // 🥜 defensive nut
+        BEGHOULED_PLANT_EMOJI.put("tall-nut", "\uD83D\uDDFC");          // 🗼 taller defensive nut
+        BEGHOULED_PLANT_EMOJI.put("puff-shroom", "\uD83C\uDF44");       // 🍄 short-range mushroom
+        BEGHOULED_PLANT_EMOJI.put("fume-shroom", "\uD83D\uDCA8");       // 💨 gas-cloud upgrade
+        BEGHOULED_PLANT_EMOJI.put("cabbage-pult", "\uD83E\uDD6C");      // 🥬 lobbed cabbage
+        BEGHOULED_PLANT_EMOJI.put("melon-pult", "\uD83C\uDF49");        // 🍉 lobbed melon upgrade
+        BEGHOULED_PLANT_EMOJI.put("winter melon", "\u26C4");            // ⛄ frozen melon upgrade
+        BEGHOULED_PLANT_EMOJI.put("bonk choy", "\uD83E\uDD4A");         // 🥊 melee puncher
+    }
+
+    /** Fallback emoji for a Beghouled plant with no specific mapping above. */
+    private static final String BEGHOULED_DEFAULT_EMOJI = "\uD83C\uDF31"; // 🌱
+
     static List<AttributedString> render(GameModel model) {
         GameMap map = model.getMap();
         List<AttributedString> lines = new ArrayList<>();
@@ -45,10 +71,14 @@ final class MapView {
         appendHeaderAndGrid(lines, model, map, level, tideLimit);
         appendInfoLines(lines, model, level, tideLimit);
 
-        lines.add(new AttributedString(
-                "P plant  O overlay  B both  G ground  Z zombie  X zombie-on-plant"
-                 + "  T grave  $ sun-grave  + pf-grave  V vase  ~ water  _ tide  ^v slide  N necro  * ice  . empty",
-                DIM));
+        String legend = "P plant  O overlay  B both  G ground  Z zombie  X zombie-on-plant"
+                 + "  T grave  $ sun-grave  + pf-grave  V vase  ~ water  _ tide  ^v slide  N necro  * ice  . empty";
+        if (level instanceof BeghouledLevel) {
+            legend += "  (plants shown as emoji: 🟢 Peashooter 🔻 Repeater 🔥 Mega Gatling Pea "
+                    + "❄️ Snow Pea 🥜 Wall-nut 🗼 Tall-nut 🍄 Puff-shroom 💨 Fume-shroom "
+                    + "🥬 Cabbage-pult 🍉 Melon-pult ⛄ Winter Melon 🥊 Bonk Choy)";
+        }
+        lines.add(new AttributedString(legend, DIM));
         return lines;
     }
 
@@ -83,6 +113,14 @@ final class MapView {
                     Vase vase = vbLevel.vaseAt(c, r);
                     if (vase != null) {
                         ch = 'V';
+                    }
+                }
+                // Beghouled: show a plant-specific emoji instead of the generic P/O/B/G letter.
+                if (level instanceof BeghouledLevel && (ch == 'P' || ch == 'O' || ch == 'B' || ch == 'G')) {
+                    String emoji = beghouledEmoji(map, c, r);
+                    if (emoji != null) {
+                        row.append(emoji, styleFor(ch));
+                        continue;
                     }
                 }
                 row.append(ch + " ", styleFor(ch));
@@ -179,6 +217,27 @@ final class MapView {
             }
         }
         return ch;
+    }
+
+    /**
+     * Resolves the emoji for the plant occupying (c, r) on a Beghouled
+     * board, checked in MAIN then GROUND layer order. Returns null if the
+     * cell holds no plant (so the caller falls back to the plain letter).
+     */
+    private static String beghouledEmoji(GameMap map, int c, int r) {
+        Cell cell = map.getCell(c, r);
+        if (cell == null) return null;
+        PlantInstance plant = null;
+        if (cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance main) {
+            plant = main;
+        } else if (cell.getPlaceable(PlacableLayer.GROUND) instanceof PlantInstance ground) {
+            plant = ground;
+        }
+        if (plant == null || plant.getDefinition() == null || plant.getDefinition().getName() == null) {
+            return null;
+        }
+        String name = plant.getDefinition().getName().toLowerCase();
+        return BEGHOULED_PLANT_EMOJI.getOrDefault(name, BEGHOULED_DEFAULT_EMOJI) + " ";
     }
 
     private static char terrainChar(GroundType ground) {

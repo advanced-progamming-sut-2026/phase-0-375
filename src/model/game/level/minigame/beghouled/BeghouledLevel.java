@@ -28,6 +28,8 @@ public class BeghouledLevel extends MiniGameLevel {
     /** Sun granted per "one sun" reward unit. */
     public static final int SUN_PER_REWARD = 50;
 
+    private static final int LAWN_COLUMNS = 8;
+
     /** Attempts at generating a board that has at least one legal move. */
     private static final int MAX_BOARD_GENERATION_ATTEMPTS = 60;
 
@@ -564,7 +566,8 @@ public class BeghouledLevel extends MiniGameLevel {
     private void spawnZombieFromPool(GameModel model) {
         List<String> pool = settings.getZombiePool();
         String zombie = pool.get(random.nextInt(pool.size()));
-        model.spawnZombieAt(zombie, random.nextInt(rows()), cols() - 1);
+        int spawnCol = Math.min(LAWN_COLUMNS - 1, cols() - 1);
+        model.spawnZombieAt(zombie, random.nextInt(rows()), spawnCol);
     }
 
     /** Spec: reaching the match target destroys every zombie in the garden. */
