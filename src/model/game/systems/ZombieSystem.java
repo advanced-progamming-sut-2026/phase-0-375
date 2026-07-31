@@ -37,6 +37,9 @@ public class ZombieSystem implements Tickable {
     private final GameModel gameModel;
     private final EventBus eventBus;
 
+    private static final float LOOT_DROP_CHANCE = 0.10f;
+    private final java.util.Random lootRandom = new java.util.Random();
+
     public ZombieSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
         this.eventBus = eventBus;
@@ -411,6 +414,10 @@ public class ZombieSystem implements Tickable {
                 gameModel.recordZombieKilled(zombie);
                 gameModel.notifyZombieKilledForScore(zombie);
 
+                gameModel.recordZombieKilled(zombie);
+                gameModel.notifyZombieKilledForScore(zombie);
+                maybeDropLoot();
+
                 // Spec notification: "Zombie of type <type> is dead at (<x>, <y>)"
                 var pos = zombie.getGridPosition();
                 int deadX = pos != null ? pos.getX() : -1;
@@ -436,5 +443,28 @@ public class ZombieSystem implements Tickable {
     private void killSilently(ZombieInstance zombie) {
         zombie.setCurrentHP(0);
         zombie.setState(ZombieState.DEAD);
+    }
+
+    private void maybeDropLoot() {
+        if (lootRandom.nextFloat() >= LOOT_DROP_CHANCE) return;
+
+        int roll = lootRandom.nextInt(3);
+        switch (roll) {
+            case 0:
+                gameModel.addDiamonds(1);
+                model.app.App.logToShell("A zombie dropped a diamond; you have "
+                        + gameModel.getDiamondCount() + " now.");
+                break;
+            case 1:
+                gameModel.addCoins(50);
+                model.app.App.logToShell("A zombie dropped 50 coins; you have "
+                        + gameModel.getCoinCount() + " now.");
+                break;
+            case 2:
+                gameModel.addFlowerPots(1);
+                model.app.App.logToShell("A zombie dropped a flower pot; you have "
+                        + gameModel.getFlowerPotCount() + " now.");
+                break;
+        }
     }
 }

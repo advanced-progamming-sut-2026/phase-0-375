@@ -90,6 +90,11 @@ public class GameModel implements BehaviorContext {
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
+    // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
+    private int diamondCount;
+    private int coinCount;
+    private int flowerPotCount;
+
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
         this.difficultyLevel = App.getInstance().getCurrentUser().getDifficultyLevel();
@@ -211,6 +216,24 @@ public class GameModel implements BehaviorContext {
     public boolean isNightLevel() {
         return chapter == Chapter.DARK_AGES;
     }
+
+    public void addDiamonds(int amount) {
+        if (amount > 0) diamondCount += amount;
+    }
+
+    public void addCoins(int amount) {
+        if (amount > 0) coinCount += amount;
+    }
+
+    public void addFlowerPots(int amount) {
+        if (amount > 0) flowerPotCount += amount;
+    }
+
+    public int getDiamondCount() { return diamondCount; }
+
+    public int getCoinCount() { return coinCount; }
+
+    public int getFlowerPotCount() { return flowerPotCount; }
 
     /**
      * @return true if the cell at {@code (row, col)} is a water tile.

@@ -47,7 +47,7 @@ public class LawnMowerSystem implements Tickable {
                 // Spec notification — printed once when the mower has
                 // finished crossing the lane, listing every zombie it
                 // killed during the sweep (triggering zombie + sweep).
-                notifyMowerKills(row, mower);
+//                notifyMowerKills(row, mower);
             }
         }
     }
