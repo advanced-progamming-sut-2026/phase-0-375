@@ -530,7 +530,7 @@ public class ProjectileSystem implements Tickable {
      * melts the ice coating it (Frostbite Caves spec).
      */
     private void thawFrozenPlantIfPresent(Projectile projectile) {
-        if (!projectile.isFire()) {
+        if (!projectile.isFire() || projectile instanceof Splash) {
             return;
         }
         int row = projectile.getRow();

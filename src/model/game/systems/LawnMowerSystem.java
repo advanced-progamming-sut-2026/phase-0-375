@@ -53,6 +53,7 @@ public class LawnMowerSystem implements Tickable {
     }
 
     private void killZombiesInPath(LawnMower mower, int row, float mowerX) {
+        if (mowerX >= gameModel.getColumnCount()) return;
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(row);
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;

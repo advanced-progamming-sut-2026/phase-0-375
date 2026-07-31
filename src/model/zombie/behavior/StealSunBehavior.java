@@ -1,5 +1,6 @@
 package model.zombie.behavior;
 
+import model.enums.SunType;
 import model.enums.ZombieBehaviorType;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
@@ -126,9 +127,7 @@ public class StealSunBehavior implements ZombieBehavior {
             drainTimer += deltaTime;
 
             // Drain from player reserve proportionally to elapsed time.
-            float drainRate = zombie.getDefinition().getBehaviorPropFloat(
-                    "TurquoiseDrainRate", DEFAULT_TURQUOISE_DRAIN_RATE);
-            if (drainRate <= 0f) drainRate = DEFAULT_TURQUOISE_DRAIN_RATE;
+            float drainRate = DEFAULT_TURQUOISE_DRAIN_RATE;
             float drainThisTick = drainRate * deltaTime;
             int drainAmount = (int) drainThisTick;
             if (drainAmount > 0) {
@@ -199,9 +198,9 @@ public class StealSunBehavior implements ZombieBehavior {
      * Called by the game system when the Ra zombie is killed.
      * Returns all captured sun to the player's reserve.
      */
-    public void onRaZombieDeath(BehaviorContext context) {
+    public void onRaZombieDeath(ZombieInstance zombie, BehaviorContext context) {
         if (context == null) return;
-        context.addSun(stolenSunAmount);
+        dropMultipleSuns(zombie, context, stolenSunAmount);
         capturedGroundSuns.clear();
         stolenSunAmount = 0;
     }
@@ -210,10 +209,10 @@ public class StealSunBehavior implements ZombieBehavior {
      * Called by the game system when the Turquoise zombie is killed.
      * Half of the stolen sun is returned to the player.
      */
-    public void onTurquoiseZombieDeath(BehaviorContext context) {
+    public void onTurquoiseZombieDeath(ZombieInstance zombie, BehaviorContext context) {
         if (context == null) return;
         int returned = (int) (stolenSunAmount * TURQUOISE_DEATH_RETURN_FRACTION);
-        context.addSun(returned);
+        dropMultipleSuns(zombie, context, returned);
         stolenSunAmount = 0;
     }
 
@@ -226,9 +225,9 @@ public class StealSunBehavior implements ZombieBehavior {
     public void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
         if (zombie == null || context == null) return;
         if (isTurquoise(zombie)) {
-            onTurquoiseZombieDeath(context);
+            onTurquoiseZombieDeath(zombie, context);
         } else {
-            onRaZombieDeath(context);
+            onRaZombieDeath(zombie, context);
         }
     }
 
@@ -256,9 +255,7 @@ public class StealSunBehavior implements ZombieBehavior {
      * detection range to the left of the zombie on the same row.
      */
     private boolean isPlantInRange(ZombieInstance zombie, BehaviorContext context) {
-        int detectionRange = zombie.getDefinition().getBehaviorPropInt(
-                "TurquoiseDetectionRange", DEFAULT_TURQUOISE_DETECTION_RANGE);
-        if (detectionRange <= 0) detectionRange = DEFAULT_TURQUOISE_DETECTION_RANGE;
+        int detectionRange = DEFAULT_TURQUOISE_DETECTION_RANGE;
 
         int zombieCol = zombie.getGridX();
         int row = zombie.getGridY();
@@ -269,6 +266,22 @@ public class StealSunBehavior implements ZombieBehavior {
             }
         }
         return false;
+    }
+
+    private void dropSun(ZombieInstance zombie, BehaviorContext context, int amount) {
+        int row = zombie.getGridY();
+        int col = zombie.getGridX();
+        Sun sun = new Sun(SunType.NORMAL, amount, col, row);
+        context.spawnSun(sun);
+    }
+
+    private void dropMultipleSuns(ZombieInstance zombie, BehaviorContext context, int amount) {
+        int numOfSuns = (int) Math.ceil(amount / 50f);
+        for (int i = 0; i < numOfSuns; i++) {
+            int currentSunAmount = Math.min(50, amount);
+            dropSun(zombie, context, currentSunAmount);
+            amount -= 50;
+        }
     }
 
     // --- Getters ---

@@ -106,6 +106,14 @@ public class Cell {
         projectiles.remove(projectile);
     }
 
+    public void rekeyPlaceable(Placeable placeable, PlacableLayer oldLayer) {
+        if (placeable == null) return;
+        if (placeables.get(oldLayer) == placeable) {
+            placeables.remove(oldLayer);
+            placeables.put(placeable.getLayer(), placeable);
+        }
+    }
+
     // --- Ground / terrain access ---
 
     /**

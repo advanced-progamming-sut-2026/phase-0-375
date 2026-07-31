@@ -68,6 +68,14 @@ public class StrikeThroughAbility implements PlantAbility {
         Plant def = plant.getDefinition();
         if (plant.getPosition() == null) return;
 
+        if (def.isShroom()) {
+            for (PlantInstance plantInstance : context.getAllPlants()) {
+                if (plantInstance.getDefinition().getName().equals(def.getName())) {
+                    plantInstance.setLifespanRemaining(PlantInstance.SHROOM_BASE_LIFESPAN);
+                }
+            }
+        }
+
         if (def.getPlantFoodType() == PlantFoodType.KNOCKBACK_BLAST) {
             int row = plant.getPosition().getY();
             for (ZombieInstance zombie : context.getZombiesInLane(row)) {

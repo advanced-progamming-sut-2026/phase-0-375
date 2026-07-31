@@ -27,7 +27,7 @@ public class ZombieFactory {
     private static final int ICE_BLOCK_HP = 600;
 
     /** HP of the Barrel Roller's barrel. */
-    private static final int BARREL_HP = 1100;
+    private static final int BARREL_HP = 600;
 
     private final ArmorRegistry armorRegistry;
 

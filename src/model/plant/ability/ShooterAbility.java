@@ -48,7 +48,6 @@ public class ShooterAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
-        if (!shouldFire(plant, context)) return;
 
         Projectile.Element element = inferElement(def);
         FloatPoint origin = pelletOrigin(plant);

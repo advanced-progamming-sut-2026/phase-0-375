@@ -38,7 +38,7 @@ public class SunProducerAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() == PlantAbilityType.INSTANT_SUN_BURST) {
-            context.addSun((int) def.getAbilityValue());
+            dropMultipleSuns(plant, context, (int) def.getAbilityValue());
             context.destroyPlant(plant);
             return;
         }
@@ -62,8 +62,12 @@ public class SunProducerAbility implements PlantAbility {
         for (int i = 0; i < count; i++) {
             float dx = (RNG.nextFloat() - 0.5f) * 2.0f;  // -1.0 .. +1.0
             float dy = (RNG.nextFloat() - 0.5f) * 2.0f;  // -1.0 .. +1.0
-            int col = Math.round(plant.getPosition().getX() + dx);
-            int row = Math.round(plant.getPosition().getY() + dy);
+            float x = Math.max(0f, Math.min(context.getColumnCount() - 1,
+                    plant.getPosition().getX() + dx));
+            float y = Math.max(0f, Math.min(context.getRowCount() - 1,
+                    plant.getPosition().getY() + dy));
+            int col = Math.round(x);
+            int row = Math.round(y);
             Sun sun = new Sun(
                     SunType.NORMAL,
                     computeSunAmount(plant),
@@ -139,5 +143,14 @@ public class SunProducerAbility implements PlantAbility {
         int col = plant.getPosition().getX();
         Sun sun = new Sun(SunType.NORMAL, amount, col, row);
         context.spawnSun(sun);
+    }
+
+    private void dropMultipleSuns(PlantInstance plant, PlantAbilityContext context, int amount) {
+        int numOfSuns = (int) Math.ceil(amount / 50f);
+        for (int i = 0; i < numOfSuns; i++) {
+            int currentSunAmount = Math.min(50, amount);
+            dropSun(plant, context, currentSunAmount);
+            amount -= 50;
+        }
     }
 }

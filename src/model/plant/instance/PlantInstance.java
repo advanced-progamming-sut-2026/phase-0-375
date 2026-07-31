@@ -6,6 +6,7 @@ import model.enums.PlantCategory;
 import model.enums.PlantState;
 import model.enums.PlantTags;
 import model.app.App;
+import model.game.map.Cell;
 import model.game.map.Point;
 import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
@@ -96,14 +97,17 @@ public class PlantInstance implements Placeable {
                 && def.getName().toLowerCase().contains("imitat");
     }
 
-    private static final float IMITATER_TRANSFORM_DELAY = 1.0f; // Default delay before it morphs into its target
-    private static final float SHROOM_BASE_LIFESPAN = 60.0f; // Base lifespan for non-warm-up shrooms.
+    public static final float IMITATER_TRANSFORM_DELAY = 1.0f; // Default delay before it morphs into its target
+    public static final float SHROOM_BASE_LIFESPAN = 60.0f; // Base lifespan for non-warm-up shrooms.
 
     // --- Tick ---
     /** Advances this plant by one game tick. */
     public void tick(float deltaTime, PlantAbilityContext context) {
         if (state == PlantState.DYING || state == PlantState.FROZEN
                 || state == PlantState.TRANSFORMED) {
+            return;
+        }
+        if (tickImitaterTransform(deltaTime)) {
             return;
         }
         tickRecharge(deltaTime);
@@ -117,8 +121,6 @@ public class PlantInstance implements Placeable {
         if (canAct()) {
             executeAbility(context);
         }
-        // When the countdown hits zero the instance morphs into its imitate target.
-        tickImitaterTransform(deltaTime);
     }
 
     /** Recharge/cooldown decay multiplier = dl/3 (higher difficulty = faster plant cooldowns). */
@@ -173,7 +175,7 @@ public class PlantInstance implements Placeable {
     }
 
     private boolean canAct() {
-        if (state == PlantState.STUNNED) return false;
+        if (state == PlantState.STUNNED || transformCountdown >= 0f) return false;
         Plant def = definition;
         if (def.getActionInterval() <= 0) {
             return true;
@@ -246,10 +248,6 @@ public class PlantInstance implements Placeable {
     }
 
     // --- Level upgrades ---
-    /**
-     * Applies every cumulative level upgrade from level 2 up to
-     * {@code targetLevel}.
-     */
     public void applyLevelUpgrade(int targetLevel) {
         if (targetLevel <= 1 || definition.getLevels() == null) {
             this.level = Math.max(1, targetLevel);
@@ -295,7 +293,6 @@ public class PlantInstance implements Placeable {
         definition.setActionInterval(newActionInterval);
         this.level = targetLevel;
     }
-
     /** Applies a non-numeric special-mechanic upgrade. */
     private void applySpecialMechanic(LevelUpgrade upgrade) {
         switch (upgrade.getSpecialTag()) {
@@ -333,14 +330,12 @@ public class PlantInstance implements Placeable {
                 break;
         }
     }
-
     // --- Ability strategy resolution ---
     public PlantAbility getAbilityStrategy() {
         if (abilityStrategy != null) return abilityStrategy;
         abilityStrategy = createAbilityStrategy(definition.getCategory());
         return abilityStrategy;
     }
-
     private static PlantAbility createAbilityStrategy(PlantCategory category) {
         if (category == null) return null;
         switch (category) {
@@ -404,9 +399,7 @@ public class PlantInstance implements Placeable {
         state = (stateBeforeTransform != null) ? stateBeforeTransform : PlantState.IDLE;
         stateBeforeTransform = null;
     }
-
     // --- Imitater transform ---
-
     /** Tick the Imitater's transform countdown. */
     public boolean tickImitaterTransform(float deltaTime) {
         if (transformCountdown < 0f) return false;
@@ -432,7 +425,17 @@ public class PlantInstance implements Placeable {
     }
     public void transformInto(Plant newDefinition) {
         if (newDefinition == null) return;
+        PlacableLayer oldLayer = getLayer();
+
         this.definition = newDefinition;
+
+        if (position != null && App.getInstance().getCurrentGameModel() != null) {
+            Cell cell = App.getInstance().getCurrentGameModel().getCellAt(position.getY(), position.getX());
+            if (cell != null) {
+                cell.rekeyPlaceable(this, oldLayer);
+            }
+        }
+
         this.state = PlantState.IDLE;
         this.currentHP = newDefinition.getBaseHP();
         this.currentRecharge = newDefinition.getRechargeTime();
@@ -449,9 +452,12 @@ public class PlantInstance implements Placeable {
         }
         this.abilityStrategy = null;
         this.imitateTarget = null;
-        this.transformCountdown = -1f;
+        if (newDefinition.isShroom() && !isImitater(newDefinition)) {
+            this.lifespanRemaining = SHROOM_BASE_LIFESPAN;
+        } else {
+            this.lifespanRemaining = -1f;
+        }
     }
-
     // --- Getters ---
     public Plant getDefinition() { return definition; }
     public PlantState getState() { return state; }
@@ -500,4 +506,6 @@ public class PlantInstance implements Placeable {
     public void setCurrentRecharge(float currentRecharge) { this.currentRecharge = currentRecharge; }
     /** Sets the plant name this Imitater should morph into. */
     public void setImitateTarget(String imitateTarget) { this.imitateTarget = imitateTarget; }
+
+    public void setLifespanRemaining(float lifespanRemaining) { this.lifespanRemaining = lifespanRemaining; }
 }
