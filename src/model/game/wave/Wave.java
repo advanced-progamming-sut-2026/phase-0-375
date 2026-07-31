@@ -108,8 +108,14 @@ public class Wave implements Tickable {
         this.state = WaveState.ACTIVE;
         this.waveClock = 0f;
 
+        float ts = gameModel == null ? 1f : gameModel.difficultyPenalty();
         for (EntryRuntime rtEntry : runtimeEntries) {
             WaveZombieEntry e = rtEntry.getWaveZombieEntry();
+            e.setMinSpawnDelay(e.getMinSpawnDelay() * ts);
+            e.setMaxSpawnDelay(e.getMaxSpawnDelay() * ts);
+            e.setMinSpawnInterval(e.getMinSpawnInterval() * ts);
+            e.setMaxSpawnInterval(e.getMaxSpawnInterval() * ts);
+            e.setStreamDurationSeconds(e.getStreamDurationSeconds() * ts);
             rtEntry.setFirstSpawnAt(rng.nextFloat(e.getMinSpawnDelay(), e.getMaxSpawnDelay()));
             rtEntry.setRemainingSpawns(rng.nextInt(e.getMinCount(), e.getMaxCount()));
             rtEntry.setNextSpawnAt(rtEntry.getFirstSpawnAt());
@@ -169,7 +175,7 @@ public class Wave implements Tickable {
     }
 
     public float getStartDelay() {
-        return startDelay;
+        return startDelay * (gameModel == null ? 1f : gameModel.difficultyPenalty());
     }
 
     public boolean isHugeWave() {

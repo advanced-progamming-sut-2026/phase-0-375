@@ -1,5 +1,6 @@
 package model.plant.instance;
 
+import model.app.App;
 import model.enums.PlacableLayer;
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
@@ -120,9 +121,16 @@ public class PlantInstance implements Placeable {
         tickImitaterTransform(deltaTime);
     }
 
+    /** Recharge/cooldown decay multiplier = dl/3 (higher difficulty = faster plant cooldowns). */
+    private static float difficultyRechargeScale() {
+        var model = App.getInstance().getCurrentGameModel();
+        return model == null ? 1f : model.difficultyBoost();
+    }
+
     private void tickRecharge(float deltaTime) {
         if (currentRecharge > 0) {
-            currentRecharge = Math.max(0, currentRecharge - deltaTime);
+            float scale = difficultyRechargeScale();
+            currentRecharge = Math.max(0, currentRecharge - deltaTime * scale);
         }
     }
 
@@ -150,7 +158,8 @@ public class PlantInstance implements Placeable {
     private void tickAbilityCooldowns(float deltaTime) {
         for (AbilityState state : abilityStates.values()) {
             if (state.getCooldownRemaining() > 0) {
-                state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime));
+                float scale = difficultyRechargeScale();
+                state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime * scale));
             }
             if (state.isDigesting()) {
                 state.setDigestRemaining(Math.max(0f, state.getDigestRemaining() - deltaTime));
