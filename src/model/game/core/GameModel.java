@@ -320,7 +320,7 @@ public class GameModel implements BehaviorContext {
         if (myopointTracker != null) {
             myopointTracker.onZombieSpawned(instance, elapsedSeconds);
         }
-        System.out.println("[Tornado] A " + zombie.getName()
+        App.logToShell("[Tornado] A " + zombie.getName()
                 + " is carried in by a tornado and lands " + columnsAhead
                 + " column(s) ahead in lane " + (lane + 1) + "!");
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));

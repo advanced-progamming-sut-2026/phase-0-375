@@ -248,66 +248,80 @@ public class LevelRegistry {
         int waveIndex = 0;
         for (LevelDataEntry.WaveData rawWave : waveData) {
             waveIndex++;
-            int waveNumber = rawWave.getWaveNumber() > 0 ? rawWave.getWaveNumber() : waveIndex;
-            boolean isFinal = rawWave.isFinalWave();
-
-            // Phase-2 budget-based wave: explicit waveBudget OR fallback when
-            // the wave has candidate pools but no scripted entries.
-            int budget = rawWave.getWaveBudget();
-            if (budget <= 0) {
-                budget = computeDefaultWaveBudget(waveNumber, isFinal,
-                        rawWave.getEntries());
-            }
-
-            List<EntryRuntime> runtimes = new ArrayList<>();
-            List<SpawnPatternType> patternTypes = new ArrayList<>();
-
-            if (budget > 0) {
-                // Build a single pooled entry + BudgetSpawnStrategy.
-                List<LevelDataEntry.ZombieCandidateData> flatPool = new ArrayList<>();
-                if (rawWave.getEntries() != null) {
-                    for (LevelDataEntry.WaveEntryData e : rawWave.getEntries()) {
-                        if (e.getPool() != null) flatPool.addAll(e.getPool());
-                    }
-                }
-                WaveZombieEntry pooledEntry = buildBudgetWaveEntry(flatPool);
-                if (pooledEntry != null) {
-                    EntryRuntime rt = new EntryRuntime(pooledEntry);
-                    runtimes.add(rt);
-                    patternTypes.add(SpawnPatternType.STREAM);
-                }
-            } else if (rawWave.getEntries() != null) {
-                // Legacy scripted-entry model.
-                for (LevelDataEntry.WaveEntryData rawEntry : rawWave.getEntries()) {
-                    SpawnPatternType patternType = resolveEnum(
-                            SpawnPatternType.class, rawEntry.getPattern(), SpawnPatternType.SINGLE
-                    );
-                    WaveZombieEntry entry = buildWaveEntry(rawEntry, patternType);
-                    if (entry != null) {
-                        runtimes.add(new EntryRuntime(entry));
-                        patternTypes.add(patternType);
-                    }
-                }
-            }
-
-            Wave wave = new Wave(
-                waveNumber, runtimes, rawWave.getStartDelay(),
-                rawWave.isHugeWave(), isFinal
-            );
-            wave.setWaveBudget(budget);
-            for (int i = 0; i < runtimes.size(); i++) {
-                EntryRuntime runtime = runtimes.get(i);
-                SpawnStrategy strategy;
-                if (budget > 0) {
-                    strategy = new BudgetSpawnStrategy(runtime, wave, budget);
-                } else {
-                    strategy = spawnStrategy(patternTypes.get(i), runtime, wave);
-                }
-                runtime.getWaveZombieEntry().setPattern(strategy);
-            }
-            waves.add(wave);
+            waves.add(buildWave(rawWave, waveIndex));
         }
         return Collections.unmodifiableList(waves);
+    }
+
+    /** Builds a single Wave: resolves its budget, its entries, and their spawn strategies. */
+    private static Wave buildWave(LevelDataEntry.WaveData rawWave, int waveIndex) {
+        int waveNumber = rawWave.getWaveNumber() > 0 ? rawWave.getWaveNumber() : waveIndex;
+        boolean isFinal = rawWave.isFinalWave();
+
+        // Phase-2 budget-based wave: explicit waveBudget OR fallback when
+        // the wave has candidate pools but no scripted entries.
+        int budget = rawWave.getWaveBudget();
+        if (budget <= 0) {
+            budget = computeDefaultWaveBudget(waveNumber, isFinal, rawWave.getEntries());
+        }
+
+        List<EntryRuntime> runtimes = new ArrayList<>();
+        List<SpawnPatternType> patternTypes = new ArrayList<>();
+        buildWaveRuntimes(rawWave, budget, runtimes, patternTypes);
+
+        Wave wave = new Wave(
+                waveNumber, runtimes, rawWave.getStartDelay(),
+                rawWave.isHugeWave(), isFinal
+        );
+        wave.setWaveBudget(budget);
+        assignSpawnStrategies(wave, runtimes, patternTypes, budget);
+        return wave;
+    }
+
+    /**
+     * Populates {@code runtimes}/{@code patternTypes} for one wave: either a single
+     * pooled entry driven by the budget, or the legacy scripted-entry list.
+     */
+    private static void buildWaveRuntimes(LevelDataEntry.WaveData rawWave, int budget,
+                                          List<EntryRuntime> runtimes, List<SpawnPatternType> patternTypes) {
+        if (budget > 0) {
+            // Build a single pooled entry + BudgetSpawnStrategy.
+            List<LevelDataEntry.ZombieCandidateData> flatPool = new ArrayList<>();
+            if (rawWave.getEntries() != null) {
+                for (LevelDataEntry.WaveEntryData e : rawWave.getEntries()) {
+                    if (e.getPool() != null) flatPool.addAll(e.getPool());
+                }
+            }
+            WaveZombieEntry pooledEntry = buildBudgetWaveEntry(flatPool);
+            if (pooledEntry != null) {
+                runtimes.add(new EntryRuntime(pooledEntry));
+                patternTypes.add(SpawnPatternType.STREAM);
+            }
+        } else if (rawWave.getEntries() != null) {
+            // Legacy scripted-entry model.
+            for (LevelDataEntry.WaveEntryData rawEntry : rawWave.getEntries()) {
+                SpawnPatternType patternType = resolveEnum(
+                        SpawnPatternType.class, rawEntry.getPattern(), SpawnPatternType.SINGLE
+                );
+                WaveZombieEntry entry = buildWaveEntry(rawEntry, patternType);
+                if (entry != null) {
+                    runtimes.add(new EntryRuntime(entry));
+                    patternTypes.add(patternType);
+                }
+            }
+        }
+    }
+
+    /** Attaches the appropriate SpawnStrategy to each entry runtime for the wave. */
+    private static void assignSpawnStrategies(Wave wave, List<EntryRuntime> runtimes,
+                                              List<SpawnPatternType> patternTypes, int budget) {
+        for (int i = 0; i < runtimes.size(); i++) {
+            EntryRuntime runtime = runtimes.get(i);
+            SpawnStrategy strategy = budget > 0
+                    ? new BudgetSpawnStrategy(runtime, wave, budget)
+                    : spawnStrategy(patternTypes.get(i), runtime, wave);
+            runtime.getWaveZombieEntry().setPattern(strategy);
+        }
     }
 
     /**

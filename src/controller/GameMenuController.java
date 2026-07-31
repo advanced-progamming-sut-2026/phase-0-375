@@ -42,16 +42,24 @@ public class GameMenuController extends AppMenuController {
     }
 
     public CommandResult<Void> enterChapter(String chapterName, Integer levelId) {
+        CommandResult<LevelResolution> resolved = resolveLevel(chapterName, levelId);
+        if (!resolved.isSuccess()) {
+            return CommandResult.error(resolved.getMessage());
+        }
+        return startLevel(chapterName, resolved.getData());
+    }
+
+    private CommandResult<LevelResolution> resolveLevel(String chapterName, Integer levelId) {
         Chapter chapter;
         try {
             chapter = Chapter.valueOf(chapterName.toUpperCase().replace(' ', '_').replace('-', '_'));
         } catch (IllegalArgumentException e) {
-            return CommandResult.error("Unknown chapter: '" + chapterName + "'.");
+            return CommandResult.errorTyped("Unknown chapter: '" + chapterName + "'.");
         }
 
         User user = App.getInstance().getCurrentUser();
         if (!isChapterUnlocked(user, chapter)) {
-            return CommandResult.error("Chapter '" + chapterName + "' is not unlocked yet.");
+            return CommandResult.errorTyped("Chapter '" + chapterName + "' is not unlocked yet.");
         }
 
         LevelRegistry registry;
@@ -62,7 +70,7 @@ public class GameMenuController extends AppMenuController {
                 LevelRegistry.init("/assets/data/levels/levels.json");
                 registry = LevelRegistry.getInstance();
             } catch (IOException | RuntimeException loadError) {
-                return CommandResult.error("Could not load level definitions: " + loadError.getMessage());
+                return CommandResult.errorTyped("Could not load level definitions: " + loadError.getMessage());
             }
         }
 
@@ -71,22 +79,29 @@ public class GameMenuController extends AppMenuController {
 
         if (levelId != null) {
             if (!registry.hasLevel(chapter, levelId)) {
-                return CommandResult.error("Level " + levelId + " does not exist in " + chapter + ".");
+                return CommandResult.errorTyped("Level " + levelId + " does not exist in " + chapter + ".");
             }
             if (levelId > nextLevelId) {
-                return CommandResult.error("Level " + levelId + " is locked. Beat level "
+                return CommandResult.errorTyped("Level " + levelId + " is locked. Beat level "
                         + (nextLevelId - 1) + " first (next unlocked: " + nextLevelId + ").");
             }
         }
 
         Level level = registry.createLevel(chapter, targetLevelId);
         if (level == null) {
-            return CommandResult.error("No level definition found for " + chapter + " level " + targetLevelId + ".");
+            return CommandResult.errorTyped(
+                    "No level definition found for " + chapter + " level " + targetLevelId + ".");
         }
-
         if (!level.canStart()) {
-            return CommandResult.error("Level " + targetLevelId + " of " + chapter + " cannot be started.");
+            return CommandResult.errorTyped("Level " + targetLevelId + " of " + chapter + " cannot be started.");
         }
+        return CommandResult.successWithData(
+                "Resolved " + chapter + " level " + targetLevelId + ".",
+                new LevelResolution(targetLevelId, level));
+    }
+
+    private CommandResult<Void> startLevel(String chapterName, LevelResolution resolution) {
+        Level level = resolution.level();
 
         GameModel model = new GameModel(level);
         PvZGameLoop loop = new PvZGameLoop(model);
@@ -97,8 +112,10 @@ public class GameMenuController extends AppMenuController {
         level.onStart();
         App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
 
-        return CommandResult.success("Entering " + chapterName + " level " + targetLevelId + ".");
+        return CommandResult.success("Entering " + chapterName + " level " + resolution.levelId() + ".");
     }
+
+    private record LevelResolution(int levelId, Level level) {}
 
     private int getNextLevelId(User user, Chapter chapter) {
         if (user == null || user.getChapterProgress() == null) return 1;

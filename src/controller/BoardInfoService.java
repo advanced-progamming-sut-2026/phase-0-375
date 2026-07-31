@@ -76,24 +76,93 @@ final class BoardInfoService {
 
         GameModel model = requireGame();
         GameMap map = model.getMap();
+        var level = model.getCurrentLevel();
+        var config = level != null ? level.getConfig() : null;
+        int tideLimit = config != null ? config.getTideLimitColumn() : -1;
+
         StringBuilder sb = new StringBuilder();
+        appendMapHeader(sb, model, map, tideLimit);
+        appendMapGrid(sb, model, map, level, tideLimit);
+
+        sb.append("Legend: P plant  O overlay plant  B both  G ground plant  Z zombie  X zombie on plant\n");
+        sb.append("T grave  V vase  ~ water  _ low tide  ^ slide up  v slide down  N necromancy  * ice  . empty\n");
+        appendSunTokens(sb, model);
+        return CommandResult.successWithData(sb.toString(), sb.toString());
+    }
+
+    /**
+     * Appends the map title, resource summary (sun/plant food/tick), and
+     * the column header row (with tide-limit markers).
+     */
+    private void appendMapHeader(StringBuilder sb, GameModel model, GameMap map, int tideLimit) {
         sb.append("── Map (").append(map.getRows()).append("x").append(map.getCols()).append(") ──\n");
         sb.append("Sun: ").append(model.getSunAmount())
                 .append(" | Plant food: ").append(model.getPlantFoodCount())
                 .append(" | Tick: ").append(model.getTick()).append("\n");
 
+        sb.append("       ");
+        for (int c = 0; c < map.getCols(); c++) {
+            if (tideLimit > 0 && c >= map.getCols() - tideLimit) {
+                sb.append("| ");
+            } else {
+                sb.append(String.format("%-2d", c));
+            }
+        }
+        sb.append('\n');
+    }
+
+    /**
+     * Appends the row-by-row cell grid, plus the belt/red-line/tide-limit
+     * annotations that follow it.
+     */
+    private void appendMapGrid(StringBuilder sb, GameModel model, GameMap map, Object level, int tideLimit) {
         for (int r = 0; r < map.getRows(); r++) {
             StringBuilder row = new StringBuilder("  Row " + r + ": ");
             for (int c = 0; c < map.getCols(); c++) {
+                // I, Zombie red line
+                if (level instanceof model.game.level.minigame.izombie.IZombieLevel iZombie
+                        && c == iZombie.redLineColumn()) {
+                    row.append("| ");
+                    continue;
+                }
                 Cell cell = map.getCell(c, r);
-                row.append(cell != null ? cellChar(model, cell, c, r) : '.').append(' ');
+                char ch = cell != null ? cellChar(model, cell, c, r) : '.';
+                // Vase Breaker: show V for unbroken vases
+                if (level instanceof model.game.level.minigame.vasebreaker.VaseBreakerLevel vbLevel && ch == '.') {
+                    if (vbLevel.vaseAt(c, r) != null) {
+                        ch = 'V';
+                    }
+                }
+                row.append(ch).append(' ');
             }
             sb.append(row).append('\n');
         }
-        sb.append("Legend: P plant  O overlay plant  B both  G ground plant  Z zombie  X zombie on plant\n");
-        sb.append("        T grave  ~ water  _ low tide  ^ slide up  v slide down  N necromancy  * ice  . empty\n");
-        appendSunTokens(sb, model);
-        return CommandResult.successWithData(sb.toString(), sb.toString());
+
+        // Conveyor belt / bowling available plants
+        List<String> beltPlants = model.getSelectedPlants();
+        if ((level instanceof model.game.level.special.ConveyorBeltLevel
+                || level instanceof model.game.level.minigame.bowling.WallnutBowlingLevel)
+                && beltPlants != null && !beltPlants.isEmpty()) {
+            sb.append("Belt: ");
+            for (int i = 0; i < beltPlants.size(); i++) {
+                if (i > 0) sb.append(", ");
+                if (i == 0) sb.append("[").append(beltPlants.get(i)).append("]");
+                else sb.append(beltPlants.get(i));
+            }
+            sb.append('\n');
+        }
+
+        // I, Zombie red line info
+        if (level instanceof model.game.level.minigame.izombie.IZombieLevel iZombie) {
+            sb.append("Red line at column ").append(iZombie.redLineColumn())
+                    .append(" | zombies must be placed right of |\n");
+        }
+
+        // Beach tide limit indicator
+        if (tideLimit > 0) {
+            sb.append("Tide limit: rightmost ").append(tideLimit)
+                    .append(" column(s) may flood (marked with |)\n");
+        }
     }
 
     /** Resolves the single map symbol for one cell: terrain, then grave, then plants, then zombies. */

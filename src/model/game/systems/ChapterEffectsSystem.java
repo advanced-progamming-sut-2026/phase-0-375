@@ -202,7 +202,7 @@ public class ChapterEffectsSystem implements Tickable {
             if (hitRows.length() > 0) hitRows.append(", ");
             hitRows.append(row + 1);
         }
-        System.out.println("[Ice Wind] An icy wind sweeps row(s) " + hitRows
+        App.logToShell("[Ice Wind] An icy wind sweeps row(s) " + hitRows
                 + "! Non-fire plants there gain a frost level.");
     }
 
@@ -250,7 +250,7 @@ public class ChapterEffectsSystem implements Tickable {
 
         boolean rising = newTide > tideColumns;
         tideColumns = newTide;
-        System.out.println("[Tide] The water " + (rising ? "rises" : "recedes")
+        App.logToShell("[Tide] The water " + (rising ? "rises" : "recedes")
                 + ": the rightmost " + newTide + " column(s) are now flooded."
                 + (rising ? " Stranded plants will drown!" : ""));
     }
@@ -277,7 +277,7 @@ public class ChapterEffectsSystem implements Tickable {
             ZombieInstance spawned =
                     gameModel.spawnZombieAt(zombie.getName(), p.getY(), p.getX());
             if (spawned != null) {
-                System.out.println("[Ambush] A " + zombie.getName()
+                App.logToShell("[Ambush] A " + zombie.getName()
                         + " bursts out of the shallows at row " + (p.getY() + 1)
                         + ", column " + (p.getX() + 1) + "!");
             }

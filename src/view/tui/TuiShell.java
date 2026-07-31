@@ -193,6 +193,11 @@ public final class TuiShell {
         sb.append(app.getCurrentMenu().name().replace('_', ' '));
         GameModel model = currentGameModel();
         if (model != null) {
+            // Show the game mode type in the header
+            String modeLabel = gameModeLabel(model);
+            if (modeLabel != null) {
+                sb.append(" \u2502 ").append(modeLabel);
+            }
             sb.append(" \u2502 Tick ").append(model.getTick())
                     .append(" \u2502 Sun ").append(model.getSunAmount())
                     .append(" \u2502 Food ").append(model.getPlantFoodCount())
@@ -200,6 +205,22 @@ public final class TuiShell {
         }
         while (sb.length() < cols) sb.append(' ');
         return new AttributedString(sb.substring(0, cols), AttributedStyle.DEFAULT.inverse());
+    }
+
+    /** Builds a short label describing the current game mode (level type or mini-game). */
+    private static String gameModeLabel(GameModel model) {
+        if (model == null || model.getCurrentLevel() == null) return null;
+        var level = model.getCurrentLevel();
+        var config = level.getConfig();
+        // Check mini-game types first (they extend MiniGameLevel)
+        if (level instanceof model.game.level.minigame.MiniGameLevel mg) {
+            return mg.getMiniGameType().name().replace('_', ' ');
+        }
+        // Regular level types from LevelConfig
+        if (config != null && config.getLevelType() != null) {
+            return config.getLevelType().name().replace('_', ' ');
+        }
+        return null;
     }
 
     private AttributedString divider(String label, int cols) {

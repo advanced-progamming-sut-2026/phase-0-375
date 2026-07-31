@@ -5,6 +5,13 @@ import model.enums.PlacableLayer;
 import model.game.core.GameModel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
+import model.game.level.Level;
+import model.game.level.LevelConfig;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.special.ConveyorBeltLevel;
 import model.item.Grave;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
@@ -31,12 +38,32 @@ final class MapView {
     static List<AttributedString> render(GameModel model) {
         GameMap map = model.getMap();
         List<AttributedString> lines = new ArrayList<>();
+        Level level = model.getCurrentLevel();
+        LevelConfig config = level != null ? level.getConfig() : null;
+        int tideLimit = config != null ? config.getTideLimitColumn() : -1;
 
-        // Column indices.
+        appendHeaderAndGrid(lines, model, map, level, tideLimit);
+        appendInfoLines(lines, model, level, tideLimit);
+
+        lines.add(new AttributedString(
+                "P plant  O overlay  B both  G ground  Z zombie  X zombie-on-plant"
+                 + "  T grave  $ sun-grave  + pf-grave  V vase  ~ water  _ tide  ^v slide  N necro  * ice  . empty",
+                DIM));
+        return lines;
+    }
+
+    /** Builds the column-index header row and the colored cell grid beneath it. */
+    private static void appendHeaderAndGrid(
+            List<AttributedString> lines, GameModel model, GameMap map, Level level, int tideLimit) {
+        // Column indices with optional tide limit markers.
         AttributedStringBuilder header = new AttributedStringBuilder();
         header.append("     ", DIM);
         for (int c = 0; c < map.getCols(); c++) {
-            header.append(String.format("%-2d", c), DIM);
+            if (tideLimit > 0 && c >= map.getCols() - tideLimit) {
+                header.append("| ", AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE));
+            } else {
+                header.append(String.format("%-2d", c), DIM);
+            }
         }
         lines.add(header.toAttributedString());
 
@@ -45,13 +72,68 @@ final class MapView {
             AttributedStringBuilder row = new AttributedStringBuilder();
             row.append(String.format("%3d  ", r), DIM);
             for (int c = 0; c < map.getCols(); c++) {
+                // I, Zombie red line: show | at the column just before the red line
+                if (level instanceof IZombieLevel iZombie && c == iZombie.redLineColumn()) {
+                    row.append("| ", AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold());
+                    continue;
+                }
                 char ch = cellChar(model, map, c, r);
+                // Vase Breaker: show V for unbroken vases
+                if (level instanceof VaseBreakerLevel vbLevel && ch == '.') {
+                    Vase vase = vbLevel.vaseAt(c, r);
+                    if (vase != null) {
+                        ch = 'V';
+                    }
+                }
                 row.append(ch + " ", styleFor(ch));
             }
+            // I, Zombie: if red line is at the last column, no separator drawn
             lines.add(row.toAttributedString());
         }
+    }
 
-        // Sun tokens on the ground.
+    /** Builds the belt / red-line / tide-limit / sun-token annotation lines below the grid. */
+    private static void appendInfoLines(
+            List<AttributedString> lines, GameModel model, Level level, int tideLimit) {
+        List<String> beltPlants = model.getSelectedPlants();
+        if ((level instanceof ConveyorBeltLevel || level instanceof WallnutBowlingLevel)
+                && beltPlants != null && !beltPlants.isEmpty()) {
+            AttributedStringBuilder belt = new AttributedStringBuilder();
+            belt.append("Belt: ", AttributedStyle.DEFAULT.bold());
+            for (int i = 0; i < beltPlants.size(); i++) {
+                if (i > 0) belt.append(", ");
+                // Highlight the first (front-of-belt) item
+                if (i == 0) {
+                    belt.append("[" + beltPlants.get(i) + "]",
+                            AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN).bold());
+                } else {
+                    belt.append(beltPlants.get(i));
+                }
+            }
+            lines.add(belt.toAttributedString());
+        }
+
+        if (level instanceof IZombieLevel iZombie) {
+            AttributedStringBuilder izInfo = new AttributedStringBuilder();
+            izInfo.append("Red line at column ", AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold());
+            izInfo.append(String.valueOf(iZombie.redLineColumn()),
+                    AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold());
+            izInfo.append(" | zombies placed right of ", DIM);
+            izInfo.append("|", AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold());
+            lines.add(izInfo.toAttributedString());
+        }
+
+        if (tideLimit > 0) {
+            AttributedStringBuilder tide = new AttributedStringBuilder();
+            tide.append("Tide limit: rightmost ",
+                    AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE));
+            tide.append(String.valueOf(tideLimit),
+                    AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE).bold());
+            tide.append(" column(s) may flood (marked with |)",
+                    AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE));
+            lines.add(tide.toAttributedString());
+        }
+
         if (!model.getActiveSuns().isEmpty()) {
             AttributedStringBuilder suns = new AttributedStringBuilder();
             suns.append("Sun tokens: ", SUN_STYLE);
@@ -60,12 +142,6 @@ final class MapView {
             }
             lines.add(suns.toAttributedString());
         }
-
-        lines.add(new AttributedString(
-                "P plant  O overlay  B both  G ground  Z zombie  X zombie-on-plant"
-                        + "  T grave  $ sun-grave  + pf-grave  ~ water  _ tide  ^v slide  N necro  * ice  . empty",
-                DIM));
-        return lines;
     }
 
     /** Same layering rules as the controller's showMap(). */
@@ -135,6 +211,7 @@ final class MapView {
             case 'v': return AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW);
             case 'N': return AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA);
             case '*': return AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN).bold();
+            case 'V': return AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
             default: return DIM;
         }
     }

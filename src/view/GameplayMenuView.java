@@ -104,6 +104,26 @@ public class GameplayMenuView extends AppMenuView {
         displayError("  show beghouled status");
         displayError("  show kill stats");
         displayError("  menu exit");
+        // Contextual hints for special game modes
+        var model = App.getInstance().getCurrentGameModel();
+        if (model != null && model.getCurrentLevel() != null) {
+            var level = model.getCurrentLevel();
+            if (level instanceof model.game.level.special.ConveyorBeltLevel
+                    || level instanceof model.game.level.minigame.bowling.WallnutBowlingLevel) {
+                displayError("");
+                displayError("  Conveyor Belt mode: use \"plant plant -t <type> -l (<x>, <y>)\"");
+                displayError("  where <type> is taken from the belt (front item marked with [brackets]).");
+            }
+            if (level instanceof model.game.level.minigame.vasebreaker.VaseBreakerLevel) {
+                displayError("");
+                displayError("  Vase Breaker: use \"break vase -l (<x>, <y>)\" to break a vase (marked V on the map).");
+            }
+            if (level instanceof model.game.level.minigame.izombie.IZombieLevel) {
+                displayError("");
+                displayError("  I, Zombie: use \"place zombie -t <type> -l (<x>, <y>)\" to place zombies.");
+                displayError("  Zombies can only be placed right of the red line (|) shown on the map.");
+            }
+        }
     }
 
     /** Delay between rendered ticks in TUI mode - faster than the 0.1s sim tick. */
