@@ -265,6 +265,7 @@ public class ZombieSystem implements Tickable {
     private int biteDamage(ZombieInstance zombie, float deltaTime) {
         float eatDPS = zombie.getDefinition().getEatDPS();
         eatDPS *= getEatDamageScale(zombie);
+        eatDPS *= gameModel.difficultyBoost();
         return (int) (eatDPS * deltaTime);
     }
 

@@ -124,7 +124,7 @@ public class IZombieLevel extends MiniGameLevel {
             return false;
         }
         return model.getZombieCount() == 0
-                && model.getSunAmount() < settings.minZombieCost();
+                && model.getSunAmount() < (int) (settings.minZombieCost() * model.difficultyPenalty());
     }
 
     /**
@@ -152,7 +152,7 @@ public class IZombieLevel extends MiniGameLevel {
             return "Zombies can only be placed right of the red line (column >= "
                     + redLine + ").";
         }
-        int cost = settings.getZombieCosts().get(canonical);
+        int cost = (int) (settings.getZombieCosts().get(canonical) * model.difficultyPenalty());
         if (!model.spendSun(cost)) {
             return "Not enough sun. Need " + cost + ", have " + model.getSunAmount() + ".";
         }

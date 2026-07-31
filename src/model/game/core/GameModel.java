@@ -294,6 +294,7 @@ public class GameModel implements BehaviorContext {
         recordZombieSeen(zombie.getName());
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
         instance.setGridPosition(new Point(gameMap.getCols(), lane));
+        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
         if (myopointTracker != null) {
