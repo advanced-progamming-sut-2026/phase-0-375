@@ -44,7 +44,7 @@ public class GameMenuController extends AppMenuController {
         return CommandResult.success("Returned to main menu.");
     }
 
-    public CommandResult<Void> enterChapter(String chapterName) {
+    public CommandResult<Void> enterChapter(String chapterName, Integer levelId) {
         Chapter chapter;
         try {
             chapter = Chapter.valueOf(chapterName.toUpperCase().replace(' ', '_').replace('-', '_'));
@@ -69,14 +69,26 @@ public class GameMenuController extends AppMenuController {
             }
         }
 
-        int levelId = getNextLevelId(user, chapter);
-        Level level = registry.createLevel(chapter, levelId);
+        int nextLevelId = getNextLevelId(user, chapter);
+        int targetLevelId = levelId == null ? nextLevelId : levelId;
+
+        if (levelId != null) {
+            if (!registry.hasLevel(chapter, levelId)) {
+                return CommandResult.error("Level " + levelId + " does not exist in " + chapter + ".");
+            }
+            if (levelId > nextLevelId) {
+                return CommandResult.error("Level " + levelId + " is locked. Beat level "
+                        + (nextLevelId - 1) + " first (next unlocked: " + nextLevelId + ").");
+            }
+        }
+
+        Level level = registry.createLevel(chapter, targetLevelId);
         if (level == null) {
-            return CommandResult.error("No level definition found for " + chapter + " level " + levelId + ".");
+            return CommandResult.error("No level definition found for " + chapter + " level " + targetLevelId + ".");
         }
 
         if (!level.canStart()) {
-            return CommandResult.error("Level " + levelId + " of " + chapter + " cannot be started.");
+            return CommandResult.error("Level " + targetLevelId + " of " + chapter + " cannot be started.");
         }
 
         GameModel model = new GameModel(level);
@@ -88,7 +100,7 @@ public class GameMenuController extends AppMenuController {
         level.onStart();
         App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
 
-        return CommandResult.success("Entering " + chapterName + " level " + levelId + ".");
+        return CommandResult.success("Entering " + chapterName + " level " + targetLevelId + ".");
     }
 
     public CommandResult<Void> enterMiniGame(String typeName, int stage) {
