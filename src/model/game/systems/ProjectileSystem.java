@@ -7,6 +7,7 @@ import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.core.GameModel;
 import model.item.GridItem;
+import model.item.Grave;
 import model.item.placeable.Placeable;
 import model.item.pushable.Pushable;
 import model.plant.ability.ModifierAbility;
@@ -294,7 +295,13 @@ public class ProjectileSystem implements Tickable {
         GridItem item = (GridItem) placeable;
         if (!item.blocksProjectiles() || (item instanceof Pushable)) return false;
 
+        boolean wasAlive = !item.isDestroyed();
         item.takeDamage(projectile.getDamage());
+        // Drop loot + remove a grave that just died from a projectile hit.
+        if (wasAlive && item.isDestroyed() && item instanceof Grave grave) {
+            grave.applyLoot(gameModel);
+            cell.removePlaceable(grave);
+        }
         return true;
     }
 

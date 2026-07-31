@@ -35,8 +35,9 @@ public class PvZGameLoop implements GameLoop {
         LevelConfig levelConfig = gameModel.getCurrentLevel().getConfig();
 
         float sunDropRateModifier = (float) levelConfig.getRules().getSunDropRateModifier();
+        boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled()
+                && !levelConfig.isHasNightEffect();
         sunDropRateModifier *= gameModel.difficultyPenalty();
-        boolean skyDropEnabled = levelConfig.getRules().isSkyDropEnabled();
         this.sunFallSystem = new SunFallSystem(gameModel, sunDropRateModifier, skyDropEnabled);
 
         this.plantSystem = new PlantSystem(gameModel);

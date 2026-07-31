@@ -1,9 +1,11 @@
 package model.game.wave;
 
+import model.app.App;
 import model.enums.WaveManagerPhase;
 import model.enums.WaveState;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
+import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -20,6 +22,11 @@ public class WaveManager implements Tickable {
 
     private float interWaveTimer;
     private GameModel gameModel;
+
+    /** Cumulative max HP of every zombie spawned by the current wave. */
+    private int currentWaveTotalHP;
+    /** HP of the current wave already depleted (sum of dead zombies' max HP). */
+    private int currentWaveDepletedHP;
 
     public WaveManager(List<Wave> waves) {
         this(waves, null);
@@ -60,6 +67,13 @@ public class WaveManager implements Tickable {
         Wave current = getCurrentWave();
         current.tick(deltaTime);
 
+        // Track HP depletion for the 75% rule.
+        updateWaveHPAccounting();
+
+        // Spec: next wave starts when 75% of current wave's HP is depleted.
+        boolean hpThresholdMet = currentWaveTotalHP > 0
+                && currentWaveDepletedHP >= 0.75 * currentWaveTotalHP;
+
         // When the current wave's spawning phase is complete AND no live
         // zombies remain on the map, mark it cleared and either advance
         // to the next wave or finish the level.
@@ -67,13 +81,37 @@ public class WaveManager implements Tickable {
             boolean mapClear = (gameModel == null) || gameModel.getZombieCount() == 0;
             if (mapClear) {
                 current.markCleared();
-                if (hasPendingWaves()) {
-                    phase = WaveManagerPhase.WAITING_FOR_NEXT_WAVE;
-                    interWaveTimer = waves.get(++currentWaveIndex).getStartDelay();
-                } else {
-                    phase = WaveManagerPhase.LEVEL_DONE;
-                }
+                advanceWaveIndex();
             }
+        } else if (hpThresholdMet && hasPendingWaves()) {
+            // 75% HP depleted — fire the next wave immediately.
+            current.markCleared();
+            advanceWaveIndex();
+        }
+    }
+
+    /** Recomputes depleted HP by scanning the current wave's spawned zombies. */
+    private void updateWaveHPAccounting() {
+        if (gameModel == null) return;
+        if (currentWaveTotalHP == 0) return;
+        int depleted = 0;
+        for (ZombieInstance z : gameModel.getZombies()) {
+            if (z == null || z.getDefinition() == null) continue;
+            // Only count zombies belonging to the current wave — approximate
+            // by counting all current zombies; dead ones have already been
+            // removed from the list, so depleted = total - alive.
+            depleted += Math.max(0, z.getDefinition().getBaseHP() - z.getCurrentHP());
+        }
+        currentWaveDepletedHP = depleted;
+    }
+
+    /** Advances to the next wave, or finishes the level if none remain. */
+    private void advanceWaveIndex() {
+        if (hasPendingWaves()) {
+            phase = WaveManagerPhase.WAITING_FOR_NEXT_WAVE;
+            interWaveTimer = waves.get(++currentWaveIndex).getStartDelay();
+        } else {
+            phase = WaveManagerPhase.LEVEL_DONE;
         }
     }
 
@@ -88,9 +126,26 @@ public class WaveManager implements Tickable {
         Wave next = waves.get(currentWaveIndex);
         next.startWave();
         phase = WaveManagerPhase.ACTIVE_WAVE;
+        // Reset HP accounting for the new wave.
+        currentWaveTotalHP = computeWaveMaxHP(next);
+        currentWaveDepletedHP = 0;
         if (gameModel != null) {
             gameModel.onWaveStarted(next);
         }
+    }
+
+    /** Sums the max HP of every zombie this wave is expected to spawn. */
+    private int computeWaveMaxHP(Wave wave) {
+        if (wave == null) return 0;
+        int total = 0;
+        for (EntryRuntime rt : wave.getRuntimeEntries()) {
+            for (model.game.wave.ZombieSpawnCandidate c : rt.getWaveZombieEntry().getPool()) {
+                if (c.getZombieDefinition() != null) {
+                    total += c.getZombieDefinition().getBaseHP();
+                }
+            }
+        }
+        return total;
     }
 
     public Wave getCurrentWave() {

@@ -12,10 +12,15 @@ import model.game.map.Point;
 import model.game.map.terrain.TerrainStrategyFactory;
 import model.game.wave.EntryRuntime;
 import model.game.wave.Wave;
+import model.game.wave.WaveRandomGenerator;
+import model.item.Grave;
+import model.item.Grave.GraveType;
 import model.item.placeable.Placeable;
 import model.plant.instance.PlantInstance;
+import model.zombie.ZombieFactory;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
+import model.app.App;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -70,6 +75,20 @@ public class ChapterEffectsSystem implements Tickable {
 
     /** Chance per submerged low-tide cell to release a zombie each wave. */
     public static final double LOW_TIDE_AMBUSH_CHANCE = 0.3;
+
+    // --- Dark Ages: per-wave grave spawning ---
+
+    /** Chance that a Dark Ages wave spawns at least one new grave. */
+    public static final double DARK_GRAVE_SPAWN_CHANCE = 0.6;
+
+    /** Max graves that may surface at the start of a single Dark Ages wave. */
+    public static final int DARK_GRAVE_SPAWN_MAX = 3;
+
+    /** Fraction of graves that carry loot (the rest are plain). */
+    public static final double DARK_GRAVE_LOOT_CHANCE = 0.4;
+
+    /** Split of loot graves: 50% sun, 50% plant food. */
+    public static final double DARK_GRAVE_SUN_LOOT_FRACTION = 0.5;
 
     private final GameModel gameModel;
     private final Random random = new Random();
@@ -151,6 +170,9 @@ public class ChapterEffectsSystem implements Tickable {
         } else if (chapter == Chapter.BIG_WAVE_BEACH) {
             shiftTide();
             maybeAmbushFromLowTide(wave);
+        } else if (chapter == Chapter.DARK_AGES) {
+            maybeSpawnDarkGraves();
+            maybeNecromancySpawn(wave);
         }
     }
 
@@ -268,6 +290,83 @@ public class ChapterEffectsSystem implements Tickable {
         if (entries == null || entries.isEmpty()) return null;
         EntryRuntime entry = entries.get(random.nextInt(entries.size()));
         return wave.getRng().rollZombiePool(entry.getWaveZombieEntry().getPool());
+    }
+
+    // --- Dark Ages: per-wave grave spawning ---
+
+    /**
+     * At the start of each Dark Ages wave, randomly surfaces up to
+     * {@link #DARK_GRAVE_SPAWN_MAX} graves on empty, plant-free cells.
+     * Some graves carry loot (50 sun or one plant food).
+     */
+    private void maybeSpawnDarkGraves() {
+        if (random.nextDouble() >= DARK_GRAVE_SPAWN_CHANCE) return;
+
+        int rows = gameModel.getRowCount();
+        int cols = gameModel.getColumnCount();
+        if (rows <= 0 || cols <= 0) return;
+
+        List<Point> candidates = new ArrayList<>();
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                Cell cell = gameModel.getCellAt(r, c);
+                if (cell == null) continue;
+                if (cell.getPlaceable(PlacableLayer.GROUND) != null) continue;  // already a grave
+                if (cell.getPlaceable(PlacableLayer.MAIN) instanceof PlantInstance) continue;  // plant
+                if (cell.getGroundType() == GroundType.WATER
+                        || cell.getGroundType() == GroundType.LOW_TIDE) continue;
+                candidates.add(new Point(c, r));
+            }
+        }
+        if (candidates.isEmpty()) return;
+
+        Collections.shuffle(candidates, random);
+        int count = 1 + random.nextInt(Math.min(DARK_GRAVE_SPAWN_MAX, candidates.size()));
+        for (int i = 0; i < count; i++) {
+            Point p = candidates.get(i);
+            GraveType type = rollGraveType();
+            gameModel.spawnGraveAt(p.getY(), p.getX(), type);
+        }
+    }
+
+    /** @return a grave type, with ~60% plain, ~20% sun, ~20% plant food. */
+    private GraveType rollGraveType() {
+        double roll = random.nextDouble();
+        if (roll >= DARK_GRAVE_LOOT_CHANCE) return GraveType.PLAIN;
+        return (random.nextDouble() < DARK_GRAVE_SUN_LOOT_FRACTION)
+                ? GraveType.SUN : GraveType.PLANT_FOOD;
+    }
+
+    // --- Dark Ages: necromancy ---
+
+    /**
+     * For each necromancy tile that currently has a grave on it, spawns a
+     * zombie from beneath that grave (consuming the grave) at wave start.
+     */
+    private void maybeNecromancySpawn(Wave wave) {
+        LevelConfig config = levelConfig();
+        if (config == null) return;
+        List<Point> necroTiles = config.getNecromancyTiles();
+        if (necroTiles == null || necroTiles.isEmpty()) return;
+
+        Zombie zombie = rollWaveZombie(wave);
+        if (zombie == null) return;
+
+        for (Point p : necroTiles) {
+            Grave grave = gameModel.getGraveAt(p.getY(), p.getX());
+            if (grave == null) continue;
+            // Remove the grave (no loot — the zombie ate it) and spawn a zombie.
+            gameModel.removeGraveAt(p.getY(), p.getX());
+            ZombieInstance spawned = gameModel.spawnZombieAt(
+                    zombie.getName(), p.getY(), p.getX());
+            if (spawned != null) {
+                App.logToShell("[Necromancy] A " + zombie.getName()
+                        + " crawls out from under a grave at ("
+                        + p.getX() + ", " + p.getY() + ")!");
+                gameModel.getEventBus().dispatch(
+                        new model.event.GameEvent(model.event.GameEvent.Type.NECROMANCY_SPAWN));
+            }
+        }
     }
 
     // --- Helpers ---

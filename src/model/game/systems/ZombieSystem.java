@@ -406,6 +406,15 @@ public class ZombieSystem implements Tickable {
                 gameModel.recordZombieKilled(zombie);
                 gameModel.notifyZombieKilledForScore(zombie);
 
+                // Spec notification: "Zombie of type <type> is dead at (<x>, <y>)"
+                var pos = zombie.getGridPosition();
+                int deadX = pos != null ? pos.getX() : -1;
+                int deadY = pos != null ? pos.getY() : -1;
+                String typeName = zombie.getDefinition() != null
+                        ? zombie.getDefinition().getName() : "Unknown";
+                model.app.App.logToShell("Zombie of type " + typeName
+                        + " is dead at (" + deadX + ", " + deadY + ")");
+
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_KILLED));
                 }

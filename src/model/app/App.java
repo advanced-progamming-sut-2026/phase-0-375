@@ -6,6 +6,7 @@ import model.game.core.PvZGameLoop;
 import model.user.User;
 import model.user.persistance.JsonUserRepository;
 import model.user.persistance.UserRepository;
+import view.tui.TuiShell;
 
 public class App {
     private static App instance;
@@ -71,5 +72,11 @@ public class App {
 
     public void setCurrentGameLoop(PvZGameLoop currentGameLoop) {
         this.currentGameLoop = currentGameLoop;
+    }
+
+    public static void logToShell(String message) {
+        TuiShell shell = TuiShell.getActive();
+        if (shell != null) shell.log(message);
+        else System.out.println(message);
     }
 }

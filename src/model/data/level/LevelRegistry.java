@@ -245,10 +245,39 @@ public class LevelRegistry {
     private static List<Wave> buildWaves(List<LevelDataEntry.WaveData> waveData) {
         if (waveData == null) return Collections.emptyList();
         List<Wave> waves = new ArrayList<>();
+        int waveIndex = 0;
         for (LevelDataEntry.WaveData rawWave : waveData) {
+            waveIndex++;
+            int waveNumber = rawWave.getWaveNumber() > 0 ? rawWave.getWaveNumber() : waveIndex;
+            boolean isFinal = rawWave.isFinalWave();
+
+            // Phase-2 budget-based wave: explicit waveBudget OR fallback when
+            // the wave has candidate pools but no scripted entries.
+            int budget = rawWave.getWaveBudget();
+            if (budget <= 0) {
+                budget = computeDefaultWaveBudget(waveNumber, isFinal,
+                        rawWave.getEntries());
+            }
+
             List<EntryRuntime> runtimes = new ArrayList<>();
             List<SpawnPatternType> patternTypes = new ArrayList<>();
-            if (rawWave.getEntries() != null) {
+
+            if (budget > 0) {
+                // Build a single pooled entry + BudgetSpawnStrategy.
+                List<LevelDataEntry.ZombieCandidateData> flatPool = new ArrayList<>();
+                if (rawWave.getEntries() != null) {
+                    for (LevelDataEntry.WaveEntryData e : rawWave.getEntries()) {
+                        if (e.getPool() != null) flatPool.addAll(e.getPool());
+                    }
+                }
+                WaveZombieEntry pooledEntry = buildBudgetWaveEntry(flatPool);
+                if (pooledEntry != null) {
+                    EntryRuntime rt = new EntryRuntime(pooledEntry);
+                    runtimes.add(rt);
+                    patternTypes.add(SpawnPatternType.STREAM);
+                }
+            } else if (rawWave.getEntries() != null) {
+                // Legacy scripted-entry model.
                 for (LevelDataEntry.WaveEntryData rawEntry : rawWave.getEntries()) {
                     SpawnPatternType patternType = resolveEnum(
                             SpawnPatternType.class, rawEntry.getPattern(), SpawnPatternType.SINGLE
@@ -260,16 +289,72 @@ public class LevelRegistry {
                     }
                 }
             }
+
             Wave wave = new Wave(
-                rawWave.getWaveNumber(), runtimes, rawWave.getStartDelay(), rawWave.isHugeWave(), rawWave.isFinalWave()
+                waveNumber, runtimes, rawWave.getStartDelay(),
+                rawWave.isHugeWave(), isFinal
             );
+            wave.setWaveBudget(budget);
             for (int i = 0; i < runtimes.size(); i++) {
                 EntryRuntime runtime = runtimes.get(i);
-                runtime.getWaveZombieEntry().setPattern(spawnStrategy(patternTypes.get(i), runtime, wave));
+                SpawnStrategy strategy;
+                if (budget > 0) {
+                    strategy = new BudgetSpawnStrategy(runtime, wave, budget);
+                } else {
+                    strategy = spawnStrategy(patternTypes.get(i), runtime, wave);
+                }
+                runtime.getWaveZombieEntry().setPattern(strategy);
             }
             waves.add(wave);
         }
         return Collections.unmodifiableList(waves);
+    }
+
+    /**
+     * Default wave budget: base × 1.25^(waveNumber-1), final wave ×2.
+     * Only kicks in when the wave has at least one pool candidate; otherwise
+     * returns 0 (falls back to scripted entries).
+     */
+    private static int computeDefaultWaveBudget(int waveNumber, boolean isFinal,
+                                                 List<LevelDataEntry.WaveEntryData> entries) {
+        if (entries == null || entries.isEmpty()) return 0;
+        boolean hasPool = false;
+        for (LevelDataEntry.WaveEntryData e : entries) {
+            if (e.getPool() != null && !e.getPool().isEmpty()) { hasPool = true; break; }
+        }
+        if (!hasPool) return 0;
+
+        final int BASE = 100;
+        double scaled = BASE * Math.pow(1.25, Math.max(0, waveNumber - 1));
+        if (isFinal) scaled *= 2.0;
+        return (int) Math.round(scaled);
+    }
+
+    /** Builds a single WaveZombieEntry whose pool is the union of all candidates. */
+    private static WaveZombieEntry buildBudgetWaveEntry(List<LevelDataEntry.ZombieCandidateData> flatPool) {
+        if (flatPool == null || flatPool.isEmpty()) return null;
+        WaveZombieEntry.Builder builder = new WaveZombieEntry.Builder()
+                .setCountRange(1, 1)
+                .setSpawnDelayRange(0f, 0f)
+                .setSpawnIntervalRange(1.5f, 1.5f)
+                .setStreamDurationSeconds(60f);
+        for (LevelDataEntry.ZombieCandidateData candidate : flatPool) {
+            Zombie zombie = ZombieFactory.getDefinition(candidate.getZombie());
+            if (zombie == null) {
+                System.err.println("[LevelRegistry] Unknown zombie in wave pool: " + candidate.getZombie());
+                continue;
+            }
+            builder.addCandidate(zombie, 1.0); // weight ignored by BudgetSpawnStrategy
+        }
+        EntryRuntime placeholderRuntime = new EntryRuntime(new WaveZombieEntry());
+        Wave placeholderWave = new Wave(1, Collections.emptyList(), 0f, false, false);
+        builder.setPattern(new SingleSpawnStrategy(placeholderRuntime, placeholderWave));
+        try {
+            return builder.build();
+        } catch (RuntimeException e) {
+            System.err.println("[LevelRegistry] Skipping invalid budget wave entry: " + e.getMessage());
+            return null;
+        }
     }
 
     private static WaveZombieEntry buildWaveEntry(LevelDataEntry.WaveEntryData raw, SpawnPatternType patternType) {

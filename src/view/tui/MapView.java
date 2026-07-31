@@ -63,7 +63,7 @@ final class MapView {
 
         lines.add(new AttributedString(
                 "P plant  O overlay  B both  G ground  Z zombie  X zombie-on-plant"
-                        + "  T grave  ~ water  _ tide  ^v slide  N necro  * ice  . empty",
+                        + "  T grave  $ sun-grave  + pf-grave  ~ water  _ tide  ^v slide  N necro  * ice  . empty",
                 DIM));
         return lines;
     }
@@ -77,8 +77,12 @@ final class MapView {
 
         // Graves sit on the field and hide the terrain under them.
         for (PlacableLayer layer : PlacableLayer.values()) {
-            if (cell.getPlaceable(layer) instanceof Grave) {
-                ch = 'T';
+            if (cell.getPlaceable(layer) instanceof Grave grave) {
+                ch = switch (grave.getType()) {
+                    case SUN -> '$';
+                    case PLANT_FOOD -> '+';
+                    default -> 'T';
+                };
                 break;
             }
         }
@@ -123,6 +127,8 @@ final class MapView {
             case 'Z': return AttributedStyle.DEFAULT.foreground(AttributedStyle.RED);
             case 'X': return AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold();
             case 'T': return AttributedStyle.DEFAULT.foreground(AttributedStyle.WHITE).bold();
+            case '$': return AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
+            case '+': return AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA).bold();
             case '~': return AttributedStyle.DEFAULT.foreground(AttributedStyle.BLUE);
             case '_': return AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN);
             case '^':

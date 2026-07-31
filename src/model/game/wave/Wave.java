@@ -27,6 +27,9 @@ public class Wave implements Tickable {
     private boolean isFinalWave; // last model.game.wave of the level
     private boolean isHugeWave; // triggers the "huge wave" banner
 
+    /** Phase-2 budget: total wavePointCost of zombies this wave should spawn. 0 = scripted entries. */
+    private int waveBudget;
+
     /** These objects encapsulate {@link WaveZombieEntry} in a wrapper class that stores other non-related
      *  data that {@link WaveZombieEntry} wouldn't concern.
      */
@@ -228,6 +231,16 @@ public class Wave implements Tickable {
 
     public int getRowCount() {
         return rowCount;
+    }
+
+    /** @return this wave's wavePointCost budget (Phase-2); 0 = scripted entries. */
+    public int getWaveBudget() {
+        return waveBudget;
+    }
+
+    /** Sets this wave's wavePointCost budget (Phase-2). */
+    public void setWaveBudget(int waveBudget) {
+        this.waveBudget = waveBudget;
     }
 
     // -- spawn functions --------

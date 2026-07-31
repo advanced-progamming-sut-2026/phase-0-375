@@ -1,11 +1,11 @@
 package model.plant.instance;
 
-import model.app.App;
 import model.enums.PlacableLayer;
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.enums.PlantState;
 import model.enums.PlantTags;
+import model.app.App;
 import model.game.map.Point;
 import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
@@ -156,9 +156,9 @@ public class PlantInstance implements Placeable {
     }
 
     private void tickAbilityCooldowns(float deltaTime) {
+        float scale = difficultyRechargeScale();
         for (AbilityState state : abilityStates.values()) {
             if (state.getCooldownRemaining() > 0) {
-                float scale = difficultyRechargeScale();
                 state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime * scale));
             }
             if (state.isDigesting()) {

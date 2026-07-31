@@ -25,8 +25,10 @@ import model.game.wave.Wave;
 import model.game.wave.WaveManager;
 import model.game.systems.ChapterEffectsSystem;
 import model.item.Grave;
+import model.item.Grave.GraveType;
 import model.item.LootDrop;
 import model.item.Sun;
+import model.item.placeable.Placeable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
@@ -294,7 +296,6 @@ public class GameModel implements BehaviorContext {
         recordZombieSeen(zombie.getName());
         instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
         instance.setGridPosition(new Point(gameMap.getCols(), lane));
-        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         activeZombies.add(instance);
         gameMap.addZombie(instance, gameMap.getCols(), lane);
         if (myopointTracker != null) {
@@ -339,13 +340,9 @@ public class GameModel implements BehaviorContext {
             return;
         }
         if (wave.isFinalWave()) {
-            TuiShell.getActive().log("[Wave] FINAL WAVE (wave " + wave.getWaveNumber() + ") is approaching!");
-        } else if (wave.isHugeWave()) {
-            TuiShell.getActive().log(
-                    "[Wave] A HUGE wave of zombies (wave " + wave.getWaveNumber() + ") is approaching!"
-            );
+            TuiShell.getActive().log("The final wave has come.");
         } else {
-            TuiShell.getActive().log("[Wave] Wave " + wave.getWaveNumber() + " started!");
+            TuiShell.getActive().log("Wave " + wave.getWaveNumber() + " started.");
         }
     }
 
@@ -800,6 +797,10 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public boolean spawnGraveAt(int row, int col) {
+        return spawnGraveAt(row, col, GraveType.PLAIN);
+    }
+
+    public boolean spawnGraveAt(int row, int col, GraveType type) {
         Cell cell = getCellAt(row, col);
         if (cell == null) {
             return false;
@@ -807,11 +808,29 @@ public class GameModel implements BehaviorContext {
         if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
             return false;
         }
-        boolean placed = cell.addPlaceable(new Grave());
+        boolean placed = cell.addPlaceable(new Grave(Grave.DEFAULT_HP, type));
         if (placed) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.GRAVE_SPAWNED));
+            App.logToShell("[Grave] A " + (type == GraveType.PLAIN ? "plain" :
+                    type == GraveType.SUN ? "sun" : "plant-food")
+                    + " grave surfaced at (" + col + ", " + row + ").");
         }
         return placed;
+    }
+
+    public Grave getGraveAt(int row, int col) {
+        Cell cell = getCellAt(row, col);
+        if (cell == null) return null;
+        Placeable p = cell.getPlaceable(PlacableLayer.GROUND);
+        return (p instanceof Grave) ? (Grave) p : null;
+    }
+
+    public boolean removeGraveAt(int row, int col) {
+        Grave grave = getGraveAt(row, col);
+        if (grave == null) return false;
+        Cell cell = getCellAt(row, col);
+        cell.removePlaceable(grave);
+        return true;
     }
 
     // --- Terrain helpers ---

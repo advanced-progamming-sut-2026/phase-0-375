@@ -463,6 +463,7 @@ public class LevelDataEntry {
         private float startDelay;
         private boolean hugeWave;
         private boolean finalWave;
+        private int waveBudget = 0;
         private List<WaveEntryData> entries;
 
         public int getWaveNumber() {
@@ -495,6 +496,14 @@ public class LevelDataEntry {
 
         public void setFinalWave(boolean finalWave) {
             this.finalWave = finalWave;
+        }
+
+        public int getWaveBudget() {
+            return waveBudget;
+        }
+
+        public void setWaveBudget(int waveBudget) {
+            this.waveBudget = waveBudget;
         }
 
         public List<WaveEntryData> getEntries() {
