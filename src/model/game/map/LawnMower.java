@@ -1,5 +1,11 @@
 package model.game.map;
 
+import model.zombie.instance.ZombieInstance;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class LawnMower {
     /** Travel speed of a triggered mower, in grid-columns per second. */
     public static final float MOWER_SPEED = 12.0f;
@@ -7,6 +13,8 @@ public class LawnMower {
     private boolean active;
     private boolean isTriggered;
     private float xPosition;
+
+    private final List<ZombieInstance> sweepKills = new ArrayList<>();
 
     public LawnMower() {
         this.active = true;
@@ -31,13 +39,25 @@ public class LawnMower {
 
     /**
      * Triggers the mower: it becomes inactive (cannot be retriggered)
-     * and starts sweeping the lane.
+     * and starts sweeping the lane. The triggering zombie is recorded
+     * so it shows up in the sweep-kill notification.
      */
     public void trigger() {
         if (!active) return;
         isTriggered = true;
         active = false;
         xPosition = 0f;
+        sweepKills.clear();
+    }
+
+    public void recordSweepKill(ZombieInstance zombie) {
+        if (zombie != null && !sweepKills.contains(zombie)) {
+            sweepKills.add(zombie);
+        }
+    }
+
+    public List<ZombieInstance> getSweepKills() {
+        return Collections.unmodifiableList(sweepKills);
     }
 
     /**

@@ -9,6 +9,7 @@ import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.Cell;
 import model.game.map.Lane;
+import model.game.map.LawnMower;
 import model.enums.ZombieState;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.WallAbility;
@@ -165,7 +166,11 @@ public class ZombieSystem implements Tickable {
         int row = zombie.getGridY();
         Lane lane = gameModel.getMap().getLane(row);
         if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
+            LawnMower mower = lane.getLawnMower();
             lane.triggerLawnMower();
+            if (mower != null) {
+                mower.recordSweepKill(zombie);
+            }
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
             }

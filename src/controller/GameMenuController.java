@@ -4,13 +4,10 @@ import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.MenuType;
-import model.enums.MiniGameType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.data.level.LevelRegistry;
-import model.data.minigame.MiniGameRegistry;
 import model.game.level.Level;
-import model.game.level.minigame.MiniGameLevel;
 import model.user.User;
 import model.user.persistance.UserRepository;
 
@@ -101,52 +98,6 @@ public class GameMenuController extends AppMenuController {
         App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
 
         return CommandResult.success("Entering " + chapterName + " level " + targetLevelId + ".");
-    }
-
-    public CommandResult<Void> enterMiniGame(String typeName, int stage) {
-        MiniGameType type;
-        try {
-            type = MiniGameType.valueOf(typeName.toUpperCase().replace(' ', '_').replace('-', '_'));
-        } catch (IllegalArgumentException e) {
-            return CommandResult.error("Unknown mini-game: '" + typeName + "'.");
-        }
-
-        MiniGameRegistry registry;
-        try {
-            registry = MiniGameRegistry.getInstance();
-        } catch (IllegalStateException e) {
-            try {
-                MiniGameRegistry.init("/assets/data/minigames/minigames.json");
-                registry = MiniGameRegistry.getInstance();
-            } catch (IOException | RuntimeException loadError) {
-                return CommandResult.error("Could not load mini-game definitions: " + loadError.getMessage());
-            }
-        }
-
-        MiniGameLevel level;
-        try {
-            level = registry.createMiniGame(type, stage);
-        } catch (IOException | RuntimeException buildError) {
-            return CommandResult.error("Could not build mini-game " + type + ": " + buildError.getMessage());
-        }
-        if (level == null) {
-            return CommandResult.error("No definition found for " + type + " stage " + stage + ".");
-        }
-
-        if (!level.canStart()) {
-            return CommandResult.error(type + " stage " + stage + " cannot be started yet.");
-        }
-
-        GameModel model = new GameModel(level);
-        PvZGameLoop loop = new PvZGameLoop(model);
-
-        App.getInstance().setCurrentGameModel(model);
-        App.getInstance().setCurrentGameLoop(loop);
-
-        level.onStart();
-        App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
-
-        return CommandResult.success("Entering " + type + " stage " + stage + ".");
     }
 
     private int getNextLevelId(User user, Chapter chapter) {

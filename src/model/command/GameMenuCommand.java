@@ -5,7 +5,6 @@ import java.util.regex.Pattern;
 
 public enum GameMenuCommand implements CLICommand {
     ENTER_CHAPTER("menu enter chapter -c (?<chaptername>\\S+)(?: -l (?<levelid>\\d+))?"),
-    ENTER_MINIGAME("menu enter minigame -t (?<type>\\S+) -s (?<stage>\\d+)"),
     GREENHOUSE("menu greenhouse"),
     TRAVEL_LOG("menu travel-log"),
     LEADERBOARD("menu leaderboard(?: -s (?<sort>\\S+))?(?: -o (?<order>\\S+))?"),

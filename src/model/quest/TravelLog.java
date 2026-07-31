@@ -19,11 +19,13 @@ public class TravelLog {
     private List<Quest> quests;
     private QuestCategory currentPage;
     private List<Quest> completedQuests;
+    private boolean viewingMiniGamePage;
 
     public TravelLog() {
         this.quests = new ArrayList<>();
         this.currentPage = QuestCategory.MAIN;
         this.completedQuests = new ArrayList<>();
+        this.viewingMiniGamePage = false;
     }
 
     /**
@@ -188,6 +190,14 @@ public class TravelLog {
 
     public void setCurrentPage(QuestCategory currentPage) {
         this.currentPage = currentPage;
+    }
+
+    public boolean isViewingMiniGamePage() {
+        return viewingMiniGamePage;
+    }
+
+    public void setViewingMiniGamePage(boolean viewingMiniGamePage) {
+        this.viewingMiniGamePage = viewingMiniGamePage;
     }
 
     public void setCompletedQuests(List<Quest> completedQuests) {

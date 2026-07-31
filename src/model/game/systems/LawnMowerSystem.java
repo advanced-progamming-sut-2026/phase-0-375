@@ -7,6 +7,7 @@ import model.game.core.Tickable;
 import model.game.map.Lane;
 import model.game.map.LawnMower;
 import model.zombie.instance.ZombieInstance;
+import model.app.App;
 
 import java.util.List;
 
@@ -37,31 +38,46 @@ public class LawnMowerSystem implements Tickable {
             gameModel.markLawnMowerUsed();
 
             boolean finished = mower.tick(deltaTime, colCount);
-            killZombiesInPath(row, mower.getXPosition());
+            killZombiesInPath(mower, row, mower.getXPosition());
 
             if (finished) {
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
                 }
+                // Spec notification — printed once when the mower has
+                // finished crossing the lane, listing every zombie it
+                // killed during the sweep (triggering zombie + sweep).
+                notifyMowerKills(row, mower);
             }
         }
     }
 
-    /**
-     * Kills every zombie in the given lane whose column is at or behind
-     * the mower's current X position.
-     */
-    private void killZombiesInPath(int row, float mowerX) {
+    private void killZombiesInPath(LawnMower mower, int row, float mowerX) {
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(row);
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
-            if (zombie.getGridPosition() == null) continue;
+            if (zombie.getContinuousPosition() == null) continue;
 
-            if (zombie.getGridX() <= mowerX && !isBoss(zombie)) {
+            if (zombie.getContinuousX() <= mowerX && !isBoss(zombie)) {
                 zombie.markKilledByMower();
                 gameModel.damageZombie(zombie, MOWER_DAMAGE);
+                mower.recordSweepKill(zombie);
             }
         }
+    }
+
+    private void notifyMowerKills(int row, LawnMower mower) {
+        List<ZombieInstance> kills = mower.getSweepKills();
+        StringBuilder sb = new StringBuilder();
+        sb.append("The lawn mower in the row ").append(row + 1)
+                .append("is triggered and killed these zombies:");
+        for (ZombieInstance z : kills) {
+            String type = (z.getDefinition() != null) ? z.getDefinition().getName() : "Unknown";
+            int x = z.getGridPosition() != null ? z.getGridX() : -1;
+            int y = z.getGridPosition() != null ? z.getGridY() : -1;
+            sb.append("\n  ").append(type).append(" at (").append(x).append(", ").append(y).append(")");
+        }
+        App.logToShell(sb.toString());
     }
 
     private boolean isBoss(ZombieInstance zombie) {

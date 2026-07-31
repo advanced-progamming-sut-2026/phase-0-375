@@ -3,6 +3,8 @@ package view;
 import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.command.TravelLogMenuCommand;
+import model.data.minigame.MiniGameDataEntry;
+import model.enums.MiniGameType;
 import model.enums.QuestCategory;
 import model.quest.Quest;
 import model.quest.QuestProgress;
@@ -30,47 +32,69 @@ public class TravelLogMenuView extends AppMenuView {
         // per-user reload + once-a-day daily quest refresh
         controller.syncForCurrentUser();
 
+        if (dispatchQuestCommand(input)) return;
+        if (dispatchMiniGameCommand(input)) return;
+
+        printHelp();
+    }
+
+    /** Handles the quest-related travel log commands; returns true if a command matched. */
+    private boolean dispatchQuestCommand(String input) {
         if (TravelLogMenuCommand.CHANGE_PAGE.matches(input)) {
             String page = TravelLogMenuCommand.CHANGE_PAGE.getParameter("pageName");
             changePage(page);
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_CURRENT_PAGE.matches(input)) {
             showCurrentPage();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_DAILY_QUESTS.matches(input)) {
             showDailyQuests();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_MAIN_QUESTS.matches(input)) {
             showMainQuests();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_EPIC_QUESTS.matches(input)) {
             showEpicQuests();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_ALL_QUESTS.matches(input)) {
             showAllQuests();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_COMPLETED_QUESTS.matches(input)) {
             showCompletedQuests();
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.COMPLETE_QUEST.matches(input)) {
             String name = TravelLogMenuCommand.COMPLETE_QUEST.getParameter("questName");
             completeQuest(name);
-            return;
+            return true;
         }
         if (TravelLogMenuCommand.SHOW_QUEST_PROGRESS.matches(input)) {
             String name = TravelLogMenuCommand.SHOW_QUEST_PROGRESS.getParameter("questName");
             showQuestProgress(name);
-            return;
+            return true;
         }
+        return false;
+    }
 
-        printHelp();
+    /** Handles the mini-game travel log commands; returns true if a command matched. */
+    private boolean dispatchMiniGameCommand(String input) {
+        if (TravelLogMenuCommand.SHOW_MINIGAMES.matches(input)) {
+            showMiniGames();
+            return true;
+        }
+        if (TravelLogMenuCommand.ENTER_MINIGAME.matches(input)) {
+            String type = TravelLogMenuCommand.ENTER_MINIGAME.getParameter("type");
+            int stage = Integer.parseInt(TravelLogMenuCommand.ENTER_MINIGAME.getParameter("stage"));
+            enterMiniGame(type, stage);
+            return true;
+        }
+        return false;
     }
 
     // Per-command view methods
@@ -85,6 +109,12 @@ public class TravelLogMenuView extends AppMenuView {
     }
 
     public void showCurrentPage() {
+        // When on the mini-game page, delegate to the mini-game listing
+        // so "show current page" reflects the page the player is viewing.
+        if (controller.isViewingMiniGamePage()) {
+            showMiniGames();
+            return;
+        }
         CommandResult<List<Quest>> result = controller.showCurrentPage();
         if (result.isSuccess()) {
             renderQuestList(result.getMessage(), result.getData());
@@ -150,6 +180,55 @@ public class TravelLogMenuView extends AppMenuView {
     public void completeQuest(String questName) {
         CommandResult<Void> result = controller.completeQuest(questName);
         displayCommandResult(result);
+    }
+
+    // --- Mini-games (travel log's mini-game page) ---
+
+    public void showMiniGames() {
+        CommandResult<List<MiniGameDataEntry>> result = controller.showMiniGames();
+        if (result.isSuccess()) {
+            renderMiniGameList(result.getMessage(), result.getData());
+        } else {
+            displayError(result.getMessage());
+        }
+    }
+
+    public void enterMiniGame(String type, int stage) {
+        CommandResult<Void> result = controller.enterMiniGame(type, stage);
+        displayCommandResult(result);
+    }
+
+    private void renderMiniGameList(String header, List<MiniGameDataEntry> entries) {
+        displayMessage("── " + header + " ──");
+        if (entries == null || entries.isEmpty()) {
+            displayMessage("  (no mini-games available)");
+            return;
+        }
+        for (MiniGameDataEntry e : entries) {
+            displayMessage(formatMiniGameLine(e));
+        }
+        displayMessage("Use 'enter minigame -t <type> -s <stage>' to play one.");
+    }
+
+    private String formatMiniGameLine(MiniGameDataEntry e) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("  ");
+        String typeLabel = prettyType(e.getMiniGameType());
+        sb.append(typeLabel);
+        sb.append(" — stage ").append(e.getStage());
+        sb.append(" (difficulty ").append(e.getDifficultyTier()).append(")");
+        if (e.getCoinReward() > 0) {
+            sb.append("  reward: ").append(e.getCoinReward()).append("c");
+        }
+        return sb.toString();
+    }
+
+    /** Pretty-prints a mini-game type for the listing (e.g. VASE_BREAKER → Vase Breaker). */
+    private String prettyType(String raw) {
+        if (raw == null) return "Unknown";
+        String friendly = raw.replace('_', ' ').toLowerCase();
+        if (friendly.isEmpty()) return raw;
+        return Character.toUpperCase(friendly.charAt(0)) + friendly.substring(1);
     }
 
     // Rendering helpers
@@ -221,7 +300,7 @@ public class TravelLogMenuView extends AppMenuView {
 
     private void printHelp() {
         displayError("Unknown travel log command. Available commands:");
-        displayError("  travel log page <daily|main|epic>");
+        displayError("  travel log page <daily|main|epic|minigame>");
         displayError("  show current page");
         displayError("  show daily quests");
         displayError("  show main quests");
@@ -230,6 +309,8 @@ public class TravelLogMenuView extends AppMenuView {
         displayError("  show completed quests");
         displayError("  show quest progress -n <quest name>");
         displayError("  complete quest -n <quest name>");
+        displayError("  show minigames");
+        displayError("  enter minigame -t <type> -s <stage>");
         displayError("  menu exit");
     }
 }

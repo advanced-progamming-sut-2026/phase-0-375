@@ -13,6 +13,7 @@ import model.game.level.minigame.vasebreaker.VaseBreakerSettings;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -145,6 +146,33 @@ public final class MiniGameRegistry {
 
     public boolean hasStage(MiniGameType type, int stage) {
         return type != null && entriesByKey.containsKey(key(type.name(), stage));
+    }
+
+    public List<MiniGameDataEntry> getAllEntries() {
+        List<MiniGameDataEntry> all = new ArrayList<>(entriesByKey.values());
+        all.sort((a, b) -> {
+            int aOrd = typeOrdinal(a.getMiniGameType());
+            int bOrd = typeOrdinal(b.getMiniGameType());
+            int typeCmp = Integer.compare(aOrd, bOrd);
+            if (typeCmp != 0) return typeCmp;
+            return Integer.compare(a.getStage(), b.getStage());
+        });
+        return all;
+    }
+
+    private static int typeOrdinal(String raw) {
+        MiniGameType t = resolveType(raw);
+        return t == null ? Integer.MAX_VALUE : t.ordinal();
+    }
+
+    private static MiniGameType resolveType(String raw) {
+        if (raw == null) return null;
+        try {
+            return MiniGameType.valueOf(raw.trim().toUpperCase(Locale.ROOT)
+                    .replace(' ', '_').replace('-', '_'));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static String key(String type, int stage) {

@@ -3,6 +3,7 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.enums.MiniGameType;
 import model.enums.QuestCategory;
 import model.enums.QuestPriority;
 import model.quest.Quest;
@@ -11,6 +12,11 @@ import model.quest.QuestReward;
 import model.quest.TravelLog;
 import model.user.User;
 import model.data.quest.QuestLoader;
+import model.data.minigame.MiniGameDataEntry;
+import model.data.minigame.MiniGameRegistry;
+import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
+import model.game.level.minigame.MiniGameLevel;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -19,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -141,17 +148,24 @@ public class TravelLogMenuController extends AppMenuController {
 
     public CommandResult<Void> changePage(String pageName) {
         if (pageName == null || pageName.isBlank()) {
-            return CommandResult.error("Page name cannot be empty. Use: daily | main | epic");
+            return CommandResult.error("Page name cannot be empty. Use: daily | main | epic | minigame");
         }
+        String trimmed = pageName.trim().toLowerCase(Locale.ROOT);
+        if (trimmed.equals("minigame") || trimmed.equals("mini-game") || trimmed.equals("mini_game")) {
+            travelLog.setViewingMiniGamePage(true);
+            return CommandResult.success("Switched to 'minigame' page.");
+        }
+        // Leaving the mini-game page: re-affirm a quest category.
+        travelLog.setViewingMiniGamePage(false);
         QuestCategory target;
         try {
-            target = QuestCategory.valueOf(pageName.trim().toUpperCase());
+            target = QuestCategory.valueOf(trimmed.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return CommandResult.error("Unknown page '" + pageName
-                    + "'. Available pages: daily, main, epic.");
+                    + "'. Available pages: daily, main, epic, minigame.");
         }
         travelLog.setCurrentPage(target);
-        return CommandResult.success("Switched to '" + target.name().toLowerCase() + "' page.");
+        return CommandResult.success("Switched to '" + target.name().toLowerCase(Locale.ROOT) + "' page.");
     }
 
     public CommandResult<List<Quest>> showCurrentPage() {
@@ -268,6 +282,75 @@ public class TravelLogMenuController extends AppMenuController {
             note += " New plant unlocked: '" + reward.getLastUnlockedPlant() + "'!";
         }
         return CommandResult.success("Quest '" + questName + "' completed! Reward granted." + note);
+    }
+
+    public boolean isViewingMiniGamePage() {
+        return travelLog.isViewingMiniGamePage();
+    }
+
+    public CommandResult<List<MiniGameDataEntry>> showMiniGames() {
+        travelLog.setViewingMiniGamePage(true);
+        MiniGameRegistry registry;
+        try {
+            registry = MiniGameRegistry.getInstance();
+        } catch (IllegalStateException e) {
+            try {
+                MiniGameRegistry.init("/assets/data/minigames/minigames.json");
+                registry = MiniGameRegistry.getInstance();
+            } catch (IOException | RuntimeException loadError) {
+                return CommandResult.errorTyped("Could not load mini-game definitions: " + loadError.getMessage());
+            }
+        }
+        List<MiniGameDataEntry> entries = registry.getAllEntries();
+        return CommandResult.successWithData(
+                "Mini-games (" + entries.size() + "):", entries);
+    }
+
+    public CommandResult<Void> enterMiniGame(String typeName, int stage) {
+        MiniGameType type;
+        try {
+            type = MiniGameType.valueOf(typeName.toUpperCase(Locale.ROOT)
+                    .replace(' ', '_').replace('-', '_'));
+        } catch (IllegalArgumentException e) {
+            return CommandResult.error("Unknown mini-game: '" + typeName + "'.");
+        }
+
+        MiniGameRegistry registry;
+        try {
+            registry = MiniGameRegistry.getInstance();
+        } catch (IllegalStateException e) {
+            try {
+                MiniGameRegistry.init("/assets/data/minigames/minigames.json");
+                registry = MiniGameRegistry.getInstance();
+            } catch (IOException | RuntimeException loadError) {
+                return CommandResult.error("Could not load mini-game definitions: " + loadError.getMessage());
+            }
+        }
+
+        MiniGameLevel level;
+        try {
+            level = registry.createMiniGame(type, stage);
+        } catch (IOException | RuntimeException buildError) {
+            return CommandResult.error("Could not build mini-game " + type + ": " + buildError.getMessage());
+        }
+        if (level == null) {
+            return CommandResult.error("No definition found for " + type + " stage " + stage + ".");
+        }
+
+        if (!level.canStart()) {
+            return CommandResult.error(type + " stage " + stage + " cannot be started yet.");
+        }
+
+        GameModel model = new GameModel(level);
+        PvZGameLoop loop = new PvZGameLoop(model);
+
+        App.getInstance().setCurrentGameModel(model);
+        App.getInstance().setCurrentGameLoop(loop);
+
+        level.onStart();
+        App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
+
+        return CommandResult.success("Entering " + type + " stage " + stage + ".");
     }
 
     // Helpers

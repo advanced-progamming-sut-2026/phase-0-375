@@ -12,7 +12,9 @@ public enum TravelLogMenuCommand implements CLICommand {
     SHOW_ALL_QUESTS("show all quests"),
     SHOW_COMPLETED_QUESTS("show completed quests"),
     COMPLETE_QUEST("complete quest -n (?<questName>.+)"),
-    SHOW_QUEST_PROGRESS("show quest progress -n (?<questName>.+)");
+    SHOW_QUEST_PROGRESS("show quest progress -n (?<questName>.+)"),
+    SHOW_MINIGAMES("show minigames"),
+    ENTER_MINIGAME("enter minigame -t (?<type>\\S+) -s (?<stage>\\d+)");
 
     private final Pattern pattern;
     private Matcher matcher;

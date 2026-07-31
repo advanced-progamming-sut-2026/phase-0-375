@@ -32,6 +32,10 @@ public class CommandResult<T> {
         return new CommandResult<>(false, errorMessage, null, null);
     }
 
+    public static <T> CommandResult<T> errorTyped(String errorMessage) {
+        return new CommandResult<>(false, errorMessage, null, null);
+    }
+
     public boolean isSuccess() {
         return success;
     }
