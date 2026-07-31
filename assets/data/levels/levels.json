@@ -29,7 +29,8 @@
             "maxSpawnInterval": 12,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 150
       },
       {
         "waveNumber": 2,
@@ -54,7 +55,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 600
       },
       {
         "waveNumber": 3,
@@ -85,7 +87,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 1500
       }
     ]
   },
@@ -143,7 +146,8 @@
             "maxSpawnInterval": 11,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 525
       },
       {
         "waveNumber": 2,
@@ -172,7 +176,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1200
       },
       {
         "waveNumber": 3,
@@ -207,7 +212,8 @@
             "maxSpawnInterval": 5,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 3375
       }
     ],
     "forcedPlants": [
@@ -265,7 +271,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -275,7 +282,7 @@
             "pool": [
               {
                 "zombie": "ZombieExplorer",
-                "weight": 1.0
+                "weight": 3.0
               },
               {
                 "zombie": "ZombieArmor2",
@@ -291,7 +298,8 @@
             "pattern": "STREAM",
             "streamDurationSeconds": 25
           }
-        ]
+        ],
+        "waveBudget": 1300
       },
       {
         "waveNumber": 3,
@@ -303,7 +311,7 @@
             "pool": [
               {
                 "zombie": "ZombieDefault",
-                "weight": 3.0
+                "weight": 1.0
               },
               {
                 "zombie": "ZombieArmor2",
@@ -311,7 +319,7 @@
               },
               {
                 "zombie": "ZombieRa",
-                "weight": 1.0
+                "weight": 2.0
               }
             ],
             "minCount": 6,
@@ -335,7 +343,8 @@
             "maxSpawnDelay": 15,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 7875
       }
     ],
     "protectedPlants": [
@@ -388,11 +397,11 @@
             "pool": [
               {
                 "zombie": "ZombieDefault",
-                "weight": 3.0
+                "weight": 2.0
               },
               {
                 "zombie": "ZombieArmor1",
-                "weight": 1.0
+                "weight": 2.0
               }
             ],
             "minCount": 3,
@@ -403,7 +412,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -413,7 +423,7 @@
             "pool": [
               {
                 "zombie": "ZombieDefault",
-                "weight": 2.0
+                "weight": 1.0
               },
               {
                 "zombie": "ZombieArmor1",
@@ -421,7 +431,7 @@
               },
               {
                 "zombie": "ZombieRa",
-                "weight": 1.0
+                "weight": 2.0
               }
             ],
             "minCount": 4,
@@ -432,7 +442,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 800
       },
       {
         "waveNumber": 3,
@@ -442,11 +453,11 @@
             "pool": [
               {
                 "zombie": "ZombieArmor1",
-                "weight": 2.0
+                "weight": 1.0
               },
               {
                 "zombie": "ZombieExplorer",
-                "weight": 1.0
+                "weight": 1.5
               },
               {
                 "zombie": "ZombieTombRaiser",
@@ -462,7 +473,8 @@
             "pattern": "SINGLE"
           }
         ],
-        "hugeWave": true
+        "hugeWave": true,
+        "waveBudget": 2812
       },
       {
         "waveNumber": 4,
@@ -497,7 +509,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 9450
       }
     ]
   },
@@ -545,7 +558,8 @@
             "maxSpawnInterval": 11,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1050
       },
       {
         "waveNumber": 2,
@@ -576,7 +590,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 3600
       }
     ]
   },
@@ -640,7 +655,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 900
       },
       {
         "waveNumber": 2,
@@ -671,7 +687,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 3900
       }
     ],
     "conveyorPlants": [
@@ -731,7 +748,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -756,7 +774,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1400
       },
       {
         "waveNumber": 3,
@@ -791,7 +810,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 5250
       }
     ]
   },
@@ -860,7 +880,8 @@
             "maxSpawnInterval": 8,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1050
       },
       {
         "waveNumber": 2,
@@ -885,7 +906,8 @@
             "maxSpawnInterval": 7,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1400
       },
       {
         "waveNumber": 3,
@@ -916,7 +938,8 @@
             "streamDurationSeconds": 25.0
           }
         ],
-        "hugeWave": true
+        "hugeWave": true,
+        "waveBudget": 5625
       },
       {
         "waveNumber": 4,
@@ -951,7 +974,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 13500
       }
     ]
   },
@@ -1007,7 +1031,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -1038,7 +1063,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 3000
       }
     ],
     "tideLimitColumn": 3,
@@ -1113,7 +1139,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -1144,7 +1171,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 6000
       }
     ],
     "tideLimitColumn": 4,
@@ -1171,8 +1199,10 @@
     "rows": 5,
     "columns": 9,
     "rules": {
-      "initialSun": 150,
-      "maxPlantsAllowed": 8
+      "initialSun": 800,
+      "maxPlantsAllowed": 8,
+      "sunFallsFromSky": false,
+      "sunProducingPlantsAllowed": false
     },
     "waterTiles": [
       {
@@ -1231,7 +1261,8 @@
             "maxSpawnInterval": 8,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -1260,7 +1291,8 @@
             "maxSpawnInterval": 7,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 2200
       },
       {
         "waveNumber": 3,
@@ -1291,7 +1323,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 6750
       }
     ]
   },
@@ -1378,7 +1411,8 @@
             "maxSpawnInterval": 8,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 450
       },
       {
         "waveNumber": 2,
@@ -1407,7 +1441,8 @@
             "maxSpawnInterval": 7,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 2200
       },
       {
         "waveNumber": 3,
@@ -1437,7 +1472,8 @@
             "pattern": "SINGLE"
           }
         ],
-        "hugeWave": true
+        "hugeWave": true,
+        "waveBudget": 7500
       },
       {
         "waveNumber": 4,
@@ -1472,7 +1508,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 9900
       }
     ]
   },
@@ -1521,7 +1558,8 @@
             "maxSpawnInterval": 10,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 825
       },
       {
         "waveNumber": 2,
@@ -1552,7 +1590,8 @@
             "maxSpawnInterval": 6,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 5400
       }
     ]
   },
@@ -1606,7 +1645,8 @@
             "maxSpawnInterval": 9,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 825
       },
       {
         "waveNumber": 2,
@@ -1631,7 +1671,8 @@
             "maxSpawnInterval": 8,
             "pattern": "AMBUSH"
           }
-        ]
+        ],
+        "waveBudget": 2700
       },
       {
         "waveNumber": 3,
@@ -1662,7 +1703,8 @@
             "maxSpawnInterval": 5,
             "pattern": "GROUP"
           }
-        ]
+        ],
+        "waveBudget": 5437
       }
     ]
   },
@@ -1727,7 +1769,8 @@
             "maxSpawnInterval": 7,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1125
       },
       {
         "waveNumber": 2,
@@ -1757,7 +1800,8 @@
             "pattern": "STREAM",
             "streamDurationSeconds": 30.0
           }
-        ]
+        ],
+        "waveBudget": 3000
       },
       {
         "waveNumber": 3,
@@ -1792,7 +1836,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 8437
       }
     ]
   },
@@ -1863,7 +1908,8 @@
             "maxSpawnInterval": 8,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 1125
       },
       {
         "waveNumber": 2,
@@ -1892,7 +1938,8 @@
             "maxSpawnInterval": 7,
             "pattern": "SINGLE"
           }
-        ]
+        ],
+        "waveBudget": 3600
       },
       {
         "waveNumber": 3,
@@ -1922,7 +1969,8 @@
             "pattern": "AMBUSH"
           }
         ],
-        "hugeWave": true
+        "hugeWave": true,
+        "waveBudget": 5625
       },
       {
         "waveNumber": 4,
@@ -1957,7 +2005,8 @@
           }
         ],
         "hugeWave": true,
-        "finalWave": true
+        "finalWave": true,
+        "waveBudget": 10125
       }
     ]
   }
