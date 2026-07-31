@@ -112,7 +112,12 @@ final class MapView {
                 if (level instanceof VaseBreakerLevel vbLevel && ch == '.') {
                     Vase vase = vbLevel.vaseAt(c, r);
                     if (vase != null) {
-                        ch = 'V';
+                        ch = switch (vase.getContentType()) {
+                            case ZOMBIE -> 'Y';
+                            case SEED_PACKET -> 'S';
+                            case GIANT_VASE -> 'W';
+                            default -> 'V'; // EMPTY
+                        };
                     }
                 }
                 // Beghouled: show a plant-specific emoji instead of the generic P/O/B/G letter.
@@ -271,6 +276,9 @@ final class MapView {
             case 'N': return AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA);
             case '*': return AttributedStyle.DEFAULT.foreground(AttributedStyle.CYAN).bold();
             case 'V': return AttributedStyle.DEFAULT.foreground(AttributedStyle.YELLOW).bold();
+            case 'Y': return AttributedStyle.DEFAULT.foreground(AttributedStyle.RED).bold();
+            case 'S': return AttributedStyle.DEFAULT.foreground(AttributedStyle.GREEN).bold();
+            case 'W': return AttributedStyle.DEFAULT.foreground(AttributedStyle.MAGENTA).bold();
             default: return DIM;
         }
     }
