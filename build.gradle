@@ -9,7 +9,10 @@ java {
     toolchain { languageVersion = JavaLanguageVersion.of(25) }
 }
 
-repositories { mavenCentral() }
+repositories { 
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
 
 dependencies {
     // same version as the jars in src/lib — databind pulls core + annotations
@@ -17,6 +20,10 @@ dependencies {
 
     // Terminal UI shell (alternate screen, line editing, colored rendering)
     implementation 'org.jline:jline:3.26.3'
+
+    // PVZ Skin and TenPatch
+    implementation 'com.github.pizpizi:pvz-skin:v0.1.0'
+    implementation 'com.github.raeleus.TenPatch:tenpatch:5.2.3'
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
