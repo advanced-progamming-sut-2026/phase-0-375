@@ -39,6 +39,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
         stage.addActor(top);
 
         BorderedTable card = new BorderedTable();
+        card.pad(28f);
         card.add(new Label("Main Menu", skin, "big")).padBottom(8f).row();
         card.add(new Label("Welcome, " + nick, skin, "medium")).padBottom(20f).row();
 
@@ -78,7 +79,16 @@ public final class MainHubScreen extends AbstractMenuScreen {
                 }
             }
         });
-        card.add(logout).width(300f).height(64f);
+        card.add(logout).width(300f).height(56f).padBottom(8f).row();
+
+        TextButton exit = new TextButton("Exit", skin, "brown");
+        exit.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                controller.menuExit();
+            }
+        });
+        card.add(exit).width(300f).height(64f);
 
         Table root = new Table();
         root.setFillParent(true);
