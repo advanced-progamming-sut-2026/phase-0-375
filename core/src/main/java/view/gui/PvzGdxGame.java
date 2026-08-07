@@ -9,6 +9,7 @@ import pvz.skin.PvzSkin;
 import view.gui.screen.LoginScreen;
 import view.gui.screen.MainHubScreen;
 import view.gui.screen.RegisterScreen;
+import view.gui.ui.SkinSmoothing;
 
 /**
  * Thin Game shell for menu screens. Uses {@link PvzSkin} only — PAM / TextureBank
@@ -21,6 +22,7 @@ public class PvzGdxGame extends Game {
     @Override
     public void create() {
         skin = PvzSkin.get();
+        SkinSmoothing.applyLinearFiltering(skin);
         batch = new SpriteBatch();
 
         App app = App.getInstance();

@@ -40,8 +40,9 @@ public final class LoginScreen extends AbstractMenuScreen {
         App.getInstance().setCurrentMenu(MenuType.LOGIN);
 
         BorderedTable card = new BorderedTable();
+        card.pad(28f);
         Label title = new Label("Login", skin, "big");
-        card.add(title).padBottom(20f).row();
+        card.add(title).padBottom(16f).row();
 
         username = new TextField("", skin);
         username.setMessageText("Username");
@@ -51,11 +52,9 @@ public final class LoginScreen extends AbstractMenuScreen {
         password.setPasswordCharacter('*');
         stayLoggedIn = new CheckBox(" Stay logged in", skin);
 
-        card.add(new Label("Username", skin, "secondary")).left().row();
-        card.add(username).width(360f).height(48f).padBottom(10f).row();
-        card.add(new Label("Password", skin, "secondary")).left().row();
-        card.add(password).width(360f).height(48f).padBottom(10f).row();
-        card.add(stayLoggedIn).left().padBottom(16f).row();
+        card.add(username).width(360f).height(40f).padBottom(8f).row();
+        card.add(password).width(360f).height(40f).padBottom(8f).row();
+        card.add(stayLoggedIn).left().padBottom(12f).row();
 
         TextButton login = new TextButton("Login", skin);
         login.addListener(new ChangeListener() {
@@ -64,7 +63,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                 submitLogin();
             }
         });
-        card.add(login).width(280f).height(64f).padBottom(10f).row();
+        card.add(login).width(260f).height(52f).padBottom(8f).row();
 
         TextButton forgot = new TextButton("Forgot password", skin, "brown");
         forgot.addListener(new ChangeListener() {
@@ -73,7 +72,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                 openForgotModal();
             }
         });
-        card.add(forgot).width(280f).height(56f).padBottom(10f).row();
+        card.add(forgot).width(260f).height(48f).padBottom(8f).row();
 
         TextButton toRegister = new TextButton("Create account", skin, "purple");
         toRegister.addListener(new ChangeListener() {
@@ -86,7 +85,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                 }
             }
         });
-        card.add(toRegister).width(280f).height(56f);
+        card.add(toRegister).width(260f).height(48f);
 
         Table root = new Table();
         root.setFillParent(true);

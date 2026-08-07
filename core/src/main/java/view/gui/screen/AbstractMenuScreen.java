@@ -13,8 +13,8 @@ import view.gui.ui.ToastBanner;
  * Scene2D-only menu base (no world / PAM). Clamps delta and hosts a toast layer.
  */
 public abstract class AbstractMenuScreen implements Screen {
-    protected static final float UI_WIDTH = 1280f;
-    protected static final float UI_HEIGHT = 720f;
+    protected static final float UI_WIDTH = 1920f;
+    protected static final float UI_HEIGHT = 1080f;
     private static final float MAX_DELTA = 1f / 30f;
 
     protected final PvzGdxGame game;

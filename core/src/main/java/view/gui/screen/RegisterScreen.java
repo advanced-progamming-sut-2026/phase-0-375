@@ -3,6 +3,7 @@ package view.gui.screen;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -21,6 +22,10 @@ import view.gui.PvzGdxGame;
  * Registration form → {@link RegisterMenuController} (fields + security question).
  */
 public final class RegisterScreen extends AbstractMenuScreen {
+    private static final float FIELD_WIDTH = 360f;
+    private static final float FIELD_HEIGHT = 40f;
+    private static final float CARD_MAX_HEIGHT = UI_HEIGHT - 64f;
+
     private final RegisterMenuController controller = RegisterMenuController.getInstance();
 
     private Table stepSecurity;
@@ -48,13 +53,18 @@ public final class RegisterScreen extends AbstractMenuScreen {
         stepSecurity = buildSecurityStep();
 
         BorderedTable card = new BorderedTable();
-        card.add(new Label("Register", skin, "big")).padBottom(16f).row();
+        card.pad(28f);
+        card.add(new Label("Register", skin, "big")).padBottom(10f).row();
         contentCell = card.add(buildFieldsStep()).growX();
         contentCell.row();
 
+        ScrollPane scroll = new ScrollPane(card, skin);
+        scroll.setFadeScrollBars(false);
+        scroll.setScrollingDisabled(true, false);
+
         Table root = new Table();
         root.setFillParent(true);
-        root.add(card).width(560f);
+        root.add(scroll).width(560f).maxHeight(CARD_MAX_HEIGHT);
         stage.addActor(root);
     }
 
@@ -72,13 +82,12 @@ public final class RegisterScreen extends AbstractMenuScreen {
         gender = new SelectBox<>(skin);
         gender.setItems("male", "female");
 
-        addLabeled(t, "Username", username);
-        addLabeled(t, "Password", password);
-        addLabeled(t, "Confirm", passwordConfirm);
-        addLabeled(t, "Nickname", nickname);
-        addLabeled(t, "Email", email);
-        t.add(new Label("Gender", skin, "secondary")).left().row();
-        t.add(gender).width(360f).height(48f).padBottom(14f).row();
+        addField(t, username);
+        addField(t, password);
+        addField(t, passwordConfirm);
+        addField(t, nickname);
+        addField(t, email);
+        t.add(gender).width(FIELD_WIDTH).height(FIELD_HEIGHT).padBottom(10f).row();
 
         TextButton next = new TextButton("Continue", skin);
         next.addListener(new ChangeListener() {
@@ -97,7 +106,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
                 }
             }
         });
-        t.add(next).width(280f).height(64f).padBottom(10f).row();
+        t.add(next).width(260f).height(52f).padBottom(8f).row();
 
         TextButton toLogin = new TextButton("I have an account", skin, "purple");
         toLogin.addListener(new ChangeListener() {
@@ -110,13 +119,13 @@ public final class RegisterScreen extends AbstractMenuScreen {
                 }
             }
         });
-        t.add(toLogin).width(280f).height(56f);
+        t.add(toLogin).width(260f).height(48f);
         return t;
     }
 
     private Table buildSecurityStep() {
         Table t = new Table();
-        t.add(new Label("Security question", skin, "medium")).padBottom(10f).row();
+        t.add(new Label("Security question", skin, "medium")).padBottom(8f).row();
 
         question = new SelectBox<>(skin);
         Array<String> items = new Array<>();
@@ -129,9 +138,9 @@ public final class RegisterScreen extends AbstractMenuScreen {
         answer = field("Answer");
         answerConfirm = field("Confirm answer");
 
-        t.add(question).width(440f).height(48f).padBottom(10f).row();
-        addLabeled(t, "Answer", answer);
-        addLabeled(t, "Confirm", answerConfirm);
+        t.add(question).width(440f).height(FIELD_HEIGHT).padBottom(8f).row();
+        addField(t, answer);
+        addField(t, answerConfirm);
 
         TextButton finish = new TextButton("Create account", skin);
         finish.addListener(new ChangeListener() {
@@ -146,7 +155,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
                 }
             }
         });
-        t.add(finish).width(280f).height(64f);
+        t.add(finish).width(260f).height(52f);
         return t;
     }
 
@@ -156,8 +165,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
         return f;
     }
 
-    private void addLabeled(Table t, String label, TextField field) {
-        t.add(new Label(label, skin, "secondary")).left().row();
-        t.add(field).width(360f).height(48f).padBottom(8f).row();
+    private void addField(Table t, TextField field) {
+        t.add(field).width(FIELD_WIDTH).height(FIELD_HEIGHT).padBottom(6f).row();
     }
 }
