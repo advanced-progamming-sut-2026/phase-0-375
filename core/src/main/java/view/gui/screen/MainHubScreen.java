@@ -13,13 +13,15 @@ import model.enums.MenuType;
 import model.user.User;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.ui.NewsOverlay;
 import view.gui.ui.ResourceBar;
 
 /**
- * Stub main hub: currency chrome, news badge, logout. Other destinations are placeholders.
+ * Stub main hub: currency chrome, news overlay, logout. Other destinations are placeholders.
  */
 public final class MainHubScreen extends AbstractMenuScreen {
     private final MainMenuController controller = MainMenuController.getInstance();
+    private TextButton newsButton;
 
     public MainHubScreen(PvzGdxGame game) {
         super(game);
@@ -43,23 +45,14 @@ public final class MainHubScreen extends AbstractMenuScreen {
         card.add(new Label("Main Menu", skin, "big")).padBottom(8f).row();
         card.add(new Label("Welcome, " + nick, skin, "medium")).padBottom(20f).row();
 
-        int unread = NewsMenuController.getInstance().countUnread();
-        String newsLabel = unread > 0 ? "News (!" + unread + ")" : "News";
-        TextButton news = new TextButton(newsLabel, skin);
-        news.addListener(new ChangeListener() {
+        newsButton = new TextButton(newsButtonLabel(), skin);
+        newsButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.menuEnter("news");
-                showToast(r.isSuccess()
-                        ? "News menu stub — coming soon. (" + unread + " unread)"
-                        : r.getMessage(), !r.isSuccess());
-                // Stay on hub until a NewsScreen exists; revert menu type.
-                if (r.isSuccess()) {
-                    App.getInstance().setCurrentMenu(MenuType.MAIN);
-                }
+                openNewsOverlay();
             }
         });
-        card.add(news).width(300f).height(64f).padBottom(10f).row();
+        card.add(newsButton).width(300f).height(64f).padBottom(10f).row();
 
         TextButton adventure = stubButton("Adventure (stub)");
         TextButton profile = stubButton("Profile (stub)");
@@ -94,6 +87,35 @@ public final class MainHubScreen extends AbstractMenuScreen {
         root.setFillParent(true);
         root.add(card).width(520f);
         stage.addActor(root);
+    }
+
+    private void openNewsOverlay() {
+        CommandResult<Void> r = controller.menuEnter("news");
+        if (!r.isSuccess()) {
+            showToast(r.getMessage(), true);
+            return;
+        }
+
+        Table overlay = NewsOverlay.create(skin, () -> {
+            CommandResult<Void> exit = NewsMenuController.getInstance().menuExit();
+            if (!exit.isSuccess()) {
+                showToast(exit.getMessage(), true);
+            }
+            refreshNewsButton();
+        });
+        stage.addActor(overlay);
+        toast.toFront();
+    }
+
+    private void refreshNewsButton() {
+        if (newsButton != null) {
+            newsButton.setText(newsButtonLabel());
+        }
+    }
+
+    private static String newsButtonLabel() {
+        int unread = NewsMenuController.getInstance().countUnread();
+        return unread > 0 ? "News (!" + unread + ")" : "News";
     }
 
     private TextButton stubButton(String text) {
