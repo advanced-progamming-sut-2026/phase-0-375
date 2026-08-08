@@ -2,11 +2,11 @@ package model.user;
 
 import model.enums.Chapter;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 
 public class User {
@@ -50,6 +50,7 @@ public class User {
     private Map<String, Long> greenhousePlantTimestamps;
 
     private List<String> readNews;
+    private Map<String, String> newsPublishDates;
 
     private int completedDailyQuests;
     private int completedNonDailyQuests;
@@ -275,6 +276,34 @@ public class User {
 
     public void setReadNews(List<String> readNews) {
         this.readNews = readNews;
+    }
+
+    public Map<String, String> getNewsPublishDates() {
+        return newsPublishDates;
+    }
+
+    public void setNewsPublishDates(Map<String, String> newsPublishDates) {
+        this.newsPublishDates = newsPublishDates;
+    }
+
+    public LocalDate rememberNewsPublishDate(String newsId) {
+        if (newsId == null || newsId.isBlank()) {
+            return LocalDate.now();
+        }
+        if (newsPublishDates == null) {
+            newsPublishDates = new HashMap<>();
+        }
+        String existing = newsPublishDates.get(newsId);
+        if (existing != null && !existing.isBlank()) {
+            try {
+                return LocalDate.parse(existing);
+            } catch (DateTimeParseException ignored) {
+                // Fall through and rewrite a bad value.
+            }
+        }
+        LocalDate today = LocalDate.now();
+        newsPublishDates.put(newsId, today.toString());
+        return today;
     }
 
     public int getCompletedDailyQuests() {

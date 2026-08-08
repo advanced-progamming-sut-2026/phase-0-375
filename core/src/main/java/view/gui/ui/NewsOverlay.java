@@ -157,8 +157,6 @@ public final class NewsOverlay {
                     public boolean act(float delta) {
                         if (isVisibleInScrollPane(itemContainer, scroll)) {
                             controller.markAsRead(newsItem.getId());
-                            itemTitle.setColor(NEWS_COLOR);
-                            itemTitle.setText(newsItem.getTitle());
                             return true;
                         }
                         return false;

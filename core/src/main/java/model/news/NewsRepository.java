@@ -28,27 +28,29 @@ public class NewsRepository {
             readIds.addAll(user.getReadNews());
         }
 
-        LocalDate today = LocalDate.now();
         List<NewsItem> items = new ArrayList<>();
 
         if (user.getUnlockedPlants() != null) {
             for (String plantName : user.getUnlockedPlants()) {
                 if (plantName != null && !plantName.trim().isEmpty()) {
-                    items.add(NewsFactory.forPlantUnlock(plantName, today));
+                    LocalDate date = user.rememberNewsPublishDate(NewsFactory.plantNewsId(plantName));
+                    items.add(NewsFactory.forPlantUnlock(plantName, date));
                 }
             }
         }
         if (user.getUnlockedZombies() != null) {
             for (String zombieName : user.getUnlockedZombies()) {
                 if (zombieName != null && !zombieName.trim().isEmpty()) {
-                    items.add(NewsFactory.forZombieUnlock(zombieName, today));
+                    LocalDate date = user.rememberNewsPublishDate(NewsFactory.zombieNewsId(zombieName));
+                    items.add(NewsFactory.forZombieUnlock(zombieName, date));
                 }
             }
         }
         if (user.getUnlockedMiniGames() != null) {
             for (String miniGame : user.getUnlockedMiniGames()) {
                 if (miniGame != null && !miniGame.trim().isEmpty()) {
-                    items.add(NewsFactory.forMiniGameUnlock(miniGame, today));
+                    LocalDate date = user.rememberNewsPublishDate(NewsFactory.miniGameNewsId(miniGame));
+                    items.add(NewsFactory.forMiniGameUnlock(miniGame, date));
                 }
             }
         }
@@ -56,14 +58,16 @@ public class NewsRepository {
         if (user.getUnlockedLevels() != null) {
             for (String level : user.getUnlockedLevels()) {
                 if (level != null && !level.trim().isEmpty()) {
-                    items.add(NewsFactory.forLevelUnlock(level, today));
+                    LocalDate date = user.rememberNewsPublishDate(NewsFactory.levelNewsId(level));
+                    items.add(NewsFactory.forLevelUnlock(level, date));
                 }
             }
         }
 
-        items.sort(Comparator.comparingInt(
-                (NewsItem a) -> a.getCategory().ordinal()).thenComparing(NewsItem::getId)
-        );
+        items.sort(Comparator
+                .comparing(NewsItem::getPublishDate).reversed()
+                .thenComparingInt((NewsItem a) -> a.getCategory().ordinal())
+                .thenComparing(NewsItem::getId));
 
         return new NewsRepository(items, readIds);
     }

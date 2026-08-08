@@ -18,6 +18,7 @@ import model.game.rule.EndGameCondition;
 import model.game.rule.RegularEndGameCondition;
 import model.plant.PlantFactory;
 import model.user.User;
+import model.news.NewsFactory;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -160,7 +161,10 @@ public class RegularLevel extends Level {
                 int nextId = completedId + 1;
                 LevelRegistry registry = LevelRegistry.getInstance();
                 if (registry.hasLevel(chapter, nextId)) {
-                    user.getUnlockedLevels().add(chapter.name() + "#" + nextId);
+                    String levelKey = chapter.name() + "#" + nextId;
+                    if (user.getUnlockedLevels().add(levelKey)) {
+                        user.rememberNewsPublishDate(NewsFactory.levelNewsId(levelKey));
+                    }
                 }
             } catch (IllegalStateException notInitialised) {
                 // LevelRegistry not loaded yet, just skip the next-level peek.

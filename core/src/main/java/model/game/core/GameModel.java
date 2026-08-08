@@ -32,6 +32,7 @@ import model.item.placeable.Placeable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
+import model.news.NewsFactory;
 import model.user.User;
 import model.zombie.ZombieFactory;
 import model.zombie.behavior.BehaviorContext;
@@ -309,6 +310,7 @@ public class GameModel implements BehaviorContext {
             user.setUnlockedZombies(seen);
         }
         if (seen.add(zombieName)) {
+            user.rememberNewsPublishDate(NewsFactory.zombieNewsId(zombieName));
             App.getInstance().getUserRepository().flush();
         }
     }

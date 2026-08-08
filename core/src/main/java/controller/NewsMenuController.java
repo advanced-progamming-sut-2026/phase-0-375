@@ -69,6 +69,15 @@ public class NewsMenuController extends AppMenuController {
     }
 
     private NewsRepository buildRepo() {
-        return NewsRepository.fromUser(App.getInstance().getCurrentUser());
+        User user = App.getInstance().getCurrentUser();
+        int before = user != null && user.getNewsPublishDates() != null
+                ? user.getNewsPublishDates().size() : 0;
+        NewsRepository repo = NewsRepository.fromUser(user);
+        int after = user != null && user.getNewsPublishDates() != null
+                ? user.getNewsPublishDates().size() : 0;
+        if (after > before) {
+            App.getInstance().getUserRepository().flush();
+        }
+        return repo;
     }
 }

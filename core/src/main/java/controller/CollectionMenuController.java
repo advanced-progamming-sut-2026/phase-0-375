@@ -10,6 +10,7 @@ import model.plant.PlantFactory;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.definition.PlantLevels;
+import model.news.NewsFactory;
 import model.user.User;
 import model.zombie.ZombieFactory;
 import model.zombie.definition.Zombie;
@@ -366,6 +367,7 @@ public class CollectionMenuController extends AppMenuController {
 
         user.setCoins(user.getCoins() - PURCHASE_COST_COINS);
         collection.unlockPlant(plantName);
+        user.rememberNewsPublishDate(NewsFactory.plantNewsId(plantName));
         persistPlantLevel(user, collection, plantName);
         App.getInstance().getUserRepository().flush();
         return CommandResult.success("'" + plantName + "' purchased successfully!");

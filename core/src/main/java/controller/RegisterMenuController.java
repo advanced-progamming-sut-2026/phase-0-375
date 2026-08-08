@@ -4,6 +4,7 @@ import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
 import model.greenhouse.Greenhouse;
+import model.news.NewsFactory;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
@@ -151,6 +152,10 @@ public class RegisterMenuController extends AppMenuController {
         user.setGreenhousePots(new HashMap<>());
         user.setGreenhousePlantTimestamps(new HashMap<>());
         user.setReadNews(new ArrayList<>());
+        user.setNewsPublishDates(new HashMap<>());
+        for (String plant : User.STARTER_PLANTS) {
+            user.rememberNewsPublishDate(NewsFactory.plantNewsId(plant));
+        }
         user.setQuestStatus(new HashMap<>());
         user.setPurchasedDailyDeals(new HashMap<>());
 

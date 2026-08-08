@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import model.enums.Chapter;
+import model.news.NewsFactory;
 import model.plant.PlantFactory;
 import model.shop.Shop;
 import model.user.User;
@@ -52,11 +53,23 @@ public class JsonUserRepository implements UserRepository {
      * Idempotent: already-unlocked plants are untouched.
      */
     private void migrateStarterPlants() {
+        boolean stampedDates = false;
         for (User u : users) {
             if (u.getUnlockedPlants() == null) {
                 u.setUnlockedPlants(new HashSet<>());
             }
             u.getUnlockedPlants().addAll(User.STARTER_PLANTS);
+            int before = u.getNewsPublishDates() == null ? 0 : u.getNewsPublishDates().size();
+            for (String plant : User.STARTER_PLANTS) {
+                u.rememberNewsPublishDate(NewsFactory.plantNewsId(plant));
+            }
+            int after = u.getNewsPublishDates() == null ? 0 : u.getNewsPublishDates().size();
+            if (after > before) {
+                stampedDates = true;
+            }
+        }
+        if (stampedDates) {
+            flush();
         }
     }
 
@@ -187,7 +200,9 @@ public class JsonUserRepository implements UserRepository {
     @Override
     public void unlockPlant(String username, String plantName) {
         findByUsername(username).ifPresent(u -> {
-            if (u.getUnlockedPlants() != null) u.getUnlockedPlants().add(plantName);
+            if (u.getUnlockedPlants() != null && u.getUnlockedPlants().add(plantName)) {
+                u.rememberNewsPublishDate(NewsFactory.plantNewsId(plantName));
+            }
         });
         flush();
     }
@@ -195,7 +210,9 @@ public class JsonUserRepository implements UserRepository {
     @Override
     public void unlockZombie(String username, String zombieName) {
         findByUsername(username).ifPresent(u -> {
-            if (u.getUnlockedZombies() != null) u.getUnlockedZombies().add(zombieName);
+            if (u.getUnlockedZombies() != null && u.getUnlockedZombies().add(zombieName)) {
+                u.rememberNewsPublishDate(NewsFactory.zombieNewsId(zombieName));
+            }
         });
         flush();
     }
@@ -227,7 +244,9 @@ public class JsonUserRepository implements UserRepository {
     @Override
     public void unlockMiniGame(String username, String miniGameId) {
         findByUsername(username).ifPresent(u -> {
-            if (u.getUnlockedMiniGames() != null) u.getUnlockedMiniGames().add(miniGameId);
+            if (u.getUnlockedMiniGames() != null && u.getUnlockedMiniGames().add(miniGameId)) {
+                u.rememberNewsPublishDate(NewsFactory.miniGameNewsId(miniGameId));
+            }
         });
         flush();
     }

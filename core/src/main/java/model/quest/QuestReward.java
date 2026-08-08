@@ -4,6 +4,7 @@ import model.app.App;
 import model.enums.QuestRewardType;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
+import model.news.NewsFactory;
 import model.user.User;
 
 import java.util.ArrayList;
@@ -70,7 +71,9 @@ public class QuestReward {
                 if (user.getUnlockedPlants() == null) {
                     user.setUnlockedPlants(new HashSet<>());
                 }
-                user.getUnlockedPlants().add(resolved);
+                if (user.getUnlockedPlants().add(resolved)) {
+                    user.rememberNewsPublishDate(NewsFactory.plantNewsId(resolved));
+                }
                 lastUnlockedPlant = resolved;
             }
         }

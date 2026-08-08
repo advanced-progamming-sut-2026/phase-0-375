@@ -11,10 +11,26 @@ public final class NewsFactory {
     public static final String MINIGAME_PREFIX = "minigame:";
     public static final String LEVEL_PREFIX = "level:";
 
+    public static String plantNewsId(String plantName) {
+        return PLANT_PREFIX + normalize(nonNull(plantName));
+    }
+
+    public static String zombieNewsId(String zombieName) {
+        return ZOMBIE_PREFIX + normalize(nonNull(zombieName));
+    }
+
+    public static String miniGameNewsId(String miniGameId) {
+        return MINIGAME_PREFIX + normalize(nonNull(miniGameId));
+    }
+
+    public static String levelNewsId(String level) {
+        return LEVEL_PREFIX + normalize(nonNull(level));
+    }
+
     /** News for "user unlocked a new plant". */
     public static NewsItem forPlantUnlock(String plantName, LocalDate unlockDate) {
         String safe = nonNull(plantName);
-        String id = PLANT_PREFIX + normalize(safe);
+        String id = plantNewsId(safe);
         String title = "New Plant Unlocked: " + safe;
         String body = "You've added '" + safe + "' to your collection. "
                 + "Open the collection menu to see its stats, or drop it into your "
@@ -25,7 +41,7 @@ public final class NewsFactory {
     /** News for "user encountered a new zombie in a level". */
     public static NewsItem forZombieUnlock(String zombieName, LocalDate unlockDate) {
         String safe = nonNull(zombieName);
-        String id = ZOMBIE_PREFIX + normalize(safe);
+        String id = zombieNewsId(safe);
         String title = "New Zombie Discovered: " + safe;
         String body = "A '" + safe + "' has shown up in a level. "
                 + "Visit the collection menu to learn its strengths, weaknesses, "
@@ -36,7 +52,7 @@ public final class NewsFactory {
     /** News for "user unlocked a new mini-game". */
     public static NewsItem forMiniGameUnlock(String miniGameId, LocalDate unlockDate) {
         String safe = nonNull(miniGameId);
-        String id = MINIGAME_PREFIX + normalize(safe);
+        String id = miniGameNewsId(safe);
         String pretty = prettify(safe);
         String title = "New Mini-Game Unlocked: " + pretty;
         String body = "Mini-Game '" + pretty + "' is now available. "
@@ -47,7 +63,7 @@ public final class NewsFactory {
     /** News for "user unlocked a new level" */
     public static NewsItem forLevelUnlock(String level, LocalDate unlockDate) {
         String safe = nonNull(level);
-        String id = LEVEL_PREFIX + normalize(safe);
+        String id = levelNewsId(safe);
         String pretty = prettify(safe);
         String title = "New Level Unlocked: " + pretty;
         String body = "Level '" + pretty + "' has been unlocked. "
