@@ -55,7 +55,17 @@ public final class MainHubScreen extends AbstractMenuScreen {
         card.add(newsButton).width(300f).height(64f).padBottom(10f).row();
 
         TextButton adventure = stubButton("Adventure (stub)");
-        TextButton profile = stubButton("Profile (stub)");
+        TextButton profile = new TextButton("Profile", skin, "purple");
+        profile.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> r = controller.menuEnter("profile");
+                showToast(r.getMessage(), !r.isSuccess());
+                if (r.isSuccess()) {
+                    game.setScreen(new ProfileScreen(game));
+                }
+            }
+        });
         TextButton settings = stubButton("Settings (stub)");
         card.add(adventure).width(300f).height(56f).padBottom(8f).row();
         card.add(profile).width(300f).height(56f).padBottom(8f).row();
