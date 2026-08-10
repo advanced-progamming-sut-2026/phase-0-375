@@ -1,11 +1,9 @@
 package model.game.systems;
 
-import model.enums.GameState;
 import model.event.EventBus;
 import model.event.GameEvent;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
-import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
@@ -24,7 +22,6 @@ public class CombatSystem implements Tickable {
     @Override
     public void tick(float deltaTime) {
         handleStatusEffectDamage(deltaTime);
-        handlePlantFreezeTimers(deltaTime);
     }
 
     /**
@@ -59,26 +56,6 @@ public class CombatSystem implements Tickable {
 
         if (anyStatusApplied && eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.STATUS_APPLIED));
-        }
-    }
-
-    /**
-     * Advances every plant's freeze timer by {@code deltaTime} and
-     * unfreezes plants whose timer has expired.
-     */
-    private void handlePlantFreezeTimers(float deltaTime) {
-        List<PlantInstance> plants = gameModel.getAllPlants();
-        if (plants == null || plants.isEmpty()) return;
-
-        boolean anyUnfroze = false;
-        for (PlantInstance plant : plants) {
-            if (plant == null) continue;
-            if (plant.tickFreeze(deltaTime)) {
-                anyUnfroze = true;
-            }
-        }
-        if (anyUnfroze && eventBus != null) {
-            eventBus.dispatch(new GameEvent(GameEvent.Type.STATUS_EXPIRED));
         }
     }
 }

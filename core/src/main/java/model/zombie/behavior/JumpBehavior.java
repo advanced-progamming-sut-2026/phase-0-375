@@ -142,11 +142,6 @@ public class JumpBehavior implements ZombieBehavior {
             zombie.startEating(plantHere);
         }
 
-        float damage = zombie.getDefinition().getEatDPS() * deltaTime;
-        if (damage > 0) {
-            context.damagePlant(plantHere, (int) damage);
-        }
-
         if (plantHere.getCurrentHP() <= 0) {
             currentTarget = null;
             zombie.stopEating();

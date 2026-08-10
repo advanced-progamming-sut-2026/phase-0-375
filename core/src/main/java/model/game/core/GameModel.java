@@ -28,6 +28,7 @@ import model.item.Grave;
 import model.item.Grave.GraveType;
 import model.item.LootDrop;
 import model.item.Sun;
+import model.item.pushable.Pushable;
 import model.item.placeable.Placeable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
@@ -71,6 +72,7 @@ public class GameModel implements BehaviorContext {
     private List<Projectile> activeProjectiles;
     private List<Sun> activeSuns;
     private List<LootDrop> pendingLootDrops;
+    private List<Pushable> orphanedPushables;
 
     private EventBus eventBus;
     private List<String> selectedPlants;       // plant types chosen for this level
@@ -114,6 +116,7 @@ public class GameModel implements BehaviorContext {
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
+        this.orphanedPushables = new ArrayList<>();
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
@@ -401,6 +404,26 @@ public class GameModel implements BehaviorContext {
     public void removeZombie(ZombieInstance zombie) {
         activeZombies.remove(zombie);
         gameMap.removeZombie(zombie);
+    }
+
+    @Override
+    public void orphanPushable(Pushable pushable) {
+        if (pushable == null || pushable.isDestroyed()) {
+            return;
+        }
+        if (!orphanedPushables.contains(pushable)) {
+            orphanedPushables.add(pushable);
+        }
+    }
+
+    @Override
+    public List<Pushable> getOrphanedPushables() {
+        return orphanedPushables;
+    }
+
+    @Override
+    public void removeOrphanedPushable(Pushable pushable) {
+        orphanedPushables.remove(pushable);
     }
 
     public void spawnProjectile(Projectile projectile, int x, int y) {

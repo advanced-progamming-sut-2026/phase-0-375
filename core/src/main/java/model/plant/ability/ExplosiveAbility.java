@@ -14,6 +14,7 @@ import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -151,8 +152,15 @@ public class ExplosiveAbility implements PlantAbility {
             return context.getZombiesInArea(row, col, 0, reach);
         }
 
-        // Default: same-tile trigger.
-        return context.getZombiesInArea(row, col, 0, 0);
+        // Default: same-tile trigger. Flying zombies pass over without setting them off.
+        List<ZombieInstance> onTile = context.getZombiesInArea(row, col, 0, 0);
+        List<ZombieInstance> grounded = new ArrayList<>();
+        for (ZombieInstance zombie : onTile) {
+            if (zombie != null && !zombie.isDead() && !zombie.isFlying()) {
+                grounded.add(zombie);
+            }
+        }
+        return grounded;
     }
 
     // --- Detonation core ---

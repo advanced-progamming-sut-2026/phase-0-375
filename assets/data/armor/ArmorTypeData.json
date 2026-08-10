@@ -82,7 +82,7 @@
     ],
     "objdata": {
       "ArmorType": "ShoulderArmor",
-      "BaseHealth": 1600,
+      "BaseHealth": 800,
       "ArmorFlags": [
         "damageable",
         "passdamage"
@@ -106,7 +106,7 @@
     ],
     "objdata": {
       "ArmorType": "Crown",
-      "BaseHealth": 1600,
+      "BaseHealth": 800,
       "ArmorFlags": [
         "damageable",
         "droppable",
@@ -133,7 +133,7 @@
     "objdata": {
       "ClassName": "NewspaperArmor",
       "ArmorType": "Newspaper",
-      "BaseHealth": 800,
+      "BaseHealth": 190,
       "ArmorFlags": [
         "damageable"
       ],

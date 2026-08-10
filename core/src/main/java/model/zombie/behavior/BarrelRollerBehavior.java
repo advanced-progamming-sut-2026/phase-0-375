@@ -68,6 +68,24 @@ public class BarrelRollerBehavior implements ZombieBehavior {
         return ZombieBehaviorType.BARREL_ROLLER;
     }
 
+    /**
+     * If the Barrel Roller dies before its barrel is destroyed, the barrel
+     * stays on the field as an orphaned pushable.
+     */
+    @Override
+    public void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
+        if (zombie == null || context == null) {
+            return;
+        }
+        Pushable pushable = zombie.getPushableItem();
+        if (pushable == null || pushable.isDestroyed()) {
+            return;
+        }
+        zombie.setPushableItem(null);
+        pushable.setPusher(null);
+        context.orphanPushable(pushable);
+    }
+
     // --- Core logic ---
 
     /**

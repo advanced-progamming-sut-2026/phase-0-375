@@ -38,8 +38,8 @@ public class PlantInstance implements Placeable {
     private int freezeHitCount;
     private PlantState stateBeforeFreeze;
     private PlantState stateBeforeTransform;
-    private float freezeTimer = 0f; // Seconds remaining before a frozen plant automatically unfreezes
-    public static final float FREEZE_DURATION = 8.0f; // Default duration that a plant stays frozen
+    private int iceHp = 0;
+    public static final int DEFAULT_ICE_HP = 600;
     private String imitateTarget; // Imitater support: null for non-Imitaters
     private float transformCountdown; // Imitater support: -1 means already transformed
     private int stackCount;
@@ -363,28 +363,44 @@ public class PlantInstance implements Placeable {
         if (isFrozen()) return;
         stateBeforeFreeze = state;
         state = PlantState.FROZEN;
-        freezeTimer = FREEZE_DURATION;
+        iceHp = DEFAULT_ICE_HP;
     }
     public void unfreeze() {
         if (!isFrozen()) return;
         state = (stateBeforeFreeze != null) ? stateBeforeFreeze : PlantState.IDLE;
         stateBeforeFreeze = null;
         freezeHitCount = 0;
-        freezeTimer = 0f;
+        iceHp = 0;
+    }
+
+    /** @return remaining ice/octopus coating HP while frozen. */
+    public int getIceHp() {
+        return iceHp;
     }
 
     /**
-     * Advances the freeze timer by {@code deltaTime} seconds.
-     * @return {@code true} if the plant unfroze this tick
+     * Damages the ice/octopus coating on a frozen plant. When the coating
+     * is destroyed the plant thaws (spec: other plants must destroy the ice).
+     *
+     * @return {@code true} if the plant unfroze as a result
      */
-    public boolean tickFreeze(float deltaTime) {
-        if (!isFrozen()) return false;
-        freezeTimer -= deltaTime;
-        if (freezeTimer <= 0f) {
+    public boolean damageIce(int damage) {
+        if (!isFrozen() || damage <= 0) return false;
+        iceHp -= damage;
+        if (iceHp <= 0) {
             unfreeze();
             return true;
         }
         return false;
+    }
+
+    /**
+     * Melts {@code iceDamage} points of ice coating (fiery thaw helper).
+     *
+     * @return {@code true} if the plant unfroze
+     */
+    public boolean meltIce(int iceDamage) {
+        return damageIce(iceDamage);
     }
 
     // --- Transform handling (Wizard's cat) ---

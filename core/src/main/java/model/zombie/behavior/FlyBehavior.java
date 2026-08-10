@@ -15,17 +15,17 @@ public class FlyBehavior implements ZombieBehavior {
 
     /**
      * Plants whose base HP meets or exceeds this threshold are considered
-     * "high-HP" obstacles that the flying zombie cannot bypass.
+     * "high-HP" obstacles (nuts) that the flying zombie flies over.
      */
     public static final int HIGH_HP_THRESHOLD = 1000;
 
-    /** Tall nut definition name. */
+    /** Tall nut definition name — blocks flight. */
     public static final String TALL_NUT_NAME = "Tall-nut";
 
     // --- State ---
 
-    /** Current phase of the fly lifecycle. */
-    private FlyPhase phase = FlyPhase.FLYING;
+    /** Current phase of the fly lifecycle. Starts grounded; takes off only over flyable plants. */
+    private FlyPhase phase = FlyPhase.LANDED;
 
     /** The plant currently being eaten; null if not eating. */
     private PlantInstance eatingTarget;
@@ -46,11 +46,16 @@ public class FlyBehavior implements ZombieBehavior {
             return;
         }
 
-        PlantInstance plant = context.getPlantAt(row, col);
+        syncToPlant(zombie, context.getPlantAt(row, col));
+    }
 
-        boolean shouldFly = plant != null
-                && plant.getCurrentHP() > 0
-                && isFlyableObstacle(plant);
+    /**
+     * Updates flight phase for the plant currently under the zombie.
+     * Called from the behavior tick and again after movement so entering a
+     * flyable cell takes off before {@code ZombieSystem} can start eating.
+     */
+    public void syncToPlant(ZombieInstance zombie, PlantInstance plant) {
+        boolean shouldFly = shouldFlyOver(plant);
 
         if (shouldFly && phase != FlyPhase.FLYING) {
             takeOff(zombie);
@@ -62,7 +67,20 @@ public class FlyBehavior implements ZombieBehavior {
             eatingTarget = plant;
         } else {
             eatingTarget = null;
+            if (zombie != null && zombie.isEating()) {
+                zombie.stopEating();
+            }
         }
+    }
+
+    /**
+     * @return true if this flying zombie should pass over {@code plant}
+     *         without stopping to eat it
+     */
+    public boolean shouldFlyOver(PlantInstance plant) {
+        return plant != null
+                && plant.getCurrentHP() > 0
+                && isFlyableObstacle(plant);
     }
 
     @Override
@@ -73,25 +91,30 @@ public class FlyBehavior implements ZombieBehavior {
     // --- Obstacle classification ---
 
     /**
-     * Returns {@code true} if the given plant is an obstacle that this
-     * flying zombie should fly over rather than stop and eat.
+     * Returns {@code true} if the given plant is an obstacle or dangerous
+     * plant that this flying zombie should fly over rather than stop and eat.
+     * Spec: high-HP nuts, lane-redirectors, and traps/mines; never Tall-nut.
      */
     private boolean isFlyableObstacle(PlantInstance plant) {
         Plant def = plant.getDefinition();
         if (def == null) return false;
 
-        // Tall-nut blocks flight.
         String name = def.getName();
-        if (TALL_NUT_NAME.equalsIgnoreCase(name)) {
+        if (name != null && TALL_NUT_NAME.equalsIgnoreCase(name)) {
             return false;
         }
 
-        // MOVE_ZOMBIE plants.
+        // Lane-redirecting plants (Garlic, Sweet Potato, …).
         if (def.hasTag(PlantTags.MOVE_ZOMBIE)) {
             return true;
         }
 
-        // High-HP plants.
+        // Dangerous trap plants (Potato Mine, …).
+        if (def.hasTag(PlantTags.TRAP)) {
+            return true;
+        }
+
+        // High-HP obstacle plants (Wall-nut, …).
         return def.getBaseHP() >= HIGH_HP_THRESHOLD;
     }
 

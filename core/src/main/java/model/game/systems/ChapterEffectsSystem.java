@@ -113,16 +113,12 @@ public class ChapterEffectsSystem implements Tickable {
 
     /**
      * Frozen plants thaw faster while a fiery plant sits in one of the eight
-     * neighbouring cells. The engine tracks freezing as a timer rather than
-     * ice HP, so the spec's 60 HP/s against 600 HP of ice is converted into
-     * an equivalent extra-thaw rate.
+     * neighbouring cells.
      */
     private void tickFieryThaw(float deltaTime) {
         int rows = gameModel.getRowCount();
         int cols = gameModel.getColumnCount();
-        float extraThaw = deltaTime
-                * ((float) FIERY_THAW_HP_PER_SECOND / PLANT_ICE_HP)
-                * PlantInstance.FREEZE_DURATION;
+        int melt = Math.max(1, Math.round(FIERY_THAW_HP_PER_SECOND * deltaTime));
 
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
@@ -132,7 +128,7 @@ public class ChapterEffectsSystem implements Tickable {
                 if (!(main instanceof PlantInstance)) continue;
                 PlantInstance plant = (PlantInstance) main;
                 if (plant.isFrozen() && hasFieryNeighbour(row, col)) {
-                    plant.tickFreeze(extraThaw);
+                    plant.meltIce(melt);
                 }
             }
         }

@@ -1,8 +1,8 @@
 package model.zombie.behavior;
 
-import model.event.GameEvent;
 import model.game.map.Cell;
 import model.item.Sun;
+import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
@@ -130,4 +130,18 @@ public interface BehaviorContext {
 
     /** @return the {@link Cell} at the given coordinates. */
     Cell getCellAt(int row, int col);
+
+    // --- Orphaned pushables ---
+
+    /**
+     * Registers a pushable that remains on the field after its pushing zombie
+     * has died (e.g. Barrel Roller barrel). Projectiles can still hit it.
+     */
+    void orphanPushable(Pushable pushable);
+
+    /** @return pushables left on the field without a living pusher. */
+    List<Pushable> getOrphanedPushables();
+
+    /** Removes an orphaned pushable from the world list. */
+    void removeOrphanedPushable(Pushable pushable);
 }

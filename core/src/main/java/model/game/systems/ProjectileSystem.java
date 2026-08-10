@@ -86,6 +86,16 @@ public class ProjectileSystem implements Tickable {
             return false;
         }
 
+        // Non-lobber shots are blocked by ice/octopus coatings on frozen plants.
+        if (hitFrozenPlantIfBlocking(projectile)) {
+            return false;
+        }
+
+        // Juggler-reflected pellets travel leftward and damage plants.
+        if (projectile.isReflected() && hitPlantIfReflected(projectile)) {
+            return false;
+        }
+
         if (projectile instanceof Pellet && hitGridItemsIfAny(projectile)) {
             discard(projectile, true);
             return true;
@@ -250,6 +260,9 @@ public class ProjectileSystem implements Tickable {
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
 
+            // Reflected projectiles travel toward plants, not zombies.
+            if (projectile.isReflected()) continue;
+
             // Bowling Bulbs never damage the same zombie twice.
             if (bulb != null && bulb.hasAlreadyHit(zombie)) continue;
 
@@ -371,10 +384,16 @@ public class ProjectileSystem implements Tickable {
     /** Applies on-hit status effects based on the projectile's element */
     private void applyOnHitEffects(Projectile projectile, ZombieInstance zombie) {
         if (projectile.isIce()) {
-            // Frostbite Caves levels: zombies never chill from ice shots
-            // (chapter rule). Frostbite-native zombies are immune anywhere.
-            if (gameModel.getChapter() != Chapter.FROSTBITE_CAVES
-                    && zombie.getDefinition().getChapter() != Chapter.FROSTBITE_CAVES) {
+            // Frostbite Caves / frostbite-native zombies: chill stacks apply,
+            // but they never freeze solid (cap at 2 stacks).
+            boolean frostbiteNative = gameModel.getChapter() == Chapter.FROSTBITE_CAVES
+                    || (zombie.getDefinition() != null
+                    && zombie.getDefinition().getChapter() == Chapter.FROSTBITE_CAVES);
+            if (frostbiteNative) {
+                if (zombie.getChillLevel() < 2) {
+                    zombie.applyChill();
+                }
+            } else {
                 zombie.applyChill();
             }
 
@@ -543,5 +562,89 @@ public class ProjectileSystem implements Tickable {
         if (plant != null && plant.isFrozen()) {
             plant.unfreeze();
         }
+    }
+
+    /**
+     * Non-lobber projectiles that reach a frozen plant are consumed by the
+     * ice/octopus coating.
+     *
+     * @return true if the projectile was consumed
+     */
+    private boolean hitFrozenPlantIfBlocking(Projectile projectile) {
+        if (projectile instanceof Splash) {
+            return false; // lobbers pass over frozen plants
+        }
+        if (projectile.isReflected()) {
+            return false; // reflected pellets use plant-hit path instead
+        }
+
+        int row = projectile.getRow();
+        int col = (int) Math.floor(projectile.getX());
+        PlantInstance plant = gameModel.getPlantAt(row, col);
+        if (plant == null || !plant.isFrozen()) {
+            return false;
+        }
+
+        if (projectile.isFire()) {
+            plant.unfreeze();
+        } else {
+            plant.damageIce(projectile.getDamage());
+        }
+        discard(projectile, true);
+        return true;
+    }
+
+    /**
+     * Applies a leftward (juggler-reflected) projectile to the first plant
+     * it reaches. Ice reflections register freeze hits like Hunter snowballs.
+     *
+     * @return true if a plant was hit and the projectile consumed
+     */
+    private boolean hitPlantIfReflected(Projectile projectile) {
+        if (projectile.getDirection() >= 0) {
+            return false;
+        }
+
+        int row = projectile.getRow();
+        float projX = projectile.getX();
+        float tolerance = 0.5f;
+
+        PlantInstance best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (PlantInstance plant : gameModel.getPlantsInLane(row)) {
+            if (plant == null || plant.getCurrentHP() <= 0) continue;
+            if (plant.getPosition() == null) continue;
+            float plantX = plant.getPosition().getX();
+            float dist = Math.abs(plantX - projX);
+            if (dist > tolerance) continue;
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = plant;
+            }
+        }
+        if (best == null) {
+            return false;
+        }
+
+        if (best.isFrozen()) {
+            if (projectile.isFire()) {
+                best.unfreeze();
+            } else {
+                best.damageIce(projectile.getDamage());
+            }
+        } else {
+            if (projectile.isIce()) {
+                best.registerFreezeHit(ShootBehavior.HUNTER_HITS_TO_FREEZE);
+            }
+            int damage = projectile.getDamage();
+            if (damage > 0) {
+                gameModel.damagePlant(best, damage);
+            }
+        }
+
+        if (!projectile.pierce()) {
+            discard(projectile, true);
+        }
+        return true;
     }
 }

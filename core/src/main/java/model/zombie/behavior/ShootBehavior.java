@@ -12,9 +12,6 @@ public class ShootBehavior implements ZombieBehavior {
 
     // --- Explorer constants ---
 
-    /** Damage per second dealt by the Explorer's torch to the targeted plant. */
-    public static final float EXPLORER_TORCH_DPS = 100f;
-
     /** How many tiles ahead (in the same lane) the torch reaches. */
     public static final int EXPLORER_TORCH_REACH = 1;
 
@@ -76,10 +73,13 @@ public class ShootBehavior implements ZombieBehavior {
     // --- Explorer ---
 
     /**
-     * While lit, continuously burns the plant sitting within {@value #EXPLORER_TORCH_REACH}
-     * tile(s) in front of the Explorer in its own lane.
+     * While lit, instantly destroys any plant within {@value #EXPLORER_TORCH_REACH}
+     * tile(s) ahead in the Explorer's lane. Also reacts to ice/fire plants
+     * sharing the Explorer's cell (extinguish / relight the torch).
      */
     private void tickExplorer(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        reactToElementalPlantContact(zombie, context);
+
         if (!torchLit) {
             return;
         }
@@ -89,9 +89,24 @@ public class ShootBehavior implements ZombieBehavior {
             return;
         }
 
-        float damage = EXPLORER_TORCH_DPS * deltaTime;
+        float damage = zombie.getDefinition().getEatDPS() * deltaTime;
         if (damage > 0) {
             context.damagePlant(target, (int) damage);
+        }
+    }
+
+    /**
+     * Ice-tagged plants extinguish the torch; fire-tagged plants relight it.
+     */
+    private void reactToElementalPlantContact(ZombieInstance zombie, BehaviorContext context) {
+        PlantInstance here = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
+        if (here == null || here.getDefinition() == null) {
+            return;
+        }
+        if (here.getDefinition().hasTag(model.enums.PlantTags.ICE)) {
+            extinguishTorch();
+        } else if (here.getDefinition().hasTag(model.enums.PlantTags.FIRE)) {
+            igniteTorch();
         }
     }
 

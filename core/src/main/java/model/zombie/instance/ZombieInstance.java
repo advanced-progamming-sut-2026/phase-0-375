@@ -131,10 +131,10 @@ public class ZombieInstance implements Tickable, Placeable {
             if (armor.isDestroyed()) continue;
 
             if (armor.isPassesDamageThrough()) {
-                // Pass-through armor
+                // Pass-through pieces absorb damage but do not stop it;
+                // remaining armor layers (and then the body) still take the hit.
                 armor.takeDamage(remaining);
-                currentHP -= remaining;
-                return;
+                continue;
             }
 
             remaining = armor.takeDamage(remaining);

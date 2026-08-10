@@ -17,6 +17,7 @@ import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
+import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
@@ -209,13 +210,21 @@ public class ZombieSystem implements Tickable {
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         boolean hypnotized = zombie.isHypnotized();
-        if (!hypnotized && isEatingSuppressed(zombie)) return;
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
         if (row < 0 || col < 0
                 || row >= context.getRowCount()
                 || col >= context.getColumnCount()) {
+            return;
+        }
+
+        syncFlyBehavior(zombie, context.getPlantAt(row, col));
+
+        if (!hypnotized && isEatingSuppressed(zombie)) {
+            if (zombie.isEating()) {
+                zombie.stopEating();
+            }
             return;
         }
 
@@ -234,6 +243,15 @@ public class ZombieSystem implements Tickable {
         }
 
         eatPlantAt(zombie, context, row, col, deltaTime);
+    }
+
+    /** Keeps {@link FlyBehavior} in sync with the plant under the zombie. */
+    private void syncFlyBehavior(ZombieInstance zombie, PlantInstance plant) {
+        if (!zombie.hasBehavior(ZombieBehaviorType.FLY)) return;
+        FlyBehavior fly = (FlyBehavior) zombie.getBehavior(ZombieBehaviorType.FLY);
+        if (fly != null) {
+            fly.syncToPlant(zombie, plant);
+        }
     }
 
     /** Special actions and movement modes during which a zombie cannot eat. */
@@ -286,6 +304,17 @@ public class ZombieSystem implements Tickable {
                 zombie.stopEating();
             }
             return;
+        }
+
+        // Dodo (and other flyers): never chew plants marked as fly-over targets.
+        if (zombie.hasBehavior(ZombieBehaviorType.FLY)) {
+            FlyBehavior fly = (FlyBehavior) zombie.getBehavior(ZombieBehaviorType.FLY);
+            if (fly != null && fly.shouldFlyOver(plant)) {
+                if (zombie.isEating()) {
+                    zombie.stopEating();
+                }
+                return;
+            }
         }
 
         if (!zombie.isEating()) {

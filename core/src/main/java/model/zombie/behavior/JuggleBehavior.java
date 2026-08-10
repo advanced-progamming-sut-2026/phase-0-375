@@ -22,12 +22,6 @@ public class JuggleBehavior implements ZombieBehavior {
     /** Seconds the zombie keeps spinning after the last projectile was reflected. */
     public static final float SPIN_TIMEOUT = 1.0f;
 
-    /**
-     * Maximum number of projectiles the Juggler can be juggling at once.
-     * Beyond this limit, extra projectiles pass through unaffected.
-     */
-    public static final int MAX_JUGGLED_PROJECTILES = 3;
-
     /** When true, only {@link Pellet} projectiles are reflected. */
     public static final boolean RESTRICT_TO_JUGGLEABLE = true;
 
@@ -41,9 +35,6 @@ public class JuggleBehavior implements ZombieBehavior {
 
     /** Total projectiles reflected by this zombie. */
     private int reflectedCount = 0;
-
-    /** Number of projectiles currently being juggled. */
-    private int currentJuggledCount = 0;
 
     // --- ZombieBehavior ---
 
@@ -73,7 +64,7 @@ public class JuggleBehavior implements ZombieBehavior {
     // --- IDLE phase ---
 
     private void tickIdle(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        // Make sure the zombie is in a walkable state.
+        // Keep walking while scanning; spinning uses a speed boost, not a halt.
         if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
             zombie.setState(ZombieState.WALKING);
         }
@@ -87,8 +78,9 @@ public class JuggleBehavior implements ZombieBehavior {
     // --- SPINNING phase ---
 
     private void tickSpinning(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        if (zombie.getState() != ZombieState.SPECIAL_ACTION) {
-            zombie.setState(ZombieState.SPECIAL_ACTION);
+        // Stay in a walkable state so ZombieSystem keeps advancing the zombie.
+        if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
         }
 
         boolean reflectedAny = reflectIncomingProjectiles(zombie, context);
@@ -108,8 +100,8 @@ public class JuggleBehavior implements ZombieBehavior {
     /**
      * Finds every incoming juggleable projectile in the zombie's lane
      * that has reached or passed the zombie's column, reflects each one
-     * back toward the plants (up to {@link #MAX_JUGGLED_PROJECTILES}),
-     * and returns true if at least one was reflected this tick.
+     * back toward the plants, and returns true if at least one was
+     * reflected this tick.
      */
     private boolean reflectIncomingProjectiles(ZombieInstance zombie, BehaviorContext context) {
         int lane = zombie.getGridY();
@@ -120,7 +112,6 @@ public class JuggleBehavior implements ZombieBehavior {
 
         List<Projectile> projectilesInLane = context.getProjectilesInLane(lane);
         boolean reflectedAny = false;
-        int reflectedThisTick = 0;
 
         for (Projectile projectile : projectilesInLane) {
             if (projectile == null) {
@@ -132,10 +123,6 @@ public class JuggleBehavior implements ZombieBehavior {
             if (!isJuggleable(projectile)) {
                 continue;
             }
-            // Don't exceed the concurrent juggle cap.
-            if (currentJuggledCount + reflectedThisTick >= MAX_JUGGLED_PROJECTILES) {
-                break;
-            }
 
             float projCol = projectile.getX();
             if (projCol < zombieCol - 1) {
@@ -145,10 +132,8 @@ public class JuggleBehavior implements ZombieBehavior {
             projectile.reflect();
             reflectedCount++;
             reflectedAny = true;
-            reflectedThisTick++;
         }
 
-        currentJuggledCount += reflectedThisTick;
         if (reflectedAny) {
             zombie.applySpeedModifier(spinSpeed);
         }
@@ -193,7 +178,7 @@ public class JuggleBehavior implements ZombieBehavior {
 
     // --- State transitions ---
 
-    /** Transitions the zombie from IDLE to SPINNING: boosts speed, sets state. */
+    /** Transitions the zombie from IDLE to SPINNING: boosts speed, keeps walking. */
     private void startSpinning(ZombieInstance zombie) {
         phase = JugglePhase.SPINNING;
         timeSinceLastProjectile = 0f;
@@ -201,16 +186,20 @@ public class JuggleBehavior implements ZombieBehavior {
                 "MoveSpeedMultiplierWhileJuggling", DEFAULT_SPIN_SPEED_MULTIPLIER);
         if (spinSpeed <= 0f) spinSpeed = DEFAULT_SPIN_SPEED_MULTIPLIER;
         zombie.applySpeedModifier(spinSpeed);
-        zombie.setState(ZombieState.SPECIAL_ACTION);
+        // Keep WALKING so movement is not blocked by SPECIAL_ACTION.
+        if (zombie.getState() != ZombieState.EATING) {
+            zombie.setState(ZombieState.WALKING);
+        }
     }
 
     /** Transitions the zombie from SPINNING back to IDLE: restores speed, sets state. */
     private void stopSpinning(ZombieInstance zombie) {
         phase = JugglePhase.IDLE;
         timeSinceLastProjectile = 0f;
-        currentJuggledCount = 0;
         zombie.clearSpeedModifier();
-        zombie.setState(ZombieState.WALKING);
+        if (zombie.getState() != ZombieState.EATING) {
+            zombie.setState(ZombieState.WALKING);
+        }
     }
 
     // --- Getters / setters ---
