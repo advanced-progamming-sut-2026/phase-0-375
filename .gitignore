@@ -97,6 +97,11 @@ www-test/
 *#*#
 /.kotlin/
 /assets/assets.txt
+/assets/RESOURCES.json
+/assets/animations.json
+/assets/atlases/
+/assets/images/
+/assets/IMAGES
 
 ## Special cases:
 
