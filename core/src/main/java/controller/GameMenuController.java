@@ -3,17 +3,22 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
+import model.enums.LevelType;
 import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.data.level.LevelRegistry;
+import model.game.level.DebugSandboxLevel;
 import model.game.level.Level;
+import model.game.level.LevelConfig;
 import model.user.User;
 import model.user.persistance.UserRepository;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 public class GameMenuController extends AppMenuController {
@@ -115,7 +120,136 @@ public class GameMenuController extends AppMenuController {
         return CommandResult.success("Entering " + chapterName + " level " + resolution.levelId() + ".");
     }
 
+    /**
+     * Boots the FrontLawn debug sandbox: no plant selection, no win/lose, empty waves.
+     */
+    public CommandResult<Void> enterDebugLevel() {
+        DebugSandboxLevel level = DebugSandboxLevel.create();
+        if (!level.canStart()) {
+            return CommandResult.error("Debug sandbox level cannot be started.");
+        }
+
+        GameModel model = new GameModel(level);
+        PvZGameLoop loop = new PvZGameLoop(model);
+
+        App.getInstance().setCurrentGameModel(model);
+        App.getInstance().setCurrentGameLoop(loop);
+
+        level.onStart();
+        App.getInstance().setCurrentMenu(MenuType.IN_GAME);
+
+        return CommandResult.success("Entering debug playground.");
+    }
+
     private record LevelResolution(int levelId, Level level) {}
+
+    /** Read-only chapter row for adventure UI. */
+    public record ChapterSummary(
+            Chapter chapter,
+            String displayName,
+            boolean unlocked,
+            int completedLevels,
+            int totalLevels) {}
+
+    /** Read-only level row for chapter level list UI. */
+    public record LevelSummary(
+            int levelId,
+            LevelType levelType,
+            boolean unlocked,
+            boolean completed) {}
+
+    /**
+     * Chapters with lock/progress for the adventure screen.
+     * Does not mutate game state.
+     */
+    public CommandResult<List<ChapterSummary>> listChapters() {
+        LevelRegistry registry = ensureRegistry();
+        if (registry == null) {
+            return errorTyped("Could not load level definitions.");
+        }
+        User user = App.getInstance().getCurrentUser();
+        List<ChapterSummary> summaries = new ArrayList<>();
+        for (Chapter chapter : Chapter.values()) {
+            List<LevelConfig> configs = registry.getConfigsForChapter(chapter);
+            int completed = completedLevels(user, chapter);
+            summaries.add(new ChapterSummary(
+                    chapter,
+                    displayName(chapter),
+                    isChapterUnlocked(user, chapter),
+                    completed,
+                    configs.size()));
+        }
+        return CommandResult.successWithData("Chapters loaded.", summaries);
+    }
+
+    /**
+     * Levels in a chapter with lock/completion flags.
+     * Does not mutate game state.
+     */
+    public CommandResult<List<LevelSummary>> listLevels(Chapter chapter) {
+        if (chapter == null) {
+            return errorTyped("Chapter is required.");
+        }
+        LevelRegistry registry = ensureRegistry();
+        if (registry == null) {
+            return errorTyped("Could not load level definitions.");
+        }
+        User user = App.getInstance().getCurrentUser();
+        if (!isChapterUnlocked(user, chapter)) {
+            return errorTyped("Chapter '" + displayName(chapter) + "' is not unlocked yet.");
+        }
+        int nextLevelId = getNextLevelId(user, chapter);
+        int completed = completedLevels(user, chapter);
+        List<LevelSummary> summaries = new ArrayList<>();
+        for (LevelConfig config : registry.getConfigsForChapter(chapter)) {
+            int id = config.getLevelId();
+            summaries.add(new LevelSummary(
+                    id,
+                    config.getLevelType(),
+                    id <= nextLevelId,
+                    id <= completed));
+        }
+        return CommandResult.successWithData("Levels loaded.", summaries);
+    }
+
+    private LevelRegistry ensureRegistry() {
+        try {
+            return LevelRegistry.getInstance();
+        } catch (IllegalStateException e) {
+            try {
+                LevelRegistry.init("/assets/data/levels/levels.json");
+                return LevelRegistry.getInstance();
+            } catch (IOException | RuntimeException loadError) {
+                return null;
+            }
+        }
+    }
+
+    private static int completedLevels(User user, Chapter chapter) {
+        if (user == null || user.getChapterProgress() == null) {
+            return 0;
+        }
+        return user.getChapterProgress().getOrDefault(chapter, 0);
+    }
+
+    private static String displayName(Chapter chapter) {
+        String raw = chapter.name().replace('_', ' ').toLowerCase(Locale.ROOT);
+        StringBuilder out = new StringBuilder(raw.length());
+        boolean cap = true;
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == ' ') {
+                out.append(c);
+                cap = true;
+            } else if (cap) {
+                out.append(Character.toUpperCase(c));
+                cap = false;
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
 
     private int getNextLevelId(User user, Chapter chapter) {
         if (user == null || user.getChapterProgress() == null) return 1;

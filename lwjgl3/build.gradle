@@ -58,6 +58,8 @@ run {
   //setIgnoreExitValue(true)
   jvmArgs += "--enable-native-access=ALL-UNNAMED"
   if (os.contains('mac')) jvmArgs += "-XstartOnFirstThread"
+  systemProperty 'pvz.assets', rootProject.findProperty('pvz.assets') ?: ''
+  systemProperty 'pvz.resolution', rootProject.findProperty('pvz.resolution') ?: '768'
 }
 
 jar {

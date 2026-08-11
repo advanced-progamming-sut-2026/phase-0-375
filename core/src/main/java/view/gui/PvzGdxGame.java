@@ -6,6 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import model.app.App;
 import model.enums.MenuType;
 import pvz.skin.PvzSkin;
+import view.gui.assets.PvzAssets;
 import view.gui.audio.GameAudio;
 import view.gui.screen.LoginScreen;
 import view.gui.screen.MainHubScreen;
@@ -13,12 +14,13 @@ import view.gui.screen.RegisterScreen;
 import view.gui.ui.SkinSmoothing;
 
 /**
- * Thin Game shell for menu screens. Uses {@link PvzSkin} only — PAM / TextureBank
- * base assets are not required for auth + stub hub.
+ * Thin Game shell. Menus use {@link PvzSkin}; gameplay screens may request
+ * {@link PvzAssets} (TextureBank / PamPlayer) lazily.
  */
 public class PvzGdxGame extends Game {
     public Skin skin;
     public SpriteBatch batch;
+    public PvzAssets assets;
 
     @Override
     public void create() {
@@ -37,6 +39,22 @@ public class PvzGdxGame extends Game {
         }
     }
 
+    /** Creates shared libPVZ assets on first gameplay need. */
+    public PvzAssets ensureAssets() {
+        if (assets == null) {
+            assets = PvzAssets.createDefault();
+        }
+        return assets;
+    }
+
+    @Override
+    public void render() {
+        if (assets != null) {
+            assets.textures.update();
+        }
+        super.render();
+    }
+
     @Override
     public void dispose() {
         if (screen != null) {
@@ -45,6 +63,10 @@ public class PvzGdxGame extends Game {
         if (batch != null) {
             batch.dispose();
             batch = null;
+        }
+        if (assets != null) {
+            assets.dispose();
+            assets = null;
         }
         // PvzSkin holds a process-lifetime singleton; disposing here ends the app.
         if (skin != null) {

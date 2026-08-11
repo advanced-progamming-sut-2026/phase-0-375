@@ -17,7 +17,7 @@ import view.gui.ui.NewsOverlay;
 import view.gui.ui.ResourceBar;
 
 /**
- * Stub main hub: currency chrome, news overlay, logout. Other destinations are placeholders.
+ * Main hub: currency chrome, news, adventure, profile, logout.
  */
 public final class MainHubScreen extends AbstractMenuScreen {
     private final MainMenuController controller = MainMenuController.getInstance();
@@ -54,7 +54,17 @@ public final class MainHubScreen extends AbstractMenuScreen {
         });
         card.add(newsButton).width(300f).height(64f).padBottom(10f).row();
 
-        TextButton adventure = stubButton("Adventure (stub)");
+        TextButton adventure = new TextButton("Adventure", skin, "purple");
+        adventure.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> r = controller.menuEnter("game");
+                showToast(r.getMessage(), !r.isSuccess());
+                if (r.isSuccess()) {
+                    game.setScreen(new AdventureScreen(game));
+                }
+            }
+        });
         TextButton profile = new TextButton("Profile", skin, "purple");
         profile.addListener(new ChangeListener() {
             @Override
