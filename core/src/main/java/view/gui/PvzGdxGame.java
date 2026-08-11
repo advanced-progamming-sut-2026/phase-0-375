@@ -6,6 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import model.app.App;
 import model.enums.MenuType;
 import pvz.skin.PvzSkin;
+import view.gui.audio.GameAudio;
 import view.gui.screen.LoginScreen;
 import view.gui.screen.MainHubScreen;
 import view.gui.screen.RegisterScreen;
@@ -26,6 +27,7 @@ public class PvzGdxGame extends Game {
         batch = new SpriteBatch();
 
         App app = App.getInstance();
+        GameAudio.get().syncFromUser();
         if (app.getCurrentUser() != null) {
             app.setCurrentMenu(MenuType.MAIN);
             setScreen(new MainHubScreen(this));

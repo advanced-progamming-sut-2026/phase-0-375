@@ -161,6 +161,18 @@ public class GameModel implements BehaviorContext {
         return 3.0f / difficultyLevel;
     }
 
+    /** Whether the settings menu asked to draw the lawn grid during gameplay. */
+    public boolean isShowLawnGrid() {
+        User user = App.getInstance().getCurrentUser();
+        return user != null && user.isShowLawnGrid();
+    }
+
+    /** Whether in-game debug cheat controls should be shown. */
+    public boolean isDebugMode() {
+        User user = App.getInstance().getCurrentUser();
+        return user != null && user.isDebugMode();
+    }
+
     // Seed packet cooldowns
 
     public boolean isSeedReady(String plantName) {

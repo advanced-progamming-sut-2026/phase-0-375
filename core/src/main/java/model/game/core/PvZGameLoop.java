@@ -1,5 +1,6 @@
 package model.game.core;
 
+import model.app.App;
 import model.enums.GameState;
 import model.event.EventBus;
 import model.event.GameEvent;
@@ -8,6 +9,7 @@ import model.game.rule.EndGameCondition;
 import model.game.systems.*;
 import model.game.wave.WaveManager;
 import model.quest.QuestTracker;
+import model.user.User;
 
 public class PvZGameLoop implements GameLoop {
 
@@ -55,25 +57,33 @@ public class PvZGameLoop implements GameLoop {
     public void update(float deltaTime) {
         if (gameState != GameState.RUNNING) return;
 
-        sunFallSystem.tick(deltaTime);
-        plantSystem.tick(deltaTime);
-        projectileSystem.tick(deltaTime);
-        zombieSystem.tick(deltaTime);
-        combatSystem.tick(deltaTime);
-        waveManager.tick(deltaTime);
-        lawnMowerSystem.tick(deltaTime);
-        pushableSystem.tick(deltaTime);
-        terrainSystem.tick(deltaTime);
-        gameModel.tick(deltaTime);
+        float scaledDelta = deltaTime * currentGameSpeed();
+
+        sunFallSystem.tick(scaledDelta);
+        plantSystem.tick(scaledDelta);
+        projectileSystem.tick(scaledDelta);
+        zombieSystem.tick(scaledDelta);
+        combatSystem.tick(scaledDelta);
+        waveManager.tick(scaledDelta);
+        lawnMowerSystem.tick(scaledDelta);
+        pushableSystem.tick(scaledDelta);
+        terrainSystem.tick(scaledDelta);
+        gameModel.tick(scaledDelta);
 
         // Level-specific per-tick logic (conveyor belts, mini-game physics, ...).
         if (gameModel.getCurrentLevel() != null) {
-            gameModel.getCurrentLevel().tick(deltaTime);
+            gameModel.getCurrentLevel().tick(scaledDelta);
         }
 
         evaluateEndGame();
 
 
+    }
+
+    /** Settings menu game-speed (1–3); defaults to 1x when no user is logged in. */
+    private static float currentGameSpeed() {
+        User user = App.getInstance().getCurrentUser();
+        return user == null ? 1f : user.getGameSpeed();
     }
 
     /** Checks the level's end-game condition and finishes the game on a verdict. */

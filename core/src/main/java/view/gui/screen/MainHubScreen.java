@@ -66,7 +66,17 @@ public final class MainHubScreen extends AbstractMenuScreen {
                 }
             }
         });
-        TextButton settings = stubButton("Settings (stub)");
+        TextButton settings = new TextButton("Settings", skin, "purple");
+        settings.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> r = controller.menuEnter("settings");
+                showToast(r.getMessage(), !r.isSuccess());
+                if (r.isSuccess()) {
+                    game.setScreen(new SettingsScreen(game));
+                }
+            }
+        });
         card.add(adventure).width(300f).height(56f).padBottom(8f).row();
         card.add(profile).width(300f).height(56f).padBottom(8f).row();
         card.add(settings).width(300f).height(56f).padBottom(16f).row();

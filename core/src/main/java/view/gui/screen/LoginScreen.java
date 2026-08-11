@@ -13,6 +13,7 @@ import model.app.App;
 import model.enums.MenuType;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
 import view.gui.ui.ModalCard;
 
 /**
@@ -100,6 +101,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                 stayLoggedIn.isChecked());
         showToast(result.getMessage(), !result.isSuccess());
         if (result.isSuccess()) {
+            GameAudio.get().syncFromUser();
             game.setScreen(new MainHubScreen(game));
         }
     }

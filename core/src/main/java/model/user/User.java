@@ -27,6 +27,11 @@ public class User {
     private int gems;
 
     private int difficultyLevel;
+    private int gameSpeed = 1;
+    private boolean showLawnGrid;
+    private boolean debugMode;
+    private float musicVolume = 1f;
+    private float sfxVolume = 1f;
 
     private int gamesPlayed;
 
@@ -156,6 +161,56 @@ public class User {
 
     public void setDifficultyLevel(int difficultyLevel) {
         this.difficultyLevel = difficultyLevel;
+    }
+
+    public int getGameSpeed() {
+        return gameSpeed < 1 ? 1 : Math.min(gameSpeed, 3);
+    }
+
+    public void setGameSpeed(int gameSpeed) {
+        this.gameSpeed = gameSpeed;
+    }
+
+    public boolean isShowLawnGrid() {
+        return showLawnGrid;
+    }
+
+    public void setShowLawnGrid(boolean showLawnGrid) {
+        this.showLawnGrid = showLawnGrid;
+    }
+
+    public boolean isDebugMode() {
+        return debugMode;
+    }
+
+    public void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
+    }
+
+    public float getMusicVolume() {
+        return clamp01(musicVolume);
+    }
+
+    public void setMusicVolume(float musicVolume) {
+        this.musicVolume = musicVolume;
+    }
+
+    public float getSfxVolume() {
+        return clamp01(sfxVolume);
+    }
+
+    public void setSfxVolume(float sfxVolume) {
+        this.sfxVolume = sfxVolume;
+    }
+
+    private static float clamp01(float value) {
+        if (value < 0f) {
+            return 0f;
+        }
+        if (value > 1f) {
+            return 1f;
+        }
+        return value;
     }
 
     public int getGamesPlayed() {
