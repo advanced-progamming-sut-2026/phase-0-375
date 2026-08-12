@@ -1,0 +1,209 @@
+package view.gui.assets;
+
+import com.badlogic.gdx.files.FileHandle;
+import com.badlogic.gdx.utils.JsonReader;
+import com.badlogic.gdx.utils.JsonValue;
+
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Resolves plant / zombie definition names to PAM paths using {@code animations.json}
+ * plus alias tables owned by each team.
+ *
+ * <p>Plant aliases: {@link PlantPamAliases}. Zombie aliases: {@link ZombiePamAliases}.
+ * Exclusive per-entity clip logic belongs in {@code view.gui.anim.plant} /
+ * {@code view.gui.anim.zombie}, not here. Use {@link #resolveClip} for shared
+ * role → clip selection.
+ */
+public final class PamCatalog {
+    public record PamEntry(String name, String path, Map<String, Float> clips) {}
+
+    private final Map<String, PamEntry> byNormName;
+    private final Map<String, String> plantOverrides;
+    private final Map<String, String> zombieOverrides;
+
+    private PamCatalog(Map<String, PamEntry> byNormName) {
+        this.byNormName = byNormName;
+        this.plantOverrides = PlantPamAliases.all();
+        this.zombieOverrides = ZombiePamAliases.all();
+    }
+
+    public static PamCatalog load(FileHandle assetsRoot) {
+        Map<String, PamEntry> index = new HashMap<>();
+        FileHandle json = assetsRoot.child("animations.json");
+        if (!json.exists()) {
+            return new PamCatalog(index);
+        }
+        JsonValue root = new JsonReader().parse(json);
+        JsonValue animations = root.get("animations");
+        if (animations == null) {
+            return new PamCatalog(index);
+        }
+        for (JsonValue anim = animations.child; anim != null; anim = anim.next) {
+            String name = anim.getString("name", null);
+            String path = anim.getString("path", null);
+            if (name == null || path == null) {
+                continue;
+            }
+            if (!isGameplayPam(path)) {
+                continue;
+            }
+            Map<String, Float> clips = new HashMap<>();
+            JsonValue clipNode = anim.get("clips");
+            if (clipNode != null) {
+                for (JsonValue c = clipNode.child; c != null; c = c.next) {
+                    clips.put(c.name, c.asFloat());
+                }
+            }
+            PamEntry entry = new PamEntry(name, path, clips);
+            String key = normalize(name);
+            PamEntry existing = index.get(key);
+            if (existing == null || prefer(entry, existing)) {
+                index.put(key, entry);
+            }
+        }
+        return new PamCatalog(index);
+    }
+
+    public PamEntry forPlant(String definitionName) {
+        if (definitionName == null) {
+            return null;
+        }
+        String override = plantOverrides.get(definitionName);
+        if (override != null) {
+            PamEntry e = byNormName.get(normalize(override));
+            if (e != null) {
+                return e;
+            }
+        }
+        return resolve(definitionName);
+    }
+
+    public PamEntry forZombie(String definitionName) {
+        if (definitionName == null) {
+            return null;
+        }
+        String override = zombieOverrides.get(definitionName);
+        if (override != null) {
+            PamEntry e = byNormName.get(normalize(override));
+            if (e != null) {
+                return e;
+            }
+        }
+        return resolve(definitionName);
+    }
+
+    /**
+     * Picks the first preferred clip that exists on {@code entry}, then soft-falls
+     * back to any clip whose name starts with the first preference (e.g. {@code idle}
+     * → {@code idle_stage1}).
+     *
+     * <p>Returns the first preference even when the catalog clip map is empty so
+     * {@link pvz.libpvz.pam.PamPlayer} can still try a live lookup after load.
+     */
+    public String resolveClip(PamEntry entry, String... preferred) {
+        if (entry == null || preferred == null || preferred.length == 0) {
+            return null;
+        }
+        Map<String, Float> clips = entry.clips();
+        if (clips == null || clips.isEmpty()) {
+            return preferred[0];
+        }
+        Map<String, String> lowerToActual = new HashMap<>();
+        for (String name : clips.keySet()) {
+            lowerToActual.put(name.toLowerCase(Locale.ROOT), name);
+        }
+        for (String want : preferred) {
+            if (want == null || want.isBlank()) {
+                continue;
+            }
+            String actual = lowerToActual.get(want.toLowerCase(Locale.ROOT));
+            if (actual != null) {
+                return actual;
+            }
+        }
+        String prefix = preferred[0] == null ? null : preferred[0].toLowerCase(Locale.ROOT);
+        if (prefix != null && !prefix.isEmpty()) {
+            String best = null;
+            for (Map.Entry<String, String> e : lowerToActual.entrySet()) {
+                if (e.getKey().startsWith(prefix)) {
+                    if (best == null || e.getKey().length() < best.length()) {
+                        best = e.getValue();
+                    }
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        return preferred[0];
+    }
+
+    private PamEntry resolve(String definitionName) {
+        String key = normalize(definitionName);
+        PamEntry exact = byNormName.get(key);
+        if (exact != null) {
+            return exact;
+        }
+        // Soft match: longest catalog key contained in / containing the query.
+        PamEntry best = null;
+        int bestScore = 0;
+        for (Map.Entry<String, PamEntry> e : byNormName.entrySet()) {
+            String k = e.getKey();
+            if (k.contains(key) || key.contains(k)) {
+                int score = Math.min(k.length(), key.length());
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = e.getValue();
+                }
+            }
+        }
+        return best;
+    }
+
+    private static boolean isGameplayPam(String path) {
+        String upper = path.toUpperCase(Locale.ROOT);
+        if (upper.contains("/EFFECTS/")) {
+            return false;
+        }
+        if (upper.contains("/NPC/")) {
+            return false;
+        }
+        return upper.contains("/PLANT/") || upper.contains("/ZOMBIE/");
+    }
+
+    /** Prefer INITIAL gameplay packs over FULL / holiday variants. */
+    private static boolean prefer(PamEntry candidate, PamEntry existing) {
+        int c = score(candidate.path);
+        int e = score(existing.path);
+        return c > e;
+    }
+
+    private static int score(String path) {
+        String upper = path.toUpperCase(Locale.ROOT);
+        int s = 0;
+        if (upper.contains("/INITIAL/")) {
+            s += 4;
+        }
+        if (upper.contains("/PLANT/") || upper.contains("/ZOMBIE/")) {
+            s += 2;
+        }
+        if (upper.contains("/FULL/")) {
+            s += 1;
+        }
+        return s;
+    }
+
+    static String normalize(String raw) {
+        StringBuilder sb = new StringBuilder(raw.length());
+        for (int i = 0; i < raw.length(); i++) {
+            char ch = raw.charAt(i);
+            if (Character.isLetterOrDigit(ch)) {
+                sb.append(Character.toUpperCase(ch));
+            }
+        }
+        return sb.toString();
+    }
+}

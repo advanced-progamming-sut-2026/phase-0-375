@@ -29,6 +29,7 @@ import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
+import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
 
 import java.util.ArrayList;
@@ -51,6 +52,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private final GameplayMenuController gameplay = GameplayMenuController.getInstance();
     private final LawnLayout lawnLayout;
     private final LawnBackgroundRenderer lawnBackground;
+    private final LawnEntityRenderer entityRenderer;
     private final DebugEntityOverlay entityOverlay;
 
     private Table pickerPanel;
@@ -76,6 +78,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
 
         BitmapFont font = resolveFont();
         entityOverlay = new DebugEntityOverlay(lawnLayout, font);
+        entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
 
         List<String> plants = plantNames();
         if (!plants.isEmpty()) {
@@ -381,7 +384,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     protected void renderWorld(float delta) {
         lawnBackground.draw(game.batch);
         drawHoverHighlight();
-        entityOverlay.draw(game.batch, App.getInstance().getCurrentGameModel());
+        entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
     }
 
     private void drawHoverHighlight() {

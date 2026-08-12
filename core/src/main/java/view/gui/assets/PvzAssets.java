@@ -17,12 +17,15 @@ import java.util.Properties;
 public final class PvzAssets implements Disposable {
     public final TextureBank textures;
     public final PamPlayer player;
+    public final PamCatalog pamCatalog;
     public final String resolution;
     public final FileHandle root;
 
-    private PvzAssets(TextureBank textures, PamPlayer player, String resolution, FileHandle root) {
+    private PvzAssets(TextureBank textures, PamPlayer player, PamCatalog pamCatalog,
+                      String resolution, FileHandle root) {
         this.textures = textures;
         this.player = player;
+        this.pamCatalog = pamCatalog;
         this.resolution = resolution;
         this.root = root;
     }
@@ -31,7 +34,8 @@ public final class PvzAssets implements Disposable {
         FileHandle root = resolveAssetsRoot();
         String res = System.getProperty("pvz.resolution", "768");
         TextureBank textures = new TextureBank(res, root);
-        return new PvzAssets(textures, new PamPlayer(textures, root), res, root);
+        PamCatalog catalog = PamCatalog.load(root);
+        return new PvzAssets(textures, new PamPlayer(textures, root), catalog, res, root);
     }
 
     /**

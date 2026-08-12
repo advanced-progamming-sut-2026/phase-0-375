@@ -14,7 +14,12 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 /**
- * Debug-only lawn markers (colored quads + names) until PAM entity art is wired.
+ * Debug-only lawn markers (colored quads + names).
+ *
+ * <p>Superseded by {@link LawnEntityRenderer} for normal PAM drawing; keep for
+ * diagnosing missing catalog entries or animation wiring.
+ *
+ * <p>TODO: optional toggle on gameplay screens when a PAM pose fails to resolve.
  */
 public final class DebugEntityOverlay implements Disposable {
     private static final Color PLANT_COLOR = new Color(0.25f, 0.78f, 0.30f, 0.85f);
@@ -66,6 +71,43 @@ public final class DebugEntityOverlay implements Disposable {
             float[] xy = layout.centerOf(Math.round(row), progressX);
             drawMarker(batch, xy[0], xy[1], ZOMBIE_COLOR, name);
         }
+    }
+
+    public void drawPlant(Batch batch, GameModel model, PlantInstance plant) {
+        if (model == null) {
+            return;
+        }
+
+        Point pos = plant.getPosition();
+        if (pos == null) {
+            return;
+        }
+        String name = plant.getDefinition() != null ? plant.getDefinition().getName() : "?";
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        drawMarker(batch, xy[0], xy[1], PLANT_COLOR, name);
+    }
+
+    public void drawZombie(Batch batch, GameModel model, ZombieInstance zombie) {
+        if (model == null) {
+            return;
+        }
+
+        FloatPoint cont = zombie.getContinuousPosition();
+        Point grid = zombie.getGridPosition();
+        float row;
+        float progressX;
+        if (cont != null) {
+            progressX = cont.getX();
+            row = cont.getY();
+        } else if (grid != null) {
+            progressX = grid.getX();
+            row = grid.getY();
+        } else {
+            return;
+        }
+        String name = zombie.getDefinition() != null ? zombie.getDefinition().getName() : "?";
+        float[] xy = layout.centerOf(Math.round(row), progressX);
+        drawMarker(batch, xy[0], xy[1], ZOMBIE_COLOR, name);
     }
 
     private void drawMarker(Batch batch, float cx, float cy, Color color, String name) {
