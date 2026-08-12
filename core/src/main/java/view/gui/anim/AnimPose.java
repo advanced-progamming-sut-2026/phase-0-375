@@ -9,6 +9,9 @@ import java.util.Map;
  * <p>Produced by {@link view.gui.anim.plant.PlantAnimAdapter} /
  * {@link view.gui.anim.zombie.ZombieAnimAdapter}; consumed by
  * {@link view.gui.lawn.LawnEntityRenderer}.
+ *
+ * <p>Hidden PAM parts (armor, butter, …) stay off unless {@link #visibility()}
+ * marks them {@code true} — use {@link PamVisibility} or {@link #withVisibleParts}.
  */
 public final class AnimPose {
     private final String pamPath;
@@ -32,6 +35,33 @@ public final class AnimPose {
         return new AnimPose(pamPath, clipName, role, true, null);
     }
 
+    public static AnimPose looping(String pamPath, String clipName, Enum<?> role,
+                                   Map<String, Boolean> visibility) {
+        return new AnimPose(pamPath, clipName, role, true, visibility);
+    }
+
+    /** Looping pose with the given PAM parts forced visible. */
+    public static AnimPose looping(String pamPath, String clipName, Enum<?> role,
+                                   String... visibleParts) {
+        return new AnimPose(pamPath, clipName, role, true, PamVisibility.show(visibleParts));
+    }
+
+    /**
+     * Copy of this pose with additional PAM parts forced visible
+     * (merged onto any existing visibility map).
+     */
+    public AnimPose withVisibleParts(String... partNames) {
+        return new AnimPose(pamPath, clipName, role, loop, PamVisibility.showAlso(visibility, partNames));
+    }
+
+    /**
+     * Copy of this pose with additional PAM parts forced visible
+     * (merged onto any existing visibility map).
+     */
+    public AnimPose withVisibleParts(Iterable<String> partNames) {
+        return new AnimPose(pamPath, clipName, role, loop, PamVisibility.showAlso(visibility, partNames));
+    }
+
     public String pamPath() {
         return pamPath;
     }
@@ -49,7 +79,7 @@ public final class AnimPose {
         return loop;
     }
 
-    /** {@code null} means default libPVZ visibility (armor / butter / ink hidden). */
+    /** {@code null} means default libPVZ visibility. */
     public Map<String, Boolean> visibility() {
         return visibility;
     }
