@@ -1,7 +1,7 @@
 # libPVZ reference
 
 Source of truth: [https://github.com/pizpizi/libPVZ](https://github.com/pizpizi/libPVZ).
-Current documented release tag: `v0.1.3`. Requires Java 8+ (project uses newer OK),
+Current documented release tag: `v0.1.5`. Requires Java 8+ (project uses newer OK),
 LibGDX **1.12.1+**, Gradle 7+.
 
 Package root: `pvz.libpvz`.
@@ -82,7 +82,8 @@ Looks for `assetsFolder/pam`, else `assetsFolder/IMAGES`.
 | `getClip(pam, clip)` | O(1) handle after load (`null` if not ready) |
 | `draw(batch, pam, clip, time, x, y, loop)` | Convenient; string lookup |
 | `draw(batch, clipRef, time, x, y, loop)` | **Preferred in render** |
-| `draw(..., visibilityMap)` | Armor / status parts |
+| `draw(batch, clipRef, time, x, y, scaleX, scaleY, loop)` | Scaled about `(x, y)`; see `AnimScale` |
+| `draw(..., visibilityMap)` | Armor / status parts (no scaled overload) |
 | `drawPart(...)` | Single named part whitelist |
 | `clips(pam)` | List clip names (sync load) |
 | `bounds(pam[, clip])` | Canvas / clip bounds (sync) |
