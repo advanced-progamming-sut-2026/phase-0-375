@@ -19,9 +19,15 @@ public final class AnimPose {
     private final Enum<?> role;
     private final boolean loop;
     private final Map<String, Boolean> visibility;
+    private final float scale;
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility) {
+        this(pamPath, clipName, role, loop, visibility, 1f);
+    }
+
+    public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
+                    Map<String, Boolean> visibility, float scale) {
         this.pamPath = pamPath;
         this.clipName = clipName;
         this.role = role;
@@ -29,6 +35,7 @@ public final class AnimPose {
         this.visibility = visibility == null || visibility.isEmpty()
                 ? null
                 : Collections.unmodifiableMap(visibility);
+        this.scale = scale > 0f ? scale : 1f;
     }
 
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role) {
@@ -51,7 +58,8 @@ public final class AnimPose {
      * (merged onto any existing visibility map).
      */
     public AnimPose withVisibleParts(String... partNames) {
-        return new AnimPose(pamPath, clipName, role, loop, PamVisibility.showAlso(visibility, partNames));
+        return new AnimPose(pamPath, clipName, role, loop,
+                PamVisibility.showAlso(visibility, partNames), scale);
     }
 
     /**
@@ -59,7 +67,13 @@ public final class AnimPose {
      * (merged onto any existing visibility map).
      */
     public AnimPose withVisibleParts(Iterable<String> partNames) {
-        return new AnimPose(pamPath, clipName, role, loop, PamVisibility.showAlso(visibility, partNames));
+        return new AnimPose(pamPath, clipName, role, loop,
+                PamVisibility.showAlso(visibility, partNames), scale);
+    }
+
+    /** Copy of this pose with an entity-specific size multiplier (Gargantuar, Imp, …). */
+    public AnimPose withScale(float scale) {
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale);
     }
 
     public String pamPath() {
@@ -82,6 +96,11 @@ public final class AnimPose {
     /** {@code null} means default libPVZ visibility. */
     public Map<String, Boolean> visibility() {
         return visibility;
+    }
+
+    /** Entity-specific multiplier applied on top of {@link AnimScale}; {@code 1} by default. */
+    public float scale() {
+        return scale;
     }
 
     public String cacheKey() {

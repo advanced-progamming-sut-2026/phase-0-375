@@ -1,6 +1,7 @@
 package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.math.Matrix4;
 import model.app.App;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
@@ -9,6 +10,7 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
+import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -39,6 +41,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[2];
+    private final Matrix4 poseTransform = new Matrix4();
+    private final Matrix4 batchTransform = new Matrix4();
 
     private final DebugEntityOverlay entityOverlay;
 
@@ -93,7 +97,7 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        drawPose(batch, plant, pose, xy[0], xy[1], delta);
+        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta);
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
@@ -106,7 +110,7 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
-        drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], delta);
+        drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], AnimScale.ZOMBIE, delta);
     }
 
     private boolean zombieWorldCenter(ZombieInstance zombie, float[] out) {
@@ -129,17 +133,33 @@ public final class LawnEntityRenderer {
         return true;
     }
 
-    private void drawPose(Batch batch, Object entity, AnimPose pose, float x, float y, float delta) {
+    private void drawPose(Batch batch, Object entity, AnimPose pose,
+                          float x, float y, float baseScale, float delta) {
         seenThisFrame.add(entity);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
             return;
         }
         float stateTime = advanceClock(entity, pose.cacheKey(), delta);
+        float scale = baseScale * pose.scale();
         if (pose.visibility() == null) {
-            player.draw(batch, ref, stateTime, x, y, pose.loop());
-        } else {
-            player.draw(batch, ref, stateTime, x, y, pose.loop(), pose.visibility());
+            player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());
+            return;
+        }
+        // libPVZ has no scale + visibility overload, so armor / status poses scale via the
+        // batch transform. Same pivot as the native path: (x, y), the entity's cell center.
+        boolean scaled = Math.abs(scale - 1f) > 0.001f;
+        if (scaled) {
+            batchTransform.set(batch.getTransformMatrix());
+            poseTransform.set(batchTransform)
+                    .translate(x, y, 0f)
+                    .scale(scale, scale, 1f)
+                    .translate(-x, -y, 0f);
+            batch.setTransformMatrix(poseTransform);
+        }
+        player.draw(batch, ref, stateTime, x, y, pose.loop(), pose.visibility());
+        if (scaled) {
+            batch.setTransformMatrix(batchTransform);
         }
     }
 
