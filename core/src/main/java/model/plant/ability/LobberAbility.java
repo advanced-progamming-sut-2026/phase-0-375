@@ -34,6 +34,25 @@ public class LobberAbility implements PlantAbility {
     public PlantCategory getCategory() { return PlantCategory.LOBBER; }
 
     @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return null;
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        // Arma-mint: trigger plant-food on every LOBBER plant.
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.LOBBER);
+            return null;
+        }
+
+        if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
+        if (!context.hasZombieInLane(plant.getPosition().getY())) return null;
+
+        execute(plant, context);
+        return TimedPlantAction.attackHold(plant, context);
+    }
+
+    @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
         if (plant.getPosition() == null) return;
         Plant def = plant.getDefinition();

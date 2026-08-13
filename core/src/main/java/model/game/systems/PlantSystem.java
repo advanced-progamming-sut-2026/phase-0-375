@@ -6,6 +6,7 @@ import model.enums.PlantTags;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.plant.ability.PlantAbilityContext;
+import model.plant.ability.PlantClipDurations;
 import model.plant.ability.WallAbility;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -24,6 +25,10 @@ public class PlantSystem implements Tickable {
     public PlantSystem(GameModel gameModel) {
         this.gameModel = gameModel;
         this.context = new GameModelPlantAbilityContext(gameModel);
+    }
+
+    public void setClipDurations(PlantClipDurations clipDurations) {
+        context.setClipDurations(clipDurations != null ? clipDurations : PlantClipDurations.NONE);
     }
 
     @Override
@@ -64,12 +69,17 @@ public class PlantSystem implements Tickable {
     private static class GameModelPlantAbilityContext implements PlantAbilityContext {
         private final GameModel gameModel;
         private PlantInstance currentPlant; // plant currently ticking (kill attribution)
+        private PlantClipDurations clipDurations = PlantClipDurations.NONE;
 
         GameModelPlantAbilityContext(GameModel gameModel) {
             this.gameModel = gameModel;
         }
 
         void setCurrentPlant(PlantInstance plant) { this.currentPlant = plant; }
+
+        void setClipDurations(PlantClipDurations clipDurations) {
+            this.clipDurations = clipDurations != null ? clipDurations : PlantClipDurations.NONE;
+        }
 
         private Plant currentDef() {
             return currentPlant != null ? currentPlant.getDefinition() : null;
@@ -240,6 +250,11 @@ public class PlantSystem implements Tickable {
         @Override
         public void removeZombie(ZombieInstance zombie) {
             gameModel.removeZombie(zombie);
+        }
+
+        @Override
+        public float plantClipDuration(String plantDefinitionName, String... preferredClipNames) {
+            return clipDurations.duration(plantDefinitionName, preferredClipNames);
         }
     }
 }

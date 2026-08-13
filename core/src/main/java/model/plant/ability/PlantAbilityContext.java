@@ -137,4 +137,15 @@ public interface PlantAbilityContext {
      * Removes the given {@code zombie} from the map.
      */
     void removeZombie(ZombieInstance zombie);
+
+    /**
+     * Duration in seconds of a plant animation clip from the asset catalog,
+     * or {@code 0} if unknown (TUI / tests without PAM data).
+     *
+     * @param plantDefinitionName plant definition name (e.g. {@code "Peashooter"})
+     * @param preferredClipNames  clip names tried in order (e.g. {@code "attack"})
+     */
+    default float plantClipDuration(String plantDefinitionName, String... preferredClipNames) {
+        return 0f;
+    }
 }
