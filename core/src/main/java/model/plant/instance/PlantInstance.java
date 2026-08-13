@@ -99,6 +99,7 @@ public class PlantInstance implements Placeable {
 
     public static final float IMITATER_TRANSFORM_DELAY = 1.0f; // Default delay before it morphs into its target
     public static final float SHROOM_BASE_LIFESPAN = 60.0f; // Base lifespan for non-warm-up shrooms.
+    public static final float PLANT_FOOD_DURATION = 5.0f;
 
     // --- Tick ---
     /** Advances this plant by one game tick. */
@@ -212,7 +213,7 @@ public class PlantInstance implements Placeable {
         isPlantFoodActive = true;
         stateBeforeFreeze = state;
         state = PlantState.PLANT_FOOD;
-        plantFoodDurationRemaining = 5.0f;
+        plantFoodDurationRemaining = PLANT_FOOD_DURATION;
         pendingPlantFoodEffect = true;
     }
 
@@ -222,7 +223,7 @@ public class PlantInstance implements Placeable {
         isPlantFoodActive = true;
         stateBeforeFreeze = state;
         state = PlantState.PLANT_FOOD;
-        plantFoodDurationRemaining = 5.0f;
+        plantFoodDurationRemaining = PLANT_FOOD_DURATION;
         pendingPlantFoodEffect = false;
         firePlantFoodEffect(context);
     }
@@ -482,6 +483,8 @@ public class PlantInstance implements Placeable {
     public Point getPosition() { return position; }
     public Map<PlantAbilityType, AbilityState> getAbilityStates() { return abilityStates; }
     public AbilityState getAbilityState(PlantAbilityType type) { return abilityStates.get(type); }
+    public float getPlantFoodDurationRemaining() { return plantFoodDurationRemaining; }
+
     @Override public PlacableLayer getLayer() {
         Plant def = definition;
         if (def == null) return PlacableLayer.MAIN;

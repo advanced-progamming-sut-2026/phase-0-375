@@ -141,6 +141,36 @@ public final class PamCatalog {
         return preferred[0];
     }
 
+    /**
+     * Exact clip duration from {@link PamEntry#clips()}, or {@code 0} if the clip
+     * is missing.
+     */
+    public float clipDurationSeconds(PamEntry entry, String clipName) {
+        String actual = findExactClip(entry, clipName);
+        if (actual == null) {
+            return 0f;
+        }
+        Float duration = entry.clips().get(actual);
+        return duration != null && duration > 0f ? duration : 0f;
+    }
+
+    private static String findExactClip(PamEntry entry, String clipName) {
+        if (entry == null || clipName == null || clipName.isBlank()) {
+            return null;
+        }
+        Map<String, Float> clips = entry.clips();
+        if (clips == null || clips.isEmpty()) {
+            return null;
+        }
+        String want = clipName.toLowerCase(Locale.ROOT);
+        for (String name : clips.keySet()) {
+            if (name.toLowerCase(Locale.ROOT).equals(want)) {
+                return name;
+            }
+        }
+        return null;
+    }
+
     private PamEntry resolve(String definitionName) {
         String key = normalize(definitionName);
         PamEntry exact = byNormName.get(key);
