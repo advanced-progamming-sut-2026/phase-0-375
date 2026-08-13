@@ -7,12 +7,25 @@ package view.gui.anim.plant;
  * {@link PlantAnimAdapter}. Add plant-only roles here without touching zombie code.
  */
 public enum PlantAnimRole {
-    IDLE,
+    IDLE(true),
+    PLANT_FOOD_ON(false),
+    PLANT_FOOD(true),
+    PLANT_FOOD_OFF(false),
+    ;
 
     // TODO: ATTACK — firing / melee cycles
-    // TODO: PLANT_FOOD — plant-food activation loops
     // TODO: GROWING — warm-up / stage idles
     // TODO: ARMED — Potato Mine / trap ready poses
     // TODO: DIE — death clips
     // TODO: SPECIAL — exclusive one-offs
+
+    private final boolean looping;
+
+    PlantAnimRole(boolean looping) {
+        this.looping = looping;
+    }
+
+    public boolean isLooping() {
+        return looping;
+    }
 }
