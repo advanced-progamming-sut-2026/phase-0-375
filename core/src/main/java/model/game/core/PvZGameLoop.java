@@ -132,4 +132,8 @@ public class PvZGameLoop implements GameLoop {
     public void setGameState(GameState state) {
         this.gameState = state;
     }
+
+    public void setPlantClipDurations(model.plant.ability.PlantClipDurations clipDurations) {
+        plantSystem.setClipDurations(clipDurations);
+    }
 }

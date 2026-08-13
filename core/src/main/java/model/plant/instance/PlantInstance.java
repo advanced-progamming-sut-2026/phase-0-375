@@ -34,6 +34,8 @@ public class PlantInstance implements Placeable {
     private float lifespanRemaining;                   // -1 = infinite
     private float plantFoodDurationRemaining;
     private boolean pendingPlantFoodEffect;
+    private PlantAction activeAction; // Multi-tick ability sequence (attack anim, windup, …); at most one.
+    private int actionEpoch; // Bumped when a presentation action starts so the view can restart clips
     private final Map<PlantAbilityType, AbilityState> abilityStates; // Per-ability runtime state
     private int freezeHitCount;
     private PlantState stateBeforeFreeze;
@@ -54,6 +56,8 @@ public class PlantInstance implements Placeable {
         this.isPlantFoodActive = false;
         this.plantFoodDurationRemaining = 0f;
         this.pendingPlantFoodEffect = false;
+        this.activeAction = null;
+        this.actionEpoch = 0;
         this.lifespanRemaining = -1f;
         this.abilityStates = new EnumMap<>(PlantAbilityType.class);
         this.freezeHitCount = 0;
@@ -119,8 +123,12 @@ public class PlantInstance implements Placeable {
             pendingPlantFoodEffect = false;
             firePlantFoodEffect(context);
         }
-        if (canAct()) {
-            executeAbility(context);
+        if (activeAction != null) {
+            if (activeAction.tick(this, context, deltaTime)) {
+                activeAction = null;
+            }
+        } else if (canAct()) {
+            startAbility(context);
         }
     }
 
@@ -176,7 +184,8 @@ public class PlantInstance implements Placeable {
     }
 
     private boolean canAct() {
-        if (state == PlantState.STUNNED || transformCountdown >= 0f) return false;
+        if (state == PlantState.STUNNED || transformCountdown >= 0f ||
+            state == PlantState.PLANT_FOOD) return false;
         Plant def = definition;
         if (def.getActionInterval() <= 0) {
             return true;
@@ -185,25 +194,48 @@ public class PlantInstance implements Placeable {
         return state == null || state.getCooldownRemaining() <= 0;
     }
 
-    private void executeAbility(PlantAbilityContext context) {
+    private void startAbility(PlantAbilityContext context) {
         PlantAbility strategy = getAbilityStrategy();
         if (strategy == null) return;
-        strategy.execute(this, context);
 
-        AbilityState state = abilityStates.get(definition.getAbilityType());
-        if (state != null && definition.getActionInterval() > 0) {
-            if (state.isDigesting()) {
-                return;
-            }
-            if (definition.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE && state.isArmed()) {
-                state.setCooldownRemaining(0);
-            } else {
-                float custom = strategy.getNextActionCooldown(this);
-                state.setCooldownRemaining(custom >= 0f
-                        ? Math.max(0f, custom)
-                        : definition.getActionInterval());
-            }
+        PlantAction action = strategy.beginAction(this, context);
+        applyAbilityCooldown(strategy);
+
+        if (action != null) {
+            activeAction = action;
+            activeAction.start(this, context);
         }
+    }
+
+    private void applyAbilityCooldown(PlantAbility strategy) {
+        AbilityState state = abilityStates.get(definition.getAbilityType());
+        if (state == null || definition.getActionInterval() <= 0) {
+            return;
+        }
+        if (state.isDigesting()) {
+            return;
+        }
+        if (definition.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE && state.isArmed()) {
+            state.setCooldownRemaining(0);
+            return;
+        }
+        float custom = strategy.getNextActionCooldown(this);
+        state.setCooldownRemaining(custom >= 0f
+                ? Math.max(0f, custom)
+                : definition.getActionInterval());
+    }
+
+    /** Interrupts any multi-tick ability sequence. */
+    private void cancelActiveAction() {
+        if (activeAction == null) return;
+        PlantAction action = activeAction;
+        activeAction = null;
+        action.cancel(this);
+    }
+
+    /** Called by {@link PlantAction} implementations when a presentation clip should restart. */
+    public void bumpActionEpoch() {
+        actionEpoch++;
     }
 
     // --- Plant food ---
@@ -211,6 +243,7 @@ public class PlantInstance implements Placeable {
     public void activatePlantFood() {
         if (!definition.hasPlantFood()) return;
         isPlantFoodActive = true;
+        cancelActiveAction();
         stateBeforeFreeze = state;
         state = PlantState.PLANT_FOOD;
         plantFoodDurationRemaining = PLANT_FOOD_DURATION;
@@ -221,6 +254,7 @@ public class PlantInstance implements Placeable {
     public void activatePlantFood(PlantAbilityContext context) {
         if (!definition.hasPlantFood()) return;
         isPlantFoodActive = true;
+        cancelActiveAction();
         stateBeforeFreeze = state;
         state = PlantState.PLANT_FOOD;
         plantFoodDurationRemaining = PLANT_FOOD_DURATION;
@@ -244,6 +278,7 @@ public class PlantInstance implements Placeable {
         currentHP -= damage;
         if (currentHP <= 0) {
             currentHP = 0;
+            cancelActiveAction();
             state = PlantState.DYING;
         }
     }
@@ -362,6 +397,7 @@ public class PlantInstance implements Placeable {
     }
     public void freeze() {
         if (isFrozen()) return;
+        cancelActiveAction();
         stateBeforeFreeze = state;
         state = PlantState.FROZEN;
         iceHp = DEFAULT_ICE_HP;
@@ -408,6 +444,7 @@ public class PlantInstance implements Placeable {
     public boolean isTransformed() { return state == PlantState.TRANSFORMED; }
     public void transform() {
         if (isTransformed()) return;
+        cancelActiveAction();
         stateBeforeTransform = state;
         state = PlantState.TRANSFORMED;
     }
@@ -459,6 +496,7 @@ public class PlantInstance implements Placeable {
         this.isPlantFoodActive = false;
         this.plantFoodDurationRemaining = 0f;
         this.pendingPlantFoodEffect = false;
+        this.activeAction = null;
         this.abilityStates.clear();
         if (newDefinition.getAbilityType() != null) {
             AbilityState fresh = new AbilityState(newDefinition.getAbilityType());
@@ -484,6 +522,8 @@ public class PlantInstance implements Placeable {
     public Map<PlantAbilityType, AbilityState> getAbilityStates() { return abilityStates; }
     public AbilityState getAbilityState(PlantAbilityType type) { return abilityStates.get(type); }
     public float getPlantFoodDurationRemaining() { return plantFoodDurationRemaining; }
+    public int getActionEpoch() { return actionEpoch; }
+    public boolean hasActiveAction() { return activeAction != null; }
 
     @Override public PlacableLayer getLayer() {
         Plant def = definition;

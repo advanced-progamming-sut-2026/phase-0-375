@@ -19,6 +19,17 @@ public interface PlantAbility extends Ability {
     void execute(PlantInstance plant, PlantAbilityContext context);
 
     /**
+     * Start the next ability cycle. Return a {@link PlantAction} to run across
+     * subsequent ticks, or {@code null} if the cycle finished in this call.
+     *
+     * <p>Default: {@link #execute} once and return {@code null}.
+     */
+    default PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        execute(plant, context);
+        return null;
+    }
+
+    /**
      * Perform the plant-food-enhanced action. Called once when the player
      * activates plant food on this plant.
      */
@@ -26,7 +37,7 @@ public interface PlantAbility extends Ability {
 
     /**
      * Optional per-shot cooldown override. Called by
-     * {@code PlantInstance.executeAbility} after {@link #execute} returns.
+     * {@code PlantInstance} after {@link #beginAction} returns.
      */
     default float getNextActionCooldown(PlantInstance plant) {
         return -1f;

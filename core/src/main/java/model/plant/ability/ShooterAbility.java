@@ -37,6 +37,23 @@ public class ShooterAbility implements PlantAbility {
     public PlantCategory getCategory() { return PlantCategory.SHOOTER; }
 
     @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        // Appease-mint: trigger plant-food on every SHOOTER plant.
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.SHOOTER);
+            return null;
+        }
+
+        if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
+
+        execute(plant, context);
+        return TimedPlantAction.attackHold(plant, context);
+    }
+
+    @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
         if (def == null) return;
@@ -232,7 +249,7 @@ public class ShooterAbility implements PlantAbility {
     }
 
     /** Maps a cycle index (0..2) to its bulb type. */
-    private BowlingBulbType bulbTypeForCycleIndex(int cycleIndex) {
+    public BowlingBulbType bulbTypeForCycleIndex(int cycleIndex) {
         switch (cycleIndex) {
             case 1: return BowlingBulbType.BLUE;
             case 2: return BowlingBulbType.ORANGE;
