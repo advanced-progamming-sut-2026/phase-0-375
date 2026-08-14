@@ -6,9 +6,9 @@ import java.util.Map;
 /**
  * Zombie-team registration hub for per-zombie {@link ZombieGait} values.
  *
- * <p>Anything not registered here walks with {@link ZombieGait#DEFAULT}. Add an entry when a
- * zombie's stride differs (Gargantuar covers more ground per cycle) or when it has no footfall
- * to lock at all (swimmers, fliers) — see {@link ZombieGait#disabled()}.
+ * <p>Anything not registered here walks with {@link ZombieGait#DEFAULT} (measures
+ * {@link ZombieGait#GROUND_SWATCH}). Add an entry when stride differs, or {@link ZombieGait#disabled()}
+ * when the sheet says {@code GroundTrackName: none}.
  */
 public final class ZombieGaitProfiles {
     private static final Map<String, ZombieGait> BY_NAME = createDefaults();
@@ -17,9 +17,8 @@ public final class ZombieGaitProfiles {
 
     private static Map<String, ZombieGait> createDefaults() {
         Map<String, ZombieGait> gaits = new HashMap<>();
-        // TODO: gaits.put("ZombieGargantuar", ZombieGait.of(1f, "<its planted foot parts>"));
-        // TODO: gaits.put("ZombieImp", ZombieGait.of(0.5f, "<its planted foot parts>"));
-        // TODO: gaits.put("ZombieBeachSnorkel", ZombieGait.disabled());
+        gaits.put("ZombiePiano", ZombieGait.disabled());
+        // TODO: gaits.put("ZombieGargantuar", ZombieGait.of(1f));
         return gaits;
     }
 

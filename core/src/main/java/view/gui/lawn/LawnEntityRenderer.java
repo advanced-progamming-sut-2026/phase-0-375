@@ -126,8 +126,8 @@ public final class LawnEntityRenderer {
         ZombieGait gait = gaitFor(zombie);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
-            // Walking is driven by travel, so a cycle always covers exactly one step and the
-            // planted foot can be held still. Every other pose stays on the wall clock.
+            // Walking is driven by travel, so a cycle always covers exactly one step and
+            // ground_swatch can be held still. Every other pose stays on the wall clock.
             // Hypnotized zombies walk the other way, so distance and the hold-back both flip.
             boolean backward = zombie.isMovingBackward();
             phase = gait.phaseAt(backward ? xyTmp[2] : -xyTmp[2]);

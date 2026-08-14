@@ -7,9 +7,9 @@ import pvz.libpvz.pam.PamPlayer;
 /**
  * How far the body has moved through a walk cycle, measured from the art itself.
  *
- * <p>A PAM keeps the body on the animation origin and slides the feet instead, so the distance the
- * planted foot travels is exactly the distance the body covered. Sampling that foot on every frame
- * gives {@link view.gui.lawn.LawnEntityRenderer} the curve it needs to hold the foot still.
+ * <p>A PAM keeps the body on the animation origin and slides {@code ground_swatch} with the planted
+ * contact. Sampling that locator every frame gives {@link view.gui.lawn.LawnEntityRenderer} the
+ * curve it needs to hold the swatch still.
  */
 public final class ZombieFootfallCurve {
     /** Even progress across the cycle, i.e. no foot lock. Used when the feet cannot be measured. */
@@ -23,20 +23,20 @@ public final class ZombieFootfallCurve {
     }
 
     /**
-     * Measures {@code footParts} across every frame of {@code clip}. The parts are treated as one
-     * foot and merged, so a rig that splits heel and toe still yields a single track.
+     * Measures {@code trackParts} across every frame of {@code clip}. Several names are merged into
+     * one track (a split locator still yields a single curve).
      *
-     * <p>Falls back to {@link #LINEAR} whenever the foot cannot be followed — a missing part, a
-     * frame where it draws nothing, or a clip whose foot never moves.
+     * <p>Falls back to {@link #LINEAR} whenever the track cannot be followed — a missing part, a
+     * frame where it draws nothing, or a clip whose swatch never moves.
      */
-    public static ZombieFootfallCurve measure(PamPlayer player, ClipRef clip, String[] footParts) {
-        if (player == null || clip == null || footParts == null || footParts.length == 0) {
+    public static ZombieFootfallCurve measure(PamPlayer player, ClipRef clip, String[] trackParts) {
+        if (player == null || clip == null || trackParts == null || trackParts.length == 0) {
             return LINEAR;
         }
-        Rectangle[][] byPart = new Rectangle[footParts.length][];
+        Rectangle[][] byPart = new Rectangle[trackParts.length][];
         int frames = 0;
-        for (int p = 0; p < footParts.length; p++) {
-            byPart[p] = player.partBoundsByFrame(clip, footParts[p]);
+        for (int p = 0; p < trackParts.length; p++) {
+            byPart[p] = player.partBoundsByFrame(clip, trackParts[p]);
             frames = Math.max(frames, byPart[p].length);
         }
         if (frames < 2) {
@@ -61,7 +61,7 @@ public final class ZombieFootfallCurve {
             x[i] = (min + max) * 0.5f;
         }
 
-        // The foot spends most of the cycle on the ground and snaps back through the air, so the
+        // The swatch spends most of the cycle planted and snaps back through the air, so the
         // direction it moves in on more frames is the stance. Air frames go backwards and clamp
         // to zero, which also keeps progress from ever running backwards.
         float[] step = new float[frames];
