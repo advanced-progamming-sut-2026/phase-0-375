@@ -349,6 +349,35 @@ public class ZombieInstance implements Tickable, Placeable {
         return movingBackward;
     }
 
+    /**
+     * Half a tile. Integer continuous X is a tile centre (plants sit there);
+     * {@code col ± TILE_BORDER} is that tile's facing edge.
+     */
+    public static final float TILE_BORDER = 0.5f;
+
+    /**
+     * Column of the plant tile this zombie has stepped onto, or {@code -1} if still
+     * approaching that tile's facing border.
+     *
+     * <p>Continuous X is a column index: integers are tile centres, half-integers are
+     * the lines between tiles. Walking left bites column {@code C} at {@code C+0.5};
+     * walking right bites it at {@code C-0.5}.
+     */
+    public int plantColumnAtFacingBorder() {
+        if (continuousPosition == null) {
+            return -1;
+        }
+        return plantColumnAtFacingBorder(continuousPosition.getX(), movingBackward);
+    }
+
+    static int plantColumnAtFacingBorder(float x, boolean movingBackward) {
+        if (movingBackward) {
+            return (int) Math.floor(x + TILE_BORDER);
+        }
+        int col = (int) Math.floor(x);
+        return x <= col + TILE_BORDER ? col : -1;
+    }
+
     /** Reverses (or restores) this zombie's walking direction. */
     public void setMovingBackward(boolean movingBackward) {
         this.movingBackward = movingBackward;

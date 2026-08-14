@@ -48,6 +48,16 @@ public final class ZombieAnimAdapter {
         return AnimPose.looping(entry.path(), clip, role);
     }
 
+    public static boolean isDistanceDriven(ZombieInstance zombie, AnimPose pose) {
+        if (zombie == null || pose == null || pose.role() != ZombieAnimRole.WALK) {
+            return false;
+        }
+        return switch (zombie.getState()) {
+            case WALKING, HYPNOTIZED, CHILLED -> !zombie.isFrozen() && !zombie.isEating();
+            default -> false;
+        };
+    }
+
     /**
      * Global zombie role mapping: eat → walk → idle.
      *

@@ -1,7 +1,6 @@
 package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.g2d.Batch;
-import com.badlogic.gdx.math.Matrix4;
 import model.app.App;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
@@ -14,6 +13,9 @@ import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
+import view.gui.anim.zombie.ZombieFootfallCurve;
+import view.gui.anim.zombie.ZombieGait;
+import view.gui.anim.zombie.ZombieGaitProfiles;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
 
@@ -32,6 +34,8 @@ import java.util.Set;
  * TODO: tint / freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
+    private static final float NO_PHASE = -1f;
+
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
     private final ZombieAnimAdapter zombieAdapter;
@@ -39,10 +43,9 @@ public final class LawnEntityRenderer {
     private final pvz.libpvz.pam.PamPlayer player;
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
+    private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
-    private final float[] xyTmp = new float[2];
-    private final Matrix4 poseTransform = new Matrix4();
-    private final Matrix4 batchTransform = new Matrix4();
+    private final float[] xyTmp = new float[3];
 
     private final DebugEntityOverlay entityOverlay;
 
@@ -97,7 +100,7 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta);
+        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, delta);
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
@@ -110,7 +113,36 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
-        drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], AnimScale.ZOMBIE, delta);
+
+        float x = xyTmp[0];
+        float phase = NO_PHASE;
+        ZombieGait gait = gaitFor(zombie);
+        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
+            // Walking is driven by travel, so a cycle always covers exactly one step and the
+            // planted foot can be held still. Every other pose stays on the wall clock.
+            // Hypnotized zombies walk the other way, so distance and the hold-back both flip.
+            boolean backward = zombie.isMovingBackward();
+            phase = gait.phaseAt(backward ? xyTmp[2] : -xyTmp[2]);
+            float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
+            x += backward ? -holdBack : holdBack;
+        }
+        drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, delta);
+    }
+
+    private static ZombieGait gaitFor(ZombieInstance zombie) {
+        return ZombieGaitProfiles.forZombie(
+                zombie.getDefinition() == null ? null : zombie.getDefinition().getName());
+    }
+
+    /** Measuring walks every frame of the clip, so each walk cycle is read from the art once. */
+    private ZombieFootfallCurve footfallFor(ZombieGait gait, ClipRef walkClip) {
+        ZombieFootfallCurve footfall = footfalls.get(walkClip);
+        if (footfall == null) {
+            footfall = gait.measureFootfall(player, walkClip);
+            footfalls.put(walkClip, footfall);
+        }
+        return footfall;
     }
 
     private boolean zombieWorldCenter(ZombieInstance zombie, float[] out) {
@@ -130,36 +162,25 @@ public final class LawnEntityRenderer {
         float[] xy = layout.centerOf(Math.round(row), progressX);
         out[0] = xy[0];
         out[1] = xy[1];
+        out[2] = progressX;
         return true;
     }
 
     private void drawPose(Batch batch, Object entity, AnimPose pose,
-                          float x, float y, float baseScale, float delta) {
+                          float x, float y, float baseScale, float phase, float delta) {
         seenThisFrame.add(entity);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
             return;
         }
-        float stateTime = advanceClock(entity, pose.cacheKey(), delta);
+        float stateTime = phase >= 0f
+                ? phase * ref.duration
+                : advanceClock(entity, pose.cacheKey(), delta);
         float scale = baseScale * pose.scale();
         if (pose.visibility() == null) {
             player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());
-            return;
-        }
-        // libPVZ has no scale + visibility overload, so armor / status poses scale via the
-        // batch transform. Same pivot as the native path: (x, y), the entity's cell center.
-        boolean scaled = Math.abs(scale - 1f) > 0.001f;
-        if (scaled) {
-            batchTransform.set(batch.getTransformMatrix());
-            poseTransform.set(batchTransform)
-                    .translate(x, y, 0f)
-                    .scale(scale, scale, 1f)
-                    .translate(-x, -y, 0f);
-            batch.setTransformMatrix(poseTransform);
-        }
-        player.draw(batch, ref, stateTime, x, y, pose.loop(), pose.visibility());
-        if (scaled) {
-            batch.setTransformMatrix(batchTransform);
+        } else {
+            player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop(), pose.visibility());
         }
     }
 

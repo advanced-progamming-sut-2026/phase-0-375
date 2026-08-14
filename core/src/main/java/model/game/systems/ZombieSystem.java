@@ -205,8 +205,8 @@ public class ZombieSystem implements Tickable {
     // --- Eating ---
 
     /**
-     * Each tick, if the zombie is on a cell with a live plant and the zombie
-     * is not currently in a special-action, the zombie eats the plant.
+     * Each tick, if the zombie has stepped onto the facing border of a tile
+     * that holds a live plant, and is not in a special-action, it eats.
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         boolean hypnotized = zombie.isHypnotized();
@@ -242,7 +242,14 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
-        eatPlantAt(zombie, context, row, col, deltaTime);
+        int eatCol = zombie.plantColumnAtFacingBorder();
+        if (eatCol < 0 || eatCol >= context.getColumnCount()) {
+            if (zombie.isEating()) {
+                zombie.stopEating();
+            }
+            return;
+        }
+        eatPlantAt(zombie, context, row, eatCol, deltaTime);
     }
 
     /** Keeps {@link FlyBehavior} in sync with the plant under the zombie. */
@@ -295,7 +302,7 @@ public class ZombieSystem implements Tickable {
         return (int) (eatDPS * deltaTime);
     }
 
-    /** Bites the plant on the zombie's cell, if there is a live one. */
+    /** Bites the plant on the tile whose facing border the zombie has stepped onto. */
     private void eatPlantAt(ZombieInstance zombie, BehaviorContext context,
                             int row, int col, float deltaTime) {
         PlantInstance plant = context.getPlantAt(row, col);

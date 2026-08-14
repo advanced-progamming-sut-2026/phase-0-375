@@ -65,8 +65,8 @@ public class SwimBehavior implements ZombieBehavior {
 
     /**
      * The zombie glides underwater, ignoring plants except to surface for
-     * meals. If a plant is on the current cell, the zombie surfaces to eat
-     * it (becoming vulnerable) and immediately deals its first tick of
+     * meals. If it has stepped onto a plant tile's facing border, it surfaces
+     * to eat (becoming vulnerable) and immediately deals its first tick of
      * damage. If the zombie has drifted back onto land, it resurfaces and
      * walks normally.
      */
@@ -77,7 +77,7 @@ public class SwimBehavior implements ZombieBehavior {
             return;
         }
 
-        PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
+        PlantInstance plantHere = plantAtFacingBorder(zombie, context);
         if (plantHere != null && plantHere.getCurrentHP() > 0) {
             // Surface and start eating immediately; apply this tick's damage too.
             phase = SwimPhase.SURFACED;
@@ -95,7 +95,7 @@ public class SwimBehavior implements ZombieBehavior {
      * zombie dives again (if still on water) or resumes walking on land.
      */
     private void tickSurfaced(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
+        PlantInstance plantHere = plantAtFacingBorder(zombie, context);
 
         if (plantHere == null || plantHere.getCurrentHP() <= 0) {
             // Plant gone - stop eating and pick the next phase based on terrain.
@@ -159,6 +159,11 @@ public class SwimBehavior implements ZombieBehavior {
     }
 
     // --- Terrain helpers ---
+
+    private static PlantInstance plantAtFacingBorder(ZombieInstance zombie, BehaviorContext context) {
+        int eatCol = zombie.plantColumnAtFacingBorder();
+        return eatCol < 0 ? null : context.getPlantAt(zombie.getGridY(), eatCol);
+    }
 
     /**
      * @return true if the zombie's current cell is a water tile (either

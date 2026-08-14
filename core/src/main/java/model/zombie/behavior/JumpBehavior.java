@@ -127,7 +127,10 @@ public class JumpBehavior implements ZombieBehavior {
      * Walks away from the house and eats plants like a regular zombie.
      */
     private void tickReversedWalk(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
+        int eatCol = zombie.plantColumnAtFacingBorder();
+        PlantInstance plantHere = eatCol < 0
+                ? null
+                : context.getPlantAt(zombie.getGridY(), eatCol);
 
         if (plantHere == null || plantHere.getCurrentHP() <= 0) {
             if (currentTarget != null) {
