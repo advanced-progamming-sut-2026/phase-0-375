@@ -1,7 +1,6 @@
 package model.plant.ability;
 
 import model.enums.PlantState;
-import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 
 /**
@@ -10,7 +9,7 @@ import model.plant.instance.PlantInstance;
  */
 public final class TimedPlantAction implements PlantAction {
 
-    /** Fallback only when {@link PlantAbilityContext#plantClipDuration} returns 0. */
+    /** Fallback only when {@link PlantAbilityContext#plantPresentationDuration} returns 0. */
     public static final float DEFAULT_ATTACK_DURATION = 0.6f;
 
     @FunctionalInterface
@@ -38,38 +37,27 @@ public final class TimedPlantAction implements PlantAction {
         this.onStart = onStart;
     }
 
-    /** Presentation-only attack window using the plant's {@code attack} clip length. */
+    /** Presentation-only attack window using the view's attack-clip length. */
     public static TimedPlantAction attackHold(PlantInstance plant, PlantAbilityContext context) {
-        return new TimedPlantAction(PlantState.ATTACKING, attackDurationFor(plant, context));
+        return new TimedPlantAction(PlantState.ATTACKING, presentationDurationFor(
+                plant, context, PlantState.ATTACKING, DEFAULT_ATTACK_DURATION));
     }
 
     /** Attack window that fires {@code onStart} when the action begins. */
     public static TimedPlantAction attack(PlantInstance plant, PlantAbilityContext context, Effect onStart) {
-        return new TimedPlantAction(PlantState.ATTACKING, attackDurationFor(plant, context), onStart);
+        return new TimedPlantAction(PlantState.ATTACKING, presentationDurationFor(
+                plant, context, PlantState.ATTACKING, DEFAULT_ATTACK_DURATION), onStart);
     }
 
     /**
-     * Resolves attack presentation length from the catalog ({@code attack}, then
-     * common aliases). Falls back to {@link #DEFAULT_ATTACK_DURATION} when no
-     * clip data is wired (headless / TUI).
+     * Length of a presentation state from the view mapping. Falls back to
+     * {@code fallback} when no clip data is wired (headless / TUI).
      */
-    public static float attackDurationFor(PlantInstance plant, PlantAbilityContext context) {
-        return clipDurationFor(plant, context, DEFAULT_ATTACK_DURATION,
-            "attack", "special_stage1", "special", "special2", "special3");
-    }
-
-    /**
-     * Generic clip-length helper for any presentation action.
-     *
-     * @param fallback used only when the catalog returns {@code 0}
-     * @param preferredClips clip names tried in order
-     */
-    public static float clipDurationFor(PlantInstance plant, PlantAbilityContext context,
-                                        float fallback, String... preferredClips) {
+    public static float presentationDurationFor(PlantInstance plant, PlantAbilityContext context,
+                                               PlantState presentation, float fallback) {
         float duration = 0f;
-        Plant def = plant != null ? plant.getDefinition() : null;
-        if (context != null && def != null && def.getName() != null && preferredClips != null) {
-            duration = context.plantClipDuration(def.getName(), preferredClips);
+        if (context != null && plant != null && presentation != null) {
+            duration = context.plantPresentationDuration(plant, presentation);
         }
         if (duration <= 0f) {
             duration = Math.max(0f, fallback);

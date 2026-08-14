@@ -145,7 +145,7 @@ public final class PamCatalog {
      * Exact clip duration from {@link PamEntry#clips()}, or {@code 0} if the clip
      * is missing.
      */
-    public float clipDurationSeconds(PamEntry entry, String clipName) {
+    public static float clipDurationSeconds(PamEntry entry, String clipName) {
         String actual = findExactClip(entry, clipName);
         if (actual == null) {
             return 0f;

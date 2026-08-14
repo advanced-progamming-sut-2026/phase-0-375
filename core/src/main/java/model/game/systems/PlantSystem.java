@@ -253,8 +253,8 @@ public class PlantSystem implements Tickable {
         }
 
         @Override
-        public float plantClipDuration(String plantDefinitionName, String... preferredClipNames) {
-            return clipDurations.duration(plantDefinitionName, preferredClipNames);
+        public float plantPresentationDuration(PlantInstance plant, PlantState presentation) {
+            return clipDurations.duration(plant, presentation);
         }
     }
 }

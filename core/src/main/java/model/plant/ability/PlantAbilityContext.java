@@ -1,6 +1,7 @@
 package model.plant.ability;
 
 import model.enums.PlantCategory;
+import model.enums.PlantState;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
@@ -139,13 +140,10 @@ public interface PlantAbilityContext {
     void removeZombie(ZombieInstance zombie);
 
     /**
-     * Duration in seconds of a plant animation clip from the asset catalog,
-     * or {@code 0} if unknown (TUI / tests without PAM data).
-     *
-     * @param plantDefinitionName plant definition name (e.g. {@code "Peashooter"})
-     * @param preferredClipNames  clip names tried in order (e.g. {@code "attack"})
+     * Duration in seconds of the plant's presentation clip for {@code presentation}
+     * (e.g. {@link PlantState#ATTACKING}), or {@code 0} if unknown.
      */
-    default float plantClipDuration(String plantDefinitionName, String... preferredClipNames) {
+    default float plantPresentationDuration(PlantInstance plant, PlantState presentation) {
         return 0f;
     }
 }

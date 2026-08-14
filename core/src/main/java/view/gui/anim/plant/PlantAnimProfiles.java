@@ -1,10 +1,15 @@
 package view.gui.anim.plant;
 
+import view.gui.anim.plant.exclusive.BowlingBulbAnim;
+import view.gui.anim.plant.exclusive.PeapodAnim;
+import view.gui.anim.plant.exclusive.PuffShroomAnim;
+import view.gui.anim.plant.exclusive.SplitPeaAnim;
+
 /**
- * Plant-team registration hub for exclusive plant animation profiles.
+ * Registration hub for exclusive plant animations.
  *
- * <p>Prefer one class per special plant with {@code register(PlantAnimOverrides)},
- * then call it from {@link #registerAll}.
+ * <p>Default clips live in {@link PlantAnimAdapter}. One class per plant that
+ * needs a non-default clip, then {@link #registerAll}.
  */
 public final class PlantAnimProfiles {
     private PlantAnimProfiles() {}
@@ -13,6 +18,10 @@ public final class PlantAnimProfiles {
         if (overrides == null) {
             return;
         }
+        PuffShroomAnim.register(overrides);
+        SplitPeaAnim.register(overrides);
+        PeapodAnim.register(overrides);
+        BowlingBulbAnim.register(overrides);
         // TODO: SunshroomAnim.register(overrides);
         // TODO: PotatoMineAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);

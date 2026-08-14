@@ -12,7 +12,10 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import model.app.App;
+import model.game.core.PvZGameLoop;
 import view.gui.PvzGdxGame;
+import view.gui.assets.PamPlantClipDurations;
 import view.gui.assets.PvzAssets;
 import view.gui.lawn.LawnLayout;
 import view.gui.ui.ToastBanner;
@@ -125,12 +128,22 @@ public abstract class AbstractGameplayScreen implements Screen {
 
     @Override
     public void show() {
+        wirePlantClipDurations();
         InputMultiplexer mux = new InputMultiplexer();
         mux.addProcessor(uiStage);
         if (worldInput != null) {
             mux.addProcessor(worldInput);
         }
         Gdx.input.setInputProcessor(mux);
+    }
+
+    /** Lets timed plant actions use real PAM clip lengths from animations.json. */
+    private void wirePlantClipDurations() {
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop == null || assets == null || assets.pamCatalog == null) {
+            return;
+        }
+        loop.setPlantClipDurations(new PamPlantClipDurations(assets.pamCatalog));
     }
 
     @Override

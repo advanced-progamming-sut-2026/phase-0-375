@@ -10,7 +10,8 @@ import java.util.Map;
 /**
  * Registry for exclusive plant animation resolvers. Owned by the plant team.
  *
- * <p>Register via {@link PlantAnimProfiles}; do not put per-plant lines in shared packages.
+ * <p>Register via {@link PlantAnimProfiles} from {@code view.gui.anim.plant.exclusive}.
+ * Do not put per-plant clip names in the adapter or the model.
  */
 public final class PlantAnimOverrides {
     @FunctionalInterface

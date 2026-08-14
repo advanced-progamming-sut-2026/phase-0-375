@@ -97,7 +97,8 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta);
+        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta,
+                pose.cacheKey() + "#" + plant.getActionEpoch());
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
@@ -110,7 +111,7 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
-        drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], AnimScale.ZOMBIE, delta);
+        drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], AnimScale.ZOMBIE, delta, pose.cacheKey());
     }
 
     private boolean zombieWorldCenter(ZombieInstance zombie, float[] out) {
@@ -134,13 +135,13 @@ public final class LawnEntityRenderer {
     }
 
     private void drawPose(Batch batch, Object entity, AnimPose pose,
-                          float x, float y, float baseScale, float delta) {
+                          float x, float y, float baseScale, float delta, String clockKey) {
         seenThisFrame.add(entity);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
             return;
         }
-        float stateTime = advanceClock(entity, pose.cacheKey(), delta);
+        float stateTime = advanceClock(entity, clockKey, delta);
         float scale = baseScale * pose.scale();
         if (pose.visibility() == null) {
             player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());

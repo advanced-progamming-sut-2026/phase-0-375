@@ -28,39 +28,74 @@ public final class PlantAnimAdapter {
         if (plant == null || plant.getDefinition() == null) {
             return null;
         }
+        return poseForPresentation(plant, plant.getState());
+    }
+
+    /**
+     * Clip length for {@code presentation}, using the same exclusive/default mapping
+     * as {@link #poseFor}.
+     */
+    public float durationFor(PlantInstance plant, PlantState presentation) {
+        if (plant == null || plant.getDefinition() == null || presentation == null || catalog == null) {
+            return 0f;
+        }
+        PamCatalog.PamEntry entry = catalog.forPlant(plant.getDefinition().getName());
+        if (entry == null) {
+            return 0f;
+        }
+        PlantAnimRole role = roleForPresentation(plant, entry, presentation);
+        AnimPose custom = overrides.tryResolve(plant, entry, role);
+        if (custom != null) {
+            return PamCatalog.clipDurationSeconds(entry, custom.clipName());
+        }
+        for (String clip : durationClips(role)) {
+            float seconds = PamCatalog.clipDurationSeconds(entry, clip);
+            if (seconds > 0f) {
+                return seconds;
+            }
+        }
+        return 0f;
+    }
+
+    private AnimPose poseForPresentation(PlantInstance plant, PlantState presentation) {
         PamCatalog.PamEntry entry = catalog.forPlant(plant.getDefinition().getName());
         if (entry == null) {
             return null;
         }
-        PlantAnimRole role = roleFor(plant, entry);
+        PlantAnimRole role = roleForPresentation(plant, entry, presentation);
         AnimPose custom = overrides.tryResolve(plant, entry, role);
-        if (custom != null) {
-            return custom;
+        AnimPose pose = custom;
+        if (pose == null) {
+            String clip = catalog.resolveClip(entry, preferredClips(role));
+            if (clip == null) {
+                return null;
+            }
+            pose = (role.isLooping())
+                ? AnimPose.looping(entry.path(), clip, role)
+                : AnimPose.once(entry.path(), clip, role);
         }
-        String clip = catalog.resolveClip(entry, preferredClips(role));
-        if (clip == null) {
-            return null;
-        }
-        return (role.isLooping())
-            ? AnimPose.looping(entry.path(), clip, role)
-            : AnimPose.once(entry.path(), clip, role);
+        return pose;
     }
 
     /**
-     * Global plant role mapping. Currently idle + plant-food intro/loop/outro.
+     * Global plant role mapping. Idle, attack, and plant-food intro/loop/outro.
      *
-     * <p>TODO: map {@link model.enums.PlantState#ATTACKING} → ATTACK,
-     * {@link model.enums.PlantState#ARMED}/{@code ARMING} → ARMED,
-     * {@link model.enums.PlantState#GROWING} → GROWING,
-     * {@link model.enums.PlantState#DYING} → DIE.
+     * <p>TODO: map {@link PlantState#ARMED}/{@code ARMING} → ARMED,
+     * {@link PlantState#GROWING} → GROWING,
+     * {@link PlantState#DYING} → DIE.
      */
-    private PlantAnimRole roleFor(PlantInstance plant, PamCatalog.PamEntry entry) {
-        if (plant == null || plant.getDefinition() == null) {
+    private PlantAnimRole roleForPresentation(PlantInstance plant, PamCatalog.PamEntry entry,
+                                             PlantState presentation) {
+        if (plant == null || plant.getDefinition() == null || presentation == null) {
             return PlantAnimRole.IDLE;
         }
 
-        if (plant.getState() == PlantState.PLANT_FOOD) {
+        if (presentation == PlantState.PLANT_FOOD) {
             return plantFoodRole(plant, entry);
+        }
+
+        if (presentation == PlantState.ATTACKING) {
+            return PlantAnimRole.ATTACK;
         }
 
         return PlantAnimRole.IDLE;
@@ -73,11 +108,11 @@ public final class PlantAnimAdapter {
      */
     private PlantAnimRole plantFoodRole(PlantInstance plant, PamCatalog.PamEntry entry) {
         float remaining = plant.getPlantFoodDurationRemaining();
-        float offDur = catalog.clipDurationSeconds(entry, "plantfood_off");
+        float offDur = PamCatalog.clipDurationSeconds(entry, "plantfood_off");
         if (offDur > 0f && remaining <= offDur) {
             return PlantAnimRole.PLANT_FOOD_OFF;
         }
-        float onDur = catalog.clipDurationSeconds(entry, "plantfood_on");
+        float onDur = PamCatalog.clipDurationSeconds(entry, "plantfood_on");
         float elapsed = PlantInstance.PLANT_FOOD_DURATION - remaining;
         if (onDur > 0f && elapsed < onDur) {
             return PlantAnimRole.PLANT_FOOD_ON;
@@ -91,11 +126,19 @@ public final class PlantAnimAdapter {
             case PLANT_FOOD_ON -> new String[]{"plantfood_on"};
             case PLANT_FOOD -> new String[]{"plantfood_loop", "plantfood", "plantfood_idle", "idle"};
             case PLANT_FOOD_OFF -> new String[]{"plantfood_off"};
-            // TODO: case ATTACK -> new String[]{"attack", "idle"};
+            case ATTACK -> new String[]{"attack", "idle"};
             // TODO: case GROWING -> new String[]{"idle", "idle_stage1"};
             // TODO: case ARMED -> new String[]{"ready_idle", "idle"};
             // TODO: case DIE -> new String[]{"die", "death"};
             // TODO: case SPECIAL -> ...
+        };
+    }
+
+    /** Clips whose catalog duration may time a presentation. */
+    private static String[] durationClips(PlantAnimRole role) {
+        return switch (role) {
+            case ATTACK -> new String[]{"attack"};
+            default -> preferredClips(role);
         };
     }
 }

@@ -37,7 +37,7 @@ public final class PlantPamAliases {
         m.put("Gold Bloom", "GOLDBLOOM");
         m.put("Hot Potato", "HOTPOTATO");
         m.put("Pierce-mint", "PEPPERMINT");
-        m.put("Rotobaga", "ROTOBAGA");
+        m.put("Rotobaga", "ROTORUTABAGA");
         return Collections.unmodifiableMap(m);
     }
 }
