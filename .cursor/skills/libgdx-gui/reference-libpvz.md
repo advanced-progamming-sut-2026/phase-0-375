@@ -1,7 +1,7 @@
 # libPVZ reference
 
 Source of truth: [https://github.com/pizpizi/libPVZ](https://github.com/pizpizi/libPVZ).
-Current documented release tag: `v0.1.5`. Requires Java 8+ (project uses newer OK),
+Current documented release tag: `v0.1.6`. Requires Java 8+ (project uses newer OK),
 LibGDX **1.12.1+**, Gradle 7+.
 
 Package root: `pvz.libpvz`.
@@ -20,7 +20,7 @@ dependencies {
     implementation "com.badlogicgames.gdx:gdx:$gdxVersion"
     implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
     implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
-    implementation 'com.github.pizpizi:libPVZ:v0.1.3'
+    implementation 'com.github.pizpizi:libPVZ:v0.1.6'
 }
 ```
 
@@ -83,11 +83,19 @@ Looks for `assetsFolder/pam`, else `assetsFolder/IMAGES`.
 | `draw(batch, pam, clip, time, x, y, loop)` | Convenient; string lookup |
 | `draw(batch, clipRef, time, x, y, loop)` | **Preferred in render** |
 | `draw(batch, clipRef, time, x, y, scaleX, scaleY, loop)` | Scaled about `(x, y)`; see `AnimScale` |
-| `draw(..., visibilityMap)` | Armor / status parts (no scaled overload) |
+| `draw(..., visibilityMap)` | Armor / status parts |
+| `draw(batch, clipRef, time, x, y, scaleX, scaleY, loop, visibilityMap)` | Scale + armor together |
 | `drawPart(...)` | Single named part whitelist |
 | `clips(pam)` | List clip names (sync load) |
 | `bounds(pam[, clip])` | Canvas / clip bounds (sync) |
+| `partBounds(clipRef \| pam+clip, time, part)` | Where one part sits on that frame |
+| `partBoundsByFrame(clipRef, part)` | Same, every frame in one pass — bake curves at load |
 | `clipDurationSeconds(pam, clip)` | Timing |
+
+`partBounds` covers the part and its descendants (what `drawPart` renders), in canvas
+units with the origin at the canvas centre and Y down — multiply by your draw scale and
+add the draw position. Null means not loaded yet or the part draws nothing there; a null
+part name is not supported.
 
 One `PamPlayer` draws many entities concurrently (stateless draw path).
 
