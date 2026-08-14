@@ -1,11 +1,14 @@
 package view.gui.lawn;
 
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import model.app.App;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
@@ -21,6 +24,7 @@ import view.gui.assets.PvzAssets;
 
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,10 +35,11 @@ import java.util.Set;
  *
  * <p>TODO: projectiles, plant-food FX, mowers, and grid props.
  * TODO: sort draw order by row (back → front) then Y within a lane.
- * TODO: tint / freeze overlays from model status flags.
+ * TODO: freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
     private static final float NO_PHASE = -1f;
+    private static final float HIT_FLASH_SEC = 0.12f;
 
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
@@ -44,6 +49,7 @@ public final class LawnEntityRenderer {
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
+    private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
 
@@ -86,6 +92,7 @@ public final class LawnEntityRenderer {
         }
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
@@ -100,7 +107,7 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, delta);
+        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
@@ -127,7 +134,7 @@ public final class LawnEntityRenderer {
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
             x += backward ? -holdBack : holdBack;
         }
-        drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, delta);
+        drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
     }
 
     private static ZombieGait gaitFor(ZombieInstance zombie) {
@@ -167,7 +174,7 @@ public final class LawnEntityRenderer {
     }
 
     private void drawPose(Batch batch, Object entity, AnimPose pose,
-                          float x, float y, float baseScale, float phase, float delta) {
+                          float x, float y, float baseScale, float phase, float flash, float delta) {
         seenThisFrame.add(entity);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
@@ -177,11 +184,57 @@ public final class LawnEntityRenderer {
                 ? phase * ref.duration
                 : advanceClock(entity, pose.cacheKey(), delta);
         float scale = baseScale * pose.scale();
+        drawClip(batch, ref, pose, stateTime, x, y, scale);
+        if (flash <= 0f) {
+            return;
+        }
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+        batch.setColor(1f, 1f, 1f, flash);
+        drawClip(batch, ref, pose, stateTime, x, y, scale);
+        batch.setColor(Color.WHITE);
+        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+    }
+
+    private void drawClip(Batch batch, ClipRef ref, AnimPose pose,
+                          float stateTime, float x, float y, float scale) {
         if (pose.visibility() == null) {
             player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());
         } else {
             player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop(), pose.visibility());
         }
+    }
+
+    /** White additive flash while body or armor HP dropped since last frame. */
+    private float tickHitFlash(ZombieInstance zombie, float delta) {
+        int vitality = vitality(zombie);
+        HitFlash flash = hitFlashes.get(zombie);
+        if (flash == null) {
+            flash = new HitFlash();
+            flash.vitality = vitality;
+            hitFlashes.put(zombie, flash);
+        } else {
+            if (vitality < flash.vitality) {
+                flash.remaining = HIT_FLASH_SEC;
+            }
+            flash.vitality = vitality;
+        }
+        if (flash.remaining <= 0f) {
+            return 0f;
+        }
+        float strength = flash.remaining / HIT_FLASH_SEC;
+        flash.remaining -= delta;
+        return strength;
+    }
+
+    private static int vitality(ZombieInstance zombie) {
+        int hp = zombie.getCurrentHP();
+        List<Armor> armors = zombie.getArmors();
+        if (armors != null) {
+            for (Armor armor : armors) {
+                hp += armor.getCurrentHealth();
+            }
+        }
+        return hp;
     }
 
     private float advanceClock(Object entity, String clipKey, float delta) {
@@ -202,5 +255,10 @@ public final class LawnEntityRenderer {
     private static final class AnimClock {
         String clipKey;
         float time;
+    }
+
+    private static final class HitFlash {
+        int vitality;
+        float remaining;
     }
 }
