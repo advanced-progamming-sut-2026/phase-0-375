@@ -1855,7 +1855,7 @@
         "mY": 10
       },
       "Hitpoints": 1100,
-      "RunningSpeedScale": 0.5,
+      "RunningSpeedScale": 1.0,
       "ScaledProps": [
         {
           "Arg1": 1.3,

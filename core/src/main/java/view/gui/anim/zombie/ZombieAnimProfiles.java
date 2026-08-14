@@ -15,6 +15,7 @@ public final class ZombieAnimProfiles {
         }
         GargantuarAnim.register(overrides);
         ImpAnim.register(overrides);
+        AllStarAnim.register(overrides);
         // TODO: NewspaperAnim.register(overrides);
         // TODO: ExplorerAnim.register(overrides);
     }

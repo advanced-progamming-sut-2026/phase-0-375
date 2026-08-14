@@ -59,6 +59,13 @@ public final class LawnEntityRenderer {
     private static final String[] DEATH_PARTS = {
             "zombie_skull", "zombie_jaw",
             "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+    /** All-Star {@code particles} group — default-hidden; {@code drawPart} to drop it. */
+    private static final String ALLSTAR_PARTICLES = "_particles";
+    /** Head / arm groups on the All-Star die body that {@link #ALLSTAR_PARTICLES} stands in for. */
+    private static final String[] ALLSTAR_HEAD_PARTS = {
+            "_particles", "particle_head", "particle_arm",
+            "zombie_skull", "zombie_jaw", "allstar_head_helmet_particle",
+            "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
     /** The Gargantuar sheds its whole head as one group instead of separate bits. */
     private static final String GARGANTUAR_HEAD = "Gargantuar_Head_Particle";
     /** Head pieces on the die body that {@link #GARGANTUAR_HEAD} stands in for. */
@@ -570,9 +577,10 @@ public final class LawnEntityRenderer {
         float hold = headGroup != null && dieRef != null ? dieRef.duration : 0f;
         float dir = snap.backward ? -1f : 1f;
         if (headGroup != null && firstLoadedClip(pam, "particles", null) != null) {
-            // particles is already just the head. drawPart of the group would whitelist
-            // butter (a child with the default-hidden flag) and show it.
-            addLimbPop(pam, "particles", headGroup, snap.x, snap.y, 0f, dir, 0.2f, 0.85f, hold, true);
+            // Gargantuar/Imp: the clip is already just the head; drawPart would whitelist butter.
+            // All-Star: {_particles} is default-hidden, so the clip must be drawn via drawPart.
+            addLimbPop(pam, "particles", headGroup, snap.x, snap.y, 0f, dir, 0.2f, 0.85f, hold,
+                    !isAllStar(pam));
             return;
         }
         for (int i = 0; i < bits.size(); i++) {
@@ -590,6 +598,10 @@ public final class LawnEntityRenderer {
         return pam != null && pam.toUpperCase().contains("IMP");
     }
 
+    private static boolean isAllStar(String pam) {
+        return pam != null && pam.toUpperCase().contains("ALLSTAR");
+    }
+
     /** {@code particles} group used for ground Y; the clip itself is drawn whole. */
     private static String deathHeadGroup(String pam) {
         if (isGargantuar(pam)) {
@@ -597,6 +609,9 @@ public final class LawnEntityRenderer {
         }
         if (isImp(pam)) {
             return IMP_HEAD;
+        }
+        if (isAllStar(pam)) {
+            return ALLSTAR_PARTICLES;
         }
         return null;
     }
@@ -608,6 +623,9 @@ public final class LawnEntityRenderer {
         }
         if (isImp(pam)) {
             return IMP_HEAD_PARTS;
+        }
+        if (isAllStar(pam)) {
+            return ALLSTAR_HEAD_PARTS;
         }
         return null;
     }
