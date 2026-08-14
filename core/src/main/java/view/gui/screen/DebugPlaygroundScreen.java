@@ -17,6 +17,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import controller.GameplayMenuController;
 import controller.result.CommandResult;
 import model.app.App;
+import model.enums.Chapter;
 import model.enums.GameState;
 import model.enums.MenuType;
 import model.game.core.GameModel;
@@ -25,8 +26,10 @@ import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.zombie.ZombieFactory;
 import model.zombie.definition.Zombie;
+import model.zombie.instance.ZombieInstance;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.assets.ZombiePamAliases;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
@@ -60,6 +63,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private Tool tool = Tool.PLANT;
     private String selectedPlant = "Sunflower";
     private String selectedZombie = "ZombieDefault";
+    private Chapter selectedZombieChapter = Chapter.ANCIENT_EGYPT;
     private boolean paused;
     private Texture placeholderAvatar;
     private Texture whitePixel;
@@ -84,9 +88,11 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         if (!plants.isEmpty()) {
             selectedPlant = plants.get(0);
         }
-        List<String> zombies = zombieNames();
+        List<ZombiePick> zombies = zombiePicks();
         if (!zombies.isEmpty()) {
-            selectedZombie = zombies.contains("ZombieDefault") ? "ZombieDefault" : zombies.get(0);
+            ZombiePick first = zombies.get(0);
+            selectedZombie = first.name;
+            selectedZombieChapter = first.chapter;
         }
 
         Pixmap pixmap = new Pixmap(48, 48, Pixmap.Format.RGBA8888);
@@ -192,6 +198,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private void openPicker(boolean plants) {
         pickerPanel.clear();
         pickerPanel.setVisible(true);
+        pickerPanel.center();
         clearHover();
 
         BorderedTable card = new BorderedTable();
@@ -199,58 +206,89 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         card.add(new Label(plants ? "Choose a plant" : "Choose a zombie", skin, "big")).padBottom(12f).row();
 
         Table list = new Table();
-        List<String> names = plants ? plantNames() : zombieNames();
+        list.top().left();
         TextureRegionDrawable avatarDrawable =
                 new TextureRegionDrawable(new TextureRegion(placeholderAvatar));
 
-        for (String name : names) {
-            Table row = new Table();
-            row.add(new Image(avatarDrawable)).size(48f).padRight(12f);
-            row.add(new Label(name, skin, "medium")).expandX().left();
-
-            TextButton pick = new TextButton("Select", skin, "brown");
-            String selectedName = name;
-            pick.addListener(new ChangeListener() {
-                @Override
-                public void changed(ChangeEvent event, Actor actor) {
-                    if (plants) {
-                        selectedPlant = selectedName;
-                        tool = Tool.PLANT;
-                    } else {
-                        selectedZombie = selectedName;
-                        tool = Tool.ZOMBIE;
-                    }
-                    pickerPanel.setVisible(false);
-                    pickerPanel.clear();
+        if (plants) {
+            for (String name : plantNames()) {
+                addPickerRow(list, avatarDrawable, name, () -> {
+                    selectedPlant = name;
+                    tool = Tool.PLANT;
+                    closePicker();
                     refreshStatus();
-                    showToast("Selected " + selectedName, false);
+                    showToast("Selected " + name, false);
+                });
+            }
+        } else {
+            Chapter lastHeader = null;
+            boolean exclusiveHeader = false;
+            for (ZombiePick pick : zombiePicks()) {
+                if (pick.chapter != null && pick.chapter != lastHeader) {
+                    lastHeader = pick.chapter;
+                    list.add(new Label(chapterTitle(pick.chapter), skin, "big"))
+                            .left().padTop(10f).padBottom(6f).row();
+                } else if (pick.chapter == null && !exclusiveHeader) {
+                    exclusiveHeader = true;
+                    list.add(new Label("Exclusive", skin, "big"))
+                            .left().padTop(10f).padBottom(6f).row();
                 }
-            });
-            row.add(pick).width(120f).height(40f);
-            list.add(row).growX().padBottom(6f).row();
+                ZombiePick chosen = pick;
+                addPickerRow(list, avatarDrawable, pick.label, () -> {
+                    selectedZombie = chosen.name;
+                    selectedZombieChapter = chosen.chapter;
+                    tool = Tool.ZOMBIE;
+                    closePicker();
+                    refreshStatus();
+                    showToast("Selected " + chosen.label, false);
+                });
+            }
         }
 
         ScrollPane scroll = new ScrollPane(list, skin);
         scroll.setFadeScrollBars(false);
-        card.add(scroll).width(560f).height(520f).row();
+        scroll.setScrollingDisabled(true, false);
+        scroll.setFlickScroll(true);
+        scroll.setScrollbarsVisible(true);
+        scroll.setForceScroll(false, true);
+        card.add(scroll).width(620f).height(480f).growX().row();
 
         TextButton close = new TextButton("Close", skin, "brown");
         close.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                pickerPanel.setVisible(false);
-                pickerPanel.clear();
+                closePicker();
                 refreshStatus();
             }
         });
         card.add(close).width(160f).height(48f).padTop(12f);
 
-        Table center = new Table();
-        center.setFillParent(true);
-        center.add(card);
-        pickerPanel.addActor(center);
+        pickerPanel.add(card);
         pickerPanel.toFront();
         toast.toFront();
+        uiStage.setScrollFocus(scroll);
+        uiStage.setKeyboardFocus(scroll);
+    }
+
+    private void closePicker() {
+        uiStage.setScrollFocus(null);
+        pickerPanel.setVisible(false);
+        pickerPanel.clear();
+    }
+
+    private void addPickerRow(Table list, TextureRegionDrawable avatar, String label, Runnable onSelect) {
+        Table row = new Table();
+        row.add(new Image(avatar)).size(48f).padRight(12f);
+        row.add(new Label(label, skin, "medium")).expandX().left();
+        TextButton pick = new TextButton("Select", skin, "brown");
+        pick.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                onSelect.run();
+            }
+        });
+        row.add(pick).width(120f).height(40f);
+        list.add(row).growX().padBottom(6f).row();
     }
 
     private void refreshStatus() {
@@ -260,7 +298,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         statusLabel.setText(
                 "TOOL: " + tool.name()
                         + " | Plant: " + selectedPlant
-                        + " | Zombie: " + selectedZombie
+                        + " | Zombie: " + zombieStatusLabel()
                         + " | Sun: " + sun
                         + " | PF: " + pf
                         + (paused ? " | PAUSED" : "")
@@ -282,19 +320,72 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         return names;
     }
 
-    private static List<String> zombieNames() {
-        List<String> names = new ArrayList<>();
+    private static List<ZombiePick> zombiePicks() {
+        List<String> biome = new ArrayList<>();
+        List<String> exclusive = new ArrayList<>();
         try {
             for (Zombie zombie : ZombieFactory.getAllDefinitions()) {
-                if (zombie != null && zombie.getName() != null && !zombie.getName().isBlank()) {
-                    names.add(zombie.getName());
+                if (zombie == null || zombie.getName() == null || zombie.getName().isBlank()) {
+                    continue;
+                }
+                if (ZombiePamAliases.usesBiomeBasicBody(zombie.getName())) {
+                    biome.add(zombie.getName());
+                } else {
+                    exclusive.add(zombie.getName());
                 }
             }
         } catch (IllegalStateException ignored) {
             // factory not ready
         }
-        names.sort(Comparator.naturalOrder());
-        return names;
+        biome.sort(Comparator.naturalOrder());
+        exclusive.sort(Comparator.naturalOrder());
+        List<ZombiePick> picks = new ArrayList<>();
+        for (Chapter chapter : Chapter.values()) {
+            for (String name : biome) {
+                picks.add(new ZombiePick(name, chapter, name + " (" + shortChapter(chapter) + ")"));
+            }
+        }
+        for (String name : exclusive) {
+            picks.add(new ZombiePick(name, null, name));
+        }
+        return picks;
+    }
+
+    private String zombieStatusLabel() {
+        if (selectedZombieChapter == null) {
+            return selectedZombie;
+        }
+        return selectedZombie + " (" + shortChapter(selectedZombieChapter) + ")";
+    }
+
+    private static String shortChapter(Chapter chapter) {
+        return switch (chapter) {
+            case ANCIENT_EGYPT -> "Egypt";
+            case FROSTBITE_CAVES -> "Frostbite";
+            case BIG_WAVE_BEACH -> "Beach";
+            case DARK_AGES -> "Dark Ages";
+        };
+    }
+
+    private static String chapterTitle(Chapter chapter) {
+        return switch (chapter) {
+            case ANCIENT_EGYPT -> "Ancient Egypt";
+            case FROSTBITE_CAVES -> "Frostbite Caves";
+            case BIG_WAVE_BEACH -> "Big Wave Beach";
+            case DARK_AGES -> "Dark Ages";
+        };
+    }
+
+    private static final class ZombiePick {
+        final String name;
+        final Chapter chapter;
+        final String label;
+
+        ZombiePick(String name, Chapter chapter, String label) {
+            this.name = name;
+            this.chapter = chapter;
+            this.label = label;
+        }
     }
 
     private void onCellHover(int col, int row) {
@@ -315,13 +406,25 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         if (pickerPanel.isVisible()) {
             return false;
         }
-        CommandResult<Void> result = switch (tool) {
-            case PLANT -> gameplay.plant(selectedPlant, col, row);
-            case ZOMBIE -> gameplay.cheatSpawnZombie(selectedZombie, col, row);
-            case SHOVEL -> gameplay.pluck(col, row);
-            case FEED -> gameplay.feed(col, row);
-            case COLLECT_SUN -> gameplay.collectSun(col, row);
-        };
+        CommandResult<Void> result;
+        if (tool == Tool.ZOMBIE) {
+            result = gameplay.cheatSpawnZombie(selectedZombie, col, row);
+            if (result.isSuccess() && selectedZombieChapter != null) {
+                GameModel model = App.getInstance().getCurrentGameModel();
+                List<ZombieInstance> zombies = model == null ? null : model.getZombies();
+                if (zombies != null && !zombies.isEmpty()) {
+                    entityRenderer.setArtChapter(zombies.get(zombies.size() - 1), selectedZombieChapter);
+                }
+            }
+        } else {
+            result = switch (tool) {
+                case PLANT -> gameplay.plant(selectedPlant, col, row);
+                case SHOVEL -> gameplay.pluck(col, row);
+                case FEED -> gameplay.feed(col, row);
+                case COLLECT_SUN -> gameplay.collectSun(col, row);
+                case ZOMBIE -> gameplay.cheatSpawnZombie(selectedZombie, col, row);
+            };
+        }
         showToast(result.getMessage(), !result.isSuccess());
         refreshStatus();
         return true;
