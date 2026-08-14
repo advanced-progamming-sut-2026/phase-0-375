@@ -1,0 +1,47 @@
+package view.gui.assets;
+
+import model.enums.ArmorType;
+import model.enums.Chapter;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
+class ZombiePamAliasesTest {
+
+    @Test
+    void defaultAndArmorFollowChapter() {
+        assertEquals("ZOMBIE_EGYPT_BASIC",
+                ZombiePamAliases.pamName("ZombieDefault", Chapter.ANCIENT_EGYPT));
+        assertEquals("ZOMBIE_ICEAGE_BASIC",
+                ZombiePamAliases.pamName("ZombieArmor1", Chapter.FROSTBITE_CAVES));
+        assertEquals("ZOMBIE_BEACH_BASIC",
+                ZombiePamAliases.pamName("ZombieArmor2", Chapter.BIG_WAVE_BEACH));
+        assertEquals("ZOMBIE_DARK_BASIC",
+                ZombiePamAliases.pamName("ZombieArmor4", Chapter.DARK_AGES));
+    }
+
+    @Test
+    void exclusiveZombiesStayOnTheirPam() {
+        assertEquals("ZOMBIE_DARK_BASIC",
+                ZombiePamAliases.pamName("ZombieDarkArmor3", Chapter.ANCIENT_EGYPT));
+        assertEquals("ZOMBIE_EGYPT_RA",
+                ZombiePamAliases.pamName("ZombieRa", Chapter.DARK_AGES));
+        assertNull(ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_RA", "ZombieRa"));
+        assertEquals("_zombie_egypt_armor1_states",
+                ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_BASIC", "ZombieArmor1"));
+        assertEquals("_zombie_beach_armor2_states",
+                ZombiePamAliases.armorStatesPart("ZOMBIE_BEACH_BASIC", "ZombieArmor2"));
+        assertEquals("_zombie_dark_armor4_states",
+                ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_BASIC", "ZombieArmor4"));
+        assertEquals("zombie_armor_brick_norm",
+                ZombiePamAliases.armorStatesPart("ZOMBIE_ICEAGE_BASIC", "ZombieArmor4"));
+        assertEquals("zombie_armor_brick_norm",
+                ZombiePamAliases.armorStatesPart("ZOMBIE_DARK_BASIC", "ZombieArmor4"));
+        assertNull(ZombiePamAliases.armorStatesPart("ZOMBIE_DARK_BASIC", "ZombieDarkArmor3"));
+        assertEquals("_zombie_armor_crown_states",
+                ZombiePamAliases.armorGroupPart(ArmorType.Crown));
+        assertEquals("zombie_shoulder_armor",
+                ZombiePamAliases.armorGroupPart(ArmorType.ShoulderArmor));
+    }
+}

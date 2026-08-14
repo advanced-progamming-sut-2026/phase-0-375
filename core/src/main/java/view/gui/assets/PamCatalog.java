@@ -3,6 +3,7 @@ package view.gui.assets;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import model.enums.Chapter;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -22,12 +23,10 @@ public final class PamCatalog {
 
     private final Map<String, PamEntry> byNormName;
     private final Map<String, String> plantOverrides;
-    private final Map<String, String> zombieOverrides;
 
     private PamCatalog(Map<String, PamEntry> byNormName) {
         this.byNormName = byNormName;
         this.plantOverrides = PlantPamAliases.all();
-        this.zombieOverrides = ZombiePamAliases.all();
     }
 
     public static PamCatalog load(FileHandle assetsRoot) {
@@ -82,10 +81,14 @@ public final class PamCatalog {
     }
 
     public PamEntry forZombie(String definitionName) {
+        return forZombie(definitionName, null);
+    }
+
+    public PamEntry forZombie(String definitionName, Chapter chapter) {
         if (definitionName == null) {
             return null;
         }
-        String override = zombieOverrides.get(definitionName);
+        String override = ZombiePamAliases.pamName(definitionName, chapter);
         if (override != null) {
             PamEntry e = byNormName.get(normalize(override));
             if (e != null) {

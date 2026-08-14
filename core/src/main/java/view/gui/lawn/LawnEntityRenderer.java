@@ -3,7 +3,10 @@ package view.gui.lawn;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.math.Matrix4;
+import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
+import model.enums.Chapter;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
@@ -16,15 +19,19 @@ import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
+import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
 import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -40,6 +47,17 @@ import java.util.Set;
 public final class LawnEntityRenderer {
     private static final float NO_PHASE = -1f;
     private static final float HIT_FLASH_SEC = 0.12f;
+    private static final float ARMOR_POP_FADE = 0.55f;
+    private static final float ARMOR_POP_HOP = 1.4f;
+    private static final float ARMOR_POP_GRAVITY = -9f;
+    private static final float ARMOR_POP_BACK_TILES = 0.2f;
+    private static final float POP_BOUNCE = 0.4f;
+    private static final String[] DEATH_PARTS_EGYPT = {
+            "zombie_egypt_skull", "zombie_egypt_jaw",
+            "zombie_egypt_arm_outer_lower", "zombie_egypt_hand_outer_01"};
+    private static final String[] DEATH_PARTS = {
+            "zombie_skull", "zombie_jaw",
+            "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
 
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
@@ -50,8 +68,14 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
     private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
+    private final IdentityHashMap<ZombieInstance, Chapter> artChapters = new IdentityHashMap<>();
+    private final List<ArmorPop> armorPops = new ArrayList<>();
+    private final List<DeathFx> deathFx = new ArrayList<>();
+    private final IdentityHashMap<ZombieInstance, LiveSnap> lastLive = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
+    private final Matrix4 batchTransform = new Matrix4();
+    private final Matrix4 popTransform = new Matrix4();
 
     private final DebugEntityOverlay entityOverlay;
 
@@ -73,6 +97,18 @@ public final class LawnEntityRenderer {
         this.entityOverlay = entityOverlay;
     }
 
+    /** Debug sandbox: biome basics use this chapter's PAM instead of the lawn chapter. */
+    public void setArtChapter(ZombieInstance zombie, Chapter chapter) {
+        if (zombie == null) {
+            return;
+        }
+        if (chapter == null) {
+            artChapters.remove(zombie);
+        } else {
+            artChapters.put(zombie, chapter);
+        }
+    }
+
     public LawnEntityRenderer(PamCatalog catalog, PvzAssets assets, LawnLayout layout,
                               DebugEntityOverlay entityOverlay) {
         this(assets, layout, new PlantAnimAdapter(catalog), new ZombieAnimAdapter(catalog), entityOverlay);
@@ -83,16 +119,27 @@ public final class LawnEntityRenderer {
             return;
         }
         seenThisFrame.clear();
+        Set<ZombieInstance> alive = new HashSet<>(model.getZombies());
+        for (ZombieInstance zombie : lastLive.keySet()) {
+            if (!alive.contains(zombie)) {
+                spawnDeath(lastLive.get(zombie));
+            }
+        }
+        lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
 
         for (PlantInstance plant : model.getAllPlants()) {
             drawPlant(batch, plant, delta);
         }
         for (ZombieInstance zombie : model.getZombies()) {
-            drawZombie(batch, zombie, delta);
+            Chapter skin = artChapters.getOrDefault(zombie, model.getChapter());
+            drawZombie(batch, zombie, skin, delta);
         }
+        drawDeathFx(batch, delta);
+        drawArmorPops(batch, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        artChapters.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
@@ -110,8 +157,8 @@ public final class LawnEntityRenderer {
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
     }
 
-    private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
-        AnimPose pose = zombieAdapter.poseFor(zombie);
+    private void drawZombie(Batch batch, ZombieInstance zombie, Chapter chapter, float delta) {
+        AnimPose pose = zombieAdapter.poseFor(zombie, chapter);
         if (pose == null) {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
@@ -134,7 +181,9 @@ public final class LawnEntityRenderer {
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
             x += backward ? -holdBack : holdBack;
         }
-        drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
+        float time = drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
+        popBrokenArmor(zombie, pose, x, xyTmp[1]);
+        lastLive.put(zombie, new LiveSnap(pose, x, xyTmp[1], zombie.isMovingBackward(), time));
     }
 
     private static ZombieGait gaitFor(ZombieInstance zombie) {
@@ -173,26 +222,26 @@ public final class LawnEntityRenderer {
         return true;
     }
 
-    private void drawPose(Batch batch, Object entity, AnimPose pose,
+    private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta) {
         seenThisFrame.add(entity);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
-            return;
+            return 0f;
         }
         float stateTime = phase >= 0f
                 ? phase * ref.duration
                 : advanceClock(entity, pose.cacheKey(), delta);
         float scale = baseScale * pose.scale();
         drawClip(batch, ref, pose, stateTime, x, y, scale);
-        if (flash <= 0f) {
-            return;
+        if (flash > 0f) {
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+            batch.setColor(1f, 1f, 1f, flash);
+            drawClip(batch, ref, pose, stateTime, x, y, scale);
+            batch.setColor(Color.WHITE);
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
         }
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
-        batch.setColor(1f, 1f, 1f, flash);
-        drawClip(batch, ref, pose, stateTime, x, y, scale);
-        batch.setColor(Color.WHITE);
-        batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        return stateTime;
     }
 
     private void drawClip(Batch batch, ClipRef ref, AnimPose pose,
@@ -257,8 +306,234 @@ public final class LawnEntityRenderer {
         float time;
     }
 
+    /** Helm/bucket/brick/crown/shoulder: last damage sprite hops off when the piece leaves. */
+    private void popBrokenArmor(ZombieInstance zombie, AnimPose pose, float x, float y) {
+        HitFlash flash = hitFlashes.get(zombie);
+        if (flash == null) {
+            flash = new HitFlash();
+            flash.vitality = vitality(zombie);
+            hitFlashes.put(zombie, flash);
+        }
+        List<Armor> living = new ArrayList<>();
+        List<Armor> armors = zombie.getArmors();
+        if (armors != null) {
+            for (Armor armor : armors) {
+                if (armor != null && !armor.isDestroyed() && armor.popLayer() != null) {
+                    living.add(armor);
+                }
+            }
+        }
+        if (flash.prevDroppables != null) {
+            for (Armor armor : flash.prevDroppables) {
+                if (living.contains(armor)) {
+                    continue;
+                }
+                String part = armor.popLayer();
+                if (part == null) {
+                    continue;
+                }
+                float dir = zombie.isMovingBackward() ? -1f : 1f;
+                float hopTime = 2f * ARMOR_POP_HOP / -ARMOR_POP_GRAVITY;
+                armorPops.add(new ArmorPop(
+                        pose.pamPath(), pose.clipName(), part,
+                        x, y, y - layout.cellHeight() * 0.5f,
+                        dir * ARMOR_POP_BACK_TILES * layout.cellWidth() / hopTime,
+                        ARMOR_POP_HOP * layout.cellHeight(),
+                        ARMOR_POP_GRAVITY * layout.cellHeight()));
+            }
+        }
+        flash.prevDroppables = living;
+    }
+
+    private void drawArmorPops(Batch batch, float delta) {
+        for (int i = armorPops.size() - 1; i >= 0; i--) {
+            ArmorPop pop = armorPops.get(i);
+            if (!pop.grounded) {
+                pop.vy += pop.gravity * delta;
+                pop.x += pop.vx * delta;
+                pop.y += pop.vy * delta;
+                if (pop.y <= pop.groundY) {
+                    pop.y = pop.groundY;
+                    if (pop.bounces < 2 && -pop.vy > layout.cellHeight() * 0.25f) {
+                        pop.vy = -pop.vy * POP_BOUNCE;
+                        pop.vx *= 0.55f;
+                        pop.bounces++;
+                    } else {
+                        pop.vx = 0f;
+                        pop.vy = 0f;
+                        pop.grounded = true;
+                    }
+                }
+            } else {
+                pop.fade += delta;
+                if (pop.fade >= ARMOR_POP_FADE) {
+                    armorPops.remove(i);
+                    continue;
+                }
+            }
+            float alpha = pop.grounded ? 1f - pop.fade / ARMOR_POP_FADE : 1f;
+            batch.setColor(1f, 1f, 1f, alpha);
+            float s = AnimScale.ZOMBIE;
+            batchTransform.set(batch.getTransformMatrix());
+            popTransform.set(batchTransform)
+                    .translate(pop.x, pop.y, 0f)
+                    .scale(s, s, 1f)
+                    .translate(-pop.x, -pop.y, 0f);
+            batch.setTransformMatrix(popTransform);
+            player.drawPart(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, pop.part);
+            batch.setTransformMatrix(batchTransform);
+            batch.setColor(Color.WHITE);
+        }
+    }
+
     private static final class HitFlash {
         int vitality;
         float remaining;
+        List<Armor> prevDroppables;
+    }
+
+    private static final class ArmorPop {
+        final String pamPath;
+        final String clipName;
+        final String part;
+        final float groundY;
+        final float gravity;
+        float x;
+        float y;
+        float vx;
+        float vy;
+        float fade;
+        boolean grounded;
+        int bounces;
+
+        ArmorPop(String pamPath, String clipName, String part,
+                 float x, float y, float groundY, float vx, float vy, float gravity) {
+            this.pamPath = pamPath;
+            this.clipName = clipName;
+            this.part = part;
+            this.x = x;
+            this.y = y;
+            this.groundY = groundY;
+            this.vx = vx;
+            this.vy = vy;
+            this.gravity = gravity;
+        }
+    }
+
+    private static final class LiveSnap {
+        final AnimPose pose;
+        final float x;
+        final float y;
+        final boolean backward;
+        final float time;
+
+        LiveSnap(AnimPose pose, float x, float y, boolean backward, float time) {
+            this.pose = pose;
+            this.x = x;
+            this.y = y;
+            this.backward = backward;
+            this.time = time;
+        }
+    }
+
+    private static final class DeathFx {
+        final AnimPose pose;
+        final float x;
+        final float y;
+        float time;
+
+        DeathFx(AnimPose pose, float x, float y) {
+            this.pose = pose;
+            this.x = x;
+            this.y = y;
+        }
+    }
+
+    private void spawnDeath(LiveSnap snap) {
+        if (snap == null || snap.pose == null) {
+            return;
+        }
+        String pam = snap.pose.pamPath();
+        String dieClip = firstLoadedClip(pam, "die", snap.pose.clipName());
+        List<String> bits = particleParts(pam);
+        Map<String, Boolean> vis = new HashMap<>();
+        if (snap.pose.visibility() != null) {
+            vis.putAll(snap.pose.visibility());
+        }
+        for (String part : bits) {
+            vis.put(part, Boolean.FALSE);
+        }
+        deathFx.add(new DeathFx(
+                AnimPose.once(pam, dieClip, ZombieAnimRole.DIE, vis.isEmpty() ? null : vis),
+                snap.x, snap.y));
+
+        float dir = snap.backward ? -1f : 1f;
+        for (int i = 0; i < bits.size(); i++) {
+            float back = 0.1f + i * 0.1f;
+            float hop = 0.85f + (i % 2) * 0.3f;
+            addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop);
+        }
+    }
+
+    private String firstLoadedClip(String pam, String preferred, String fallback) {
+        if (preferred == null) {
+            return fallback;
+        }
+        if (clips.getOrLoad(pam, preferred) != null) {
+            return preferred;
+        }
+        player.getParts(pam);
+        return player.getClip(pam, preferred) != null ? preferred : fallback;
+    }
+
+    /** Skull / jaw / outer arm on {@code particles}. Egypt uses biome-prefixed names. */
+    private List<String> particleParts(String pam) {
+        List<String> bits = new ArrayList<>();
+        if (firstLoadedClip(pam, "particles", null) == null) {
+            return bits;
+        }
+        String[] names = pam != null && pam.toUpperCase().contains("EGYPT")
+                ? DEATH_PARTS_EGYPT : DEATH_PARTS;
+        for (String part : names) {
+            if (player.partBounds(pam, "particles", 0f, part) != null) {
+                bits.add(part);
+            }
+        }
+        return bits;
+    }
+
+    private void addLimbPop(String pam, String clip, String part,
+                            float originX, float originY, float time,
+                            float dir, float backTiles, float hopTiles) {
+        float s = AnimScale.ZOMBIE;
+        Rectangle bounds = player.partBounds(pam, clip, time, part);
+        float groundY = originY - layout.cellHeight() * 0.5f;
+        if (bounds != null) {
+            groundY = originY - layout.cellHeight() * 0.5f + (bounds.y + bounds.height) * s;
+        }
+        float hopTime = 2f * hopTiles / -ARMOR_POP_GRAVITY;
+        armorPops.add(new ArmorPop(
+                pam, clip, part,
+                originX, originY, groundY,
+                dir * backTiles * layout.cellWidth() / hopTime,
+                hopTiles * layout.cellHeight(),
+                ARMOR_POP_GRAVITY * layout.cellHeight()));
+    }
+
+    private void drawDeathFx(Batch batch, float delta) {
+        for (int i = deathFx.size() - 1; i >= 0; i--) {
+            DeathFx fx = deathFx.get(i);
+            ClipRef ref = clips.getOrLoad(fx.pose.pamPath(), fx.pose.clipName());
+            if (ref == null) {
+                continue;
+            }
+            if (fx.time >= ref.duration) {
+                deathFx.remove(i);
+                continue;
+            }
+            float scale = AnimScale.ZOMBIE * fx.pose.scale();
+            drawClip(batch, ref, fx.pose, fx.time, fx.x, fx.y, scale);
+            fx.time += delta;
+        }
     }
 }

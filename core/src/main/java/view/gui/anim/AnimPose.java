@@ -47,6 +47,12 @@ public final class AnimPose {
         return new AnimPose(pamPath, clipName, role, true, visibility);
     }
 
+    /** One-shot clip (death); does not loop. */
+    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
+                                Map<String, Boolean> visibility) {
+        return new AnimPose(pamPath, clipName, role, false, visibility);
+    }
+
     /** Looping pose with the given PAM parts forced visible. */
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role,
                                    String... visibleParts) {
