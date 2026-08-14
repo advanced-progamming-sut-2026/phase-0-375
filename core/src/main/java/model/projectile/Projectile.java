@@ -35,6 +35,13 @@ public abstract class Projectile {
     /** Horizontal travel direction: +1 = rightward (toward zombies), -1 = leftward (toward plants). */
     protected int direction;
 
+    /**
+     * True after {@link #reflect()} sends this projectile back toward plants
+     * (Juggler, etc.). Distinct from a plant that simply fires leftward
+     * (Split Pea, Rotobaga, Starfruit).
+     */
+    protected boolean reflected;
+
     /** World-units per second. */
     protected float velocity;
     protected float yVelocity;
@@ -76,6 +83,7 @@ public abstract class Projectile {
         this.pierce = false;
         this.element = element == null ? Element.NONE : element;
         this.direction = direction >= 0 ? +1 : -1;
+        this.reflected = false;
     }
 
     // --- Reflection ---
@@ -87,6 +95,7 @@ public abstract class Projectile {
      */
     public void reflect() {
         this.direction = -this.direction;
+        this.reflected = this.direction < 0;
     }
 
     // --- Getters / setters ---
@@ -200,9 +209,9 @@ public abstract class Projectile {
         return element == Element.BUTTER;
     }
 
-    /** @return true if this projectile is traveling leftward. */
+    /** @return true if a juggler (or similar) deflected this projectile back toward plants. */
     public boolean isReflected() {
-        return direction < 0;
+        return reflected;
     }
 
     // --- Homing ---

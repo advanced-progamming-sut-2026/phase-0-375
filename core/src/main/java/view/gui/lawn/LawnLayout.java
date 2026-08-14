@@ -115,9 +115,18 @@ public final class LawnLayout {
      * {@code progressX} is model continuous X (column units).
      */
     public float[] centerOf(int row, float progressX) {
+        return centerOf((float) row, progressX);
+    }
+
+    /**
+     * World center for a continuous grid position (projectiles, bouncing bulbs).
+     * {@code row} and {@code progressX} are model units; row 0 is the top lane.
+     */
+    public float[] centerOf(float row, float progressX) {
+        float top = LAWN_ORIGIN_Y + GRID_HEIGHT;
         return new float[]{
                 LAWN_ORIGIN_X + progressX * cellWidth + cellWidth * 0.5f,
-                centerY(row)
+                top - row * cellHeight - cellHeight * 0.5f
         };
     }
 

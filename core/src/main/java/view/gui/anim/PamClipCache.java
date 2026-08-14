@@ -4,19 +4,22 @@ import pvz.libpvz.pam.ClipRef;
 import pvz.libpvz.pam.PamPlayer;
 
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Caches {@link ClipRef} handles and kicks async PAM loads when a clip is not ready yet.
  *
  * <p>One cache per shared {@link PamPlayer}. Safe to call from the render thread only.
+ * After a PAM is baked, missing clip names fall back to common effect clips / the first
+ * available clip instead of throwing.
  */
 public final class PamClipCache {
+    private static final String[] CLIP_FALLBACKS = {"animation", "idle", "loop", "projectile"};
+
     private final PamPlayer player;
     private final Map<String, ClipRef> clips = new HashMap<>();
-    private final Set<String> loading = new HashSet<>();
 
     public PamClipCache(PamPlayer player) {
         this.player = player;
@@ -34,16 +37,58 @@ public final class PamClipCache {
         if (cached != null) {
             return cached;
         }
-        ClipRef ref = player.getClip(pamPath, clipName);
-        if (ref != null) {
-            clips.put(key, ref);
-            loading.remove(pamPath);
-            return ref;
+
+        ClipRef baked = player.getClip(pamPath, "");
+        if (baked == null) {
+            return null;
         }
-        if (loading.add(pamPath)) {
-            player.loadAsync(pamPath, () -> loading.remove(pamPath));
+
+        ClipRef resolved = resolveLoadedClip(pamPath, clipName, baked);
+        if (resolved != null) {
+            clips.put(key, resolved);
         }
-        return null;
+        return resolved;
+    }
+
+    private ClipRef resolveLoadedClip(String pamPath, String clipName, ClipRef whole) {
+        List<String> available = player.clips(pamPath);
+        if (available == null || available.isEmpty()) {
+            return whole;
+        }
+        String actual = findClip(available, clipName);
+        if (actual == null) {
+            for (String pref : CLIP_FALLBACKS) {
+                actual = findClip(available, pref);
+                if (actual != null) {
+                    break;
+                }
+            }
+        }
+        if (actual == null) {
+            actual = available.getFirst();
+        }
+        return player.getClip(pamPath, actual);
+    }
+
+    private static String findClip(List<String> available, String want) {
+        if (want == null || want.isBlank()) {
+            return null;
+        }
+        String needle = want.toLowerCase(Locale.ROOT);
+        String prefixHit = null;
+        for (String name : available) {
+            if (name == null) {
+                continue;
+            }
+            String lower = name.toLowerCase(Locale.ROOT);
+            if (lower.equals(needle)) {
+                return name;
+            }
+            if (prefixHit == null && lower.startsWith(needle)) {
+                prefixHit = name;
+            }
+        }
+        return prefixHit;
     }
 
     /** Optional sync preload for a known PAM + clips (loading screens / level start). */
@@ -56,7 +101,7 @@ public final class PamClipCache {
             return;
         }
         for (String clip : clipNames) {
-            ClipRef ref = player.getClip(pamPath, clip);
+            ClipRef ref = getOrLoad(pamPath, clip);
             if (ref != null) {
                 clips.put(pamPath + "#" + clip, ref);
             }

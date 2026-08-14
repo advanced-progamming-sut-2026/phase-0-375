@@ -21,4 +21,6 @@ public final class AnimScale {
     public static final float PLANT = LAWN;
 
     public static final float ZOMBIE = LAWN;
+
+    public static final float PROJECTILE = LAWN;
 }

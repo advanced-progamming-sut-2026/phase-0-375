@@ -160,7 +160,7 @@ public class ShooterAbility implements PlantAbility {
     private FloatPoint pelletOrigin(PlantInstance plant) {
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
-        return new FloatPoint(col + PELLET_SPAWN_OFFSET, row);
+        return new FloatPoint(col, row);
     }
 
     private Projectile.Element inferElement(Plant def) {
@@ -288,7 +288,7 @@ public class ShooterAbility implements PlantAbility {
     private void shootDefault(PlantAbilityContext context, PlantInstance plant, int pelletCount,
                               FloatPoint origin, Projectile.Element element) {
         for (int i = 0; i < pelletCount; i++) {
-            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.1f, origin.getY());
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.5f, origin.getY());
             shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
                     plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
         }
@@ -297,8 +297,8 @@ public class ShooterAbility implements PlantAbility {
     private void shootThreepeater(PlantAbilityContext context, PlantInstance plant, int pelletCount,
                                   FloatPoint origin, Projectile.Element element) {
         for (int i = 0; i < pelletCount; i++) {
-            float offset = Math.powExact(-1, i) * 0.1f * ((i + 1) / 2);
-            FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
+            float offset = Math.powExact(-1, i) * 0.5f * ((i + 1) / 2);
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + offset, origin.getY());
             shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
                     plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
         }
@@ -307,10 +307,12 @@ public class ShooterAbility implements PlantAbility {
     private void shootSplitPea(PlantAbilityContext context, PlantInstance plant, int pelletCount,
                                FloatPoint origin, Projectile.Element element) {
         for (int i = 0; i < pelletCount; i++) {
-            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + i * 0.1f, origin.getY());
+            int sign = Math.powExact(-1, i);
+            FloatPoint pelletOrigin =
+                new FloatPoint(origin.getX() + sign * ((i + 1) / 2) * 0.5f, origin.getY());
             shootOne(context, plant.getDefinition().getDamage(), pelletOrigin,
                     plant.getPosition().getY(), PELLET_VELOCITY, element,
-                    (i % 3 == 0) ? +1 : -1, 0);
+                    (i % 3 == 2) ? +1 : -1, 0);
         }
     }
 

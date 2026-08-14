@@ -37,6 +37,9 @@ public class ProjectileSystem implements Tickable {
     private static final float DIAGONAL = (float) (1.0 / Math.sqrt(2.0));
     private static final int BULB_EXPLOSION_RADIUS = 1;
 
+    /** How far past the plantable grid a projectile may travel before despawn. */
+    private static final float OFF_GRID_MARGIN = 1.5f;
+
     /**
      * Tracks the last ice-cell column each projectile has already damaged,
      * so a fire pea melting an ice block deals its damage exactly once per
@@ -80,8 +83,7 @@ public class ProjectileSystem implements Tickable {
         damageIceIfPresent(projectile);
         thawFrozenPlantIfPresent(projectile);
 
-        float x = projectile.getX();
-        if (x < 0f || x >= gameModel.getColumnCount()) {
+        if (leftPlayableArea(projectile)) {
             discard(projectile, false);
             return false;
         }
@@ -136,6 +138,18 @@ public class ProjectileSystem implements Tickable {
         if (dispatchHitEvent && eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
         }
+    }
+
+    /** True once the shot has flown well past the lawn (not merely off a plantable cell). */
+    private boolean leftPlayableArea(Projectile projectile) {
+        float x = projectile.getX();
+        float y = projectile.getY();
+        int cols = gameModel.getColumnCount();
+        int rows = gameModel.getRowCount();
+        return x < -OFF_GRID_MARGIN
+                || x >= cols + OFF_GRID_MARGIN
+                || y < -OFF_GRID_MARGIN
+                || y > (rows - 1) + OFF_GRID_MARGIN;
     }
 
     // --- Movement ---

@@ -11,6 +11,7 @@ import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
 
 /**
@@ -24,6 +25,7 @@ import model.zombie.instance.ZombieInstance;
 public final class DebugEntityOverlay implements Disposable {
     private static final Color PLANT_COLOR = new Color(0.25f, 0.78f, 0.30f, 0.85f);
     private static final Color ZOMBIE_COLOR = new Color(0.85f, 0.22f, 0.22f, 0.85f);
+    private static final Color PROJECTILE_COLOR = new Color(0.95f, 0.82f, 0.22f, 0.85f);
 
     private final LawnLayout layout;
     private final Texture pixel;
@@ -108,6 +110,17 @@ public final class DebugEntityOverlay implements Disposable {
         String name = zombie.getDefinition() != null ? zombie.getDefinition().getName() : "?";
         float[] xy = layout.centerOf(Math.round(row), progressX);
         drawMarker(batch, xy[0], xy[1], ZOMBIE_COLOR, name);
+    }
+
+    public void drawProjectile(Batch batch, Projectile projectile) {
+        if (projectile == null) {
+            return;
+        }
+        String name = projectile.getSourcePlant() != null
+                ? projectile.getSourcePlant().getName()
+                : projectile.getClass().getSimpleName();
+        float[] xy = layout.centerOf(projectile.getY(), projectile.getX());
+        drawMarker(batch, xy[0], xy[1], PROJECTILE_COLOR, name);
     }
 
     private void drawMarker(Batch batch, float cx, float cy, Color color, String name) {

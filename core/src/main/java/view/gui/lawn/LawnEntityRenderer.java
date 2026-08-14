@@ -7,12 +7,14 @@ import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
+import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
@@ -22,12 +24,12 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 
 /**
- * Draws plants and zombies on the lawn via libPVZ PAM clips.
+ * Draws plants, zombies, and projectiles on the lawn via libPVZ PAM clips.
  *
- * <p>Pipeline: model entity → {@link PlantAnimAdapter} / {@link ZombieAnimAdapter}
- * → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
+ * <p>Pipeline: model entity → {@link PlantAnimAdapter} / {@link ZombieAnimAdapter} /
+ * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
  *
- * <p>TODO: projectiles, plant-food FX, mowers, and grid props.
+ * <p>TODO: plant-food FX, mowers, and grid props.
  * TODO: sort draw order by row (back → front) then Y within a lane.
  * TODO: tint / freeze overlays from model status flags.
  */
@@ -35,6 +37,7 @@ public final class LawnEntityRenderer {
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
     private final ZombieAnimAdapter zombieAdapter;
+    private final ProjectileAnimAdapter projectileAdapter;
     private final PamClipCache clips;
     private final pvz.libpvz.pam.PamPlayer player;
 
@@ -59,6 +62,7 @@ public final class LawnEntityRenderer {
         this.layout = layout;
         this.plantAdapter = plantAdapter;
         this.zombieAdapter = zombieAdapter;
+        this.projectileAdapter = new ProjectileAnimAdapter();
         this.player = assets.player;
         this.clips = new PamClipCache(assets.player);
         this.entityOverlay = entityOverlay;
@@ -80,6 +84,11 @@ public final class LawnEntityRenderer {
         }
         for (ZombieInstance zombie : model.getZombies()) {
             drawZombie(batch, zombie, delta);
+        }
+        if (model.getProjectiles() != null) {
+            for (Projectile projectile : model.getProjectiles()) {
+                drawProjectile(batch, projectile, delta);
+            }
         }
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
@@ -114,6 +123,19 @@ public final class LawnEntityRenderer {
         drawPose(batch, zombie, pose, xyTmp[0], xyTmp[1], AnimScale.ZOMBIE, delta, pose.cacheKey());
     }
 
+    private void drawProjectile(Batch batch, Projectile projectile, float delta) {
+        if (projectile == null) {
+            return;
+        }
+        AnimPose pose = projectileAdapter.poseFor(projectile);
+        if (pose == null) {
+            entityOverlay.drawProjectile(batch, projectile);
+            return;
+        }
+        float[] xy = layout.centerOf(projectile.getY(), projectile.getX());
+        drawPose(batch, projectile, pose, xy[0], xy[1], AnimScale.PROJECTILE, delta, pose.cacheKey());
+    }
+
     private boolean zombieWorldCenter(ZombieInstance zombie, float[] out) {
         FloatPoint cont = zombie.getContinuousPosition();
         Point grid = zombie.getGridPosition();
@@ -143,23 +165,26 @@ public final class LawnEntityRenderer {
         }
         float stateTime = advanceClock(entity, clockKey, delta);
         float scale = baseScale * pose.scale();
-        if (pose.visibility() == null) {
-            player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());
-            return;
-        }
-        // libPVZ has no scale + visibility overload, so armor / status poses scale via the
-        // batch transform. Same pivot as the native path: (x, y), the entity's cell center.
-        boolean scaled = Math.abs(scale - 1f) > 0.001f;
-        if (scaled) {
+        boolean flipX = pose.flipX();
+        boolean vis = pose.visibility() != null;
+        float batchSx = (flipX ? -1f : 1f) * (vis ? scale : 1f);
+        float batchSy = vis ? scale : 1f;
+        float pamScale = vis ? 1f : scale;
+        boolean useBatch = flipX || (vis && Math.abs(scale - 1f) > 0.001f);
+        if (useBatch) {
             batchTransform.set(batch.getTransformMatrix());
             poseTransform.set(batchTransform)
                     .translate(x, y, 0f)
-                    .scale(scale, scale, 1f)
+                    .scale(batchSx, batchSy, 1f)
                     .translate(-x, -y, 0f);
             batch.setTransformMatrix(poseTransform);
         }
-        player.draw(batch, ref, stateTime, x, y, pose.loop(), pose.visibility());
-        if (scaled) {
+        if (vis) {
+            player.draw(batch, ref, stateTime, x, y, pose.loop(), pose.visibility());
+        } else {
+            player.draw(batch, ref, stateTime, x, y, pamScale, pamScale, pose.loop());
+        }
+        if (useBatch) {
             batch.setTransformMatrix(batchTransform);
         }
     }
