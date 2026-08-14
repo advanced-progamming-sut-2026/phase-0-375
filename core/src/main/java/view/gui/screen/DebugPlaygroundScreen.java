@@ -328,7 +328,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                 if (zombie == null || zombie.getName() == null || zombie.getName().isBlank()) {
                     continue;
                 }
-                if (ZombiePamAliases.usesBiomeBasicBody(zombie.getName())) {
+                if (ZombiePamAliases.usesChapterArt(zombie.getName())) {
                     biome.add(zombie.getName());
                 } else {
                     exclusive.add(zombie.getName());

@@ -13,8 +13,9 @@ public final class ZombieAnimProfiles {
         if (overrides == null) {
             return;
         }
+        GargantuarAnim.register(overrides);
+        ImpAnim.register(overrides);
         // TODO: NewspaperAnim.register(overrides);
-        // TODO: GargantuarAnim.register(overrides);
         // TODO: ExplorerAnim.register(overrides);
     }
 }

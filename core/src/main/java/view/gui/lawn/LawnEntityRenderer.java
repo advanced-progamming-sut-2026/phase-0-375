@@ -12,6 +12,7 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
+import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
@@ -58,6 +59,16 @@ public final class LawnEntityRenderer {
     private static final String[] DEATH_PARTS = {
             "zombie_skull", "zombie_jaw",
             "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+    /** The Gargantuar sheds its whole head as one group instead of separate bits. */
+    private static final String GARGANTUAR_HEAD = "Gargantuar_Head_Particle";
+    /** Head pieces on the die body that {@link #GARGANTUAR_HEAD} stands in for. */
+    private static final String[] GARGANTUAR_HEAD_PARTS = {
+            "Zombie_gargantuar_head", "Zombie_gargantuar_jaw",
+            "Zombie_gargantuar_headBehind", "Zombie_gargantuar_head_Dress_Back"};
+    /** Imp {@code particles} group — the whole clip is the detached head. */
+    private static final String IMP_HEAD = "particle_head";
+    private static final String[] IMP_HEAD_PARTS = {
+            "zombie_imp_skull", "zombie_imp_jaw", "_zombie_imp_head_top"};
 
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
@@ -72,6 +83,8 @@ public final class LawnEntityRenderer {
     private final List<ArmorPop> armorPops = new ArrayList<>();
     private final List<DeathFx> deathFx = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, LiveSnap> lastLive = new IdentityHashMap<>();
+    /** World-pixel skull alignment for a thrown Imp; lerped to 0 as it lands. */
+    private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
     private final Matrix4 batchTransform = new Matrix4();
@@ -131,7 +144,7 @@ public final class LawnEntityRenderer {
             drawPlant(batch, plant, delta);
         }
         for (ZombieInstance zombie : model.getZombies()) {
-            Chapter skin = artChapters.getOrDefault(zombie, model.getChapter());
+            Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
         }
         drawDeathFx(batch, delta);
@@ -139,6 +152,7 @@ public final class LawnEntityRenderer {
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         artChapters.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
     }
 
@@ -169,6 +183,18 @@ public final class LawnEntityRenderer {
         }
 
         float x = xyTmp[0];
+        float y = xyTmp[1];
+        ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
+        if (flight != null) {
+            alignToss(zombie, flight, pose, x, y);
+            float t = flight.progress();
+            float[] align = tossAlign.get(zombie);
+            if (align != null) {
+                x += align[0] * (1f - t);
+                y += align[1] * (1f - t);
+            }
+            y += flight.heightTiles() * layout.cellHeight();
+        }
         float phase = NO_PHASE;
         ZombieGait gait = gaitFor(zombie);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
@@ -181,9 +207,63 @@ public final class LawnEntityRenderer {
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
             x += backward ? -holdBack : holdBack;
         }
-        float time = drawPose(batch, zombie, pose, x, xyTmp[1], AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
-        popBrokenArmor(zombie, pose, x, xyTmp[1]);
-        lastLive.put(zombie, new LiveSnap(pose, x, xyTmp[1], zombie.isMovingBackward(), time));
+        float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
+        popBrokenArmor(zombie, pose, x, y);
+        lastLive.put(zombie, new LiveSnap(pose, x, y, zombie.isMovingBackward(), time));
+    }
+
+    private Chapter artChapterFor(ZombieInstance zombie, Chapter lawn) {
+        Chapter skin = artChapters.get(zombie);
+        if (skin != null) {
+            return skin;
+        }
+        ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
+        if (flight != null && flight.thrower() != null) {
+            Chapter fromThrower = artChapters.get(flight.thrower());
+            if (fromThrower != null) {
+                return fromThrower;
+            }
+        }
+        return lawn;
+    }
+
+    /**
+     * Shift the Imp so {@code zombie_imp_skull} sits where it left the Gargantuar.
+     * Stored in world pixels and faded out along the flight so it lands on the tile centre.
+     *
+     * <p>libPVZ {@code partBounds} is PAM-local (Y-down from the canvas centre). Draw flips Y,
+     * so world Y is {@code originY - localY * scale}.
+     */
+    private void alignToss(ZombieInstance imp, ThrowImpBehavior.Flight flight,
+                           AnimPose pose, float impX, float impY) {
+        if (!flight.isFlying() || tossAlign.containsKey(imp) || pose == null) {
+            return;
+        }
+        LiveSnap garg = lastLive.get(flight.thrower());
+        if (garg == null || garg.pose == null) {
+            return;
+        }
+        float s = AnimScale.ZOMBIE;
+        float gargTime = "cannon_fire".equals(garg.pose.clipName())
+                ? garg.time : ThrowImpBehavior.RELEASE_AT;
+        Rectangle from = skullBounds(garg.pose.pamPath(), "cannon_fire", gargTime);
+        Rectangle to = skullBounds(pose.pamPath(), pose.clipName(), 0f);
+        if (from == null || to == null) {
+            return;
+        }
+        float gargSkullX = garg.x + (from.x + from.width * 0.5f) * s;
+        float gargSkullY = garg.y - (from.y + from.height * 0.5f) * s;
+        float impSkullX = impX + (to.x + to.width * 0.5f) * s;
+        float impSkullY = impY - (to.y + to.height * 0.5f) * s;
+        tossAlign.put(imp, new float[]{gargSkullX - impSkullX, gargSkullY - impSkullY});
+    }
+
+    private Rectangle skullBounds(String pam, String clip, float time) {
+        Rectangle bounds = player.partBounds(pam, clip, time, "zombie_imp_skull");
+        if (bounds == null) {
+            bounds = player.partBounds(pam, clip, time, "_zombie_imp_head_top");
+        }
+        return bounds;
     }
 
     private static ZombieGait gaitFor(ZombieInstance zombie) {
@@ -348,6 +428,7 @@ public final class LawnEntityRenderer {
     private void drawArmorPops(Batch batch, float delta) {
         for (int i = armorPops.size() - 1; i >= 0; i--) {
             ArmorPop pop = armorPops.get(i);
+            pop.life += delta;
             if (!pop.grounded) {
                 pop.vy += pop.gravity * delta;
                 pop.x += pop.vx * delta;
@@ -364,7 +445,7 @@ public final class LawnEntityRenderer {
                         pop.grounded = true;
                     }
                 }
-            } else {
+            } else if (pop.life >= pop.hold) {
                 pop.fade += delta;
                 if (pop.fade >= ARMOR_POP_FADE) {
                     armorPops.remove(i);
@@ -380,7 +461,12 @@ public final class LawnEntityRenderer {
                     .scale(s, s, 1f)
                     .translate(-pop.x, -pop.y, 0f);
             batch.setTransformMatrix(popTransform);
-            player.drawPart(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, pop.part);
+            if (pop.part == null) {
+                // Whole clip: PAM default-hidden flags stay on (butter, etc.).
+                player.draw(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, 1f, 1f, false);
+            } else {
+                player.drawPart(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, pop.part);
+            }
             batch.setTransformMatrix(batchTransform);
             batch.setColor(Color.WHITE);
         }
@@ -395,6 +481,7 @@ public final class LawnEntityRenderer {
     private static final class ArmorPop {
         final String pamPath;
         final String clipName;
+        /** PAM part to draw; {@code null} draws the whole clip (Gargantuar {@code particles}). */
         final String part;
         final float groundY;
         final float gravity;
@@ -403,6 +490,10 @@ public final class LawnEntityRenderer {
         float vx;
         float vy;
         float fade;
+        /** Seconds since the pop spawned. */
+        float life;
+        /** Don't start fading before this many seconds have passed, even once grounded. */
+        float hold;
         boolean grounded;
         int bounces;
 
@@ -463,16 +554,62 @@ public final class LawnEntityRenderer {
         for (String part : bits) {
             vis.put(part, Boolean.FALSE);
         }
+        String[] bodyHead = deathHeadParts(pam);
+        if (bodyHead != null) {
+            for (String part : bodyHead) {
+                vis.put(part, Boolean.FALSE);
+            }
+        }
         deathFx.add(new DeathFx(
                 AnimPose.once(pam, dieClip, ZombieAnimRole.DIE, vis.isEmpty() ? null : vis),
                 snap.x, snap.y));
 
+        // The head lies on the ground until the body has finished collapsing, then both fade together.
+        ClipRef dieRef = clips.getOrLoad(pam, dieClip);
+        String headGroup = deathHeadGroup(pam);
+        float hold = headGroup != null && dieRef != null ? dieRef.duration : 0f;
         float dir = snap.backward ? -1f : 1f;
+        if (headGroup != null && firstLoadedClip(pam, "particles", null) != null) {
+            // particles is already just the head. drawPart of the group would whitelist
+            // butter (a child with the default-hidden flag) and show it.
+            addLimbPop(pam, "particles", headGroup, snap.x, snap.y, 0f, dir, 0.2f, 0.85f, hold, true);
+            return;
+        }
         for (int i = 0; i < bits.size(); i++) {
             float back = 0.1f + i * 0.1f;
             float hop = 0.85f + (i % 2) * 0.3f;
-            addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop);
+            addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop, hold, false);
         }
+    }
+
+    private static boolean isGargantuar(String pam) {
+        return pam != null && pam.toUpperCase().contains("GARGANTUAR") && !pam.toUpperCase().contains("IMP");
+    }
+
+    private static boolean isImp(String pam) {
+        return pam != null && pam.toUpperCase().contains("IMP");
+    }
+
+    /** {@code particles} group used for ground Y; the clip itself is drawn whole. */
+    private static String deathHeadGroup(String pam) {
+        if (isGargantuar(pam)) {
+            return GARGANTUAR_HEAD;
+        }
+        if (isImp(pam)) {
+            return IMP_HEAD;
+        }
+        return null;
+    }
+
+    /** Head pieces to hide on the {@code die} body so they aren't drawn twice. */
+    private static String[] deathHeadParts(String pam) {
+        if (isGargantuar(pam)) {
+            return GARGANTUAR_HEAD_PARTS;
+        }
+        if (isImp(pam)) {
+            return IMP_HEAD_PARTS;
+        }
+        return null;
     }
 
     private String firstLoadedClip(String pam, String preferred, String fallback) {
@@ -492,7 +629,8 @@ public final class LawnEntityRenderer {
         if (firstLoadedClip(pam, "particles", null) == null) {
             return bits;
         }
-        String[] names = pam != null && pam.toUpperCase().contains("EGYPT")
+        String[] names = deathHeadGroup(pam) != null ? new String[]{deathHeadGroup(pam)}
+                : pam.toUpperCase().contains("EGYPT")
                 ? DEATH_PARTS_EGYPT : DEATH_PARTS;
         for (String part : names) {
             if (player.partBounds(pam, "particles", 0f, part) != null) {
@@ -504,7 +642,8 @@ public final class LawnEntityRenderer {
 
     private void addLimbPop(String pam, String clip, String part,
                             float originX, float originY, float time,
-                            float dir, float backTiles, float hopTiles) {
+                            float dir, float backTiles, float hopTiles, float hold,
+                            boolean wholeClip) {
         float s = AnimScale.ZOMBIE;
         Rectangle bounds = player.partBounds(pam, clip, time, part);
         float groundY = originY - layout.cellHeight() * 0.5f;
@@ -512,12 +651,14 @@ public final class LawnEntityRenderer {
             groundY = originY - layout.cellHeight() * 0.5f + (bounds.y + bounds.height) * s;
         }
         float hopTime = 2f * hopTiles / -ARMOR_POP_GRAVITY;
-        armorPops.add(new ArmorPop(
-                pam, clip, part,
+        ArmorPop pop = new ArmorPop(
+                pam, clip, wholeClip ? null : part,
                 originX, originY, groundY,
                 dir * backTiles * layout.cellWidth() / hopTime,
                 hopTiles * layout.cellHeight(),
-                ARMOR_POP_GRAVITY * layout.cellHeight()));
+                ARMOR_POP_GRAVITY * layout.cellHeight());
+        pop.hold = hold;
+        armorPops.add(pop);
     }
 
     private void drawDeathFx(Batch batch, float delta) {
@@ -527,12 +668,16 @@ public final class LawnEntityRenderer {
             if (ref == null) {
                 continue;
             }
-            if (fx.time >= ref.duration) {
+            if (fx.time >= ref.duration + ARMOR_POP_FADE) {
                 deathFx.remove(i);
                 continue;
             }
+            // Hold the collapsed last frame and fade it out instead of popping it off-screen.
             float scale = AnimScale.ZOMBIE * fx.pose.scale();
-            drawClip(batch, ref, fx.pose, fx.time, fx.x, fx.y, scale);
+            float alpha = 1f - Math.max(0f, fx.time - ref.duration) / ARMOR_POP_FADE;
+            batch.setColor(1f, 1f, 1f, alpha);
+            drawClip(batch, ref, fx.pose, Math.min(fx.time, ref.duration), fx.x, fx.y, scale);
+            batch.setColor(Color.WHITE);
             fx.time += delta;
         }
     }

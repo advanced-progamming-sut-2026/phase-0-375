@@ -44,11 +44,24 @@ public final class ZombiePamAliases {
         if (BIOME_BASIC_BODIES.contains(definitionName)) {
             return basicForChapter(chapter);
         }
+        if ("ZombieGargantuar".equals(definitionName)) {
+            return gargantuarForChapter(chapter);
+        }
+        if ("ZombieImp".equals(definitionName)) {
+            return impForChapter(chapter);
+        }
         return BY_NAME.get(definitionName);
     }
 
     public static boolean usesBiomeBasicBody(String definitionName) {
         return BIOME_BASIC_BODIES.contains(definitionName);
+    }
+
+    /** Basics plus Gargantuar and Imp: one PAM per lawn chapter. */
+    public static boolean usesChapterArt(String definitionName) {
+        return usesBiomeBasicBody(definitionName)
+                || "ZombieGargantuar".equals(definitionName)
+                || "ZombieImp".equals(definitionName);
     }
 
     public static String basicForChapter(Chapter chapter) {
@@ -60,6 +73,30 @@ public final class ZombiePamAliases {
             case FROSTBITE_CAVES -> ICEAGE_BASIC;
             case BIG_WAVE_BEACH -> BEACH_BASIC;
             case DARK_AGES -> DARK_BASIC;
+        };
+    }
+
+    public static String gargantuarForChapter(Chapter chapter) {
+        if (chapter == null) {
+            return "EGYPT_GARGANTUAR";
+        }
+        return switch (chapter) {
+            case ANCIENT_EGYPT -> "EGYPT_GARGANTUAR";
+            case FROSTBITE_CAVES -> "ZOMBIE_ICEAGE_GARGANTUAR";
+            case BIG_WAVE_BEACH -> "BEACH_GARGANTUAR";
+            case DARK_AGES -> "DARK_GARGANTUAR";
+        };
+    }
+
+    public static String impForChapter(Chapter chapter) {
+        if (chapter == null) {
+            return "ZOMBIE_EGYPT_IMP";
+        }
+        return switch (chapter) {
+            case ANCIENT_EGYPT -> "ZOMBIE_EGYPT_IMP";
+            case FROSTBITE_CAVES -> "ZOMBIE_ICEAGE_IMP";
+            case BIG_WAVE_BEACH -> "ZOMBIE_BEACH_IMP_MERMAID";
+            case DARK_AGES -> "ZOMBIE_DARK_IMP_MONK";
         };
     }
 
@@ -133,8 +170,7 @@ public final class ZombiePamAliases {
         m.put("ZombieRa", "ZOMBIE_EGYPT_RA");
         m.put("ZombieExplorer", "ZOMBIE_EGYPT_EXPLORER");
         m.put("ZombieTombRaiser", "ZOMBIE_EGYPT_TOMBRAISER");
-        m.put("ZombieImp", "IMP");
-        m.put("ZombieGargantuar", "GARGANTUAR");
+        m.put("ZombieImp", "ZOMBIE_EGYPT_IMP");
         m.put("ZombieIceAgeDodo", "ZOMBIE_ICEAGE_DODO");
         m.put("ZombieIceAgeHunter", "ZOMBIE_ICEAGE_HUNTER");
         m.put("ZombieIceAgeTroglobite", "ZOMBIE_ICEAGE_TROGLOBITE");

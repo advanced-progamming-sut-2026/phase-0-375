@@ -22,6 +22,30 @@ class ZombiePamAliasesTest {
     }
 
     @Test
+    void gargantuarFollowsChapter() {
+        assertEquals("EGYPT_GARGANTUAR",
+                ZombiePamAliases.pamName("ZombieGargantuar", Chapter.ANCIENT_EGYPT));
+        assertEquals("ZOMBIE_ICEAGE_GARGANTUAR",
+                ZombiePamAliases.pamName("ZombieGargantuar", Chapter.FROSTBITE_CAVES));
+        assertEquals("BEACH_GARGANTUAR",
+                ZombiePamAliases.pamName("ZombieGargantuar", Chapter.BIG_WAVE_BEACH));
+        assertEquals("DARK_GARGANTUAR",
+                ZombiePamAliases.pamName("ZombieGargantuar", Chapter.DARK_AGES));
+    }
+
+    @Test
+    void impFollowsChapter() {
+        assertEquals("ZOMBIE_EGYPT_IMP",
+                ZombiePamAliases.pamName("ZombieImp", Chapter.ANCIENT_EGYPT));
+        assertEquals("ZOMBIE_ICEAGE_IMP",
+                ZombiePamAliases.pamName("ZombieImp", Chapter.FROSTBITE_CAVES));
+        assertEquals("ZOMBIE_BEACH_IMP_MERMAID",
+                ZombiePamAliases.pamName("ZombieImp", Chapter.BIG_WAVE_BEACH));
+        assertEquals("ZOMBIE_DARK_IMP_MONK",
+                ZombiePamAliases.pamName("ZombieImp", Chapter.DARK_AGES));
+    }
+
+    @Test
     void exclusiveZombiesStayOnTheirPam() {
         assertEquals("ZOMBIE_DARK_BASIC",
                 ZombiePamAliases.pamName("ZombieDarkArmor3", Chapter.ANCIENT_EGYPT));
@@ -32,7 +56,7 @@ class ZombiePamAliasesTest {
                 ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_BASIC", "ZombieArmor1"));
         assertEquals("_zombie_beach_armor2_states",
                 ZombiePamAliases.armorStatesPart("ZOMBIE_BEACH_BASIC", "ZombieArmor2"));
-        assertEquals("_zombie_dark_armor4_states",
+        assertEquals("_zombie_egypt_armor4_states",
                 ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_BASIC", "ZombieArmor4"));
         assertEquals("zombie_armor_brick_norm",
                 ZombiePamAliases.armorStatesPart("ZOMBIE_ICEAGE_BASIC", "ZombieArmor4"));
