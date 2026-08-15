@@ -17,6 +17,7 @@ import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
+import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
@@ -268,7 +269,8 @@ public class ZombieSystem implements Tickable {
         if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return true;
         return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()
-                || zombie.getPushableItem() instanceof Piano;
+                || zombie.getPushableItem() instanceof Piano
+                || zombie.getPushableItem() instanceof Barrel;
     }
 
     /**

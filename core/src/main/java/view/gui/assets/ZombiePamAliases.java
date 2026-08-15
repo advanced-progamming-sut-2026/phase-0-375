@@ -188,7 +188,8 @@ public final class ZombiePamAliases {
         m.put("ZombiePiano", "ZOMBIE_PIANO");
         m.put("ZombieNewspaper", "ZOMBIE_MODERN_NEWSPAPER");
         m.put("ZombieArcade", "ZOMBIE_80S_ARCADE");
-        m.put("ZombieBarrelRoller", "ZOMBIE_PIRATE_BARRELROLLER");
+        m.put("ZombieBarrelRoller", "ZOMBIE_PIRATE_BARREL_PUSHER");
+        m.put("ZombiePirateImp", "ZOMBIE_PIRATE_IMP");
         return Collections.unmodifiableMap(m);
     }
 }

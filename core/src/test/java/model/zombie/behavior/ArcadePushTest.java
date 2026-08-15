@@ -9,6 +9,7 @@ import model.enums.ZombieState;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Barrel;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
 import model.plant.definition.Plant;
@@ -177,6 +178,57 @@ class ArcadePushTest {
         assertNotEquals(ZombieState.PUSHING, zombie.getState());
     }
 
+    @Test
+    void barrelCrushesPlantOnTileItEnters() {
+        PlantInstance plant = wallnut();
+        Barrel barrel = new Barrel(600);
+        ZombieInstance zombie = barrelAt(SPAWN_COL, barrel);
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        BehaviorContext context = stubContextAt(plant, SPAWN_COL - 1);
+
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL - 1, barrel.getCol());
+        assertTrue(plant.getCurrentHP() <= 0, "plant on the barrel's tile is crushed");
+        assertFalse(push.isPushing());
+
+        PlantInstance next = wallnut();
+        context = stubContextAt(next, SPAWN_COL - 2);
+        zombie.setGridX(SPAWN_COL - 1);
+        zombie.setContinuousX(SPAWN_COL - 1f);
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL - 2, barrel.getCol());
+        assertTrue(next.getCurrentHP() <= 0);
+    }
+
+    @Test
+    void barrelOccupancyFollowsPartBoundsOffset() {
+        Barrel barrel = new Barrel(600);
+        ZombieInstance zombie = barrelAt(SPAWN_COL, barrel);
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        push.setBarrelFrontOffsetTiles(1.6f);
+        push.execute(zombie, stubContext(null), TICK);
+        assertEquals(Math.round(SPAWN_COL - 1.6f), barrel.getCol());
+    }
+
+    @Test
+    void barrelWaitsUntilCentrePassesTileEdge() {
+        PlantInstance plant = wallnut();
+        Barrel barrel = new Barrel(600);
+        ZombieInstance zombie = barrelAt(SPAWN_COL, barrel);
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        BehaviorContext context = stubContextAt(plant, SPAWN_COL - 1);
+
+        push.setBarrelFrontOffsetTiles(0.4f);
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL, barrel.getCol());
+        assertTrue(plant.getCurrentHP() > 0, "lip in the next tile is not enough");
+
+        push.setBarrelFrontOffsetTiles(0.6f);
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL - 1, barrel.getCol());
+        assertTrue(plant.getCurrentHP() <= 0, "centre past the tile edge crushes");
+    }
+
     private static ZombieInstance arcadeAt(int col, ArcadeMachine cabinet) {
         Zombie definition = new Zombie(
                 "ZombieArcade", 1290, 0.16f, 100f, ZombieSize.NORMAL,
@@ -198,6 +250,19 @@ class ArcadePushTest {
                 List.of(ZombieBehaviorType.PUSH, ZombieBehaviorType.PIANO_SWAP));
         ZombieInstance zombie = new ZombieInstance(definition, List.of(), piano);
         piano.setPusher(zombie);
+        zombie.setGridPosition(new Point(col, 0));
+        zombie.setContinuousPosition(new FloatPoint(col, 0));
+        return zombie;
+    }
+
+    private static ZombieInstance barrelAt(int col, Barrel barrel) {
+        Zombie definition = new Zombie(
+                "ZombieBarrelRoller", 190, 0.25f, 100f, ZombieSize.NORMAL,
+                Chapter.ANCIENT_EGYPT, 300, 1, List.of(),
+                PushableItemType.BARREL, null,
+                List.of(ZombieBehaviorType.PUSH, ZombieBehaviorType.BARREL_ROLLER));
+        ZombieInstance zombie = new ZombieInstance(definition, List.of(), barrel);
+        barrel.setPusher(zombie);
         zombie.setGridPosition(new Point(col, 0));
         zombie.setContinuousPosition(new FloatPoint(col, 0));
         return zombie;

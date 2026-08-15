@@ -13,9 +13,11 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
+import model.zombie.behavior.BarrelRollerBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.StealSunBehavior;
@@ -26,6 +28,7 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
+import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
@@ -191,7 +194,7 @@ public final class LawnEntityRenderer {
         Set<ZombieInstance> alive = new HashSet<>(model.getZombies());
         for (ZombieInstance zombie : lastLive.keySet()) {
             if (!alive.contains(zombie)) {
-                spawnDeath(zombie, lastLive.get(zombie));
+                spawnDeath(model, zombie, lastLive.get(zombie));
             }
         }
         lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
@@ -217,6 +220,8 @@ public final class LawnEntityRenderer {
         for (Pushable cabinet : liveCabinets) {
             if (cabinet instanceof Piano) {
                 drawPiano(batch, cabinet, delta);
+            } else if (cabinet instanceof Barrel) {
+                drawBarrel(batch, cabinet, delta);
             } else {
                 drawCabinet(batch, cabinet, delta);
             }
@@ -263,6 +268,12 @@ public final class LawnEntityRenderer {
                 && piano.getPusher() != null
                 && !piano.getPusher().isDead()) {
             live.add(piano);
+            return;
+        }
+        if (item instanceof Barrel barrel
+                && !barrel.isDestroyed()
+                && barrel.getPosition() != null) {
+            live.add(barrel);
         }
     }
 
@@ -314,6 +325,105 @@ public final class LawnEntityRenderer {
         }
         float time = drawPose(batch, piano, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
         lastCabinets.put(piano, new LiveSnap(pose, x, y, false, time));
+    }
+
+    /**
+     * Barrel art lives in the pusher's walk/eat. After he dies, freeze those
+     * barrel parts at the last {@code partBounds} pose. Separate barrel PAM is
+     * only the break clip.
+     */
+    private void drawBarrel(Batch batch, Pushable barrel, float delta) {
+        Point pos = barrel.getPosition();
+        if (pos == null || catalog == null) {
+            return;
+        }
+        ZombieInstance pusher = barrel.getPusher();
+        if (pusher != null && !pusher.isDead()) {
+            rememberLiveBarrel(barrel, pusher);
+            return;
+        }
+        LiveSnap leftover = lastCabinets.get(barrel);
+        if (leftover != null && leftover.pose != null
+                && BarrelRollerAnim.isPusherPam(leftover.pose.pamPath())) {
+            drawBarrelParts(batch, leftover);
+            lastCabinets.put(barrel, leftover);
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(BarrelRollerAnim.BARREL_PAM);
+        if (entry == null) {
+            return;
+        }
+        clips.getOrLoad(entry.path(), "die");
+        String clip = catalog.resolveClip(entry, "roll");
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        float time = drawPose(batch, barrel, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        lastCabinets.put(barrel, new LiveSnap(pose, xy[0], xy[1], false, time));
+    }
+
+    /** Cache break-FX origin at the barrel parts, not the grid cell. */
+    private void rememberLiveBarrel(Pushable barrel, ZombieInstance pusher) {
+        PamCatalog.PamEntry entry = catalog.byName(BarrelRollerAnim.BARREL_PAM);
+        if (entry != null) {
+            clips.getOrLoad(entry.path(), "die");
+        }
+        LiveSnap body = lastLive.get(pusher);
+        if (body != null && body.pose != null) {
+            lastCabinets.put(barrel, new LiveSnap(body.pose, body.x, body.y, body.backward, body.time));
+            return;
+        }
+        Point pos = barrel.getPosition();
+        if (pos == null) {
+            return;
+        }
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        AnimPose pose = entry == null
+                ? null
+                : AnimPose.looping(entry.path(), "roll", ZombieAnimRole.IDLE);
+        if (pose != null) {
+            lastCabinets.put(barrel, new LiveSnap(pose, xy[0], xy[1], false, 0f));
+        }
+    }
+
+    private static float leftoverHoldPhase(LiveSnap leftover, ClipRef ref) {
+        if (ref == null || ref.duration <= 0f) {
+            return 0f;
+        }
+        float phase = leftover.time / ref.duration;
+        if (leftover.pose != null && leftover.pose.loop()) {
+            phase -= (float) Math.floor(phase);
+            if (phase < 0f) {
+                phase = 0f;
+            }
+        } else if (phase > 1f) {
+            phase = 1f;
+        }
+        return phase;
+    }
+
+    /** Whitelist barrel PAM parts so the pusher body never draws on the leftover. */
+    private void drawBarrelParts(Batch batch, LiveSnap leftover) {
+        if (leftover == null || leftover.pose == null) {
+            return;
+        }
+        ClipRef ref = clips.getOrLoad(leftover.pose.pamPath(), leftover.pose.clipName());
+        float t = leftover.time;
+        if (ref != null && ref.duration > 0f) {
+            t = leftoverHoldPhase(leftover, ref) * ref.duration;
+        }
+        float s = AnimScale.ZOMBIE * leftover.pose.scale();
+        float sx = leftover.pose.flipX() ? -s : s;
+        batchTransform.set(batch.getTransformMatrix());
+        popTransform.set(batchTransform)
+                .translate(leftover.x, leftover.y, 0f)
+                .scale(sx, s, 1f)
+                .translate(-leftover.x, -leftover.y, 0f);
+        batch.setTransformMatrix(popTransform);
+        for (String part : BarrelRollerAnim.BARREL_PARTS) {
+            player.drawPart(batch, leftover.pose.pamPath(), leftover.pose.clipName(),
+                    t, leftover.x, leftover.y, part);
+        }
+        batch.setTransformMatrix(batchTransform);
     }
 
     /** HP → {@code arcade_cabinet_damage0} (pristine) … {@code damage5} (almost gone). */
@@ -423,10 +533,93 @@ public final class LawnEntityRenderer {
             spawnPianoDeath(snap, pam);
             return;
         }
+        if (BarrelRollerAnim.isBarrelPropPam(pam) || BarrelRollerAnim.isPusherPam(pam)) {
+            spawnBarrelBreak(snap);
+            return;
+        }
         String clip = firstLoadedClip(pam, "death", snap.pose.clipName());
         deathFx.add(new DeathFx(
                 AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
                 snap.x, snap.y));
+    }
+
+    private void spawnBarrelBreak(LiveSnap snap) {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(BarrelRollerAnim.BARREL_PAM);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "die");
+        float x = snap.x;
+        float y = snap.y;
+        if (snap.pose != null && BarrelRollerAnim.isPusherPam(snap.pose.pamPath())) {
+            float[] xy = barrelWorldCenter(snap);
+            x = xy[0];
+            y = xy[1];
+        }
+        deathFx.add(new DeathFx(
+                AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
+                x, y));
+    }
+
+    private float[] barrelWorldCenter(LiveSnap snap) {
+        Rectangle bounds = barrelPartBounds(snap.pose.pamPath(), snap.pose.clipName(), snap.time);
+        if (bounds == null) {
+            return new float[]{snap.x, snap.y};
+        }
+        float s = AnimScale.ZOMBIE * snap.pose.scale();
+        float localX = bounds.x + bounds.width * 0.5f;
+        float localY = bounds.y + bounds.height * 0.5f;
+        if (snap.pose.flipX()) {
+            localX = -localX;
+        }
+        return new float[]{snap.x + localX * s, snap.y - localY * s};
+    }
+
+    private Rectangle barrelPartBounds(String pam, String clip, float time) {
+        if (pam == null || clip == null) {
+            return null;
+        }
+        clips.getOrLoad(pam, clip);
+        Rectangle union = null;
+        for (String part : BarrelRollerAnim.BARREL_PARTS) {
+            Rectangle r = player.partBounds(pam, clip, time, part);
+            if (r == null) {
+                continue;
+            }
+            if (union == null) {
+                union = new Rectangle(r);
+            } else {
+                union.merge(r);
+            }
+        }
+        if (union != null) {
+            return union;
+        }
+        ClipRef ref = clips.getOrLoad(pam, clip);
+        if (ref == null) {
+            return null;
+        }
+        for (String part : BarrelRollerAnim.BARREL_PARTS) {
+            Rectangle[] frames = player.partBoundsByFrame(ref, part);
+            if (frames == null) {
+                continue;
+            }
+            for (Rectangle r : frames) {
+                if (r == null) {
+                    continue;
+                }
+                if (union == null) {
+                    union = new Rectangle(r);
+                } else {
+                    union.merge(r);
+                }
+                break;
+            }
+        }
+        return union;
     }
 
     private void spawnPianoDeath(LiveSnap snap, String pam) {
@@ -517,6 +710,25 @@ public final class LawnEntityRenderer {
         lastLive.put(zombie, new LiveSnap(pose, x, y,
                 zombie.isMovingBackward() || pose.flipX(), time));
         maybeDrawCrystalSkullBeam(batch, pose, x, y, time);
+        syncBarrelFront(zombie, pose, time);
+    }
+
+    /** Art-measured tiles from zombie origin to the barrel centre. */
+    private void syncBarrelFront(ZombieInstance zombie, AnimPose pose, float time) {
+        if (!(zombie.getPushableItem() instanceof Barrel) || pose == null) {
+            return;
+        }
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        if (push == null) {
+            return;
+        }
+        Rectangle bounds = barrelPartBounds(pose.pamPath(), pose.clipName(), time);
+        if (bounds == null) {
+            return;
+        }
+        float localCenterX = bounds.x + bounds.width * 0.5f;
+        float tiles = -localCenterX * AnimScale.ZOMBIE * pose.scale() / layout.cellWidth();
+        push.setBarrelFrontOffsetTiles(tiles);
     }
 
     /** Kick the EFFECTS PAM load during {@code power_up} so {@code laser_beam} is ready at 0.63s. */
@@ -1087,15 +1299,21 @@ public final class LawnEntityRenderer {
         }
     }
 
-    private void spawnDeath(ZombieInstance zombie, LiveSnap snap) {
+    private void spawnDeath(GameModel model, ZombieInstance zombie, LiveSnap snap) {
         if (snap == null || snap.pose == null) {
             return;
         }
         if (trySpawnJaneAsh(zombie, snap)) {
             return;
         }
+        boolean barrelLeft = attachBarrelLeftover(model, zombie, snap);
+        if (barrelLeft) {
+            return;
+        }
         String pam = snap.pose.pamPath();
-        String dieClip = firstLoadedClip(pam, "die", snap.pose.clipName());
+        String dieClip = BarrelRollerAnim.isUnarmedClip(snap.pose.clipName())
+                ? firstLoadedClip(pam, "die2", snap.pose.clipName())
+                : firstLoadedClip(pam, "die", snap.pose.clipName());
         List<String> bits = particleParts(pam);
         Map<String, Boolean> vis = new HashMap<>();
         if (snap.pose.visibility() != null) {
@@ -1134,6 +1352,72 @@ public final class LawnEntityRenderer {
             float hop = 0.85f + (i % 2) * 0.3f;
             addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop, hold, false);
         }
+    }
+
+    /**
+     * Freeze the last live barrel parts on the orphan. Body still plays {@code die}.
+     */
+    private boolean attachBarrelLeftover(GameModel model, ZombieInstance zombie, LiveSnap snap) {
+        if (zombie == null || zombie.getDefinition() == null
+                || !BarrelRollerAnim.DEFINITION_NAME.equals(zombie.getDefinition().getName())) {
+            return false;
+        }
+        if (snap == null || snap.pose == null || BarrelRollerAnim.isUnarmedClip(snap.pose.clipName())) {
+            return false;
+        }
+        Barrel barrel = findOrphanBarrel(model, zombie);
+        if (barrel == null) {
+            return false;
+        }
+        clips.getOrLoad(snap.pose.pamPath(), snap.pose.clipName());
+        AnimPose held = AnimPose.once(snap.pose.pamPath(), snap.pose.clipName(),
+                ZombieAnimRole.IDLE, null);
+        if (snap.pose.flipX()) {
+            held = held.flipped();
+        }
+        lastCabinets.put(barrel, new LiveSnap(held, snap.x, snap.y, snap.backward, snap.time));
+        return true;
+    }
+
+    private Barrel findOrphanBarrel(GameModel model, ZombieInstance zombie) {
+        Barrel fromOrphans = matchBarrel(
+                model == null ? null : model.getOrphanedPushables(), zombie);
+        if (fromOrphans != null) {
+            return fromOrphans;
+        }
+        for (Pushable item : lastCabinets.keySet()) {
+            if (item instanceof Barrel barrel
+                    && !barrel.isDestroyed()
+                    && barrel.getPosition() != null) {
+                return barrel;
+            }
+        }
+        return null;
+    }
+
+    private static Barrel matchBarrel(Iterable<Pushable> items, ZombieInstance zombie) {
+        if (items == null || zombie == null) {
+            return null;
+        }
+        BarrelRollerBehavior roller = (BarrelRollerBehavior) zombie.getBehavior(
+                ZombieBehaviorType.BARREL_ROLLER);
+        int row = roller != null ? roller.getLastBarrelRow() : zombie.getGridY();
+        int col = roller != null ? roller.getLastBarrelCol() : -1;
+        Barrel fallback = null;
+        for (Pushable item : items) {
+            if (!(item instanceof Barrel barrel)
+                    || barrel.isDestroyed()
+                    || barrel.getPosition() == null) {
+                continue;
+            }
+            if (col >= 0 && barrel.getRow() == row && barrel.getCol() == col) {
+                return barrel;
+            }
+            if (barrel.getRow() == row) {
+                fallback = barrel;
+            }
+        }
+        return fallback;
     }
 
     /** Jane's incineration PAM lives under EFFECTS and has clip {@code animation}, not {@code die}. */

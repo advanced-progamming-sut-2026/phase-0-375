@@ -2474,6 +2474,22 @@
   },
   {
     "aliases": [
+      "ZombiePirateImp"
+    ],
+    "objclass": "ZombiePropertySheet",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 50,
+      "EatDPS": 200,
+      "Hitpoints": 190,
+      "Size": "imp",
+      "Speed": 0.22,
+      "WavePointCost": 50,
+      "Weight": 0
+    }
+  },
+  {
+    "aliases": [
       "ZombotanyPeashooter"
     ],
     "objclass": "ZombotanyPeashooterProps",

@@ -5,6 +5,8 @@ import model.game.map.Point;
 import model.item.pushable.Pushable;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Barrel Roller behavior.
  */
@@ -13,10 +15,13 @@ public class BarrelRollerBehavior implements ZombieBehavior {
     // --- Constants ---
 
     /** Definition name of the imp to spawn when the barrel breaks. */
-    public static final String IMP_NAME = "ZombieImp";
+    public static final String IMP_NAME = "ZombiePirateImp";
 
     /** Number of imps spawned when the barrel is destroyed. */
     public static final int IMPS_PER_BARREL = 2;
+
+    /** Half-width of spawn jitter, in tiles. Keeps both imps in the barrel's cell. */
+    public static final float IMP_SPAWN_JITTER = 0.4f;
 
     // --- State ---
 
@@ -98,8 +103,20 @@ public class BarrelRollerBehavior implements ZombieBehavior {
         }
 
         for (int i = 0; i < IMPS_PER_BARREL; i++) {
-            context.spawnZombieAt(IMP_NAME, lastBarrelRow, lastBarrelCol);
+            scatterImp(context.spawnZombieAt(IMP_NAME, lastBarrelRow, lastBarrelCol));
         }
+    }
+
+    /**
+     * Nudges a just-spawned imp off the barrel centre so stacked pops do not
+     * occupy the same pixel.
+     */
+    public static void scatterImp(ZombieInstance imp) {
+        if (imp == null || imp.getContinuousPosition() == null) {
+            return;
+        }
+        float dx = (ThreadLocalRandom.current().nextFloat() * 2f - 1f) * IMP_SPAWN_JITTER;
+        imp.setContinuousX(imp.getContinuousX() + dx);
     }
 
     // --- Getters / setters ---

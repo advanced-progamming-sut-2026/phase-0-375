@@ -65,6 +65,12 @@ public class PushBehavior implements ZombieBehavior {
     /** True once we've initialized {@link #sparePushablesRemaining} from the definition. */
     private boolean pushableReserveInitialized = false;
 
+    /**
+     * Tiles from zombie origin to the barrel centre (toward the house). Renderer
+     * overwrites from PAM {@code partBounds}; tests keep the one-tile default.
+     */
+    private float barrelFrontOffsetTiles = 1f;
+
     // --- ZombieBehavior ---
 
     @Override
@@ -90,6 +96,10 @@ public class PushBehavior implements ZombieBehavior {
 
         if (isPiano(zombie)) {
             tickPiano(zombie, context, pushable);
+            return;
+        }
+        if (isBarrel(zombie)) {
+            tickBarrel(zombie, context, pushable);
             return;
         }
 
@@ -172,6 +182,11 @@ public class PushBehavior implements ZombieBehavior {
                 && zombie.getDefinition().getPushableItemType() == PushableItemType.PIANO;
     }
 
+    static boolean isBarrel(ZombieInstance zombie) {
+        return zombie.getDefinition() != null
+                && zombie.getDefinition().getPushableItemType() == PushableItemType.BARREL;
+    }
+
     /**
      * Zombie origin has reached the centre of the tile to the right of the cabinet.
      */
@@ -213,6 +228,30 @@ public class PushBehavior implements ZombieBehavior {
         }
         int row = zombie.getGridY();
         int col = zombie.getGridX();
+        Point here = new Point(col, row);
+        Point old = pushable.getPosition();
+        if (old == null || old.getX() != col || old.getY() != row) {
+            pushable.setPosition(here);
+            pushable.push();
+        }
+        crushPlantIfAny(pushable, context, row, col);
+        crushHypnotizedZombies(pushable, context, row, col);
+    }
+
+    /**
+     * Barrel rides in front of the pusher. Occupancy is {@code round(zombieX - offset)}
+     * so a plant dies when the barrel centre crosses the tile edge (halfway).
+     */
+    private void tickBarrel(ZombieInstance zombie, BehaviorContext context, Pushable pushable) {
+        if (zombie.getState() == ZombieState.PUSHING
+                || zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
+        }
+        int row = zombie.getGridY();
+        int col = Math.round(zombie.getContinuousX() - barrelFrontOffsetTiles);
+        if (col < 0) {
+            col = 0;
+        }
         Point here = new Point(col, row);
         Point old = pushable.getPosition();
         if (old == null || old.getX() != col || old.getY() != row) {
@@ -384,6 +423,16 @@ public class PushBehavior implements ZombieBehavior {
 
     public void setSparePushablesRemaining(int sparePushablesRemaining) {
         this.sparePushablesRemaining = sparePushablesRemaining;
+    }
+
+    public float getBarrelFrontOffsetTiles() {
+        return barrelFrontOffsetTiles;
+    }
+
+    public void setBarrelFrontOffsetTiles(float barrelFrontOffsetTiles) {
+        if (barrelFrontOffsetTiles > 0.05f) {
+            this.barrelFrontOffsetTiles = barrelFrontOffsetTiles;
+        }
     }
 
     // --- Inner types ---

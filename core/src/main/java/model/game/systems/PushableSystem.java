@@ -108,7 +108,8 @@ public class PushableSystem implements Tickable {
 
             if (wasOrphanBarrel && row >= 0 && col >= 0) {
                 for (int i = 0; i < BarrelRollerBehavior.IMPS_PER_BARREL; i++) {
-                    gameModel.spawnZombieAt(BarrelRollerBehavior.IMP_NAME, row, col);
+                    BarrelRollerBehavior.scatterImp(
+                            gameModel.spawnZombieAt(BarrelRollerBehavior.IMP_NAME, row, col));
                 }
             }
 
