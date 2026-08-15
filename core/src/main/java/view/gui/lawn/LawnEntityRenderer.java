@@ -16,6 +16,7 @@ import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.PushBehavior;
+import model.zombie.behavior.StealSunBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
@@ -92,6 +93,14 @@ public final class LawnEntityRenderer {
     private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
     /** Lost City Jane fire/explosion death — clip name is {@code animation}, not {@code die}. */
     private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
+    /** Crystal Skull laser — EFFECTS PAM, clip {@code laser_beam}. */
+    private static final String CRYSTALSKULL_BEAM_PAM = "CRYSTALSKULL_BEAM";
+    /** Glow on {@code attack} that cues the beam at {@link StealSunBehavior#ATTACK_BEAM_AT}. */
+    private static final String CRYSTALSKULL_GLOW_PART = "zombie_egypt_ra_staff_whiteglow";
+    /** Held crystal skull (Ra staff mesh) — beam's right edge tracks this part's left. */
+    private static final String[] CRYSTALSKULL_SKULL_PARTS = {
+            "zombie_egypt_ra_staff", CRYSTALSKULL_GLOW_PART, "zombie_skull"};
+    private static final String[] CRYSTALSKULL_BEAM_PARTS = {"laser_beam", "beam"};
     /** Outstretched pushing hand on {@code ZOMBIE_80S_ARCADE}. */
     private static final String ARCADE_HAND_PART = "zombie_troglobite_hand_oute_push";
 
@@ -106,6 +115,9 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
     /** Left-edge canvas X of the pushing hand, one sample per push-clip frame. */
     private final IdentityHashMap<ClipRef, float[]> arcadePushHandX = new IdentityHashMap<>();
+    /** Crystal Skull / beam part names that actually exist on the loaded PAM. */
+    private String crystalSkullPart;
+    private String crystalBeamPart;
     private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
     private final IdentityHashMap<ZombieInstance, Chapter> artChapters = new IdentityHashMap<>();
     private final List<ArmorPop> armorPops = new ArrayList<>();
@@ -395,6 +407,116 @@ public final class LawnEntityRenderer {
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
         popBrokenArmor(zombie, pose, x, y);
         lastLive.put(zombie, new LiveSnap(pose, x, y, zombie.isMovingBackward(), time));
+        maybeDrawCrystalSkullBeam(batch, pose, x, y, time);
+    }
+
+    /** Kick the EFFECTS PAM load during {@code power_up} so {@code laser_beam} is ready at 0.63s. */
+    private void preloadCrystalSkullBeam() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry beam = catalog.byName(CRYSTALSKULL_BEAM_PAM);
+        if (beam != null) {
+            clips.getOrLoad(beam.path(), catalog.resolveClip(beam, "laser_beam"));
+        }
+    }
+
+    /**
+     * {@code CRYSTALSKULL_BEAM} starts when {@code zombie_egypt_ra_staff_whiteglow} fires
+     * at {@link StealSunBehavior#ATTACK_BEAM_AT} of {@code attack}. The beam's right edge
+     * sits on the skull's left and follows that part each frame.
+     */
+    private void maybeDrawCrystalSkullBeam(Batch batch, AnimPose pose, float x, float y, float time) {
+        if (pose == null || catalog == null) {
+            return;
+        }
+        if ("power_up".equals(pose.clipName()) || "power".equals(pose.clipName())
+                || "power_down".equals(pose.clipName())) {
+            preloadCrystalSkullBeam();
+            return;
+        }
+        if (!"attack".equals(pose.clipName()) || time < StealSunBehavior.ATTACK_BEAM_AT) {
+            return;
+        }
+        PamCatalog.PamEntry beam = catalog.byName(CRYSTALSKULL_BEAM_PAM);
+        if (beam == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(beam, "laser_beam");
+        ClipRef beamRef = clips.getOrLoad(beam.path(), clip);
+        if (beamRef == null) {
+            return;
+        }
+        float beamTime = time - StealSunBehavior.ATTACK_BEAM_AT;
+        if (beamTime > beamRef.duration) {
+            return;
+        }
+        ClipRef attack = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        if (crystalSkullPart == null) {
+            crystalSkullPart = firstDrawnPart(attack, CRYSTALSKULL_SKULL_PARTS);
+        }
+        if (crystalBeamPart == null) {
+            crystalBeamPart = firstDrawnPart(beamRef, CRYSTALSKULL_BEAM_PARTS);
+        }
+        Rectangle skull = partAt(attack, time, crystalSkullPart);
+        Rectangle beamBox = partAt(beamRef, beamTime, crystalBeamPart);
+        if (beamBox == null) {
+            beamBox = player.bounds(beam.path(), clip);
+        }
+        float s = AnimScale.ZOMBIE;
+        float bx = x;
+        float by = y;
+        if (skull != null && beamBox != null) {
+            bx = x + (skull.x - (beamBox.x + beamBox.width)) * s;
+            by = y + ((beamBox.y + beamBox.height * 0.5f) - (skull.y + skull.height * 0.5f)) * s;
+        } else if (skull != null) {
+            bx = x + skull.x * s;
+            by = y - (skull.y + skull.height * 0.5f) * s;
+        }
+        player.draw(batch, beamRef, beamTime, bx, by, s, s, false);
+    }
+
+    private String firstDrawnPart(ClipRef clip, String[] names) {
+        if (clip == null || names == null) {
+            return null;
+        }
+        for (String name : names) {
+            Rectangle[] frames = player.partBoundsByFrame(clip, name);
+            if (frames == null) {
+                continue;
+            }
+            for (Rectangle frame : frames) {
+                if (frame != null) {
+                    return name;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Current-frame part box; if that frame is empty, first non-null {@code partBoundsByFrame}. */
+    private Rectangle partAt(ClipRef clip, float time, String name) {
+        if (clip == null || name == null) {
+            return null;
+        }
+        Rectangle now = player.partBounds(clip, time, name);
+        if (now != null) {
+            return now;
+        }
+        Rectangle[] frames = player.partBoundsByFrame(clip, name);
+        if (frames == null) {
+            return null;
+        }
+        int i = clip.duration > 0f
+                ? Math.min(frames.length - 1, Math.max(0, (int) (time / clip.duration * frames.length)))
+                : 0;
+        for (int k = 0; k < frames.length; k++) {
+            Rectangle box = frames[(i + k) % frames.length];
+            if (box != null) {
+                return box;
+            }
+        }
+        return null;
     }
 
     /** First frame of a new {@code push}: rewind so a second shove doesn't keep the old time. */

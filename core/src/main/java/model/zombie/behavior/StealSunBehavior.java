@@ -2,6 +2,7 @@ package model.zombie.behavior;
 
 import model.enums.SunType;
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
 import model.item.Sun;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
@@ -35,6 +36,21 @@ public class StealSunBehavior implements ZombieBehavior {
     /** Fraction of stolen sun the Turquoise drops on death. */
     public static final float TURQUOISE_DEATH_RETURN_FRACTION = 0.5f;
 
+    /** {@code power_up} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
+    public static final float POWER_UP_DURATION = 0.6667f;
+
+    /** Seconds {@code power} loops before {@code power_down}. JSON {@code ChargingTime}. */
+    public static final float POWER_DURATION = DEFAULT_TURQUOISE_CHARGE_TIME;
+
+    /** {@code power_down} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
+    public static final float POWER_DOWN_DURATION = 1.2667f;
+
+    /** {@code attack} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
+    public static final float ATTACK_DURATION = 1.9667f;
+
+    /** Seconds into {@code attack} when {@code zombie_egypt_ra_staff_whiteglow} fires the beam. */
+    public static final float ATTACK_BEAM_AT = 0.63f;
+
     /** Max sun the Ra zombie can steal before it stops. JSON: {@code MaxClaimedSunCurrency}. */
     public static final int DEFAULT_RA_MAX_STOLEN_SUN = 5000;
 
@@ -43,20 +59,29 @@ public class StealSunBehavior implements ZombieBehavior {
     /** Accumulated sun stolen so far. */
     private int stolenSunAmount = 0;
 
+    /** Fractional sun waiting to be spent (drain rate is 25/s; ticks are smaller). */
+    private float drainRemainder = 0f;
+
     /** Suns physically pulled from the ground (Ra zombie). */
     private final List<Sun> capturedGroundSuns = new ArrayList<>();
 
     /** Which phase the Turquoise zombie is currently in. */
-    private TurquoisePhase turquoisePhase = TurquoisePhase.DRAIN;
+    private TurquoisePhase turquoisePhase = TurquoisePhase.WALKING;
 
-    /** Seconds elapsed in the current DRAIN phase. */
+    /** Seconds stolen this charge cycle ({@code power_up} + {@code power} + {@code power_down}). */
     private float drainTimer = 0f;
+
+    /** Seconds elapsed in the current clip phase. */
+    private float phaseTimer = 0f;
 
     /**
      * Whether the Turquoise zombie has detected a plant and started draining
-     * in the current DRAIN cycle.
+     * in the current charge cycle.
      */
     private boolean isDraining = false;
+
+    /** True after the laser has dealt damage this {@code attack} clip. */
+    private boolean laserFired = false;
 
     // --- ZombieBehavior ---
 
@@ -102,66 +127,110 @@ public class StealSunBehavior implements ZombieBehavior {
         if (context == null || zombie == null || zombie.isDead()) return;
 
         switch (turquoisePhase) {
-            case DRAIN:
-                tickDrainPhase(zombie, context, deltaTime);
-                break;
-            case LASER:
-                fireLaser(zombie, context, deltaTime);
-                break;
-            default:
-                break;
+            case WALKING -> tickWalking(zombie, context, deltaTime);
+            case POWER_UP -> tickPowerUp(zombie, context, deltaTime);
+            case POWER -> tickPower(zombie, context, deltaTime);
+            case POWER_DOWN -> tickPowerDown(zombie, context, deltaTime);
+            case ATTACK -> tickAttack(zombie, context, deltaTime);
         }
     }
 
-    /**
-     * Drains sun from the player if a plant is detectable within range,
-     * then after the configured charge time triggers the laser. The
-     * charge time shortens as more sun is stolen (per the JSON
-     * {@code ChargingTimeDecrementPerFiveSun} field).
-     */
-    private void tickDrainPhase(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        boolean plantInRange = isPlantInRange(zombie, context);
-
-        if (plantInRange) {
-            isDraining = true;
-            drainTimer += deltaTime;
-
-            // Drain from player reserve proportionally to elapsed time.
-            float drainRate = DEFAULT_TURQUOISE_DRAIN_RATE;
-            float drainThisTick = drainRate * deltaTime;
-            int drainAmount = (int) drainThisTick;
-            if (drainAmount > 0) {
-                boolean spent = context.spendSun(drainAmount);
-                if (spent) {
-                    stolenSunAmount += drainAmount;
-                }
-            }
-
-            // Effective charge time shortens as more sun is stolen.
-            float baseCharge = zombie.getDefinition().getBehaviorPropFloat(
-                    "ChargingTime", DEFAULT_TURQUOISE_CHARGE_TIME);
-            if (baseCharge <= 0f) baseCharge = DEFAULT_TURQUOISE_CHARGE_TIME;
-            float decrementPerFiveSun = zombie.getDefinition().getBehaviorPropFloat(
-                    "ChargingTimeDecrementPerFiveSun", 0f);
-            float reduction = (stolenSunAmount / 5f) * decrementPerFiveSun;
-            float effectiveCharge = Math.max(0.5f, baseCharge - reduction);
-
-            // After the full drain window, switch to laser phase.
-            if (drainTimer >= effectiveCharge) {
-                turquoisePhase = TurquoisePhase.LASER;
-                drainTimer = 0f;
-            }
-        } else {
-            // No plant visible: pause drain timer but keep the phase.
+    private void tickWalking(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (!isPlantInRange(zombie, context)) {
             isDraining = false;
+            return;
         }
+        beginPowerUp(zombie);
+        tickPowerUp(zombie, context, deltaTime);
+    }
+
+    private void beginPowerUp(ZombieInstance zombie) {
+        turquoisePhase = TurquoisePhase.POWER_UP;
+        phaseTimer = 0f;
+        drainTimer = 0f;
+        drainRemainder = 0f;
+        laserFired = false;
+        isDraining = true;
+        zombie.stopEating();
+        zombie.setState(ZombieState.SPECIAL_ACTION);
+    }
+
+    private void tickPowerUp(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        drainIfPlantInRange(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= POWER_UP_DURATION) {
+            phaseTimer = 0f;
+            turquoisePhase = TurquoisePhase.POWER;
+        }
+    }
+
+    /** Loops {@code power} for {@link #POWER_DURATION} (JSON {@code ChargingTime}). */
+    private void tickPower(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        drainIfPlantInRange(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= powerDuration(zombie)) {
+            phaseTimer = 0f;
+            turquoisePhase = TurquoisePhase.POWER_DOWN;
+        }
+    }
+
+    private void tickPowerDown(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        drainIfPlantInRange(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= POWER_DOWN_DURATION) {
+            phaseTimer = 0f;
+            laserFired = false;
+            isDraining = false;
+            turquoisePhase = TurquoisePhase.ATTACK;
+        }
+    }
+
+    private void tickAttack(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        phaseTimer += deltaTime;
+        if (!laserFired && phaseTimer >= ATTACK_BEAM_AT) {
+            fireLaser(zombie, context);
+            laserFired = true;
+        }
+        if (phaseTimer >= ATTACK_DURATION) {
+            turquoisePhase = TurquoisePhase.WALKING;
+            phaseTimer = 0f;
+            drainTimer = 0f;
+            drainRemainder = 0f;
+            isDraining = false;
+            laserFired = false;
+            zombie.setState(ZombieState.WALKING);
+        }
+    }
+
+    private void drainIfPlantInRange(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (!isPlantInRange(zombie, context)) {
+            isDraining = false;
+            return;
+        }
+        isDraining = true;
+        drainTimer += deltaTime;
+        drainRemainder += DEFAULT_TURQUOISE_DRAIN_RATE * deltaTime;
+        int drainAmount = (int) drainRemainder;
+        if (drainAmount <= 0) {
+            return;
+        }
+        drainRemainder -= drainAmount;
+        if (context.spendSun(drainAmount)) {
+            stolenSunAmount += drainAmount;
+        }
+    }
+
+    private float powerDuration(ZombieInstance zombie) {
+        float seconds = zombie.getDefinition().getBehaviorPropFloat(
+                "ChargingTime", POWER_DURATION);
+        return seconds > 0f ? seconds : POWER_DURATION;
     }
 
     /**
      * Fires a laser that instantly destroys every plant in the configured
      * laser range cells directly to the left of the zombie.
      */
-    private void fireLaser(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+    private void fireLaser(ZombieInstance zombie, BehaviorContext context) {
         int laserRange = zombie.getDefinition().getBehaviorPropInt(
                 "LaserBeamLength", DEFAULT_TURQUOISE_LASER_RANGE);
         // LaserBeamLength in JSON is in world-units (pixels); convert to
@@ -180,16 +249,11 @@ public class StealSunBehavior implements ZombieBehavior {
         for (int col = startCol; col >= 0 && col > startCol - laserRange; col--) {
             if (col < 0 || col >= cols) continue;
 
-            // Destroy the plant in this cell if there is one.
             PlantInstance plant = context.getPlantAt(row, col);
             if (plant != null) {
                 context.damagePlant(plant, laserDamage);
             }
         }
-
-        // Reset back to drain phase.
-        turquoisePhase = TurquoisePhase.DRAIN;
-        isDraining = false;
     }
 
     // --- Death handling ---
@@ -298,17 +362,28 @@ public class StealSunBehavior implements ZombieBehavior {
         return drainTimer;
     }
 
+    public float getPhaseTimer() {
+        return phaseTimer;
+    }
+
     public boolean isDraining() {
         return isDraining;
+    }
+
+    public boolean hasFiredLaser() {
+        return laserFired;
     }
 
     // --- Inner types ---
 
     /**
-     * The two alternating phases of the Turquoise zombie's attack cycle.
+     * Charge then laser: {@code power_up} → looping {@code power} → {@code power_down} → {@code attack}.
      */
     public enum TurquoisePhase {
-        DRAIN, // Draining sun from the player's reserve
-        LASER // Firing the destructive laser across 4 tiles
+        WALKING,
+        POWER_UP,
+        POWER,
+        POWER_DOWN,
+        ATTACK
     }
 }
