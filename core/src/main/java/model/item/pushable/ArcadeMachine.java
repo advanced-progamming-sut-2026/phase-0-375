@@ -15,8 +15,15 @@ public class ArcadeMachine extends GridItem implements Pushable {
     /** Current grid position of this machine; null until the pusher places it. */
     private Point position;
 
+    private final int maxHp;
+
     public ArcadeMachine(int hp) {
         super(hp);
+        this.maxHp = hp;
+    }
+
+    public int getMaxHp() {
+        return maxHp;
     }
 
     @Override

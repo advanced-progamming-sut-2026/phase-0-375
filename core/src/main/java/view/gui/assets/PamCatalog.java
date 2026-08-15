@@ -198,6 +198,9 @@ public final class PamCatalog {
 
     private static boolean isGameplayPam(String path) {
         String upper = path.toUpperCase(Locale.ROOT);
+        if (upper.contains("/EFFECTS/80S_ARCADE_CABINET/") && !upper.contains("BREAK")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/")) {
             return false;
         }
@@ -205,6 +208,14 @@ public final class PamCatalog {
             return false;
         }
         return upper.contains("/PLANT/") || upper.contains("/ZOMBIE/");
+    }
+
+    /** Catalog entry by animations.json {@code name}, or {@code null}. */
+    public PamEntry byName(String pamName) {
+        if (pamName == null) {
+            return null;
+        }
+        return byNormName.get(normalize(pamName));
     }
 
     /** Prefer INITIAL gameplay packs over FULL / holiday variants. */

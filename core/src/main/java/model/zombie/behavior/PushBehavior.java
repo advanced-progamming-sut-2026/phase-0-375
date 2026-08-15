@@ -3,6 +3,7 @@ package model.zombie.behavior;
 import model.enums.PushableItemType;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
+import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Pushable;
@@ -24,6 +25,20 @@ public class PushBehavior implements ZombieBehavior {
      * (state = PUSHING).
      */
     public static final float PUSH_DURATION = 0.5f;
+
+    /** Arcade {@code push} clip length; art sets the pace. */
+    public static final float ARCADE_PUSH_DURATION = 4.0333f;
+
+    /**
+     * Centre of the tile to the right of the cabinet. The cabinet stays on its
+     * tile; the zombie plays {@code push} when its origin reaches that centre.
+     */
+    public static final float ARCADE_HAND_REACH_TILES = 1f;
+
+    /**
+     * Past {@link #ARCADE_HAND_REACH_TILES} so the zombie walks into the first push.
+     */
+    public static final float ARCADE_SPAWN_PAST_BORDER = 0.12f;
 
     /**
      * Damage dealt to a hypnotized zombie crushed by a pushable. Intentionally
@@ -70,8 +85,7 @@ public class PushBehavior implements ZombieBehavior {
 
         // Initialize the pushable's grid position on the first tick.
         if (pushable.getPosition() == null) {
-            int initCol = Math.max(0, zombie.getGridX() - 1);
-            pushable.setPosition(new Point(initCol, zombie.getGridY()));
+            placePushableOnSpawn(zombie, pushable);
         }
 
         switch (phase) {
@@ -118,6 +132,39 @@ public class PushBehavior implements ZombieBehavior {
         resetToWalking(zombie);
     }
 
+    /**
+     * Cabinet on the spawn tile; zombie just past hand-contact so it walks in.
+     * Other pushers keep the pushable one cell ahead.
+     */
+    private void placePushableOnSpawn(ZombieInstance zombie, Pushable pushable) {
+        int row = zombie.getGridY();
+        int spawnCol = zombie.getGridX();
+        if (isArcade(zombie)) {
+            pushable.setPosition(new Point(spawnCol, row));
+            float x = spawnCol + ARCADE_HAND_REACH_TILES + ARCADE_SPAWN_PAST_BORDER;
+            if (zombie.getContinuousPosition() != null) {
+                zombie.setContinuousX(x);
+            } else {
+                zombie.setContinuousPosition(new FloatPoint(x, row));
+            }
+            return;
+        }
+        int initCol = Math.max(0, spawnCol - 1);
+        pushable.setPosition(new Point(initCol, row));
+    }
+
+    static boolean isArcade(ZombieInstance zombie) {
+        return zombie.getDefinition() != null
+                && zombie.getDefinition().getPushableItemType() == PushableItemType.ARCADE_MACHINE;
+    }
+
+    /**
+     * Zombie origin has reached the centre of the tile to the right of the cabinet.
+     */
+    static boolean arcadeHandReachesCabinet(float zombieX, int cabinetCol) {
+        return zombieX <= cabinetCol + ARCADE_HAND_REACH_TILES;
+    }
+
     /** Leaves the PUSHING state and restarts the walk cycle. */
     private void resetToWalking(ZombieInstance zombie) {
         if (zombie.getState() == ZombieState.PUSHING) {
@@ -156,6 +203,18 @@ public class PushBehavior implements ZombieBehavior {
             zombie.setState(ZombieState.WALKING);
         }
 
+        if (isArcade(zombie)) {
+            if (pushable.getCol() <= 0) {
+                return;
+            }
+            if (arcadeHandReachesCabinet(zombie.getContinuousX(), pushable.getCol())) {
+                phase = PushPhase.PUSHING;
+                pushTimer = 0f;
+                zombie.setState(ZombieState.PUSHING);
+            }
+            return;
+        }
+
         int zombieCol = zombie.getGridX();
         int pushableCol = pushable.getCol();
 
@@ -170,10 +229,9 @@ public class PushBehavior implements ZombieBehavior {
     // --- PUSH phase ---
 
     /**
-     * The zombie is in contact with the pushable (one cell behind it) and
-     * is transferring force. After {@value #PUSH_DURATION} seconds, the
-     * pushable snaps one cell forward and the crush check runs on the
-     * pushable's new cell.
+     * The zombie is in contact with the pushable and transferring force.
+     * After the push duration the item snaps one cell forward. Arcade holds
+     * for the {@code push} clip so the cabinet sprite can follow the arm.
      */
     private void tickPushing(ZombieInstance zombie, BehaviorContext context,
                              float deltaTime, Pushable pushable) {
@@ -183,33 +241,28 @@ public class PushBehavior implements ZombieBehavior {
         }
 
         pushTimer += deltaTime;
-        if (pushTimer < PUSH_DURATION) {
-            return; // still transferring force
-        }
-
-        // Push complete
-        pushTimer = 0f;
-
-        int row = zombie.getGridY();
-        int newCol = pushable.getCol() - 1;
-
-        if (newCol < 0) {
-            phase = PushPhase.WALKING;
-            zombie.setState(ZombieState.WALKING);
+        float duration = isArcade(zombie) ? ARCADE_PUSH_DURATION : PUSH_DURATION;
+        if (pushTimer < duration) {
             return;
         }
 
-        // Snap the pushable to its new cell.
-        pushable.setPosition(new Point(newCol, row));
-        pushable.push();
-
-        // Crush anything in the pushable's new cell.
-        crushPlantIfAny(pushable, context, row, newCol);
-        crushHypnotizedZombies(pushable, context, row, newCol);
-
-        // The zombie now needs to walk one cell to catch up.
+        pushTimer = 0f;
+        shoveForward(zombie, context, pushable);
         phase = PushPhase.WALKING;
         zombie.setState(ZombieState.WALKING);
+    }
+
+    /** Snaps the pushable one cell toward the house and crushes that cell. */
+    private void shoveForward(ZombieInstance zombie, BehaviorContext context, Pushable pushable) {
+        int row = zombie.getGridY();
+        int newCol = pushable.getCol() - 1;
+        if (newCol < 0) {
+            return;
+        }
+        pushable.setPosition(new Point(newCol, row));
+        pushable.push();
+        crushPlantIfAny(pushable, context, row, newCol);
+        crushHypnotizedZombies(pushable, context, row, newCol);
     }
 
     // --- Crush helpers ---

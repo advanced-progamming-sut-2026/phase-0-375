@@ -7,11 +7,15 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
 import model.enums.Chapter;
+import model.enums.ZombieBehaviorType;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
+import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
@@ -76,20 +80,36 @@ public final class LawnEntityRenderer {
     private static final String IMP_HEAD = "particle_head";
     private static final String[] IMP_HEAD_PARTS = {
             "zombie_imp_skull", "zombie_imp_jaw", "_zombie_imp_head_top"};
+    /** Arcade {@code particles} groups — default-hidden; {@code drawPart} to drop them. */
+    private static final String[] ARCADE_PARTICLE_PARTS = {"particle_head", "particle_arm"};
+    /** Head / arm on the Arcade die body that the particle groups stand in for. */
+    private static final String[] ARCADE_HEAD_PARTS = {
+            "particle_head", "particle_arm",
+            "zombie_skull", "zombie_jaw",
+            "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+
+    /** Arcade cabinet effect PAM (not a zombie body). */
+    private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
+    /** Outstretched pushing hand on {@code ZOMBIE_80S_ARCADE}. */
+    private static final String ARCADE_HAND_PART = "zombie_troglobite_hand_oute_push";
 
     private final LawnLayout layout;
     private final PlantAnimAdapter plantAdapter;
     private final ZombieAnimAdapter zombieAdapter;
     private final PamClipCache clips;
     private final pvz.libpvz.pam.PamPlayer player;
+    private final PamCatalog catalog;
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
+    /** Left-edge canvas X of the pushing hand, one sample per push-clip frame. */
+    private final IdentityHashMap<ClipRef, float[]> arcadePushHandX = new IdentityHashMap<>();
     private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
     private final IdentityHashMap<ZombieInstance, Chapter> artChapters = new IdentityHashMap<>();
     private final List<ArmorPop> armorPops = new ArrayList<>();
     private final List<DeathFx> deathFx = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, LiveSnap> lastLive = new IdentityHashMap<>();
+    private final IdentityHashMap<Pushable, LiveSnap> lastCabinets = new IdentityHashMap<>();
     /** World-pixel skull alignment for a thrown Imp; lerped to 0 as it lands. */
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
@@ -114,6 +134,7 @@ public final class LawnEntityRenderer {
         this.zombieAdapter = zombieAdapter;
         this.player = assets.player;
         this.clips = new PamClipCache(assets.player);
+        this.catalog = assets.pamCatalog;
         this.entityOverlay = entityOverlay;
     }
 
@@ -150,6 +171,24 @@ public final class LawnEntityRenderer {
         for (PlantInstance plant : model.getAllPlants()) {
             drawPlant(batch, plant, delta);
         }
+        Set<Pushable> liveCabinets = new HashSet<>();
+        for (ZombieInstance zombie : model.getZombies()) {
+            collectLiveCabinet(zombie.getPushableItem(), liveCabinets);
+        }
+        if (model.getOrphanedPushables() != null) {
+            for (Pushable orphan : model.getOrphanedPushables()) {
+                collectLiveCabinet(orphan, liveCabinets);
+            }
+        }
+        for (Pushable cabinet : lastCabinets.keySet()) {
+            if (!liveCabinets.contains(cabinet)) {
+                spawnCabinetDeath(lastCabinets.get(cabinet));
+            }
+        }
+        lastCabinets.entrySet().removeIf(e -> !liveCabinets.contains(e.getKey()));
+        for (Pushable cabinet : liveCabinets) {
+            drawCabinet(batch, cabinet, delta);
+        }
         for (ZombieInstance zombie : model.getZombies()) {
             Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
@@ -178,6 +217,141 @@ public final class LawnEntityRenderer {
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
     }
 
+    private static void collectLiveCabinet(Pushable item, Set<Pushable> live) {
+        if (item instanceof ArcadeMachine cabinet
+                && !cabinet.isDestroyed()
+                && cabinet.getPosition() != null) {
+            live.add(cabinet);
+        }
+    }
+
+    private void drawCabinet(Batch batch, Pushable cabinet, float delta) {
+        Point pos = cabinet.getPosition();
+        if (pos == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(ARCADE_CABINET_PAM);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle");
+        String damage = cabinetDamagePart(cabinet);
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE, damage);
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        float x = xy[0] + arcadeArmPushDeltaX(cabinet);
+        float time = drawPose(batch, cabinet, pose, x, xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
+        lastCabinets.put(cabinet, new LiveSnap(pose, x, xy[1], false, time));
+    }
+
+    /** HP → {@code arcade_cabinet_damage0} (pristine) … {@code damage5} (almost gone). */
+    private static String cabinetDamagePart(Pushable cabinet) {
+        if (!(cabinet instanceof ArcadeMachine machine)) {
+            return "arcade_cabinet_damage0";
+        }
+        int hp = machine.getHp();
+        int max = machine.getMaxHp();
+        int idx = 0;
+        if (max > 0 && hp < max) {
+            idx = Math.min(5, (max - hp) * 6 / max);
+        }
+        return "arcade_cabinet_damage" + idx;
+    }
+
+    /**
+     * World-X delta so the cabinet follows the pushing hand by the same amount
+     * the hand actually travels — not a full extra tile.
+     */
+    private float arcadeArmPushDeltaX(Pushable cabinet) {
+        ZombieInstance pusher = cabinet.getPusher();
+        if (pusher == null || pusher.getDefinition() == null) {
+            return 0f;
+        }
+        PushBehavior push = (PushBehavior) pusher.getBehavior(ZombieBehaviorType.PUSH);
+        if (push == null || !push.isPushing()) {
+            return 0f;
+        }
+        PamCatalog.PamEntry entry = catalog.forZombie(pusher.getDefinition().getName(), null);
+        if (entry == null) {
+            return 0f;
+        }
+        ClipRef clip = clips.getOrLoad(entry.path(), "push");
+        if (clip == null || clip.duration <= 0f) {
+            return 0f;
+        }
+        float[] xs = arcadePushHandCurve(clip);
+        if (xs == null) {
+            return 0f;
+        }
+        float t = Math.min(push.getPushTimer(), clip.duration);
+        return (sampleCurve(xs, t / clip.duration) - xs[0]) * AnimScale.ZOMBIE;
+    }
+
+    /** Canvas-local left-edge X of {@link #ARCADE_HAND_PART}, one value per clip frame. */
+    private float[] arcadePushHandCurve(ClipRef clip) {
+        float[] cached = arcadePushHandX.get(clip);
+        if (cached != null) {
+            return cached.length == 0 ? null : cached;
+        }
+        float[] xs = leftEdgeCurve(clip, ARCADE_HAND_PART);
+        arcadePushHandX.put(clip, xs == null ? new float[0] : xs);
+        return xs;
+    }
+
+    private float[] leftEdgeCurve(ClipRef clip, String part) {
+        Rectangle[] frames = player.partBoundsByFrame(clip, part);
+        if (frames == null || frames.length < 2) {
+            return null;
+        }
+        float[] xs = new float[frames.length];
+        float last = Float.NaN;
+        for (int i = 0; i < frames.length; i++) {
+            if (frames[i] != null) {
+                last = frames[i].x;
+            }
+            xs[i] = last;
+        }
+        if (Float.isNaN(last)) {
+            return null;
+        }
+        float first = last;
+        for (int i = 0; i < xs.length; i++) {
+            if (!Float.isNaN(xs[i])) {
+                first = xs[i];
+                break;
+            }
+        }
+        for (int i = 0; i < xs.length; i++) {
+            if (Float.isNaN(xs[i])) {
+                xs[i] = first;
+            }
+        }
+        return xs;
+    }
+
+    private static float sampleCurve(float[] xs, float phase) {
+        if (xs.length == 1) {
+            return xs[0];
+        }
+        float p = phase < 0f ? 0f : Math.min(phase, 1f);
+        float at = p * (xs.length - 1);
+        int i = (int) at;
+        if (i >= xs.length - 1) {
+            return xs[xs.length - 1];
+        }
+        return xs[i] + (xs[i + 1] - xs[i]) * (at - i);
+    }
+
+    private void spawnCabinetDeath(LiveSnap snap) {
+        if (snap == null || snap.pose == null) {
+            return;
+        }
+        String pam = snap.pose.pamPath();
+        String clip = firstLoadedClip(pam, "death", snap.pose.clipName());
+        deathFx.add(new DeathFx(
+                AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
+                snap.x, snap.y));
+    }
+
     private void drawZombie(Batch batch, ZombieInstance zombie, Chapter chapter, float delta) {
         AnimPose pose = zombieAdapter.poseFor(zombie, chapter);
         if (pose == null) {
@@ -188,6 +362,8 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
+
+        restartArcadePushClock(zombie, pose);
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -217,6 +393,20 @@ public final class LawnEntityRenderer {
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
         popBrokenArmor(zombie, pose, x, y);
         lastLive.put(zombie, new LiveSnap(pose, x, y, zombie.isMovingBackward(), time));
+    }
+
+    /** First frame of a new {@code push}: rewind so a second shove doesn't keep the old time. */
+    private void restartArcadePushClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !"push".equals(pose.clipName())) {
+            return;
+        }
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        if (push == null || !push.isPushing() || push.getPushTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
     }
 
     private Chapter artChapterFor(ZombieInstance zombie, Chapter lawn) {
@@ -319,6 +509,11 @@ public final class LawnEntityRenderer {
         float stateTime = phase >= 0f
                 ? phase * ref.duration
                 : advanceClock(entity, pose.cacheKey(), delta);
+        if (phase >= 0f) {
+            // Gait skips the wall clock; still stamp the clip so the next one-shot
+            // (Arcade {@code push}, All-Star {@code tackle}, …) restarts from 0.
+            stampClockClip(entity, pose.cacheKey());
+        }
         float scale = baseScale * pose.scale();
         drawClip(batch, ref, pose, stateTime, x, y, scale);
         if (flash > 0f) {
@@ -374,11 +569,7 @@ public final class LawnEntityRenderer {
     }
 
     private float advanceClock(Object entity, String clipKey, float delta) {
-        AnimClock clock = clocks.get(entity);
-        if (clock == null) {
-            clock = new AnimClock();
-            clocks.put(entity, clock);
-        }
+        AnimClock clock = clockFor(entity);
         if (!clipKey.equals(clock.clipKey)) {
             clock.clipKey = clipKey;
             clock.time = 0f;
@@ -386,6 +577,24 @@ public final class LawnEntityRenderer {
             clock.time += delta;
         }
         return clock.time;
+    }
+
+    /** Gait walks never call {@link #advanceClock}; stamp so the next one-shot restarts. */
+    private void stampClockClip(Object entity, String clipKey) {
+        AnimClock clock = clockFor(entity);
+        if (!clipKey.equals(clock.clipKey)) {
+            clock.clipKey = clipKey;
+            clock.time = 0f;
+        }
+    }
+
+    private AnimClock clockFor(Object entity) {
+        AnimClock clock = clocks.get(entity);
+        if (clock == null) {
+            clock = new AnimClock();
+            clocks.put(entity, clock);
+        }
+        return clock;
     }
 
     private static final class AnimClock {
@@ -574,7 +783,8 @@ public final class LawnEntityRenderer {
         // The head lies on the ground until the body has finished collapsing, then both fade together.
         ClipRef dieRef = clips.getOrLoad(pam, dieClip);
         String headGroup = deathHeadGroup(pam);
-        float hold = headGroup != null && dieRef != null ? dieRef.duration : 0f;
+        float hold = dieRef != null && (headGroup != null || isArcadeZombie(pam))
+                ? dieRef.duration : 0f;
         float dir = snap.backward ? -1f : 1f;
         if (headGroup != null && firstLoadedClip(pam, "particles", null) != null) {
             // Gargantuar/Imp: the clip is already just the head; drawPart would whitelist butter.
@@ -602,6 +812,10 @@ public final class LawnEntityRenderer {
         return pam != null && pam.toUpperCase().contains("ALLSTAR");
     }
 
+    private static boolean isArcadeZombie(String pam) {
+        return pam != null && pam.toUpperCase().contains("ZOMBIE_80S_ARCADE");
+    }
+
     /** {@code particles} group used for ground Y; the clip itself is drawn whole. */
     private static String deathHeadGroup(String pam) {
         if (isGargantuar(pam)) {
@@ -627,6 +841,9 @@ public final class LawnEntityRenderer {
         if (isAllStar(pam)) {
             return ALLSTAR_HEAD_PARTS;
         }
+        if (isArcadeZombie(pam)) {
+            return ARCADE_HEAD_PARTS;
+        }
         return null;
     }
 
@@ -645,6 +862,10 @@ public final class LawnEntityRenderer {
     private List<String> particleParts(String pam) {
         List<String> bits = new ArrayList<>();
         if (firstLoadedClip(pam, "particles", null) == null) {
+            return bits;
+        }
+        if (isArcadeZombie(pam)) {
+            bits.addAll(List.of(ARCADE_PARTICLE_PARTS));
             return bits;
         }
         String[] names = deathHeadGroup(pam) != null ? new String[]{deathHeadGroup(pam)}
