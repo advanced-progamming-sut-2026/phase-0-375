@@ -13,6 +13,7 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.item.pushable.ArcadeMachine;
+import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.JumpBehavior;
@@ -92,6 +93,13 @@ public final class LawnEntityRenderer {
 
     /** Arcade cabinet effect PAM (not a zombie body). */
     private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
+    /** Pianist’s piano — {@code 768/FULL/ZOMBIE/PIANO/PIANO.PAM}. */
+    private static final String PIANO_PAM = "PIANO";
+    /** Piano {@code particles} parts that scatter on {@code die}. */
+    private static final String[] PIANO_PARTICLE_PARTS = {
+            "particle_jar_01", "particle_jar_02",
+            "particle_key_01", "particle_key_02",
+            "particle_note_01", "particle_note_02"};
     /** Lost City Jane fire/explosion death — clip name is {@code animation}, not {@code die}. */
     private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
     /** Crystal Skull laser — EFFECTS PAM, clip {@code laser_beam}. */
@@ -207,7 +215,11 @@ public final class LawnEntityRenderer {
         }
         lastCabinets.entrySet().removeIf(e -> !liveCabinets.contains(e.getKey()));
         for (Pushable cabinet : liveCabinets) {
-            drawCabinet(batch, cabinet, delta);
+            if (cabinet instanceof Piano) {
+                drawPiano(batch, cabinet, delta);
+            } else {
+                drawCabinet(batch, cabinet, delta);
+            }
         }
         for (ZombieInstance zombie : model.getZombies()) {
             Chapter skin = artChapterFor(zombie, model.getChapter());
@@ -244,6 +256,13 @@ public final class LawnEntityRenderer {
                 && !cabinet.isDestroyed()
                 && cabinet.getPosition() != null) {
             live.add(cabinet);
+            return;
+        }
+        if (item instanceof Piano piano
+                && piano.getPosition() != null
+                && piano.getPusher() != null
+                && !piano.getPusher().isDead()) {
+            live.add(piano);
         }
     }
 
@@ -263,6 +282,38 @@ public final class LawnEntityRenderer {
         float x = xy[0] + arcadeArmPushDeltaX(cabinet);
         float time = drawPose(batch, cabinet, pose, x, xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
         lastCabinets.put(cabinet, new LiveSnap(pose, x, xy[1], false, time));
+    }
+
+    /** Piano rides the pianist’s cell centre — no extra offset. */
+    private void drawPiano(Batch batch, Pushable piano, float delta) {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(PIANO_PAM);
+        if (entry == null) {
+            return;
+        }
+        clips.getOrLoad(entry.path(), "die");
+        clips.getOrLoad(entry.path(), "particles");
+        String clip = catalog.resolveClip(entry, "play");
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        float x;
+        float y;
+        ZombieInstance pusher = piano.getPusher();
+        if (pusher != null && zombieWorldCenter(pusher, xyTmp)) {
+            x = xyTmp[0];
+            y = xyTmp[1];
+        } else {
+            Point pos = piano.getPosition();
+            if (pos == null) {
+                return;
+            }
+            float[] xy = layout.centerOf(pos.getY(), pos.getX());
+            x = xy[0];
+            y = xy[1];
+        }
+        float time = drawPose(batch, piano, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        lastCabinets.put(piano, new LiveSnap(pose, x, y, false, time));
     }
 
     /** HP → {@code arcade_cabinet_damage0} (pristine) … {@code damage5} (almost gone). */
@@ -368,10 +419,42 @@ public final class LawnEntityRenderer {
             return;
         }
         String pam = snap.pose.pamPath();
+        if (isPianoProp(pam)) {
+            spawnPianoDeath(snap, pam);
+            return;
+        }
         String clip = firstLoadedClip(pam, "death", snap.pose.clipName());
         deathFx.add(new DeathFx(
                 AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
                 snap.x, snap.y));
+    }
+
+    private void spawnPianoDeath(LiveSnap snap, String pam) {
+        String dieClip = firstLoadedClip(pam, "die", snap.pose.clipName());
+        Map<String, Boolean> vis = new HashMap<>();
+        if (snap.pose.visibility() != null) {
+            vis.putAll(snap.pose.visibility());
+        }
+        vis.put("_particles", Boolean.FALSE);
+        for (String part : PIANO_PARTICLE_PARTS) {
+            vis.put(part, Boolean.FALSE);
+        }
+        deathFx.add(new DeathFx(
+                AnimPose.once(pam, dieClip, ZombieAnimRole.DIE, vis),
+                snap.x, snap.y));
+        ClipRef dieRef = clips.getOrLoad(pam, dieClip);
+        float hold = dieRef != null ? dieRef.duration : 0f;
+        String particleClip = firstLoadedClip(pam, "particles", null);
+        if (particleClip == null) {
+            return;
+        }
+        float dir = snap.backward ? -1f : 1f;
+        for (int i = 0; i < PIANO_PARTICLE_PARTS.length; i++) {
+            float back = 0.1f + i * 0.1f;
+            float hop = 0.85f + (i % 2) * 0.3f;
+            addLimbPop(pam, particleClip, PIANO_PARTICLE_PARTS[i],
+                    snap.x, snap.y, 0f, dir, back, hop, hold, false);
+        }
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, Chapter chapter, float delta) {
@@ -1087,6 +1170,15 @@ public final class LawnEntityRenderer {
 
     private static boolean isArcadeZombie(String pam) {
         return pam != null && pam.toUpperCase().contains("ZOMBIE_80S_ARCADE");
+    }
+
+    private static boolean isPianoProp(String pam) {
+        if (pam == null) {
+            return false;
+        }
+        String upper = pam.toUpperCase();
+        return upper.contains("/PIANO/PIANO")
+                || (upper.endsWith("PIANO.PAM") && !upper.contains("ZOMBIE_PIANO"));
     }
 
     private static boolean isProspector(String pam) {

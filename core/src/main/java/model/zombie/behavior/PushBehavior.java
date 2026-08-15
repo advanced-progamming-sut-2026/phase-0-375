@@ -88,6 +88,11 @@ public class PushBehavior implements ZombieBehavior {
             placePushableOnSpawn(zombie, pushable);
         }
 
+        if (isPiano(zombie)) {
+            tickPiano(zombie, context, pushable);
+            return;
+        }
+
         switch (phase) {
             case WALKING:
                 tickWalking(zombie, context, deltaTime, pushable);
@@ -149,6 +154,10 @@ public class PushBehavior implements ZombieBehavior {
             }
             return;
         }
+        if (isPiano(zombie)) {
+            pushable.setPosition(new Point(spawnCol, row));
+            return;
+        }
         int initCol = Math.max(0, spawnCol - 1);
         pushable.setPosition(new Point(initCol, row));
     }
@@ -156,6 +165,11 @@ public class PushBehavior implements ZombieBehavior {
     static boolean isArcade(ZombieInstance zombie) {
         return zombie.getDefinition() != null
                 && zombie.getDefinition().getPushableItemType() == PushableItemType.ARCADE_MACHINE;
+    }
+
+    static boolean isPiano(ZombieInstance zombie) {
+        return zombie.getDefinition() != null
+                && zombie.getDefinition().getPushableItemType() == PushableItemType.PIANO;
     }
 
     /**
@@ -186,6 +200,27 @@ public class PushBehavior implements ZombieBehavior {
     @Override
     public ZombieBehaviorType getType() {
         return ZombieBehaviorType.PUSH;
+    }
+
+    /**
+     * Piano rides the same tile as the pianist. Stay walking so they move
+     * linearly; crush whatever shares that cell.
+     */
+    private void tickPiano(ZombieInstance zombie, BehaviorContext context, Pushable pushable) {
+        if (zombie.getState() == ZombieState.PUSHING
+                || zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
+        }
+        int row = zombie.getGridY();
+        int col = zombie.getGridX();
+        Point here = new Point(col, row);
+        Point old = pushable.getPosition();
+        if (old == null || old.getX() != col || old.getY() != row) {
+            pushable.setPosition(here);
+            pushable.push();
+        }
+        crushPlantIfAny(pushable, context, row, col);
+        crushHypnotizedZombies(pushable, context, row, col);
     }
 
     // --- WALK phase ---

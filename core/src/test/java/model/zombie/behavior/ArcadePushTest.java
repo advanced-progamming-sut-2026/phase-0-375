@@ -10,6 +10,7 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.IceBlock;
+import model.item.pushable.Piano;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.definition.Zombie;
@@ -21,6 +22,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -139,6 +141,42 @@ class ArcadePushTest {
         assertEquals(PushBehavior.PushPhase.WALKING, push.getPhase());
     }
 
+    @Test
+    void pianoSpawnsOnSameTileAndStaysWalking() {
+        Piano piano = new Piano(840);
+        ZombieInstance zombie = pianistAt(SPAWN_COL, piano);
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+
+        push.execute(zombie, stubContext(null), TICK);
+
+        assertEquals(SPAWN_COL, piano.getCol());
+        assertEquals(SPAWN_COL, zombie.getContinuousX(), 1e-4f);
+        assertNotEquals(ZombieState.PUSHING, zombie.getState());
+        assertFalse(push.isPushing());
+    }
+
+    @Test
+    void pianoFollowsGridAndCrushesCurrentTile() {
+        PlantInstance plant = wallnut();
+        Piano piano = new Piano(840);
+        ZombieInstance zombie = pianistAt(SPAWN_COL, piano);
+        PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
+        BehaviorContext context = stubContextAt(plant, SPAWN_COL);
+
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL, piano.getCol());
+        assertTrue(plant.getCurrentHP() <= 0, "plant on the shared tile is crushed");
+
+        PlantInstance next = wallnut();
+        context = stubContextAt(next, SPAWN_COL - 1);
+        zombie.setGridX(SPAWN_COL - 1);
+        zombie.setContinuousX(SPAWN_COL - 1);
+        push.execute(zombie, context, TICK);
+        assertEquals(SPAWN_COL - 1, piano.getCol());
+        assertTrue(next.getCurrentHP() <= 0);
+        assertNotEquals(ZombieState.PUSHING, zombie.getState());
+    }
+
     private static ZombieInstance arcadeAt(int col, ArcadeMachine cabinet) {
         Zombie definition = new Zombie(
                 "ZombieArcade", 1290, 0.16f, 100f, ZombieSize.NORMAL,
@@ -147,6 +185,19 @@ class ArcadePushTest {
                 List.of(ZombieBehaviorType.PUSH));
         ZombieInstance zombie = new ZombieInstance(definition, List.of(), cabinet);
         cabinet.setPusher(zombie);
+        zombie.setGridPosition(new Point(col, 0));
+        zombie.setContinuousPosition(new FloatPoint(col, 0));
+        return zombie;
+    }
+
+    private static ZombieInstance pianistAt(int col, Piano piano) {
+        Zombie definition = new Zombie(
+                "ZombiePiano", 840, 0.12f, 4000f, ZombieSize.NORMAL,
+                Chapter.ANCIENT_EGYPT, 450, 1, List.of(),
+                PushableItemType.PIANO, null,
+                List.of(ZombieBehaviorType.PUSH, ZombieBehaviorType.PIANO_SWAP));
+        ZombieInstance zombie = new ZombieInstance(definition, List.of(), piano);
+        piano.setPusher(zombie);
         zombie.setGridPosition(new Point(col, 0));
         zombie.setContinuousPosition(new FloatPoint(col, 0));
         return zombie;
@@ -172,6 +223,24 @@ class ArcadePushTest {
                 (proxy, method, args) -> switch (method.getName()) {
                     case "getColumnCount" -> 9;
                     case "getPlantAt" -> (int) args[1] == SPAWN_COL - 1 ? plant : null;
+                    case "destroyPlant" -> {
+                        if (args[0] != null) {
+                            ((PlantInstance) args[0]).setCurrentHP(0);
+                        }
+                        yield null;
+                    }
+                    case "getZombiesInLane" -> List.of();
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static BehaviorContext stubContextAt(PlantInstance plant, int plantCol) {
+        return (BehaviorContext) Proxy.newProxyInstance(
+                BehaviorContext.class.getClassLoader(),
+                new Class<?>[]{BehaviorContext.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getColumnCount" -> 9;
+                    case "getPlantAt" -> (int) args[1] == plantCol ? plant : null;
                     case "destroyPlant" -> {
                         if (args[0] != null) {
                             ((PlantInstance) args[0]).setCurrentHP(0);
