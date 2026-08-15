@@ -59,6 +59,9 @@ public class ZombieInstance implements Tickable, Placeable {
     /** True if any non-plant source (mower, environment, zombie) damaged this zombie. */
     private boolean nonPlantDamaged = false;
 
+    /** Killing blow was fire or an explosion — play ash instead of {@code die}. */
+    private boolean blownUp;
+
     public ZombieInstance(Zombie definition) {
         this.definition = definition;
         this.state = ZombieState.SPAWNING;
@@ -157,6 +160,9 @@ public class ZombieInstance implements Tickable, Placeable {
         int scaled = (int) (damage * fireDamageMultiplier);
         if (scaled <= 0) return 0;
         takeDamage(scaled);
+        if (currentHP <= 0) {
+            blownUp = true;
+        }
         return scaled;
     }
 
@@ -491,6 +497,9 @@ public class ZombieInstance implements Tickable, Placeable {
     /** @return the last source that damaged this zombie, or null if unknown. */
     public Object getLastDamageSource() { return lastDamageSource; }
     public void setLastDamageSource(Object lastDamageSource) { this.lastDamageSource = lastDamageSource;}
+    /** Cherry Bomb / Jalapeno / Potato Mine / Explode-o-nut — ash death, not {@code die}. */
+    public void markBlownUp() { blownUp = true; }
+    public boolean isBlownUp() { return blownUp; }
     public FloatPoint getContinuousPosition() { return continuousPosition; }
     public float getContinuousX() { return continuousPosition.getX(); }
     public float getContinuousY() { return continuousPosition.getY(); }

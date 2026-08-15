@@ -90,6 +90,8 @@ public final class LawnEntityRenderer {
 
     /** Arcade cabinet effect PAM (not a zombie body). */
     private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
+    /** Lost City Jane fire/explosion death — clip name is {@code animation}, not {@code die}. */
+    private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
     /** Outstretched pushing hand on {@code ZOMBIE_80S_ARCADE}. */
     private static final String ARCADE_HAND_PART = "zombie_troglobite_hand_oute_push";
 
@@ -163,7 +165,7 @@ public final class LawnEntityRenderer {
         Set<ZombieInstance> alive = new HashSet<>(model.getZombies());
         for (ZombieInstance zombie : lastLive.keySet()) {
             if (!alive.contains(zombie)) {
-                spawnDeath(lastLive.get(zombie));
+                spawnDeath(zombie, lastLive.get(zombie));
             }
         }
         lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
@@ -756,8 +758,11 @@ public final class LawnEntityRenderer {
         }
     }
 
-    private void spawnDeath(LiveSnap snap) {
+    private void spawnDeath(ZombieInstance zombie, LiveSnap snap) {
         if (snap == null || snap.pose == null) {
+            return;
+        }
+        if (trySpawnJaneAsh(zombie, snap)) {
             return;
         }
         String pam = snap.pose.pamPath();
@@ -798,6 +803,26 @@ public final class LawnEntityRenderer {
             float hop = 0.85f + (i % 2) * 0.3f;
             addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop, hold, false);
         }
+    }
+
+    /** Jane's incineration PAM lives under EFFECTS and has clip {@code animation}, not {@code die}. */
+    private boolean trySpawnJaneAsh(ZombieInstance zombie, LiveSnap snap) {
+        if (zombie == null || !zombie.isBlownUp() || catalog == null) {
+            return false;
+        }
+        if (zombie.getDefinition() == null
+                || !"ZombieLostCityJane".equals(zombie.getDefinition().getName())) {
+            return false;
+        }
+        PamCatalog.PamEntry ash = catalog.byName(JANE_ASH_PAM);
+        if (ash == null) {
+            return false;
+        }
+        String clip = catalog.resolveClip(ash, "animation");
+        deathFx.add(new DeathFx(
+                AnimPose.once(ash.path(), clip, ZombieAnimRole.DIE, null),
+                snap.x, snap.y));
+        return true;
     }
 
     private static boolean isGargantuar(String pam) {

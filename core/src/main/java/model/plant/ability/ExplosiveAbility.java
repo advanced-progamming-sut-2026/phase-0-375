@@ -188,6 +188,7 @@ public class ExplosiveAbility implements PlantAbility {
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
         boolean isFire = def.hasTag(PlantTags.FIRE);
+        boolean ash = !isSquash(def);
         int damage = def.getDamage();
         // EXPLODE_DAMAGE_BUFF adds to the explosion damage.
         damage += (int) cumulativeSpecialValue(plant, PlantSpecialTag.EXPLODE_DAMAGE_BUFF);
@@ -196,7 +197,7 @@ public class ExplosiveAbility implements PlantAbility {
         if (radius >= MAPWIDE_THRESHOLD) {
             for (int lane = 0; lane < context.getRowCount(); lane++) {
                 for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
-                    applyExplosionDamage(context, zombie, damage, isFire);
+                    applyExplosionDamage(context, zombie, damage, isFire, ash);
                 }
             }
             // Heat melts every ice block on the map.
@@ -208,7 +209,7 @@ public class ExplosiveAbility implements PlantAbility {
         // Lane-clearing explosion (Jalapeno).
         if (isFire && radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInLane(row)) {
-                applyExplosionDamage(context, zombie, damage, isFire);
+                applyExplosionDamage(context, zombie, damage, isFire, ash);
             }
             // Jalapeno scorches the entire lane - melt all ice in it.
             context.damageIceInArea(
@@ -219,7 +220,7 @@ public class ExplosiveAbility implements PlantAbility {
         // 3x3 AoE (Cherry Bomb, Grapeshot, Primal Potato Mine).
         if (radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
-                applyExplosionDamage(context, zombie, damage, isFire);
+                applyExplosionDamage(context, zombie, damage, isFire, ash);
             }
             // Melt ice in the 3x3 blast area.
             context.damageIceInArea(row, col, 1, 1, damage);
@@ -227,19 +228,23 @@ public class ExplosiveAbility implements PlantAbility {
         }
         // Localised explosion (Potato Mine).
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
-            applyExplosionDamage(context, zombie, damage, isFire);
+            applyExplosionDamage(context, zombie, damage, isFire, ash);
         }
         // Melt ice in the localized blast area.
         context.damageIceInArea(row, col, radius, radius, damage);
     }
 
     /** Applies explosion damage to a single zombie (attributed via context). */
-    private void applyExplosionDamage(PlantAbilityContext context, ZombieInstance zombie, int damage, boolean isFire) {
+    private void applyExplosionDamage(PlantAbilityContext context, ZombieInstance zombie,
+                                      int damage, boolean isFire, boolean ash) {
         if (zombie == null || zombie.isDead() || damage <= 0) return;
         if (isFire) {
             context.damageZombieWithFire(zombie, damage);
         } else {
             context.damageZombie(zombie, damage);
+        }
+        if (ash && zombie.getCurrentHP() <= 0) {
+            zombie.markBlownUp();
         }
     }
 

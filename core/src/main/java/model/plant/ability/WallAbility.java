@@ -96,6 +96,9 @@ public class WallAbility implements PlantAbility {
         int radius = DEFAULT_EXPLODE_O_NUT_RADIUS;
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
             context.damageZombie(zombie, damage);
+            if (zombie.getCurrentHP() <= 0) {
+                zombie.markBlownUp();
+            }
         }
     }
 
