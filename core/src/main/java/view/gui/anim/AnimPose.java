@@ -20,14 +20,22 @@ public final class AnimPose {
     private final boolean loop;
     private final Map<String, Boolean> visibility;
     private final float scale;
+    private final boolean flipX;
+    private final boolean reverse;
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility) {
-        this(pamPath, clipName, role, loop, visibility, 1f);
+        this(pamPath, clipName, role, loop, visibility, 1f, false, false);
     }
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility, float scale) {
+        this(pamPath, clipName, role, loop, visibility, scale, false, false);
+    }
+
+    private AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
+                     Map<String, Boolean> visibility, float scale,
+                     boolean flipX, boolean reverse) {
         this.pamPath = pamPath;
         this.clipName = clipName;
         this.role = role;
@@ -36,6 +44,8 @@ public final class AnimPose {
                 ? null
                 : Collections.unmodifiableMap(visibility);
         this.scale = scale > 0f ? scale : 1f;
+        this.flipX = flipX;
+        this.reverse = reverse;
     }
 
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role) {
@@ -79,7 +89,7 @@ public final class AnimPose {
      */
     public AnimPose withVisibleParts(String... partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
     }
 
     /**
@@ -88,12 +98,22 @@ public final class AnimPose {
      */
     public AnimPose withVisibleParts(Iterable<String> partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
     }
 
     /** Copy of this pose with an entity-specific size multiplier (Gargantuar, Imp, …). */
     public AnimPose withScale(float scale) {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
+    }
+
+    /** Mirror horizontally around the PAM canvas centre. */
+    public AnimPose flipped() {
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, true, reverse);
+    }
+
+    /** Play the clip last-frame-first. */
+    public AnimPose reversed() {
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, true);
     }
 
     public String pamPath() {
@@ -121,6 +141,14 @@ public final class AnimPose {
     /** Entity-specific multiplier applied on top of {@link AnimScale}; {@code 1} by default. */
     public float scale() {
         return scale;
+    }
+
+    public boolean flipX() {
+        return flipX;
+    }
+
+    public boolean reverse() {
+        return reverse;
     }
 
     public String cacheKey() {

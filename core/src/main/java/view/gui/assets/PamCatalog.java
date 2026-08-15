@@ -207,6 +207,9 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/CRYSTALSKULL_BEAM/")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/ZOMBIE_PROSPECTOR_BLAST_OFF/")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/")) {
             return false;
         }

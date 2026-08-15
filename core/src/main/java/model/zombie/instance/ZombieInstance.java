@@ -319,7 +319,12 @@ public class ZombieInstance implements Tickable, Placeable {
         this.eatingTarget = null;
         this.combatTargetZombie = null;
         if (state == ZombieState.EATING) {
-            state = movingBackward ? ZombieState.HYPNOTIZED : ZombieState.WALKING;
+            JumpBehavior jump = (JumpBehavior) getBehavior(ZombieBehaviorType.JUMP);
+            boolean reversedWalk = jump != null
+                    && jump.getPhase() == JumpBehavior.JumpPhase.REVERSED_WALK;
+            state = movingBackward && !reversedWalk
+                    ? ZombieState.HYPNOTIZED
+                    : ZombieState.WALKING;
         }
     }
 

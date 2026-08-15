@@ -15,6 +15,7 @@ import model.plant.instance.PlantInstance;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
+import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.StealSunBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
@@ -95,6 +96,9 @@ public final class LawnEntityRenderer {
     private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
     /** Crystal Skull laser — EFFECTS PAM, clip {@code laser_beam}. */
     private static final String CRYSTALSKULL_BEAM_PAM = "CRYSTALSKULL_BEAM";
+    /** Ground burst when Prospector's dynamite explodes. Clips {@code animation} + {@code animation2}. */
+    private static final String PROSPECTOR_BLAST_PAM = "ZOMBIE_PROSPECTOR_BLAST_OFF";
+    private static final String[] PROSPECTOR_BLAST_CLIPS = {"animation", "animation2"};
     /** Glow on {@code attack} that cues the beam at {@link StealSunBehavior#ATTACK_BEAM_AT}. */
     private static final String CRYSTALSKULL_GLOW_PART = "zombie_egypt_ra_staff_whiteglow";
     /** Held crystal skull (Ra staff mesh) — beam's right edge tracks this part's left. */
@@ -126,6 +130,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Pushable, LiveSnap> lastCabinets = new IdentityHashMap<>();
     /** World-pixel skull alignment for a thrown Imp; lerped to 0 as it lands. */
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
+    private final List<BlastFx> prospectorBlasts = new ArrayList<>();
+    private final IdentityHashMap<ZombieInstance, Boolean> prospectorBlastSpawned = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
     private final Matrix4 batchTransform = new Matrix4();
@@ -207,12 +213,14 @@ public final class LawnEntityRenderer {
             Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
         }
+        drawProspectorBlasts(batch, delta);
         drawDeathFx(batch, delta);
         drawArmorPops(batch, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
+        prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         artChapters.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
     }
 
@@ -378,6 +386,7 @@ public final class LawnEntityRenderer {
         }
 
         restartArcadePushClock(zombie, pose);
+        restartProspectorJumpClock(zombie, pose);
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -392,10 +401,26 @@ public final class LawnEntityRenderer {
             }
             y += flight.heightTiles() * layout.cellHeight();
         }
+        JumpBehavior jump = (JumpBehavior) zombie.getBehavior(ZombieBehaviorType.JUMP);
+        if (jump != null) {
+            y += jump.heightPx();
+            if (jump.getPhase() == JumpBehavior.JumpPhase.COUNTDOWN) {
+                clips.getOrLoad(pose.pamPath(), "blastoff");
+                clips.getOrLoad(pose.pamPath(), "fly");
+                clips.getOrLoad(pose.pamPath(), "land");
+                preloadProspectorBlast();
+            } else if (jump.getPhase() == JumpBehavior.JumpPhase.JUMPING) {
+                spawnProspectorBlast(zombie, jump);
+            }
+        }
         float phase = NO_PHASE;
         ZombieGait gait = gaitFor(zombie);
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
-        if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
+        if (ref != null && jump != null && jump.getPhase() == JumpBehavior.JumpPhase.JUMPING
+                && ref.duration > 0f) {
+            // Fuse hit → blastoff this frame. Do not let the gait walk clock finish first.
+            phase = prospectorJumpPhase(jump, pose.clipName(), ref.duration);
+        } else if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
             // Walking is driven by travel, so a cycle always covers exactly one step and
             // ground_swatch can be held still. Every other pose stays on the wall clock.
             // Hypnotized zombies walk the other way, so distance and the hold-back both flip.
@@ -406,7 +431,8 @@ public final class LawnEntityRenderer {
         }
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
         popBrokenArmor(zombie, pose, x, y);
-        lastLive.put(zombie, new LiveSnap(pose, x, y, zombie.isMovingBackward(), time));
+        lastLive.put(zombie, new LiveSnap(pose, x, y,
+                zombie.isMovingBackward() || pose.flipX(), time));
         maybeDrawCrystalSkullBeam(batch, pose, x, y, time);
     }
 
@@ -418,6 +444,59 @@ public final class LawnEntityRenderer {
         PamCatalog.PamEntry beam = catalog.byName(CRYSTALSKULL_BEAM_PAM);
         if (beam != null) {
             clips.getOrLoad(beam.path(), catalog.resolveClip(beam, "laser_beam"));
+        }
+    }
+
+    private void preloadProspectorBlast() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry blast = catalog.byName(PROSPECTOR_BLAST_PAM);
+        if (blast == null) {
+            return;
+        }
+        for (String clip : PROSPECTOR_BLAST_CLIPS) {
+            clips.getOrLoad(blast.path(), catalog.resolveClip(blast, clip));
+        }
+    }
+
+    /** Ground burst at the fuse tile; stays put while the body flies. */
+    private void spawnProspectorBlast(ZombieInstance zombie, JumpBehavior jump) {
+        if (zombie == null || jump == null || prospectorBlastSpawned.containsKey(zombie)) {
+            return;
+        }
+        preloadProspectorBlast();
+        PamCatalog.PamEntry blast = catalog == null ? null : catalog.byName(PROSPECTOR_BLAST_PAM);
+        if (blast == null) {
+            return;
+        }
+        float[] xy = layout.centerOf(zombie.getGridY(), jump.getLaunchX());
+        prospectorBlasts.add(new BlastFx(blast.path(), xy[0], xy[1]));
+        prospectorBlastSpawned.put(zombie, Boolean.TRUE);
+    }
+
+    private void drawProspectorBlasts(Batch batch, float delta) {
+        float scale = AnimScale.ZOMBIE;
+        for (int i = prospectorBlasts.size() - 1; i >= 0; i--) {
+            BlastFx fx = prospectorBlasts.get(i);
+            float maxDuration = 0f;
+            boolean drew = false;
+            for (String clip : PROSPECTOR_BLAST_CLIPS) {
+                ClipRef ref = clips.getOrLoad(fx.pamPath, clip);
+                if (ref == null) {
+                    continue;
+                }
+                maxDuration = Math.max(maxDuration, ref.duration);
+                if (fx.time < ref.duration) {
+                    player.draw(batch, ref, fx.time, fx.x, fx.y, scale, scale, false);
+                    drew = true;
+                }
+            }
+            if (!drew && (maxDuration <= 0f || fx.time >= maxDuration)) {
+                prospectorBlasts.remove(i);
+                continue;
+            }
+            fx.time += delta;
         }
     }
 
@@ -533,6 +612,34 @@ public final class LawnEntityRenderer {
         clock.time = 0f;
     }
 
+    /** Fuse done: cut walk immediately and play {@code blastoff} from t=0. */
+    private void restartProspectorJumpClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !"blastoff".equals(pose.clipName())) {
+            return;
+        }
+        JumpBehavior jump = (JumpBehavior) zombie.getBehavior(ZombieBehaviorType.JUMP);
+        if (jump == null || jump.getPhase() != JumpBehavior.JumpPhase.JUMPING) {
+            return;
+        }
+        if (jump.getTravelTimer() > JumpBehavior.BLASTOFF_DURATION) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /** 0 at the start of this jump clip; not the leftover walk gait phase. */
+    private static float prospectorJumpPhase(JumpBehavior jump, String clip, float duration) {
+        float local = jump.getTravelTimer();
+        if ("fly".equals(clip)) {
+            local -= JumpBehavior.BLASTOFF_DURATION;
+        } else if ("land".equals(clip)) {
+            local -= JumpBehavior.BLASTOFF_DURATION + JumpBehavior.FLY_DURATION;
+        }
+        return Math.max(0f, local) / duration;
+    }
+
     private Chapter artChapterFor(ZombieInstance zombie, Chapter lawn) {
         Chapter skin = artChapters.get(zombie);
         if (skin != null) {
@@ -638,6 +745,9 @@ public final class LawnEntityRenderer {
             // (Arcade {@code push}, All-Star {@code tackle}, …) restarts from 0.
             stampClockClip(entity, pose.cacheKey());
         }
+        if (pose.reverse() && ref.duration > 0f) {
+            stateTime = Math.max(0f, ref.duration - Math.min(stateTime, ref.duration));
+        }
         float scale = baseScale * pose.scale();
         drawClip(batch, ref, pose, stateTime, x, y, scale);
         if (flash > 0f) {
@@ -652,10 +762,11 @@ public final class LawnEntityRenderer {
 
     private void drawClip(Batch batch, ClipRef ref, AnimPose pose,
                           float stateTime, float x, float y, float scale) {
+        float sx = pose.flipX() ? -scale : scale;
         if (pose.visibility() == null) {
-            player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop());
+            player.draw(batch, ref, stateTime, x, y, sx, scale, pose.loop());
         } else {
-            player.draw(batch, ref, stateTime, x, y, scale, scale, pose.loop(), pose.visibility());
+            player.draw(batch, ref, stateTime, x, y, sx, scale, pose.loop(), pose.visibility());
         }
     }
 
@@ -880,6 +991,19 @@ public final class LawnEntityRenderer {
         }
     }
 
+    private static final class BlastFx {
+        final String pamPath;
+        final float x;
+        final float y;
+        float time;
+
+        BlastFx(String pamPath, float x, float y) {
+            this.pamPath = pamPath;
+            this.x = x;
+            this.y = y;
+        }
+    }
+
     private void spawnDeath(ZombieInstance zombie, LiveSnap snap) {
         if (snap == null || snap.pose == null) {
             return;
@@ -903,14 +1027,16 @@ public final class LawnEntityRenderer {
                 vis.put(part, Boolean.FALSE);
             }
         }
-        deathFx.add(new DeathFx(
-                AnimPose.once(pam, dieClip, ZombieAnimRole.DIE, vis.isEmpty() ? null : vis),
-                snap.x, snap.y));
+        AnimPose diePose = AnimPose.once(pam, dieClip, ZombieAnimRole.DIE, vis.isEmpty() ? null : vis);
+        if (snap.pose.flipX()) {
+            diePose = diePose.flipped();
+        }
+        deathFx.add(new DeathFx(diePose, snap.x, snap.y));
 
         // The head lies on the ground until the body has finished collapsing, then both fade together.
         ClipRef dieRef = clips.getOrLoad(pam, dieClip);
         String headGroup = deathHeadGroup(pam);
-        float hold = dieRef != null && (headGroup != null || isArcadeZombie(pam))
+        float hold = dieRef != null && (headGroup != null || popsHeadAndArm(pam))
                 ? dieRef.duration : 0f;
         float dir = snap.backward ? -1f : 1f;
         if (headGroup != null && firstLoadedClip(pam, "particles", null) != null) {
@@ -963,6 +1089,20 @@ public final class LawnEntityRenderer {
         return pam != null && pam.toUpperCase().contains("ZOMBIE_80S_ARCADE");
     }
 
+    private static boolean isProspector(String pam) {
+        if (pam == null) {
+            return false;
+        }
+        String upper = pam.toUpperCase();
+        return upper.contains("ZOMBIE_PROSPECTOR")
+                && !upper.contains("BLAST")
+                && !upper.contains("SMOKE");
+    }
+
+    private static boolean popsHeadAndArm(String pam) {
+        return isArcadeZombie(pam) || isProspector(pam);
+    }
+
     /** {@code particles} group used for ground Y; the clip itself is drawn whole. */
     private static String deathHeadGroup(String pam) {
         if (isGargantuar(pam)) {
@@ -988,7 +1128,7 @@ public final class LawnEntityRenderer {
         if (isAllStar(pam)) {
             return ALLSTAR_HEAD_PARTS;
         }
-        if (isArcadeZombie(pam)) {
+        if (popsHeadAndArm(pam)) {
             return ARCADE_HEAD_PARTS;
         }
         return null;
@@ -1011,7 +1151,7 @@ public final class LawnEntityRenderer {
         if (firstLoadedClip(pam, "particles", null) == null) {
             return bits;
         }
-        if (isArcadeZombie(pam)) {
+        if (popsHeadAndArm(pam)) {
             bits.addAll(List.of(ARCADE_PARTICLE_PARTS));
             return bits;
         }
