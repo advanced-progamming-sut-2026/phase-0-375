@@ -12,8 +12,8 @@ public class ShootBehavior implements ZombieBehavior {
 
     // --- Explorer constants ---
 
-    /** How many tiles ahead (in the same lane) the torch reaches. */
-    public static final int EXPLORER_TORCH_REACH = 1;
+    /** Torch kills plants in the same lane strictly closer than this many tiles ahead. */
+    public static final float EXPLORER_TORCH_REACH = 1f;
 
     // --- Ice Age Hunter constants ---
 
@@ -57,7 +57,7 @@ public class ShootBehavior implements ZombieBehavior {
         }
 
         if (isExplorer(zombie)) {
-            tickExplorer(zombie, context, deltaTime);
+            tickExplorer(zombie, context);
         } else if (isIceAgeHunter(zombie)) {
             tickIceAgeHunter(zombie, context, deltaTime);
         } else if (isBeachOctopus(zombie)) {
@@ -73,62 +73,44 @@ public class ShootBehavior implements ZombieBehavior {
     // --- Explorer ---
 
     /**
-     * While lit, instantly destroys any plant within {@value #EXPLORER_TORCH_REACH}
-     * tile(s) ahead in the Explorer's lane. Also reacts to ice/fire plants
-     * sharing the Explorer's cell (extinguish / relight the torch).
+     * While lit, instantly destroys plants in this lane whose centre is closer
+     * than {@value #EXPLORER_TORCH_REACH} tile ahead. Ice in that span
+     * extinguishes the torch; fire relights it.
      */
-    private void tickExplorer(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        reactToElementalPlantContact(zombie, context);
+    private void tickExplorer(ZombieInstance zombie, BehaviorContext context) {
+        for (PlantInstance plant : context.getPlantsInLane(zombie.getGridY())) {
+            float d = torchDistanceAhead(zombie, plant);
+            if (d < 0f || d >= EXPLORER_TORCH_REACH || plant.getDefinition() == null) {
+                continue;
+            }
+            if (plant.getDefinition().hasTag(model.enums.PlantTags.ICE)) {
+                extinguishTorch();
+            } else if (plant.getDefinition().hasTag(model.enums.PlantTags.FIRE)) {
+                igniteTorch();
+            }
+        }
 
         if (!torchLit) {
             return;
         }
 
-        PlantInstance target = findTorchTarget(zombie, context);
-        if (target == null) {
-            return;
-        }
-
-        float damage = zombie.getDefinition().getEatDPS() * deltaTime;
-        if (damage > 0) {
-            context.damagePlant(target, (int) damage);
+        for (PlantInstance plant : context.getPlantsInLane(zombie.getGridY())) {
+            float d = torchDistanceAhead(zombie, plant);
+            if (d > 0f && d < EXPLORER_TORCH_REACH) {
+                context.destroyPlant(plant);
+            }
         }
     }
 
     /**
-     * Ice-tagged plants extinguish the torch; fire-tagged plants relight it.
+     * Tiles the plant sits ahead of the Explorer (walks left). {@code 0} is the
+     * same centre; negative is behind or dead.
      */
-    private void reactToElementalPlantContact(ZombieInstance zombie, BehaviorContext context) {
-        PlantInstance here = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
-        if (here == null || here.getDefinition() == null) {
-            return;
+    private static float torchDistanceAhead(ZombieInstance zombie, PlantInstance plant) {
+        if (plant == null || plant.getCurrentHP() <= 0 || plant.getPosition() == null) {
+            return -1f;
         }
-        if (here.getDefinition().hasTag(model.enums.PlantTags.ICE)) {
-            extinguishTorch();
-        } else if (here.getDefinition().hasTag(model.enums.PlantTags.FIRE)) {
-            igniteTorch();
-        }
-    }
-
-    /**
-     * Finds the plant, if any, within torch reach directly in front of the
-     * zombie in its own lane.
-     */
-    private PlantInstance findTorchTarget(ZombieInstance zombie, BehaviorContext context) {
-        int row = zombie.getGridY();
-        int zombieCol = zombie.getGridX();
-
-        for (int offset = 1; offset <= EXPLORER_TORCH_REACH; offset++) {
-            int col = zombieCol - offset;
-            if (col < 0) {
-                continue;
-            }
-            PlantInstance plant = context.getPlantAt(row, col);
-            if (plant != null && plant.getCurrentHP() > 0) {
-                return plant;
-            }
-        }
-        return null;
+        return zombie.getContinuousX() - plant.getPosition().getX();
     }
 
     /**

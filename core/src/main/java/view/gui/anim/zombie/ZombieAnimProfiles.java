@@ -23,6 +23,6 @@ public final class ZombieAnimProfiles {
         PianoAnim.register(overrides);
         NewspaperAnim.register(overrides);
         BarrelRollerAnim.register(overrides);
-        // TODO: ExplorerAnim.register(overrides);
+        ExplorerAnim.register(overrides);
     }
 }

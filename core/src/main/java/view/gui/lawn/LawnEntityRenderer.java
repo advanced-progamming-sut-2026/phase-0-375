@@ -1623,6 +1623,11 @@ public final class LawnEntityRenderer {
         return player.getClip(pam, preferred) != null ? preferred : fallback;
     }
 
+    private static boolean egyptDeathParts(String pam) {
+        String upper = pam.toUpperCase();
+        return upper.contains("EGYPT") || upper.contains("EXPLORER");
+    }
+
     /** Skull / jaw / outer arm on {@code particles}. Egypt uses biome-prefixed names. */
     private List<String> particleParts(String pam) {
         List<String> bits = new ArrayList<>();
@@ -1634,7 +1639,7 @@ public final class LawnEntityRenderer {
             return bits;
         }
         String[] names = deathHeadGroup(pam) != null ? new String[]{deathHeadGroup(pam)}
-                : pam.toUpperCase().contains("EGYPT")
+                : egyptDeathParts(pam)
                 ? DEATH_PARTS_EGYPT : DEATH_PARTS;
         for (String part : names) {
             if (player.partBounds(pam, "particles", 0f, part) != null) {
