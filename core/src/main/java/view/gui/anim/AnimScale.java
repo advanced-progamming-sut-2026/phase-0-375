@@ -21,4 +21,7 @@ public final class AnimScale {
     public static final float PLANT = LAWN;
 
     public static final float ZOMBIE = LAWN;
+
+    /** Lawn collectible. {@code SUN.PAM} canvas is 200, smaller than plant/zombie 390. */
+    public static final float SUN = 0.25f;
 }

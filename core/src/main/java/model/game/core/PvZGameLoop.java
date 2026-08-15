@@ -114,6 +114,10 @@ public class PvZGameLoop implements GameLoop {
         QuestTracker.onLevelEnd(gameModel, result == GameState.WON);
     }
 
+    public SunFallSystem getSunFallSystem() {
+        return sunFallSystem;
+    }
+
     @Override
     public GameState getGameState() {
         return gameState;

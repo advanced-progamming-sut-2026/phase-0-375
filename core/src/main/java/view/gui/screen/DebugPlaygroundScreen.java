@@ -20,6 +20,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
 import model.enums.MenuType;
+import model.enums.SunType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.plant.PlantFactory;
@@ -110,6 +111,11 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         setWorldInput(createCellPickInput(lawnLayout, this::onCellPicked, this::onCellHover));
         buildHud();
         refreshStatus();
+
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop != null && loop.getSunFallSystem() != null) {
+            loop.getSunFallSystem().spawnSkySun(4, 2, SunType.NORMAL);
+        }
     }
 
     private BitmapFont resolveFont() {

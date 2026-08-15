@@ -18,6 +18,7 @@ public final class ZombieAnimProfiles {
         AllStarAnim.register(overrides);
         ArcadeAnim.register(overrides);
         CrystalSkullAnim.register(overrides);
+        RaAnim.register(overrides);
         ProspectorAnim.register(overrides);
         PianoAnim.register(overrides);
         NewspaperAnim.register(overrides);

@@ -12,6 +12,7 @@ import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.item.Sun;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
@@ -107,6 +108,8 @@ public final class LawnEntityRenderer {
     private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
     /** Crystal Skull laser — EFFECTS PAM, clip {@code laser_beam}. */
     private static final String CRYSTALSKULL_BEAM_PAM = "CRYSTALSKULL_BEAM";
+    /** Lawn collectible — EFFECTS PAM. Yellow/normal is clip {@code animation}. */
+    private static final String SUN_PAM = "SUN";
     /** Ground burst when Prospector's dynamite explodes. Clips {@code animation} + {@code animation2}. */
     private static final String PROSPECTOR_BLAST_PAM = "ZOMBIE_PROSPECTOR_BLAST_OFF";
     private static final String[] PROSPECTOR_BLAST_CLIPS = {"animation", "animation2"};
@@ -233,6 +236,7 @@ public final class LawnEntityRenderer {
         drawProspectorBlasts(batch, delta);
         drawDeathFx(batch, delta);
         drawArmorPops(batch, delta);
+        drawSuns(batch, model, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
@@ -254,6 +258,104 @@ public final class LawnEntityRenderer {
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
+    }
+
+    private void drawSuns(Batch batch, GameModel model, float delta) {
+        IdentityHashMap<Sun, StealSunBehavior.SunPull> pulled = new IdentityHashMap<>();
+        for (ZombieInstance zombie : model.getZombies()) {
+            StealSunBehavior steal = (StealSunBehavior) zombie.getBehavior(ZombieBehaviorType.STEAL_SUN);
+            if (steal == null || steal.getPulls().isEmpty()) {
+                continue;
+            }
+            if (!zombieWorldCenter(zombie, xyTmp)) {
+                continue;
+            }
+            float destX = xyTmp[0];
+            float destY = xyTmp[1];
+            for (StealSunBehavior.SunPull pull : steal.getPulls()) {
+                Sun sun = pull.sun();
+                if (sun == null) {
+                    continue;
+                }
+                pulled.put(sun, pull);
+                float[] start = pullWorld(pull);
+                float u = Math.max(0f, Math.min(1f, pull.t()));
+                u = u * u * (3f - 2f * u);
+                drawSunToken(batch, sun,
+                        start[0] + (destX - start[0]) * u,
+                        start[1] + (destY - start[1]) * u,
+                        delta);
+            }
+        }
+        List<Sun> tokens = model.getActiveSuns();
+        if (tokens == null) {
+            return;
+        }
+        for (Sun sun : tokens) {
+            if (pulled.containsKey(sun)) {
+                continue;
+            }
+            float[] dest = sunWorld(sun);
+            float x = dest[0];
+            float y = dest[1];
+            if (sun.isFalling()) {
+                float t = Math.max(0f, Math.min(1f, sun.fallProgress()));
+                t = t * t * (3f - 2f * t);
+                float[] start = sun.hasOrigin()
+                        ? originWorld(sun)
+                        : new float[]{dest[0], LawnLayout.WORLD_HEIGHT};
+                x = start[0] + (dest[0] - start[0]) * t;
+                y = start[1] + (dest[1] - start[1]) * t;
+            }
+            drawSunToken(batch, sun, x, y, delta);
+        }
+    }
+
+    private float[] pullWorld(StealSunBehavior.SunPull pull) {
+        float[] xy = layout.centerOf(pull.startRow(), pull.startCol());
+        xy[0] += pull.startOffsetX() * layout.cellWidth();
+        xy[1] += pull.startOffsetY() * layout.cellHeight();
+        if (pull.startFallDuration() > 0f && pull.startFallRemaining() > 0f) {
+            float t = 1f - pull.startFallRemaining() / pull.startFallDuration();
+            t = Math.max(0f, Math.min(1f, t));
+            xy[1] = LawnLayout.WORLD_HEIGHT + (xy[1] - LawnLayout.WORLD_HEIGHT) * t;
+        }
+        return xy;
+    }
+
+    private float[] sunWorld(Sun sun) {
+        float[] xy = layout.centerOf(sun.getY(), sun.getX());
+        xy[0] += sun.getOffsetX() * layout.cellWidth();
+        xy[1] += sun.getOffsetY() * layout.cellHeight();
+        return xy;
+    }
+
+    private float[] originWorld(Sun sun) {
+        return layout.centerOf(Math.round(sun.getOriginY()), sun.getOriginX());
+    }
+
+    private void drawSunToken(Batch batch, Sun sun, float x, float y, float delta) {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(SUN_PAM);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, sunClip(sun), "animation");
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        drawPose(batch, sun, pose, x, y, AnimScale.SUN, NO_PHASE, 0f, delta);
+    }
+
+    private static String sunClip(Sun sun) {
+        if (sun == null || sun.getType() == null) {
+            return "animation";
+        }
+        return switch (sun.getType()) {
+            case SPECIAL -> "red";
+            case RADIOACTIVE -> "blue";
+            default -> "animation";
+        };
     }
 
     private static void collectLiveCabinet(Pushable item, Set<Pushable> live) {

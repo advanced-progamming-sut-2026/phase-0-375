@@ -10,6 +10,7 @@ import model.zombie.instance.ZombieInstance;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Sun-stealing behavior.
@@ -36,13 +37,25 @@ public class StealSunBehavior implements ZombieBehavior {
     /** Fraction of stolen sun the Turquoise drops on death. */
     public static final float TURQUOISE_DEATH_RETURN_FRACTION = 0.5f;
 
-    /** {@code power_up} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
+    /** {@code power_up} clip length on Ra and Crystal Skull. */
     public static final float POWER_UP_DURATION = 0.6667f;
 
-    /** Seconds {@code power} loops before {@code power_down}. JSON {@code ChargingTime}. */
+    /** Seconds Crystal Skull loops {@code power} before {@code power_down}. JSON {@code ChargingTime}. */
     public static final float POWER_DURATION = DEFAULT_TURQUOISE_CHARGE_TIME;
 
-    /** {@code power_down} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
+    /** {@code power} clip length on {@code ZOMBIE_EGYPT_RA}. Loops until pulls arrive. */
+    public static final float RA_POWER_DURATION = 1f;
+
+    /** Seconds between Ra steal scans while walking. */
+    public static final float RA_SCAN_INTERVAL = 2f;
+
+    /** Seconds for a claimed sun to fly to Ra. */
+    public static final float RA_PULL_DURATION = 1f;
+
+    /** Short fall when stolen sun scatters on death. */
+    public static final float RA_DEATH_FALL = 1.5f;
+
+    /** {@code power_down} clip length on Ra and Crystal Skull. */
     public static final float POWER_DOWN_DURATION = 1.2667f;
 
     /** {@code attack} clip length on {@code ZOMBIE_LOSTCITY_CRYSTALSKULL}. */
@@ -62,8 +75,15 @@ public class StealSunBehavior implements ZombieBehavior {
     /** Fractional sun waiting to be spent (drain rate is 25/s; ticks are smaller). */
     private float drainRemainder = 0f;
 
-    /** Suns physically pulled from the ground (Ra zombie). */
-    private final List<Sun> capturedGroundSuns = new ArrayList<>();
+    /** Suns flying to Ra this absorb cycle. */
+    private final List<SunPull> pulling = new ArrayList<>();
+
+    /** Stolen tokens kept for death scatter (type + value). */
+    private final List<Sun> captured = new ArrayList<>();
+
+    private float raScanTimer = 0f;
+
+    private final Random rng = new Random();
 
     /** Which phase the Turquoise zombie is currently in. */
     private TurquoisePhase turquoisePhase = TurquoisePhase.WALKING;
@@ -104,21 +124,115 @@ public class StealSunBehavior implements ZombieBehavior {
     // --- Ra Zombie ---
 
     private void tickRa(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        int maxStolen = zombie.getDefinition().getBehaviorPropInt(
-                "MaxClaimedSunCurrency", DEFAULT_RA_MAX_STOLEN_SUN);
-        if (maxStolen <= 0) maxStolen = DEFAULT_RA_MAX_STOLEN_SUN;
+        if (context == null || zombie == null) {
+            return;
+        }
+        switch (turquoisePhase) {
+            case WALKING -> tickRaWalking(zombie, context, deltaTime);
+            case POWER_UP -> tickRaPowerUp(zombie, context, deltaTime);
+            case POWER -> tickRaPower(zombie, context, deltaTime);
+            case POWER_DOWN -> tickRaPowerDown(zombie, context, deltaTime);
+            case ATTACK -> { /* Ra has no attack clip. */ }
+        }
+    }
 
-        Iterator<Sun> iterator = context.getActiveSuns().iterator();
-        while (iterator.hasNext()) {
-            if (stolenSunAmount >= maxStolen) {
-                // Ra has hit its cap; stop capturing.
+    private void tickRaWalking(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        raScanTimer += deltaTime;
+        if (raScanTimer < RA_SCAN_INTERVAL) {
+            return;
+        }
+        raScanTimer = 0f;
+        if (!canStealMore(zombie) || !hasGroundSun(context)) {
+            return;
+        }
+        turquoisePhase = TurquoisePhase.POWER_UP;
+        phaseTimer = 0f;
+        zombie.stopEating();
+        zombie.setState(ZombieState.SPECIAL_ACTION);
+        beginPulls(zombie, context);
+        tickRaPowerUp(zombie, context, deltaTime);
+    }
+
+    private void tickRaPowerUp(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        tickPulls(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= POWER_UP_DURATION) {
+            phaseTimer = 0f;
+            turquoisePhase = TurquoisePhase.POWER;
+        }
+    }
+
+    private void tickRaPower(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        tickPulls(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (pulling.isEmpty() && phaseTimer >= RA_POWER_DURATION) {
+            phaseTimer = 0f;
+            turquoisePhase = TurquoisePhase.POWER_DOWN;
+        }
+    }
+
+    private void tickRaPowerDown(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        tickPulls(zombie, context, deltaTime);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= POWER_DOWN_DURATION) {
+            phaseTimer = 0f;
+            pulling.clear();
+            turquoisePhase = TurquoisePhase.WALKING;
+            zombie.setState(ZombieState.WALKING);
+        }
+    }
+
+    private void beginPulls(ZombieInstance zombie, BehaviorContext context) {
+        pulling.clear();
+        List<Sun> ground = context.getActiveSuns();
+        if (ground == null) {
+            return;
+        }
+        int room = raMaxStolen(zombie) - stolenSunAmount;
+        for (Sun sun : ground) {
+            if (room <= 0) {
                 break;
             }
-            Sun sun = iterator.next();
-            capturedGroundSuns.add(sun);
-            stolenSunAmount += sun.getValue();
-            iterator.remove(); // remove from the active-sun list
+            pulling.add(new SunPull(sun));
+            room -= sun.getValue();
         }
+    }
+
+    private void tickPulls(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (pulling.isEmpty()) {
+            return;
+        }
+        List<Sun> ground = context.getActiveSuns();
+        Iterator<SunPull> it = pulling.iterator();
+        while (it.hasNext()) {
+            SunPull pull = it.next();
+            if (ground == null || !ground.contains(pull.sun)) {
+                it.remove();
+                continue;
+            }
+            pull.t += deltaTime / RA_PULL_DURATION;
+            if (pull.t >= 1f) {
+                context.removeSun(pull.sun);
+                stolenSunAmount += pull.sun.getValue();
+                captured.add(new Sun(pull.sun.getType(), pull.sun.getValue(), 0, 0));
+                it.remove();
+            }
+        }
+    }
+
+    private int raMaxStolen(ZombieInstance zombie) {
+        int maxStolen = zombie.getDefinition().getBehaviorPropInt(
+                "MaxClaimedSunCurrency", DEFAULT_RA_MAX_STOLEN_SUN);
+        return maxStolen <= 0 ? DEFAULT_RA_MAX_STOLEN_SUN : maxStolen;
+    }
+
+    private boolean canStealMore(ZombieInstance zombie) {
+        return stolenSunAmount < raMaxStolen(zombie);
+    }
+
+    private static boolean hasGroundSun(BehaviorContext context) {
+        List<Sun> ground = context.getActiveSuns();
+        return ground != null && !ground.isEmpty();
     }
 
     // --- Turquoise Zombie ---
@@ -263,9 +377,12 @@ public class StealSunBehavior implements ZombieBehavior {
      * Returns all captured sun to the player's reserve.
      */
     public void onRaZombieDeath(ZombieInstance zombie, BehaviorContext context) {
-        if (context == null) return;
-        dropMultipleSuns(zombie, context, stolenSunAmount);
-        capturedGroundSuns.clear();
+        if (context == null) {
+            return;
+        }
+        pulling.clear();
+        dropScatteredSuns(zombie, context);
+        captured.clear();
         stolenSunAmount = 0;
     }
 
@@ -339,6 +456,31 @@ public class StealSunBehavior implements ZombieBehavior {
         context.spawnSun(sun);
     }
 
+    private void dropScatteredSuns(ZombieInstance zombie, BehaviorContext context) {
+        int cols = Math.max(1, context.getColumnCount());
+        int rows = Math.max(1, context.getRowCount());
+        int originCol = zombie.getGridX();
+        int originRow = zombie.getGridY();
+        float fromX = zombie.getContinuousPosition() != null
+                ? zombie.getContinuousX() : originCol;
+        float fromY = zombie.getContinuousPosition() != null
+                ? zombie.getContinuousY() : originRow;
+        for (Sun kept : captured) {
+            int col = clamp(originCol + rng.nextInt(3) - 1, 0, cols - 1);
+            int row = clamp(originRow + rng.nextInt(3) - 1, 0, rows - 1);
+            SunType type = kept.getType() != null ? kept.getType() : SunType.NORMAL;
+            Sun sun = new Sun(type, kept.getValue(), col, row);
+            sun.setOffset((rng.nextFloat() - 0.5f) * 0.8f, (rng.nextFloat() - 0.5f) * 0.8f);
+            sun.setFall(RA_DEATH_FALL, RA_DEATH_FALL);
+            sun.setOrigin(fromX, fromY);
+            context.spawnSun(sun);
+        }
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
     private void dropMultipleSuns(ZombieInstance zombie, BehaviorContext context, int amount) {
         int numOfSuns = (int) Math.ceil(amount / 50f);
         for (int i = 0; i < numOfSuns; i++) {
@@ -374,10 +516,69 @@ public class StealSunBehavior implements ZombieBehavior {
         return laserFired;
     }
 
+    public List<SunPull> getPulls() {
+        return pulling;
+    }
+
     // --- Inner types ---
 
+    /** One lawn sun flying to Ra. {@code t} is 0..1 along {@link #RA_PULL_DURATION}. */
+    public static final class SunPull {
+        private final Sun sun;
+        private final int startCol;
+        private final int startRow;
+        private final float startOffsetX;
+        private final float startOffsetY;
+        private final float startFallRemaining;
+        private final float startFallDuration;
+        private float t;
+
+        SunPull(Sun sun) {
+            this.sun = sun;
+            this.startCol = sun.getX();
+            this.startRow = sun.getY();
+            this.startOffsetX = sun.getOffsetX();
+            this.startOffsetY = sun.getOffsetY();
+            this.startFallRemaining = sun.getFallRemaining();
+            this.startFallDuration = sun.getFallDuration();
+        }
+
+        public Sun sun() {
+            return sun;
+        }
+
+        public int startCol() {
+            return startCol;
+        }
+
+        public int startRow() {
+            return startRow;
+        }
+
+        public float startOffsetX() {
+            return startOffsetX;
+        }
+
+        public float startOffsetY() {
+            return startOffsetY;
+        }
+
+        public float startFallRemaining() {
+            return startFallRemaining;
+        }
+
+        public float startFallDuration() {
+            return startFallDuration;
+        }
+
+        public float t() {
+            return t;
+        }
+    }
+
     /**
-     * Charge then laser: {@code power_up} → looping {@code power} → {@code power_down} → {@code attack}.
+     * Charge clips shared by Ra and Crystal Skull. Skull continues to {@code attack};
+     * Ra returns to {@code WALKING} after {@code power_down}.
      */
     public enum TurquoisePhase {
         WALKING,

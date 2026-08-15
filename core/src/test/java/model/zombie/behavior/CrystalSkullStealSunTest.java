@@ -96,30 +96,65 @@ class CrystalSkullStealSunTest {
     }
 
     @Test
-    void raStillCapturesGroundSun() {
-        Zombie definition = new Zombie(
-                "ZombieRa", 200, 0.2f, 100f, ZombieSize.NORMAL,
-                Chapter.ANCIENT_EGYPT, 150, 1, List.of(), null, null,
-                List.of(ZombieBehaviorType.STEAL_SUN));
-        definition.putBehaviorProp("MaxClaimedSunCurrency", 5000);
-        ZombieInstance ra = new ZombieInstance(definition);
-        ra.setGridPosition(new Point(4, 0));
+    void raPowerUpPowerPowerDownThenWalk() {
+        ZombieInstance ra = raZombie(5000);
         StealSunBehavior steal = (StealSunBehavior) ra.getBehavior(ZombieBehaviorType.STEAL_SUN);
-
         List<Sun> ground = new ArrayList<>();
         ground.add(new Sun(SunType.NORMAL, 50, 3, 0));
-        BehaviorContext context = (BehaviorContext) Proxy.newProxyInstance(
-                BehaviorContext.class.getClassLoader(),
-                new Class<?>[]{BehaviorContext.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "getActiveSuns" -> ground;
-                    default -> throw new UnsupportedOperationException(method.getName());
-                });
+        BehaviorContext context = raContext(ground, null);
 
         steal.execute(ra, context, TICK);
+        assertEquals(StealSunBehavior.TurquoisePhase.WALKING, steal.getTurquoisePhase());
+        assertEquals(1, ground.size());
+        assertEquals(0, steal.getStolenSunAmount());
+
+        runUntil(steal, ra, context, StealSunBehavior.TurquoisePhase.POWER_UP);
+        assertEquals(ZombieState.SPECIAL_ACTION, ra.getState());
+        assertFalse(ground.isEmpty(), "suns fly during absorb, not vacuumed on raise");
+        assertEquals(0, steal.getStolenSunAmount());
+
+        runUntil(steal, ra, context, StealSunBehavior.TurquoisePhase.WALKING);
+        assertEquals(ZombieState.WALKING, ra.getState());
         assertTrue(ground.isEmpty());
         assertEquals(50, steal.getStolenSunAmount());
+    }
+
+    @Test
+    void raSkipsRaiseWhenNoGroundSun() {
+        ZombieInstance ra = raZombie(5000);
+        StealSunBehavior steal = (StealSunBehavior) ra.getBehavior(ZombieBehaviorType.STEAL_SUN);
+        BehaviorContext context = raContext(new ArrayList<>(), null);
+
+        runFor(steal, ra, context, StealSunBehavior.RA_SCAN_INTERVAL + 0.5f);
         assertEquals(StealSunBehavior.TurquoisePhase.WALKING, steal.getTurquoisePhase());
+        assertEquals(ZombieState.WALKING, ra.getState());
+    }
+
+    @Test
+    void raDeathScattersFallingSunsNearby() {
+        ZombieInstance ra = raZombie(5000);
+        StealSunBehavior steal = (StealSunBehavior) ra.getBehavior(ZombieBehaviorType.STEAL_SUN);
+        List<Sun> ground = new ArrayList<>();
+        ground.add(new Sun(SunType.SPECIAL, 100, 3, 0));
+        List<Sun> dropped = new ArrayList<>();
+        BehaviorContext context = raContext(ground, dropped);
+
+        runUntil(steal, ra, context, StealSunBehavior.TurquoisePhase.POWER_UP);
+        runUntil(steal, ra, context, StealSunBehavior.TurquoisePhase.WALKING);
+        assertEquals(100, steal.getStolenSunAmount());
+
+        steal.onZombieDeath(ra, context);
+        assertEquals(1, dropped.size());
+        Sun chip = dropped.get(0);
+        assertEquals(SunType.SPECIAL, chip.getType());
+        assertEquals(100, chip.getValue());
+        assertTrue(chip.isFalling());
+        assertTrue(chip.hasOrigin());
+        assertEquals(4, chip.getOriginX(), 0.01f);
+        assertEquals(0, chip.getOriginY(), 0.01f);
+        assertTrue(Math.abs(chip.getX() - 4) <= 1);
+        assertTrue(Math.abs(chip.getY() - 0) <= 1);
+        assertEquals(0, steal.getStolenSunAmount());
     }
 
     private static void runUntil(StealSunBehavior steal, ZombieInstance zombie,
@@ -135,6 +170,40 @@ class CrystalSkullStealSunTest {
         for (float t = 0f; t < seconds; t += TICK) {
             steal.execute(zombie, context, TICK);
         }
+    }
+
+    private static ZombieInstance raZombie(int maxStolen) {
+        Zombie definition = new Zombie(
+                "ZombieRa", 200, 0.2f, 100f, ZombieSize.NORMAL,
+                Chapter.ANCIENT_EGYPT, 150, 1, List.of(), null, null,
+                List.of(ZombieBehaviorType.STEAL_SUN));
+        definition.putBehaviorProp("MaxClaimedSunCurrency", maxStolen);
+        ZombieInstance zombie = new ZombieInstance(definition);
+        zombie.setGridPosition(new Point(4, 0));
+        zombie.setState(ZombieState.WALKING);
+        return zombie;
+    }
+
+    private static BehaviorContext raContext(List<Sun> ground, List<Sun> dropped) {
+        return (BehaviorContext) Proxy.newProxyInstance(
+                BehaviorContext.class.getClassLoader(),
+                new Class<?>[]{BehaviorContext.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getActiveSuns" -> ground;
+                    case "removeSun" -> {
+                        ground.remove((Sun) args[0]);
+                        yield null;
+                    }
+                    case "getColumnCount" -> 9;
+                    case "getRowCount" -> 5;
+                    case "spawnSun" -> {
+                        if (dropped != null) {
+                            dropped.add((Sun) args[0]);
+                        }
+                        yield null;
+                    }
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
     }
 
     private static ZombieInstance crystalSkull() {
