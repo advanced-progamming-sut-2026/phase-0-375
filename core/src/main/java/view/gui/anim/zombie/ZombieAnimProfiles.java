@@ -20,7 +20,7 @@ public final class ZombieAnimProfiles {
         CrystalSkullAnim.register(overrides);
         ProspectorAnim.register(overrides);
         PianoAnim.register(overrides);
-        // TODO: NewspaperAnim.register(overrides);
+        NewspaperAnim.register(overrides);
         // TODO: ExplorerAnim.register(overrides);
     }
 }
