@@ -32,5 +32,6 @@ public final class ZombieAnimProfiles {
         OctopusAnim.register(overrides);
         SnorkelerAnim.register(overrides);
         JugglerAnim.register(overrides);
+        WizardAnim.register(overrides);
     }
 }

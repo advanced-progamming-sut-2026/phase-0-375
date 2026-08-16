@@ -281,9 +281,14 @@ public class GameplayMenuController extends AppMenuController {
                 "Dear humanz, zis is not done yet; we will come back to eat your brainz, humanz. (No zombies to nuke.)"
             );
         }
-        // Snapshot to avoid ConcurrentModificationException while removing
+        // Snapshot to avoid ConcurrentModificationException while removing.
+        // Fire on-death hooks first (Wizard sheep revert, barrel leftover, …)
+        // then strip the board, including anything those hooks spawned.
         List<ZombieInstance> snapshot = new ArrayList<>(model.getZombies());
         for (ZombieInstance z : snapshot) {
+            z.fireOnDeathBehaviors(model);
+        }
+        for (ZombieInstance z : new ArrayList<>(model.getZombies())) {
             model.removeZombie(z);
         }
         return CommandResult.success("Nuke released! " + killed + " zombie(s) vaporized.");

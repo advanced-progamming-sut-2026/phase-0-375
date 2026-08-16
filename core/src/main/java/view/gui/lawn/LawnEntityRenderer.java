@@ -37,6 +37,7 @@ import model.zombie.behavior.StealSunBehavior;
 import model.zombie.behavior.SummonBehavior;
 import model.zombie.behavior.SwimBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
+import model.zombie.behavior.TransformBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
@@ -51,6 +52,7 @@ import view.gui.anim.zombie.JugglerAnim;
 import view.gui.anim.zombie.OctopusAnim;
 import view.gui.anim.zombie.SnorkelerAnim;
 import view.gui.anim.zombie.TroglobiteAnim;
+import view.gui.anim.zombie.WizardAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
@@ -66,6 +68,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Draws plants and zombies on the lawn via libPVZ PAM clips.
@@ -178,6 +181,7 @@ public final class LawnEntityRenderer {
     /** World origin of a flying octopus at release (PAM canvas centre). */
     private final IdentityHashMap<ShootBehavior.OctopusShot, float[]> octopusAlign = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
@@ -283,6 +287,8 @@ public final class LawnEntityRenderer {
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
+        sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
+                && !plant.isTransformed());
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
@@ -294,6 +300,9 @@ public final class LawnEntityRenderer {
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
+        if (drawWizardSheep(batch, plant, delta)) {
+            return;
+        }
         Point pos = plant.getPosition();
         if (pos == null) {
             entityOverlay.drawPlant(batch, App.getInstance().getCurrentGameModel(), plant);
@@ -342,19 +351,148 @@ public final class LawnEntityRenderer {
         }
         seenThisFrame.add(grave);
         float u = tickGraveEmerge(grave, delta);
-        float sxN = GraveAnim.scaleX(u);
-        float syN = GraveAnim.scaleY(u);
-        float s = AnimScale.PLANT;
         float[] xy = layout.centerOf(row, col);
-        // Scale is about the PAM centre; pin the base so the pancake sits on the tile.
-        float y = xy[1] + (syN - 1f) * s * (GraveAnim.CANVAS * 0.5f);
-        player.draw(batch, ref, 0f, xy[0], y, s * sxN, s * syN, false);
+        drawSquashStretch(batch, ref, 0f, xy[0], xy[1], AnimScale.PLANT, u, false);
     }
 
     private float tickGraveEmerge(Grave grave, float delta) {
         float u = graveEmerge.getOrDefault(grave, 0f);
         graveEmerge.put(grave, Math.min(1f, u + delta / GraveAnim.EMERGE_DURATION));
         return u;
+    }
+
+    /** Tomb pop (and wizard plant vanish/emerge). {@code u} 0 is pancake, 1 is rest. */
+    private void drawSquashStretch(Batch batch, ClipRef ref, float time,
+                                   float x, float y, float baseScale, float u, boolean loop) {
+        float sxN = GraveAnim.scaleX(u);
+        float syN = GraveAnim.scaleY(u);
+        float yPin = y + (syN - 1f) * baseScale * (GraveAnim.CANVAS * 0.5f);
+        player.draw(batch, ref, time, x, yPin, baseScale * sxN, baseScale * syN, loop);
+    }
+
+    /**
+     * @return true if this plant was drawn as a vanishing plant, sheep, or emerging plant
+     */
+    private boolean drawWizardSheep(Batch batch, PlantInstance plant, float delta) {
+        SheepFx fx = sheepFx.get(plant);
+        if (plant.isTransformed()) {
+            if (fx == null) {
+                fx = new SheepFx();
+                fx.idleClip = ThreadLocalRandom.current().nextBoolean()
+                        ? WizardAnim.IDLE2_CLIP : WizardAnim.IDLE3_CLIP;
+                sheepFx.put(plant, fx);
+            }
+        } else if (fx != null && fx.phase != SheepPhase.LEAVE && fx.phase != SheepPhase.EMERGE) {
+            if (fx.phase == SheepPhase.VANISH) {
+                fx.phase = SheepPhase.EMERGE;
+                fx.time = Math.max(0f, GraveAnim.EMERGE_DURATION - fx.time);
+            } else {
+                fx.phase = SheepPhase.LEAVE;
+                fx.time = 0f;
+            }
+        }
+        if (fx == null) {
+            return false;
+        }
+        seenThisFrame.add(plant);
+        Point pos = plant.getPosition();
+        if (pos == null) {
+            sheepFx.remove(plant);
+            return false;
+        }
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        preloadWizardSheepening();
+        switch (fx.phase) {
+            case VANISH -> {
+                if (drawPlantPop(batch, plant, xy[0], xy[1], 1f - popU(fx.time))) {
+                    fx.time += delta;
+                    if (fx.time >= GraveAnim.EMERGE_DURATION) {
+                        fx.phase = SheepPhase.APPEAR;
+                        fx.time = 0f;
+                    }
+                    return true;
+                }
+                fx.phase = SheepPhase.APPEAR;
+                fx.time = 0f;
+                return drawSheepening(batch, xy[0], xy[1], fx, delta);
+            }
+            case APPEAR, IDLE, LEAVE -> {
+                return drawSheepening(batch, xy[0], xy[1], fx, delta);
+            }
+            case EMERGE -> {
+                if (drawPlantPop(batch, plant, xy[0], xy[1], popU(fx.time))) {
+                    fx.time += delta;
+                    if (fx.time >= GraveAnim.EMERGE_DURATION) {
+                        sheepFx.remove(plant);
+                    }
+                    return true;
+                }
+                sheepFx.remove(plant);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static float popU(float time) {
+        return Math.max(0f, Math.min(1f, time / GraveAnim.EMERGE_DURATION));
+    }
+
+    private boolean drawPlantPop(Batch batch, PlantInstance plant,
+                                 float x, float y, float u) {
+        AnimPose pose = plantAdapter.poseFor(plant);
+        if (pose == null) {
+            return false;
+        }
+        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        if (ref == null) {
+            return false;
+        }
+        drawSquashStretch(batch, ref, 0f, x, y, AnimScale.PLANT * pose.scale(), u, pose.loop());
+        return true;
+    }
+
+    private boolean drawSheepening(Batch batch, float x, float y, SheepFx fx, float delta) {
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(WizardAnim.SHEEPENING_PAM);
+        if (entry == null) {
+            fx.time += delta;
+            return true;
+        }
+        String clip = switch (fx.phase) {
+            case APPEAR -> WizardAnim.APPEAR_CLIP;
+            case LEAVE -> WizardAnim.LEAVE_CLIP;
+            default -> fx.idleClip;
+        };
+        boolean loop = fx.phase == SheepPhase.IDLE;
+        ClipRef ref = clips.getOrLoad(entry.path(), catalog.resolveClip(entry, clip));
+        if (ref == null) {
+            fx.time += delta;
+            return true;
+        }
+        player.draw(batch, ref, fx.time, x, y, AnimScale.PLANT, AnimScale.PLANT, loop);
+        fx.time += delta;
+        if (fx.phase == SheepPhase.APPEAR && fx.time >= ref.duration) {
+            fx.phase = SheepPhase.IDLE;
+            fx.time = 0f;
+        } else if (fx.phase == SheepPhase.LEAVE && fx.time >= ref.duration) {
+            fx.phase = SheepPhase.EMERGE;
+            fx.time = 0f;
+        }
+        return true;
+    }
+
+    private void preloadWizardSheepening() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(WizardAnim.SHEEPENING_PAM);
+        if (entry == null) {
+            return;
+        }
+        clips.getOrLoad(entry.path(), catalog.resolveClip(entry, WizardAnim.APPEAR_CLIP));
+        clips.getOrLoad(entry.path(), catalog.resolveClip(entry, WizardAnim.LEAVE_CLIP));
+        clips.getOrLoad(entry.path(), catalog.resolveClip(entry, WizardAnim.IDLE2_CLIP));
+        clips.getOrLoad(entry.path(), catalog.resolveClip(entry, WizardAnim.IDLE3_CLIP));
     }
 
     private void drawSuns(Batch batch, GameModel model, float delta) {
@@ -1036,6 +1174,7 @@ public final class LawnEntityRenderer {
         restartJugglerSpinClock(zombie, pose);
         restartOctopusTossClock(zombie, pose);
         restartFishermanClock(zombie, pose);
+        restartWizardSheepClock(zombie, pose);
         spawnHunterSplat(zombie);
 
         float x = xyTmp[0];
@@ -1619,6 +1758,20 @@ public final class LawnEntityRenderer {
         clock.time = 0f;
     }
 
+    /** First frame of a new {@code sheep}: rewind so the next cast replays. */
+    private void restartWizardSheepClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !WizardAnim.SHEEP_CLIP.equals(pose.clipName())) {
+            return;
+        }
+        TransformBehavior transform = (TransformBehavior) zombie.getBehavior(ZombieBehaviorType.TRANSFORM);
+        if (transform == null || !transform.isCasting() || transform.getSheepTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
     /** First frame of a new {@code intro}/{@code cast}/{@code reel}: rewind so the next cycle replays. */
     private void restartFishermanClock(ZombieInstance zombie, AnimPose pose) {
         if (pose == null) {
@@ -2057,6 +2210,16 @@ public final class LawnEntityRenderer {
         float x;
         float y;
         boolean dying;
+    }
+
+    private enum SheepPhase {
+        VANISH, APPEAR, IDLE, LEAVE, EMERGE
+    }
+
+    private static final class SheepFx {
+        SheepPhase phase = SheepPhase.VANISH;
+        float time;
+        String idleClip = WizardAnim.IDLE2_CLIP;
     }
 
     private void spawnDeath(GameModel model, ZombieInstance zombie, LiveSnap snap) {
