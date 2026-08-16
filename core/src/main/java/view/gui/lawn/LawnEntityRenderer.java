@@ -27,6 +27,7 @@ import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.BarrelRollerBehavior;
+import model.zombie.behavior.BuffBehavior;
 import model.zombie.behavior.FishBehavior;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.behavior.JuggleBehavior;
@@ -46,6 +47,7 @@ import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
+import view.gui.anim.zombie.DarkKingAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.JugglerAnim;
@@ -1174,6 +1176,7 @@ public final class LawnEntityRenderer {
         restartJugglerSpinClock(zombie, pose);
         restartOctopusTossClock(zombie, pose);
         restartFishermanClock(zombie, pose);
+        restartDarkKingClock(zombie, pose);
         restartWizardSheepClock(zombie, pose);
         spawnHunterSplat(zombie);
 
@@ -1765,6 +1768,32 @@ public final class LawnEntityRenderer {
         }
         TransformBehavior transform = (TransformBehavior) zombie.getBehavior(ZombieBehaviorType.TRANSFORM);
         if (transform == null || !transform.isCasting() || transform.getSheepTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /** First frame of a new {@code intro}/{@code special}: rewind so the next cycle replays. */
+    private void restartDarkKingClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!DarkKingAnim.INTRO_CLIP.equals(clip) && !DarkKingAnim.SPECIAL_CLIP.equals(clip)) {
+            return;
+        }
+        BuffBehavior buff = (BuffBehavior) zombie.getBehavior(ZombieBehaviorType.BUFF);
+        if (buff == null || buff.getPhaseTimer() != 0f) {
+            return;
+        }
+        boolean match = switch (buff.getPhase()) {
+            case INTRO -> DarkKingAnim.INTRO_CLIP.equals(clip);
+            case SPECIAL -> DarkKingAnim.SPECIAL_CLIP.equals(clip);
+            case IDLE -> false;
+        };
+        if (!match) {
             return;
         }
         AnimClock clock = clockFor(zombie);

@@ -267,6 +267,7 @@ public class ZombieSystem implements Tickable {
     private boolean isEatingSuppressed(ZombieInstance zombie) {
         if (zombie.getState() == ZombieState.SPECIAL_ACTION) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.FISH)) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.BUFF)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return true;
         return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()
