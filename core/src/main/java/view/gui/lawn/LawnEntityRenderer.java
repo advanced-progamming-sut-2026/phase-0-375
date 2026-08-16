@@ -34,6 +34,7 @@ import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.ShootBehavior;
 import model.zombie.behavior.StealSunBehavior;
 import model.zombie.behavior.SummonBehavior;
+import model.zombie.behavior.SwimBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
@@ -45,6 +46,7 @@ import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.HunterAnim;
+import view.gui.anim.zombie.SnorkelerAnim;
 import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimRole;
@@ -178,6 +180,8 @@ public final class LawnEntityRenderer {
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
+    private float snorkelRippleTime;
+    private boolean snorkelRippleLoaded;
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
@@ -219,6 +223,7 @@ public final class LawnEntityRenderer {
         if (model == null) {
             return;
         }
+        snorkelRippleTime += Math.max(0f, delta);
         seenThisFrame.clear();
         Set<ZombieInstance> alive = new HashSet<>(model.getZombies());
         for (ZombieInstance zombie : lastLive.keySet()) {
@@ -1064,7 +1069,33 @@ public final class LawnEntityRenderer {
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
             x += backward ? -holdBack : holdBack;
         }
+        float standY = y;
+        Rectangle snorkelMask = null;
+        float snorkelWaterY = Float.NaN;
+        SwimBehavior swim = SnorkelerAnim.isSnorkelerPam(pose.pamPath())
+                ? (SwimBehavior) zombie.getBehavior(ZombieBehaviorType.SWIM)
+                : null;
+        if (swim != null && (swim.isSubmerged() || swim.isSurfaced()) && swim.getRise() < 1f - 1e-3f) {
+            float scale = AnimScale.ZOMBIE * pose.scale();
+            float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
+            Rectangle skull = ref != null ? partAt(ref, measureT, SnorkelerAnim.SKULL_PART) : null;
+            if (skull == null) {
+                skull = partAt(clips.getOrLoad(pose.pamPath(), "walk"), 0f, SnorkelerAnim.SKULL_PART);
+            }
+            snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+            y = SnorkelerAnim.drawOriginY(standY, snorkelWaterY, skull, scale, swim.getRise());
+            snorkelMask = FishermanAnim.drownMaskWorld(layout, x, zombie.getGridY(), snorkelWaterY);
+        }
+        if (snorkelMask != null) {
+            drownShader().begin(batch, snorkelMask);
+        }
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
+        if (snorkelMask != null) {
+            drownShader().end(batch);
+        }
+        if (!Float.isNaN(snorkelWaterY)) {
+            drawSnorkelRipple(batch, pose, ref, time, x, y, snorkelWaterY);
+        }
         popBrokenArmor(zombie, pose, x, y);
         lastLive.put(zombie, new LiveSnap(pose, x, y,
                 zombie.isMovingBackward() || pose.flipX(), time));
@@ -1769,6 +1800,7 @@ public final class LawnEntityRenderer {
         final boolean drown;
         float time;
         float drownWaterY = Float.NaN;
+        float snorkelRise;
 
         DeathFx(AnimPose pose, float x, float y) {
             this(pose, x, y, false);
@@ -1835,10 +1867,23 @@ public final class LawnEntityRenderer {
             diePose = diePose.flipped();
         }
         boolean drown = FishermanAnim.isFishermanPam(pam);
-        deathFx.add(new DeathFx(diePose, snap.x, snap.y, drown));
+        if (SnorkelerAnim.isSnorkelerPam(pam)) {
+            SwimBehavior swim = (SwimBehavior) zombie.getBehavior(ZombieBehaviorType.SWIM);
+            if (swim != null && (swim.isSubmerged() || swim.isSurfaced()) && swim.getRise() < 1f) {
+                drown = true;
+                DeathFx fx = new DeathFx(diePose, snap.x, snap.y, true);
+                fx.snorkelRise = swim.getRise();
+                fx.drownWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+                deathFx.add(fx);
+                return;
+            }
+        }
         if (drown) {
+            deathFx.add(new DeathFx(diePose, snap.x, snap.y, true));
             return;
         }
+
+        deathFx.add(new DeathFx(diePose, snap.x, snap.y, false));
 
         // The head lies on the ground until the body has finished collapsing, then both fade together.
         ClipRef dieRef = clips.getOrLoad(pam, dieClip);
@@ -2101,7 +2146,11 @@ public final class LawnEntityRenderer {
                 freezeDrownWaterY(fx, ref, scale);
             }
             Rectangle mask = fx.drown && !Float.isNaN(fx.drownWaterY)
-                    ? FishermanAnim.drownMaskWorld(layout, fx.x, fx.y, fx.drownWaterY)
+                    ? FishermanAnim.drownMaskWorld(layout, fx.x,
+                    SnorkelerAnim.isSnorkelerPam(fx.pose.pamPath())
+                            ? FishermanAnim.rowAt(layout, fx.drownWaterY)
+                            : FishermanAnim.rowAt(layout, fx.y),
+                    fx.drownWaterY)
                     : null;
             Rectangle sprite = fx.drown
                     ? FishermanAnim.spriteWorld(fx.x, fx.y,
@@ -2127,8 +2176,35 @@ public final class LawnEntityRenderer {
         return drownShader;
     }
 
+    private void drawSnorkelRipple(Batch batch, AnimPose pose, ClipRef body, float time,
+                                   float x, float y, float waterY) {
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(SnorkelerAnim.RIPPLE_NAME);
+        String path = entry != null ? entry.path() : SnorkelerAnim.RIPPLE_PATH;
+        String clip = entry != null
+                ? catalog.resolveClip(entry, SnorkelerAnim.RIPPLE_CLIP, "ripple_exit")
+                : SnorkelerAnim.RIPPLE_CLIP;
+        ClipRef ripple = clips.getOrLoad(path, clip);
+        if (ripple == null && !snorkelRippleLoaded) {
+            snorkelRippleLoaded = true;
+            clips.preloadSync(path, clip);
+            ripple = clips.getOrLoad(path, clip);
+        }
+        if (ripple == null) {
+            return;
+        }
+        float scale = AnimScale.ZOMBIE * pose.scale();
+        Rectangle skull = body != null ? partAt(body, time, SnorkelerAnim.SKULL_PART) : null;
+        float rx = SnorkelerAnim.skullCenterWorldX(x, skull, scale, pose.flipX());
+        Rectangle clipBox = player.bounds(path, clip);
+        float ry = SnorkelerAnim.rippleDrawY(waterY, clipBox, scale);
+        player.draw(batch, ripple, snorkelRippleTime, rx, ry, scale, scale, true);
+    }
+
     private void freezeDrownWaterY(DeathFx fx, ClipRef die, float scale) {
         if (!Float.isNaN(fx.drownWaterY)) {
+            return;
+        }
+        if (SnorkelerAnim.isSnorkelerPam(fx.pose.pamPath())) {
             return;
         }
         Rectangle tube = partAt(die, 0f, FishermanAnim.INNERTUBE_PART);

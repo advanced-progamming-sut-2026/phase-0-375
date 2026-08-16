@@ -58,11 +58,20 @@ public final class FishermanAnim {
         if (layout == null) {
             return null;
         }
+        return drownMaskWorld(layout, originX, rowAt(layout, originY), waterY);
+    }
+
+    /** Same strip, pinned to a grid row so a sunk origin cannot pick the lane below. */
+    public static Rectangle drownMaskWorld(LawnLayout layout, float originX, int row,
+                                           float waterY) {
+        if (layout == null) {
+            return null;
+        }
         int col = colAt(layout, originX);
-        int row = rowAt(layout, originY);
+        int r = Math.max(0, Math.min(layout.rows() - 1, row));
         float tile = layout.cellWidth();
         float left = layout.cellLeft(col) - tile;
-        float bottom = layout.cellBottom(row) - layout.cellHeight();
+        float bottom = layout.cellBottom(r) - layout.cellHeight();
         float h = waterY - bottom;
         if (h <= 1f) {
             return null;
@@ -96,12 +105,12 @@ public final class FishermanAnim {
         return new Rectangle(left, Math.min(bottom, top), Math.abs(x1 - x0), Math.abs(top - bottom));
     }
 
-    static int colAt(LawnLayout layout, float originX) {
+    public static int colAt(LawnLayout layout, float originX) {
         int col = (int) Math.floor((originX - LawnLayout.LAWN_ORIGIN_X) / layout.cellWidth());
         return Math.max(0, Math.min(layout.cols() - 1, col));
     }
 
-    static int rowAt(LawnLayout layout, float originY) {
+    public static int rowAt(LawnLayout layout, float originY) {
         float top = LawnLayout.LAWN_ORIGIN_Y + LawnLayout.GRID_HEIGHT;
         int row = (int) Math.floor((top - originY) / layout.cellHeight());
         return Math.max(0, Math.min(layout.rows() - 1, row));

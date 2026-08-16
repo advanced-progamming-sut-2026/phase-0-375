@@ -12,6 +12,11 @@ import model.zombie.instance.ZombieInstance;
  */
 public class SwimBehavior implements ZombieBehavior {
 
+    /** Clip-plane rise while eating a plant on water (half the body). */
+    public static final float EAT_RISE = 0.5f;
+    /** Rise units per second toward the current target. */
+    public static final float RISE_SPEED = 2f;
+
     // --- State ---
 
     /** Current phase of the swim cycle. */
@@ -19,6 +24,9 @@ public class SwimBehavior implements ZombieBehavior {
 
     /** Plant currently being eaten while at the surface; null if not eating. */
     private PlantInstance eatingTarget;
+
+    /** 0 = skull-only, {@link #EAT_RISE} = eat, 1 = fully above the waterline. */
+    private float rise;
 
     // --- ZombieBehavior ---
 
@@ -41,6 +49,7 @@ public class SwimBehavior implements ZombieBehavior {
             default:
                 break;
         }
+        tickRise(zombie, context, deltaTime);
     }
 
     @Override
@@ -200,6 +209,78 @@ public class SwimBehavior implements ZombieBehavior {
     /** @return true while the zombie is at the surface eating a plant (fully vulnerable). */
     public boolean isSurfaced() {
         return phase == SwimPhase.SURFACED;
+    }
+
+    /**
+     * Visual submergence: 0 skull-only, {@link #EAT_RISE} eating, 1 clear of water.
+     * The renderer clips below the waterline while this is below 1 on water.
+     */
+    public float getRise() {
+        return rise;
+    }
+
+    public void setRise(float rise) {
+        this.rise = Math.max(0f, Math.min(1f, rise));
+    }
+
+    private void tickRise(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (!isOnWater(zombie, context)) {
+            rise = 1f;
+            return;
+        }
+        rise = moveToward(rise, targetRise(zombie, context), RISE_SPEED * Math.max(0f, deltaTime));
+    }
+
+    float targetRise(ZombieInstance zombie, BehaviorContext context) {
+        if (!isOnWater(zombie, context)) {
+            return 1f;
+        }
+        if (phase == SwimPhase.SURFACED) {
+            return EAT_RISE;
+        }
+        if (isLastWaterColumn(zombie, context)) {
+            return lastColumnProgress(zombie);
+        }
+        return 0f;
+    }
+
+    /**
+     * Leftmost flooded column in this row — the last strip of the water layer
+     * a left-walking snorkeler crosses before dry land.
+     */
+    boolean isLastWaterColumn(ZombieInstance zombie, BehaviorContext context) {
+        if (!isOnWater(zombie, context)) {
+            return false;
+        }
+        int col = zombie.getGridX();
+        if (col <= 0) {
+            return true;
+        }
+        Cell left = context.getCellAt(zombie.getGridY(), col - 1);
+        if (left == null) {
+            return true;
+        }
+        GroundType ground = left.getGroundType();
+        return ground != GroundType.WATER && ground != GroundType.LOW_TIDE;
+    }
+
+    /**
+     * {@code floor(x)} occupancy is {@code [col, col+1)}. Walking left: 0 at the
+     * right edge (just entered from deeper water), 1 at {@code x == col} (about to
+     * step onto land).
+     */
+    static float lastColumnProgress(ZombieInstance zombie) {
+        int col = zombie.getGridX();
+        float x = zombie.getContinuousX();
+        return Math.max(0f, Math.min(1f, (col + 1f) - x));
+    }
+
+    static float moveToward(float current, float target, float maxDelta) {
+        float d = target - current;
+        if (Math.abs(d) <= maxDelta) {
+            return target;
+        }
+        return current + Math.signum(d) * maxDelta;
     }
 
     // --- Getters / setters ---
