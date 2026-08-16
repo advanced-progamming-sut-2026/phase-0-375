@@ -1,5 +1,6 @@
 package view.gui.anim.projectile;
 
+import model.projectile.FumeCloud;
 import model.projectile.Projectile;
 import view.gui.anim.AnimPose;
 import view.gui.assets.ProjectilePamPaths;
@@ -19,6 +20,9 @@ public final class ProjectileAnimAdapter {
         String pam = ProjectilePamPaths.pathFor(projectile);
         if (pam == null) {
             return null;
+        }
+        if (projectile instanceof FumeCloud) {
+            return AnimPose.once(pam, "special", ProjectileAnimRole.FLYING);
         }
         AnimPose pose = AnimPose.looping(pam, ProjectilePamPaths.CLIP_PREFERENCES[0],
                 ProjectileAnimRole.FLYING);

@@ -14,6 +14,7 @@ import model.plant.ability.ModifierAbility;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.BowlingBulb;
+import model.projectile.FumeCloud;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.projectile.Splash;
@@ -72,6 +73,11 @@ public class ProjectileSystem implements Tickable {
      *         frame by hitting a grid item), preserving the original behavior
      */
     private boolean tickProjectile(Projectile projectile, float deltaTime) {
+        if (projectile instanceof FumeCloud) {
+            tickFumeCloud((FumeCloud) projectile, deltaTime);
+            return false;
+        }
+
         moveProjectile(projectile, deltaTime);
 
         if (projectile instanceof BowlingBulb) {
@@ -108,6 +114,36 @@ public class ProjectileSystem implements Tickable {
             handleZombieHit(projectile, target);
         }
         return false;
+    }
+
+    /**
+     * Fume bubbles sit on a tile, damage every zombie there once, then
+     * dissipate with the clip instead of traveling.
+     */
+    private void tickFumeCloud(FumeCloud cloud, float deltaTime) {
+        if (!cloud.isBurstDone()) {
+            applyFumeBurst(cloud);
+            cloud.markBurstDone();
+        }
+        if (cloud.tickLifetime(deltaTime)) {
+            discard(cloud, true);
+        }
+    }
+
+    private void applyFumeBurst(FumeCloud cloud) {
+        int lane = cloud.getRow();
+        int tile = Math.round(cloud.getX());
+        List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(lane);
+        if (zombiesInLane == null) return;
+
+        boolean isPlantFired = cloud.getSourcePlant() != null;
+        for (ZombieInstance zombie : zombiesInLane) {
+            if (zombie == null || zombie.isDead()) continue;
+            if (zombie.getContinuousPosition() == null) continue;
+            if (isPlantFired && zombie.isHypnotized()) continue;
+            if (Math.round(zombie.getContinuousX()) != tile) continue;
+            handleZombieHit(cloud, zombie);
+        }
     }
 
     /** Applies damage and on-hit effects once a projectile reaches a zombie. */

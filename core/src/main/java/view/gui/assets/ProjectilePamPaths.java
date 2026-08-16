@@ -4,6 +4,7 @@ import model.enums.BowlingBulbType;
 import model.enums.PlantTags;
 import model.plant.definition.Plant;
 import model.projectile.BowlingBulb;
+import model.projectile.FumeCloud;
 import model.projectile.Projectile;
 
 import java.util.Map;
@@ -29,6 +30,10 @@ public final class ProjectilePamPaths {
             "768/INITIAL/EFFECTS/T_STARFRUIT_PROJECTILE/T_STARFRUIT_PROJECTILE.PAM";
     public static final String PUFF_SHROOM =
             "768/INITIAL/EFFECTS/T_PUFFSHROOM_PROJECTILE/T_PUFFSHROOM_PROJECTILE.PAM";
+    public static final String CACTUS =
+            "768/INITIAL/EFFECTS/T_CACTUS_PROJECTILE/T_CACTUS_PROJECTILE.PAM";
+    public static final String FUME_SHROOM =
+            "768/INITIAL/EFFECTS/FUMESHROOM_BUBBLES/FUMESHROOM_BUBBLES.PAM";
     public static final String ROTOBAGA =
             "768/FULL/EFFECTS/ROTORUTABAGA_PROJECTILE1/ROTORUTABAGA_PROJECTILE1.PAM";
     public static final String CITRON =
@@ -61,7 +66,9 @@ public final class ProjectilePamPaths {
             Map.entry("Goo Peashooter", GOO_PEA),
             Map.entry("Mega Gatling Pea", MEGA_GATLING),
             Map.entry("Sea-shroom", SEA_SHROOM),
-            Map.entry("Puff-shroom", PUFF_SHROOM)
+            Map.entry("Puff-shroom", PUFF_SHROOM),
+            Map.entry("Cactus", CACTUS),
+            Map.entry("Fume-shroom", FUME_SHROOM)
     );
 
     /**
@@ -74,6 +81,9 @@ public final class ProjectilePamPaths {
         }
         if (projectile instanceof BowlingBulb bulb) {
             return pathForBulb(bulb.getType());
+        }
+        if (projectile instanceof FumeCloud) {
+            return FUME_SHROOM;
         }
         Plant source = projectile.getSourcePlant();
         String name = source != null ? source.getName() : null;

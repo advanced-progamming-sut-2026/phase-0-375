@@ -9,6 +9,7 @@ import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.definition.PlantLevels;
 import model.plant.instance.PlantInstance;
+import model.projectile.FumeCloud;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.zombie.instance.ZombieInstance;
@@ -29,8 +30,34 @@ public class StrikeThroughAbility implements PlantAbility {
     /** Cactus projectile count when it's on plant food. */
     private static final int BURST_PROJ_COUNT = 3;
 
+    /** Length of {@code FUMESHROOM_BUBBLES} {@code special} clip, in seconds. */
+    private static final float FUME_BUBBLE_LIFETIME = 1.2f;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.STRIKE_THROUGH; }
+
+    @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return null;
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        // Pierce-mint: trigger plant-food on every STRIKE_THROUGH plant.
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.STRIKE_THROUGH);
+            return null;
+        }
+
+        if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
+        if (def.isShroom()) {
+            if (!hasZombieInFumeRange(plant, context)) return null;
+        } else if (!context.hasZombieInLane(plant.getPosition().getY())) {
+            return null;
+        }
+
+        execute(plant, context);
+        return TimedPlantAction.attackHold(plant, context);
+    }
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
@@ -45,11 +72,14 @@ public class StrikeThroughAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
+        if (def.isShroom()) {
+            shootFume(plant, context);
+            return;
+        }
         if (!context.hasZombieInLane(plant.getPosition().getY())) return;
 
         int row = plant.getPosition().getY();
-        float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
-        FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f + rangeBonus, row);
+        FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
 
         Pellet pellet = new Pellet(
                 def.getDamage(),
@@ -61,6 +91,53 @@ public class StrikeThroughAbility implements PlantAbility {
         );
         pellet.setPierce(true);
         context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+    }
+
+    /**
+     * Spawns a stationary bubble on each tile in front of Fume-shroom.
+     * Range is {@code abilityValue} tiles, plus {@link PlantSpecialTag#TILE_RANGE_EXT}.
+     */
+    private void shootFume(PlantInstance plant, PlantAbilityContext context) {
+        if (!hasZombieInFumeRange(plant, context)) return;
+
+        Plant def = plant.getDefinition();
+        int row = plant.getPosition().getY();
+        float plantX = plant.getPosition().getX();
+        int tiles = fumeTileCount(plant);
+
+        for (int i = 1; i <= tiles; i++) {
+            FumeCloud bubble = new FumeCloud(
+                    def.getDamage(),
+                    new FloatPoint(plantX + i, row),
+                    row,
+                    FUME_BUBBLE_LIFETIME
+            );
+            context.spawnProjectile(bubble, bubble.getX(), bubble.getY());
+        }
+    }
+
+    private boolean hasZombieInFumeRange(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return false;
+        int row = plant.getPosition().getY();
+        float plantX = plant.getPosition().getX();
+        float range = fumeTileCount(plant);
+        for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+            if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
+            if (zombie.isHypnotized()) continue;
+            float dx = zombie.getContinuousX() - plantX;
+            if (dx > 0f && dx <= range) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Number of tiles ahead covered by a fume burst. */
+    private int fumeTileCount(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        float range = (def != null ? def.getAbilityValue() : 0f)
+                + cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
+        return Math.max(1, Math.round(range));
     }
 
     @Override
