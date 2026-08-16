@@ -29,6 +29,7 @@ import model.zombie.armor.Armor;
 import model.zombie.behavior.BarrelRollerBehavior;
 import model.zombie.behavior.FishBehavior;
 import model.zombie.behavior.FlyBehavior;
+import model.zombie.behavior.JuggleBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.ShootBehavior;
@@ -46,6 +47,8 @@ import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.HunterAnim;
+import view.gui.anim.zombie.JugglerAnim;
+import view.gui.anim.zombie.OctopusAnim;
 import view.gui.anim.zombie.SnorkelerAnim;
 import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -172,6 +175,9 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<ZombieInstance, Boolean> prospectorBlastSpawned = new IdentityHashMap<>();
     private final List<BlastFx> hunterSplats = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, Integer> hunterSplatSeq = new IdentityHashMap<>();
+    /** World origin of a flying octopus at release (PAM canvas centre). */
+    private final IdentityHashMap<ShootBehavior.OctopusShot, float[]> octopusAlign = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
@@ -268,6 +274,7 @@ public final class LawnEntityRenderer {
             Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
         }
+        drawOctopi(batch, model, delta);
         drawHunterSplats(batch, delta);
         drawProspectorBlasts(batch, delta);
         drawDeathFx(batch, delta);
@@ -280,6 +287,7 @@ public final class LawnEntityRenderer {
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         hunterSplatSeq.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
+        octopusAlign.keySet().removeIf(shot -> !shot.isFlying());
         Set<ZombieInstance> keepArt = new HashSet<>(model.getZombies());
         collectIcedOccupants(model, keepArt);
         artChapters.keySet().removeIf(zombie -> !keepArt.contains(zombie));
@@ -1025,6 +1033,8 @@ public final class LawnEntityRenderer {
         restartTombRaiseClock(zombie, pose);
         restartDodoFlyClock(zombie, pose);
         restartHunterThrowClock(zombie, pose);
+        restartJugglerSpinClock(zombie, pose);
+        restartOctopusTossClock(zombie, pose);
         restartFishermanClock(zombie, pose);
         spawnHunterSplat(zombie);
 
@@ -1099,6 +1109,7 @@ public final class LawnEntityRenderer {
         popBrokenArmor(zombie, pose, x, y);
         lastLive.put(zombie, new LiveSnap(pose, x, y,
                 zombie.isMovingBackward() || pose.flipX(), time));
+        captureOctopusRelease(zombie, pose, x, y, time);
         maybeDrawCrystalSkullBeam(batch, pose, x, y, time);
         syncBarrelFront(zombie, pose, time);
     }
@@ -1333,6 +1344,32 @@ public final class LawnEntityRenderer {
         clock.time = 0f;
     }
 
+    /** First frame of a new {@code spinup} / {@code spindown}: rewind so the next cycle replays. */
+    private void restartJugglerSpinClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!JugglerAnim.SPINUP_CLIP.equals(clip) && !JugglerAnim.SPINDOWN_CLIP.equals(clip)) {
+            return;
+        }
+        JuggleBehavior juggle = (JuggleBehavior) zombie.getBehavior(ZombieBehaviorType.JUGGLE);
+        if (juggle == null || juggle.getClipTimer() != 0f) {
+            return;
+        }
+        if (JugglerAnim.SPINUP_CLIP.equals(clip)
+                && juggle.getPhase() != JuggleBehavior.JugglePhase.SPINUP) {
+            return;
+        }
+        if (JugglerAnim.SPINDOWN_CLIP.equals(clip)
+                && juggle.getPhase() != JuggleBehavior.JugglePhase.SPINDOWN) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
     private void spawnHunterSplat(ZombieInstance zombie) {
         ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
         if (shoot == null || !shoot.isIceAgeHunter(zombie)) {
@@ -1384,6 +1421,188 @@ public final class LawnEntityRenderer {
             player.draw(batch, ref, fx.time, fx.x, fx.y, scale, scale, false);
             fx.time += delta;
         }
+    }
+
+    /** First frame of a new {@code toss}: rewind so the next throw replays. */
+    private void restartOctopusTossClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !OctopusAnim.TOSS_CLIP.equals(pose.clipName())) {
+            return;
+        }
+        ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+        if (shoot == null || !shoot.isOctopusThrowing() || shoot.getOctopusTossTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /**
+     * Snapshot the held octopus part so the projectile PAM starts on those bounds.
+     * libPVZ {@code partBounds} is PAM-local (Y-down); draw flips Y.
+     */
+    private void captureOctopusRelease(ZombieInstance zombie, AnimPose pose,
+                                       float x, float y, float time) {
+        ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+        if (shoot == null || !shoot.hasReleasedOctopus() || pose == null) {
+            return;
+        }
+        float s = AnimScale.ZOMBIE * pose.scale();
+        ClipRef toss = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        Rectangle from = partAt(toss, time, OctopusAnim.HELD_PART);
+        if (from == null) {
+            from = partAt(toss, ShootBehavior.OCTOPUS_RELEASE_AT, OctopusAnim.HELD_PART);
+        }
+        float heldX = x;
+        float heldY = y;
+        if (from != null) {
+            heldX = x + (from.x + from.width * 0.5f) * s;
+            heldY = y - (from.y + from.height * 0.5f) * s;
+        }
+        PamCatalog.PamEntry proj = catalog == null ? null : catalog.byName(OctopusAnim.PROJECTILE_PAM);
+        ClipRef fly = proj == null ? null : clips.getOrLoad(proj.path(), OctopusAnim.FLY_CLIP);
+        Rectangle to = partAt(fly, 0f, OctopusAnim.HELD_PART);
+        float originX = heldX;
+        float originY = heldY;
+        if (to != null) {
+            originX = heldX - (to.x + to.width * 0.5f) * s;
+            originY = heldY + (to.y + to.height * 0.5f) * s;
+        }
+        for (ShootBehavior.OctopusShot shot : shoot.getOctopusShots()) {
+            if (shot.isFlying() && !octopusAlign.containsKey(shot)) {
+                octopusAlign.put(shot, new float[]{originX, originY});
+            }
+        }
+        preloadOctopusProjectile();
+    }
+
+    private void preloadOctopusProjectile() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry proj = catalog.byName(OctopusAnim.PROJECTILE_PAM);
+        if (proj == null) {
+            return;
+        }
+        clips.getOrLoad(proj.path(), OctopusAnim.FLY_CLIP);
+        clips.getOrLoad(proj.path(), OctopusAnim.IMPACT_CLIP);
+        clips.getOrLoad(proj.path(), OctopusAnim.LOOP_CLIP);
+        clips.getOrLoad(proj.path(), OctopusAnim.DIE_CLIP);
+    }
+
+    private void drawOctopi(Batch batch, GameModel model, float delta) {
+        preloadOctopusProjectile();
+        PamCatalog.PamEntry proj = catalog == null ? null : catalog.byName(OctopusAnim.PROJECTILE_PAM);
+        if (proj == null) {
+            return;
+        }
+        String path = proj.path();
+        for (ZombieInstance zombie : model.getZombies()) {
+            ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+            if (shoot == null || !shoot.isBeachOctopus(zombie)) {
+                continue;
+            }
+            if (shoot.isOctopusThrowing()) {
+                clips.getOrLoad(path, OctopusAnim.FLY_CLIP);
+            }
+            for (ShootBehavior.OctopusShot shot : shoot.getOctopusShots()) {
+                if (shot.isFlying()) {
+                    drawFlyingOctopus(batch, shot, path);
+                }
+            }
+        }
+        Set<PlantInstance> plants = new HashSet<>();
+        for (PlantInstance plant : model.getAllPlants()) {
+            plants.add(plant);
+            if (plant.hasOctopusCoating() && !octopusCoats.containsKey(plant)) {
+                octopusCoats.put(plant, new OctopusCoatFx());
+            }
+        }
+        for (PlantInstance plant : new ArrayList<>(octopusCoats.keySet())) {
+            OctopusCoatFx fx = octopusCoats.get(plant);
+            boolean gone = !plants.contains(plant) || plant.getCurrentHP() <= 0
+                    || (!plant.hasOctopusCoating() && !fx.dying);
+            if (gone && !fx.dying) {
+                fx.dying = true;
+                fx.time = 0f;
+            }
+            if (!drawOctopusCoat(batch, plant, path, fx, delta)) {
+                octopusCoats.remove(plant);
+            }
+        }
+    }
+
+    private void drawFlyingOctopus(Batch batch, ShootBehavior.OctopusShot shot, String path) {
+        Point cell = shot.targetCell();
+        if (cell == null) {
+            return;
+        }
+        float[] dest = layout.centerOf(cell.getY(), cell.getX());
+        float[] start = octopusAlign.get(shot);
+        float x0 = dest[0];
+        float y0 = dest[1];
+        if (start != null) {
+            x0 = start[0];
+            y0 = start[1];
+        } else if (shot.thrower() != null && zombieWorldCenter(shot.thrower(), xyTmp)) {
+            x0 = xyTmp[0];
+            y0 = xyTmp[1];
+        }
+        float t = shot.progress();
+        float x = x0 + (dest[0] - x0) * t;
+        float y = y0 + (dest[1] - y0) * t + shot.heightTiles() * layout.cellHeight();
+        ClipRef ref = clips.getOrLoad(path, OctopusAnim.FLY_CLIP);
+        if (ref == null) {
+            return;
+        }
+        float scale = AnimScale.ZOMBIE;
+        player.draw(batch, ref, shot.timer(), x, y, scale, scale, true);
+    }
+
+    /**
+     * @return false when this overlay is finished and should be dropped
+     */
+    private boolean drawOctopusCoat(Batch batch, PlantInstance plant, String path,
+                                    OctopusCoatFx fx, float delta) {
+        Point pos = plant.getPosition();
+        if (pos == null && !fx.dying) {
+            return false;
+        }
+        float x;
+        float y;
+        if (pos != null) {
+            float[] xy = layout.centerOf(pos.getY(), pos.getX());
+            x = xy[0];
+            y = xy[1];
+            fx.x = x;
+            fx.y = y;
+        } else {
+            x = fx.x;
+            y = fx.y;
+        }
+        String clip = fx.dying ? OctopusAnim.DIE_CLIP
+                : fx.time < impactDuration(path) ? OctopusAnim.IMPACT_CLIP
+                : OctopusAnim.LOOP_CLIP;
+        boolean loop = !fx.dying && OctopusAnim.LOOP_CLIP.equals(clip);
+        ClipRef ref = clips.getOrLoad(path, clip);
+        if (ref == null) {
+            fx.time += delta;
+            return !fx.dying;
+        }
+        float clipTime = OctopusAnim.LOOP_CLIP.equals(clip)
+                ? Math.max(0f, fx.time - impactDuration(path))
+                : fx.time;
+        player.draw(batch, ref, clipTime, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, loop);
+        fx.time += delta;
+        if (fx.dying && fx.time >= ref.duration) {
+            return false;
+        }
+        return true;
+    }
+
+    private float impactDuration(String path) {
+        ClipRef impact = clips.getOrLoad(path, OctopusAnim.IMPACT_CLIP);
+        return impact == null ? 0.9667f : impact.duration;
     }
 
     /** First frame of a new {@code power}: rewind so the next raise doesn't keep the old time. */
@@ -1831,6 +2050,13 @@ public final class LawnEntityRenderer {
             this.x = x;
             this.y = y;
         }
+    }
+
+    private static final class OctopusCoatFx {
+        float time;
+        float x;
+        float y;
+        boolean dying;
     }
 
     private void spawnDeath(GameModel model, ZombieInstance zombie, LiveSnap snap) {

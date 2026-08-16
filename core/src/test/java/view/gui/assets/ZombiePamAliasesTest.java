@@ -81,8 +81,12 @@ class ZombiePamAliasesTest {
                 ZombiePamAliases.pamName("ZombiePirateImp", Chapter.ANCIENT_EGYPT));
         assertEquals("ZOMBIE_BEACH_FISHERMAN",
                 ZombiePamAliases.pamName("ZombieBeachFisherman", Chapter.BIG_WAVE_BEACH));
+        assertEquals("ZOMBIE_BEACH_OCTOPUS",
+                ZombiePamAliases.pamName("ZombieBeachOctopus", Chapter.ANCIENT_EGYPT));
         assertEquals("ZOMBIE_BEACH_SNORKELER",
                 ZombiePamAliases.pamName("ZombieBeachSnorkel", Chapter.BIG_WAVE_BEACH));
+        assertEquals("ZOMBIE_DARK_JESTER",
+                ZombiePamAliases.pamName("ZombieDarkJuggler", Chapter.DARK_AGES));
         assertNull(ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_RA", "ZombieRa"));
         assertEquals("_zombie_egypt_armor1_states",
                 ZombiePamAliases.armorStatesPart("ZOMBIE_EGYPT_BASIC", "ZombieArmor1"));

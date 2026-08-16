@@ -213,6 +213,9 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/ZOMBIE_HUNTER_SNOWBALL_SPLAT/")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/ZOMBIE_OCTOPUS_PROJECTILE/")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_ZOMBIE/")
                 && !upper.contains("BEHIND")) {
             return true;

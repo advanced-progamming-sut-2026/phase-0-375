@@ -29,6 +29,8 @@ public final class ZombieAnimProfiles {
         DodoAnim.register(overrides);
         TroglobiteAnim.register(overrides);
         FishermanAnim.register(overrides);
+        OctopusAnim.register(overrides);
         SnorkelerAnim.register(overrides);
+        JugglerAnim.register(overrides);
     }
 }
