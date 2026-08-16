@@ -8,6 +8,7 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
+import model.projectile.Splash;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
@@ -132,8 +133,17 @@ public final class LawnEntityRenderer {
             entityOverlay.drawProjectile(batch, projectile);
             return;
         }
+        projectileWorldCenter(projectile, xyTmp);
+        drawPose(batch, projectile, pose, xyTmp[0], xyTmp[1], AnimScale.PROJECTILE, delta, pose.cacheKey());
+    }
+
+    private void projectileWorldCenter(Projectile projectile, float[] out) {
         float[] xy = layout.centerOf(projectile.getY(), projectile.getX());
-        drawPose(batch, projectile, pose, xy[0], xy[1], AnimScale.PROJECTILE, delta, pose.cacheKey());
+        out[0] = xy[0];
+        out[1] = xy[1];
+        if (projectile instanceof Splash splash) {
+            out[1] += splash.getVisualHeight() * layout.cellHeight();
+        }
     }
 
     private boolean zombieWorldCenter(ZombieInstance zombie, float[] out) {

@@ -14,6 +14,7 @@ import model.projectile.Projectile;
 import model.projectile.Splash;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -21,7 +22,7 @@ import java.util.Random;
  */
 public class LobberAbility implements PlantAbility {
 
-    private static final float LOB_VELOCITY = 0.8f;
+    private static final float LOB_VELOCITY = 2.2f;
     private static final Random RNG = new Random();
 
     /** Base chance (0..1) that Kernel-pult throws a butter instead of a kernel. */
@@ -77,6 +78,7 @@ public class LobberAbility implements PlantAbility {
 
         int row = plant.getPosition().getY();
         FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+        ZombieInstance target = nearestZombieAhead(plant, context, +1);
 
         for (int i = 0; i < shots; i++) {
             Splash splash = new Splash(
@@ -88,6 +90,7 @@ public class LobberAbility implements PlantAbility {
                     +1,
                     splashRadius
             );
+            aimLob(splash, origin, target, context.getColumnCount());
             context.spawnProjectile(splash, splash.getX(), splash.getY());
         }
     }
@@ -112,16 +115,19 @@ public class LobberAbility implements PlantAbility {
             float splashRadius = inferSplashRadius(def, plant);
             int damage = inferDamage(def, plant);
 
+            ZombieInstance target = nearestZombieAhead(plant, context, +1);
             for (int i = 0; i < volley; i++) {
+                FloatPoint shotOrigin = new FloatPoint(origin.getX() + i * 0.2f, origin.getY());
                 Splash splash = new Splash(
                         damage * 2,
-                        new FloatPoint(origin.getX() + i * 0.2f, origin.getY()),
+                        shotOrigin,
                         row,
                         LOB_VELOCITY * 1.2f,
                         element,
                         +1,
                         Math.max(1.0f, splashRadius)
                 );
+                aimLob(splash, shotOrigin, target, context.getColumnCount());
                 context.spawnProjectile(splash, splash.getX(), splash.getY());
             }
         }
@@ -132,16 +138,17 @@ public class LobberAbility implements PlantAbility {
             float splashRadius = inferSplashRadius(def, plant);
             for (int i = 0; i < context.getRowCount(); i++) {
                 for (ZombieInstance zombie : context.getZombiesInLane(i)) {
+                    int direction = (zombie.getGridX() < plant.getPosition().getX()) ? -1 : +1;
                     Splash splash = new Splash(
                             inferDamage(def, plant),
                             new FloatPoint(origin.getX(), origin.getY()),
                             row,
                             LOB_VELOCITY,
                             Projectile.Element.BUTTER,
-                            (zombie.getGridX() < plant.getPosition().getX()) ? -1 : +1,
+                            direction,
                             Math.max(1.0f, splashRadius)
                     );
-                    splash.setHomingTarget(zombie);
+                    aimLob(splash, origin, zombie, context.getColumnCount());
                     context.spawnProjectile(splash, splash.getX(), splash.getY());
                 }
             }
@@ -183,6 +190,59 @@ public class LobberAbility implements PlantAbility {
             }
         }
         return baseDamage;
+    }
+
+    private static void aimLob(Splash splash, FloatPoint origin, ZombieInstance target, int columnCount) {
+        splash.setHomingTarget(target);
+        float landingX;
+        float landingY = origin.getY();
+        if (target != null && target.getContinuousPosition() != null) {
+            landingX = target.getContinuousX();
+            landingY = target.getContinuousY();
+        } else {
+            landingX = splash.getDirection() >= 0 ? columnCount - 0.5f : -0.5f;
+        }
+        splash.beginLob(origin.getX(), origin.getY(), landingX, landingY);
+    }
+
+    /**
+     * Closest living zombie in the plant's lane that sits in {@code direction}
+     * of the plant (the zombie this lob is attacking).
+     */
+    private static ZombieInstance nearestZombieAhead(PlantInstance plant, PlantAbilityContext context,
+                                                    int direction) {
+        if (plant.getPosition() == null || context == null) {
+            return null;
+        }
+        int row = plant.getPosition().getY();
+        float originX = plant.getPosition().getX() + 0.5f;
+        ZombieInstance best = null;
+        float bestDist = Float.MAX_VALUE;
+        List<ZombieInstance> lane = context.getZombiesInLane(row);
+        if (lane == null) {
+            return null;
+        }
+        for (ZombieInstance zombie : lane) {
+            if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) {
+                continue;
+            }
+            if (zombie.isHypnotized()) {
+                continue;
+            }
+            float dx = zombie.getContinuousX() - originX;
+            if (direction > 0 && dx < 0f) {
+                continue;
+            }
+            if (direction < 0 && dx > 0f) {
+                continue;
+            }
+            float dist = Math.abs(dx);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = zombie;
+            }
+        }
+        return best;
     }
 
     /** @return true if this plant is a Kernel-pult. */

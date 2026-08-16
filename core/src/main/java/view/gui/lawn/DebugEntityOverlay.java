@@ -12,6 +12,7 @@ import model.game.map.FloatPoint;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
+import model.projectile.Splash;
 import model.zombie.instance.ZombieInstance;
 
 /**
@@ -120,6 +121,9 @@ public final class DebugEntityOverlay implements Disposable {
                 ? projectile.getSourcePlant().getName()
                 : projectile.getClass().getSimpleName();
         float[] xy = layout.centerOf(projectile.getY(), projectile.getX());
+        if (projectile instanceof Splash splash) {
+            xy[1] += splash.getVisualHeight() * layout.cellHeight();
+        }
         drawMarker(batch, xy[0], xy[1], PROJECTILE_COLOR, name);
     }
 

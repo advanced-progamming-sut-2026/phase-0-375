@@ -109,9 +109,17 @@ public class ProjectileSystem implements Tickable {
             return true;
         }
 
+        // Lobs fly over zombies until they land, then splash at the impact tile.
+        if (projectile instanceof Splash splash && splash.isLobbing() && !splash.hasLanded()) {
+            return false;
+        }
+
         ZombieInstance target = findCollision(projectile);
         if (target != null) {
             handleZombieHit(projectile, target);
+        } else if (projectile instanceof Splash splash && splash.hasLanded()) {
+            applySplashDamage(splash, null);
+            discard(splash, true);
         }
         return false;
     }
@@ -196,6 +204,10 @@ public class ProjectileSystem implements Tickable {
     // --- Movement ---
 
     private void moveProjectile(Projectile projectile, float deltaTime) {
+        if (projectile instanceof Splash splash) {
+            moveLobbedSplash(splash, deltaTime);
+            return;
+        }
         // Homing projectiles steer toward their target each tick.
         if (projectile.isHoming()) {
             steerHoming(projectile, deltaTime);
@@ -210,6 +222,30 @@ public class ProjectileSystem implements Tickable {
         if (newRow != projectile.getRow()) {
             projectile.setRow(newRow);
         }
+    }
+
+    /**
+     * Interpolates a splash along its throw parabola. If the ability did not
+     * call {@link Splash#beginLob}, a default lob is started toward the homing
+     * target (or the far edge of the lawn).
+     */
+    private void moveLobbedSplash(Splash splash, float deltaTime) {
+        if (!splash.isLobbing()) {
+            float originX = splash.getX();
+            float originY = splash.getY();
+            float landingX = originX;
+            float landingY = originY;
+            ZombieInstance target = splash.getHomingTarget();
+            if (target != null && !target.isDead() && target.getContinuousPosition() != null) {
+                landingX = target.getContinuousX();
+                landingY = target.getContinuousY();
+            } else {
+                int cols = gameModel.getColumnCount();
+                landingX = splash.getDirection() >= 0 ? cols - 0.5f : -0.5f;
+            }
+            splash.beginLob(originX, originY, landingX, landingY);
+        }
+        splash.advanceLob(deltaTime);
     }
 
     /** Steers a homing projectile toward its target. */
