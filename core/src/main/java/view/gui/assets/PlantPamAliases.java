@@ -20,6 +20,8 @@ public final class PlantPamAliases {
         m.put("Fume-shroom", "FUMESHROOM");
         m.put("Ice-shroom", "ICESHROOM");
         m.put("Hypno-shroom", "HYPNOSHROOM");
+        m.put("Caulipower", "CAULIPOWER");
+        m.put("Electric Blueberry", "ELECTRICBLUEBERRY");
         m.put("Magnet-shroom", "MAGNETSHROOM");
         m.put("Grave Buster", "GRAVEBUSTER");
         m.put("Potato Mine", "POTATOMINE");
@@ -32,6 +34,7 @@ public final class PlantPamAliases {
         m.put("Snapdragon", "SNAPDRAGON");
         m.put("Cold Snapdragon", "COLD_SNAPDRAGON");
         m.put("Iceberg Lettuce", "ICEBERGLETTUCE");
+        // PvZ2 shipped Homing Thistle, not Cat-tail — no CATTAIL PAM in this pack.
         m.put("Cat-tail", "CATTAIL");
         m.put("Lily Pad", "LILYPAD");
         m.put("Gold Bloom", "GOLDBLOOM");

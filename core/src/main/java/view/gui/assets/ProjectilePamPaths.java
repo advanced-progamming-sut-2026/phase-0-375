@@ -56,6 +56,13 @@ public final class ProjectilePamPaths {
             "768/FULL/EFFECTS/T_WINTERMELON_PROJECTILE/T_WINTERMELON_PROJECTILE.PAM";
     public static final String PEPPER_PULT =
             "768/FULL/EFFECTS/T_PEPPERPULT_PROJECTILE/T_PEPPERPULT_PROJECTILE.PAM";
+    public static final String CAULIPOWER =
+            "768/INITIAL/EFFECTS/CAULIPOWER_PROJECTILE/CAULIPOWER_PROJECTILE.PAM";
+    public static final String ELECTRIC_BLUEBERRY =
+            "768/INITIAL/EFFECTS/ELECTRICBLUEBERRY_CLOUD_PROJECTILE/ELECTRICBLUEBERRY_CLOUD_PROJECTILE.PAM";
+
+    /** Storm-cloud hover on {@link #ELECTRIC_BLUEBERRY} (no {@code animation} clip). */
+    public static final String ELECTRIC_BLUEBERRY_CLIP = "idle";
 
     /** Butter clip on {@link #KERNEL_PULT} ({@code animation} is the kernel). */
     public static final String KERNEL_BUTTER_CLIP = "animation3";
@@ -86,7 +93,9 @@ public final class ProjectilePamPaths {
             Map.entry("Kernel-pult", KERNEL_PULT),
             Map.entry("Melon-pult", MELON_PULT),
             Map.entry("Winter Melon", WINTER_MELON),
-            Map.entry("Pepper-pult", PEPPER_PULT)
+            Map.entry("Pepper-pult", PEPPER_PULT),
+            Map.entry("Caulipower", CAULIPOWER),
+            Map.entry("Electric Blueberry", ELECTRIC_BLUEBERRY)
     );
 
     /**

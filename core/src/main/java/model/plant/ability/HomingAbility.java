@@ -4,13 +4,16 @@ import model.enums.*;
 import model.game.map.FloatPoint;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
+import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Strategy for the {@link PlantCategory#HOMING} family.
@@ -23,8 +26,35 @@ public class HomingAbility implements PlantAbility {
 
     private static final int ONE_HIT_DAMAGE = BURST_PROJ_DAMAGE;
 
+    private static final Random RNG = new Random();
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.HOMING; }
+
+    @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null || plant.getPosition() == null) return null;
+
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.HOMING);
+            return null;
+        }
+
+        if (def.getAbilityType() == PlantAbilityType.SHOOT_PROJECTILE) {
+            if (pickTarget(plant, context) == null) return null;
+            execute(plant, context);
+            return TimedPlantAction.attackHold(plant, context);
+        }
+
+        if (def.getAbilityType() == PlantAbilityType.MODIFIER_UTILITY) {
+            if (!hasMetalInRange(plant, context)) return null;
+            execute(plant, context);
+            return TimedPlantAction.attackHold(plant, context);
+        }
+
+        return null;
+    }
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
@@ -64,7 +94,11 @@ public class HomingAbility implements PlantAbility {
                 break;
             case KNOCKBACK_BLAST:
                 // Magnet-shroom plant-food
-                pullMetalAndStunAll(context, (int) def.getPlantFoodValue());
+                ArmorType pulled = pullMetalAndStunAll(context, (int) def.getPlantFoodValue());
+                AbilityState pfState = plant.getAbilityState(def.getAbilityType());
+                if (pulled != null && pfState != null) {
+                    pfState.setHeldMetal(pulled);
+                }
                 break;
             case PROJECTILE_BURST:
                 // cat-tail plant-food
@@ -86,8 +120,10 @@ public class HomingAbility implements PlantAbility {
                 plant.getPosition().getX() + 0.5f,
                 plant.getPosition().getY()
         );
+        // Caulipower's bolt hypnotizes on hit instead of dealing lethal damage.
+        int damage = def.hasTag(PlantTags.MAGIC) ? 0 : def.getDamage();
         Pellet pellet = new Pellet(
-                def.getDamage(),
+                damage,
                 origin,
                 plant.getPosition().getY(),
                 PELLET_VELOCITY,
@@ -105,6 +141,22 @@ public class HomingAbility implements PlantAbility {
      * lane and destroys its metallic armor.
      */
     private void pullMetalFromNearest(PlantInstance plant, PlantAbilityContext context) {
+        ZombieInstance nearest = findNearestMetalZombie(plant, context);
+        if (nearest == null) {
+            return;
+        }
+        ArmorType pulled = stripMetalArmour(nearest);
+        AbilityState state = plant.getAbilityState(plant.getDefinition().getAbilityType());
+        if (pulled != null && state != null) {
+            state.setHeldMetal(pulled);
+        }
+    }
+
+    private boolean hasMetalInRange(PlantInstance plant, PlantAbilityContext context) {
+        return findNearestMetalZombie(plant, context) != null;
+    }
+
+    private ZombieInstance findNearestMetalZombie(PlantInstance plant, PlantAbilityContext context) {
         int row = plant.getPosition().getY();
         int plantCol = plant.getPosition().getX();
 
@@ -122,9 +174,7 @@ public class HomingAbility implements PlantAbility {
                 nearest = zombie;
             }
         }
-        if (nearest != null) {
-            stripMetalArmour(nearest);
-        }
+        return nearest;
     }
 
     // --- Magnet-shroom plant-food ---
@@ -134,11 +184,14 @@ public class HomingAbility implements PlantAbility {
      * field, then freezes each affected zombie solid (3 chill stacks)
      * and deals a small bonus damage.
      */
-    private void pullMetalAndStunAll(PlantAbilityContext context, int stunDamage) {
+    private ArmorType pullMetalAndStunAll(PlantAbilityContext context, int stunDamage) {
+        ArmorType lastPulled = null;
         for (int lane = 0; lane < context.getRowCount(); lane++) {
             for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
                 if (zombie == null || zombie.isDead()) continue;
-                if (!stripMetalArmour(zombie)) continue;
+                ArmorType pulled = stripMetalArmour(zombie);
+                if (pulled == null) continue;
+                lastPulled = pulled;
 
                 // Freeze the zombie solid (3 chill stacks). The existing
                 // chill / unfreeze machinery ticks the stacks back down.
@@ -151,6 +204,7 @@ public class HomingAbility implements PlantAbility {
                 }
             }
         }
+        return lastPulled;
     }
 
     // --- Metal-stripping helpers ---
@@ -170,23 +224,25 @@ public class HomingAbility implements PlantAbility {
     /**
      * Destroys every metallic armor piece on the zombie.
      *
-     * @return true if at least one metal piece was stripped
+     * @return the first metal type stripped, or {@code null} if none
      */
-    private static boolean stripMetalArmour(ZombieInstance zombie) {
-        boolean stripped = false;
+    private static ArmorType stripMetalArmour(ZombieInstance zombie) {
+        ArmorType pulled = null;
         List<Armor> armors = zombie.getArmors();
-        if (armors == null || armors.isEmpty()) return false;
+        if (armors == null || armors.isEmpty()) return null;
 
         for (Armor armor : armors) {
             if (armor != null && armor.isMetallic() && !armor.isDestroyed()) {
+                if (pulled == null) {
+                    pulled = armor.getType();
+                }
                 armor.setCurrentHealth(0);
-                stripped = true;
             }
         }
-        if (stripped) {
+        if (pulled != null) {
             zombie.removeDestroyedArmor();
         }
-        return stripped;
+        return pulled;
     }
 
     // --- Caulipower plant-food ---
@@ -250,16 +306,51 @@ public class HomingAbility implements PlantAbility {
             if (garg != null) return garg;
         }
 
-        // Default policy: prefer the highest-HP zombie on the field.
+        Plant def = plant.getDefinition();
+        if (isCatTail(def)) {
+            return findNearestZombie(plant, context);
+        }
+
+        // Caulipower / Electric Blueberry: a random zombie on the field.
+        return pickRandomZombie(context);
+    }
+
+    private static boolean isCatTail(Plant def) {
+        String name = def != null ? def.getName() : null;
+        return name != null && name.equalsIgnoreCase("Cat-tail");
+    }
+
+    private ZombieInstance findNearestZombie(PlantInstance plant, PlantAbilityContext context) {
+        float originX = plant.getPosition().getX();
+        float originY = plant.getPosition().getY();
         ZombieInstance best = null;
+        float bestDist = Float.MAX_VALUE;
         for (int lane = 0; lane < context.getRowCount(); lane++) {
             for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
-                if (best == null || zombie.getCurrentHP() > best.getCurrentHP()) {
+                if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+                if (zombie.getContinuousPosition() == null) continue;
+                float dx = zombie.getContinuousX() - originX;
+                float dy = zombie.getContinuousY() - originY;
+                float dist = dx * dx + dy * dy;
+                if (dist < bestDist) {
+                    bestDist = dist;
                     best = zombie;
                 }
             }
         }
         return best;
+    }
+
+    private ZombieInstance pickRandomZombie(PlantAbilityContext context) {
+        List<ZombieInstance> candidates = new ArrayList<>();
+        for (int lane = 0; lane < context.getRowCount(); lane++) {
+            for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
+                if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+                candidates.add(zombie);
+            }
+        }
+        if (candidates.isEmpty()) return null;
+        return candidates.get(RNG.nextInt(candidates.size()));
     }
 
     /** @return true if the plant has the PRIORITIZE_GARGANTUARS upgrade. */

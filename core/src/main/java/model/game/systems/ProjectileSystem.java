@@ -104,7 +104,8 @@ public class ProjectileSystem implements Tickable {
             return false;
         }
 
-        if (projectile instanceof Pellet && hitGridItemsIfAny(projectile)) {
+        // Homing shots (Caulipower, …) pass through graves and other blockers.
+        if (projectile instanceof Pellet && !projectile.isHoming() && hitGridItemsIfAny(projectile)) {
             discard(projectile, true);
             return true;
         }
@@ -511,6 +512,14 @@ public class ProjectileSystem implements Tickable {
             zombie.applyChill();
             zombie.applyChill();
             zombie.applyChill();
+        }
+
+        Plant source = projectile.getSourcePlant();
+        if (source != null
+                && source.getCategory() == PlantCategory.HOMING
+                && source.hasTag(PlantTags.MAGIC)) {
+            zombie.setState(ZombieState.HYPNOTIZED);
+            zombie.setMovingBackward(true);
         }
     }
 

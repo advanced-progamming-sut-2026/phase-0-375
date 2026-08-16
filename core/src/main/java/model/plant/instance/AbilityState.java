@@ -1,5 +1,6 @@
 package model.plant.instance;
 
+import model.enums.ArmorType;
 import model.enums.PlantAbilityType;
 
 /**
@@ -14,6 +15,7 @@ public class AbilityState {
     private int growthStage;          // current growth stage for staged plants
     private boolean isDigesting;      // true for Chomper after swallowing a zombie
     private float digestRemaining;    // seconds left in digestion
+    private ArmorType heldMetal;      // Metal last pulled by Magnet-shroom; null if none
 
     public AbilityState(PlantAbilityType abilityType) {
         this.abilityType = abilityType;
@@ -54,6 +56,10 @@ public class AbilityState {
         return digestRemaining;
     }
 
+    public ArmorType getHeldMetal() {
+        return heldMetal;
+    }
+
     // --- Setters ---
 
     public void setAbilityType(PlantAbilityType abilityType) {
@@ -86,5 +92,9 @@ public class AbilityState {
 
     public void setDigestRemaining(float digestRemaining) {
         this.digestRemaining = digestRemaining;
+    }
+
+    public void setHeldMetal(ArmorType heldMetal) {
+        this.heldMetal = heldMetal;
     }
 }

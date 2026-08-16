@@ -24,6 +24,10 @@ public final class ProjectileAnimAdapter {
         if (projectile instanceof FumeCloud) {
             return AnimPose.once(pam, "special", ProjectileAnimRole.FLYING);
         }
+        if (ProjectilePamPaths.ELECTRIC_BLUEBERRY.equals(pam)) {
+            return AnimPose.looping(pam, ProjectilePamPaths.ELECTRIC_BLUEBERRY_CLIP,
+                    ProjectileAnimRole.FLYING);
+        }
         String clip = projectile.isButter() && ProjectilePamPaths.KERNEL_PULT.equals(pam)
                 ? ProjectilePamPaths.KERNEL_BUTTER_CLIP
                 : ProjectilePamPaths.CLIP_PREFERENCES[0];
