@@ -112,6 +112,11 @@ public class ProjectileSystem implements Tickable {
 
     /** Applies damage and on-hit effects once a projectile reaches a zombie. */
     private void handleZombieHit(Projectile projectile, ZombieInstance target) {
+        if (projectile.hasAlreadyHit(target)) {
+            return;
+        }
+        projectile.markHit(target);
+
         applyDamage(projectile, target);
         applyOnHitEffects(projectile, target);
 
@@ -264,8 +269,6 @@ public class ProjectileSystem implements Tickable {
         float projX = projectile.getX();
         float tolerance = 0.5f;
         boolean isPlantFired = projectile.getSourcePlant() != null;
-        boolean isBowlingBulb = projectile instanceof BowlingBulb;
-        BowlingBulb bulb = isBowlingBulb ? (BowlingBulb) projectile : null;
 
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(lane);
         ZombieInstance best = null;
@@ -277,8 +280,8 @@ public class ProjectileSystem implements Tickable {
             // Reflected projectiles travel toward plants, not zombies.
             if (projectile.isReflected()) continue;
 
-            // Bowling Bulbs never damage the same zombie twice.
-            if (bulb != null && bulb.hasAlreadyHit(zombie)) continue;
+            // skip anyone this projectile has already damaged.
+            if (projectile.hasAlreadyHit(zombie)) continue;
 
             if (isPlantFired && zombie.isHypnotized()) {
                 continue;
@@ -442,7 +445,6 @@ public class ProjectileSystem implements Tickable {
     // --- Bowling Bulb physics ---
 
     private void handleBulbCollision(BowlingBulb bulb, ZombieInstance target) {
-        bulb.markHit(target);
         bulb.incrementHitCount();
 
         if (bulb.isExplosive()) {

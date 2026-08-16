@@ -5,6 +5,9 @@ import model.game.map.Point;
 import model.plant.definition.Plant;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 /**
  * Abstract base class for all projectiles fired by plants.
  */
@@ -48,6 +51,10 @@ public abstract class Projectile {
 
     /** True if this projectile pierces through zombies and doesn't get destroyed. */
     protected boolean pierce;
+
+    /** Zombies this projectile has already damaged. */
+    private final Set<ZombieInstance> alreadyHit =
+        Collections.newSetFromMap(new IdentityHashMap<>());
 
     /** Elemental affinity, preserved across reflection. */
     protected Element element;
@@ -179,6 +186,16 @@ public abstract class Projectile {
 
     public void setPierce(boolean pierce) {
         this.pierce = pierce;
+    }
+
+    /** @return true if this projectile has already damaged {@code zombie}. */
+    public boolean hasAlreadyHit(ZombieInstance zombie) {
+        return zombie != null && alreadyHit.contains(zombie);
+    }
+
+    /** Records that this projectile has damaged {@code zombie}. */
+    public void markHit(ZombieInstance zombie) {
+        if (zombie != null) alreadyHit.add(zombie);
     }
 
     public Element getElement() {

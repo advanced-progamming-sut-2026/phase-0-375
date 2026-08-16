@@ -2,11 +2,6 @@ package model.projectile;
 
 import model.enums.BowlingBulbType;
 import model.game.map.FloatPoint;
-import model.zombie.instance.ZombieInstance;
-
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Set;
 
 /**
  * A bulb projectile fired by the Bowling Bulb plant.
@@ -23,9 +18,6 @@ public class BowlingBulb extends Projectile {
 
     /** {@code true} for the plant-food effect. */
     private boolean explosive;
-
-    /** Zombies already damaged by this bulb. */
-    private final Set<ZombieInstance> alreadyHit = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public BowlingBulb(int damage, FloatPoint position, int row, float velocity,
                        BowlingBulbType type, int maxBounces) {
@@ -86,15 +78,5 @@ public class BowlingBulb extends Projectile {
 
     public void setExplosive(boolean explosive) {
         this.explosive = explosive;
-    }
-
-    // --- Already-hit tracking ---
-
-    public boolean hasAlreadyHit(ZombieInstance zombie) {
-        return zombie != null && alreadyHit.contains(zombie);
-    }
-
-    public void markHit(ZombieInstance zombie) {
-        if (zombie != null) alreadyHit.add(zombie);
     }
 }
