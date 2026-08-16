@@ -72,6 +72,24 @@ public final class PamVisibility {
         return freeze(map);
     }
 
+    /**
+     * Copy of {@code base} plus each named part forced hidden.
+     * {@code base} may be {@code null}.
+     */
+    public static Map<String, Boolean> hideAlso(Map<String, Boolean> base, String... partNames) {
+        Map<String, Boolean> map = base == null || base.isEmpty()
+                ? new HashMap<>()
+                : new HashMap<>(base);
+        if (partNames != null) {
+            for (String part : partNames) {
+                if (part != null && !part.isBlank()) {
+                    map.put(part, Boolean.FALSE);
+                }
+            }
+        }
+        return freeze(map);
+    }
+
     private static void putVisible(Map<String, Boolean> map, String part) {
         if (part != null && !part.isBlank()) {
             map.put(part, Boolean.TRUE);

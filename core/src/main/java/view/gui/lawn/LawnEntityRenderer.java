@@ -41,6 +41,7 @@ import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.behavior.TransformBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
+import pvz.libpvz.pam.PamPlayer;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
@@ -69,6 +70,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -89,6 +91,9 @@ public final class LawnEntityRenderer {
     private static final float ARMOR_POP_HOP = 1.4f;
     private static final float ARMOR_POP_GRAVITY = -9f;
     private static final float ARMOR_POP_BACK_TILES = 0.2f;
+    /** Head ({@code particle_head}) arc stays inside the death tile (centre ± half a cell). */
+    private static final float HEAD_THROW_BACK_TILES = 0.2f;
+    private static final float HEAD_THROW_HOP_TILES = 0.45f;
     private static final float POP_BOUNCE = 0.4f;
     private static final String[] DEATH_PARTS_EGYPT = {
             "zombie_egypt_skull", "zombie_egypt_jaw",
@@ -119,12 +124,35 @@ public final class LawnEntityRenderer {
     private static final String[] ARCADE_HEAD_PARTS = {
             "particle_head", "particle_arm",
             "zombie_skull", "zombie_jaw",
-            "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+            "zombie_arm_outer_lower", "zombie_arm_outer_upper", "zombie_arms_outer_upper",
+            "zombie_hand_outer", "zombie_troglobite_hand_oute_push"};
+
     /** Hunter {@code die} body parts that {@link HunterAnim#DEATH_PARTICLE_PARTS} stand in for. */
     private static final String[] HUNTER_HEAD_PARTS = {
             "particle_head", "particle_hand",
             "zombie_skull", "zombie_jaw",
             "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+    /** Fallback live-body parts to hide after {@code particle_arm} drops at half HP. */
+    private static final String[] LOST_HAND_BODY_PARTS = {
+            "particle_hand", "particle_arm", "particle_arm_01", "particle_arm_02",
+            "zombie_arm_outer_lower", "zombie_arm_outer_upper", "zombie_arms_outer_upper",
+            "zombie_hand_outer", "zombie_hand_outer_01", "zombie_hand_outer_02", "zombie_hand_outer_03",
+            "zombie_troglobite_hand_oute_push", "zombie_troglobite_hand_outer",
+            "zombie_troglobite_arm_outer_lower", "zombie_troglobite_arm_outer_upper",
+            "zombie_egypt_arm_outer_lower", "zombie_egypt_arm_outer_upper",
+            "zombie_egypt_arms_outer_upper", "zombie_egypt_hand_outer_01"};
+    /** Detached limb groups on {@code particles}; {@code particle_hand} is the fallback. */
+    private static final String[] ARM_PARTICLE_NAMES = {
+            "particle_arm", "particle_arm_01", "particle_arm_02", "particle_hand"};
+    /** PAM overlay layers that ride the skull; keep them off thrown heads. */
+    private static final String[] INK_BUTTER_PARTS = {
+            "butter", "ink", "_butter", "_ink", "zombie_butter", "zombie_ink"};
+    /** Sibling/child bits that must not fly with {@code particle_head}. */
+    private static final String[] HEAD_POP_HIDE = {
+            "particle_arm", "particle_hand",
+            "zombie_arm_outer_lower", "zombie_arms_outer_upper",
+            "zombie_egypt_arm_outer_lower", "zombie_egypt_hand_outer_01",
+            "zombie_jaw", "zombie_egypt_jaw"};
 
     /** Arcade cabinet effect PAM (not a zombie body). */
     private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
@@ -157,7 +185,7 @@ public final class LawnEntityRenderer {
     private final PlantAnimAdapter plantAdapter;
     private final ZombieAnimAdapter zombieAdapter;
     private final PamClipCache clips;
-    private final pvz.libpvz.pam.PamPlayer player;
+    private final PamPlayer player;
     private final PamCatalog catalog;
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
@@ -168,6 +196,10 @@ public final class LawnEntityRenderer {
     private String crystalSkullPart;
     private String crystalBeamPart;
     private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
+    /** Body HP has crossed half; {@code particle_arm} already hopped off. */
+    private final IdentityHashMap<ZombieInstance, Boolean> lostHands = new IdentityHashMap<>();
+    /** Outer-arm part names on the live PAM, cached after the first half-HP pop. */
+    private final Map<String, String[]> lostArmBodyByPam = new HashMap<>();
     private final IdentityHashMap<ZombieInstance, Chapter> artChapters = new IdentityHashMap<>();
     private final List<ArmorPop> armorPops = new ArrayList<>();
     private final List<DeathFx> deathFx = new ArrayList<>();
@@ -189,6 +221,7 @@ public final class LawnEntityRenderer {
     private final float[] xyTmp = new float[3];
     private final Matrix4 batchTransform = new Matrix4();
     private final Matrix4 popTransform = new Matrix4();
+    private final Map<String, Boolean> popVis = new HashMap<>();
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
@@ -292,6 +325,7 @@ public final class LawnEntityRenderer {
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
                 && !plant.isTransformed());
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        lostHands.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         hunterSplatSeq.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
@@ -1241,6 +1275,10 @@ public final class LawnEntityRenderer {
         if (snorkelMask != null) {
             drownShader().begin(batch, snorkelMask);
         }
+        maybePopLostHand(zombie, pose, x, y);
+        if (lostHands.containsKey(zombie)) {
+            pose = pose.withHiddenParts(lostArmBodyParts(pose.pamPath()));
+        }
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
         if (snorkelMask != null) {
             drownShader().end(batch);
@@ -2053,6 +2091,36 @@ public final class LawnEntityRenderer {
         float time;
     }
 
+    /** {@code particle_arm} hops off {@code particles} at half HP. */
+    private void maybePopLostHand(ZombieInstance zombie, AnimPose pose, float x, float y) {
+        if (zombie == null || pose == null || lostHands.containsKey(zombie)) {
+            return;
+        }
+        if (!atOrBelowHalfHp(zombie)) {
+            return;
+        }
+        String pam = pose.pamPath();
+        if (firstLoadedClip(pam, "particles", null) == null) {
+            return;
+        }
+        List<String> arms = particleArmParts(pam);
+        if (arms.isEmpty()) {
+            for (String part : particleParts(pam)) {
+                if (isArmPopPart(part)) {
+                    arms.add(part);
+                }
+            }
+        }
+        if (arms.isEmpty()) {
+            return;
+        }
+        float dir = zombie.isMovingBackward() || pose.flipX() ? -1f : 1f;
+        for (String part : arms) {
+            addLimbPop(pam, "particles", part, x, y, 0f, dir, 0.15f, 0.85f, 0f, false);
+        }
+        lostHands.put(zombie, Boolean.TRUE);
+    }
+
     /** Helm/bucket/brick/crown/shoulder: last damage sprite hops off when the piece leaves. */
     private void popBrokenArmor(ZombieInstance zombie, AnimPose pose, float x, float y) {
         HitFlash flash = hitFlashes.get(zombie);
@@ -2102,7 +2170,7 @@ public final class LawnEntityRenderer {
                 pop.y += pop.vy * delta;
                 if (pop.y <= pop.groundY) {
                     pop.y = pop.groundY;
-                    if (pop.bounces < 2 && -pop.vy > layout.cellHeight() * 0.25f) {
+                    if (pop.bounces < pop.maxBounces && -pop.vy > layout.cellHeight() * 0.25f) {
                         pop.vy = -pop.vy * POP_BOUNCE;
                         pop.vx *= 0.55f;
                         pop.bounces++;
@@ -2128,11 +2196,15 @@ public final class LawnEntityRenderer {
                     .scale(s, s, 1f)
                     .translate(-pop.x, -pop.y, 0f);
             batch.setTransformMatrix(popTransform);
-            if (pop.part == null) {
-                // Whole clip: PAM default-hidden flags stay on (butter, etc.).
-                player.draw(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, 1f, 1f, false);
+            clips.getOrLoad(pop.pamPath, pop.clipName);
+            if (pop.part == null || isHeadPopPart(pop.part)) {
+                ClipRef ref = clips.getOrLoad(pop.pamPath, pop.clipName);
+                if (ref != null) {
+                    player.draw(batch, ref, pop.clipTime, pop.x, pop.y, 1f, 1f, false,
+                            headPopVis(pop.part));
+                }
             } else {
-                player.drawPart(batch, pop.pamPath, pop.clipName, 0f, pop.x, pop.y, pop.part);
+                player.drawPart(batch, pop.pamPath, pop.clipName, pop.clipTime, pop.x, pop.y, pop.part);
             }
             batch.setTransformMatrix(batchTransform);
             batch.setColor(Color.WHITE);
@@ -2152,6 +2224,7 @@ public final class LawnEntityRenderer {
         final String part;
         final float groundY;
         final float gravity;
+        float clipTime;
         float x;
         float y;
         float vx;
@@ -2163,6 +2236,7 @@ public final class LawnEntityRenderer {
         float hold;
         boolean grounded;
         int bounces;
+        int maxBounces = 2;
 
         ArmorPop(String pamPath, String clipName, String part,
                  float x, float y, float groundY, float vx, float vy, float gravity) {
@@ -2274,6 +2348,7 @@ public final class LawnEntityRenderer {
         for (String part : bits) {
             vis.put(part, Boolean.FALSE);
         }
+        hideInkButter(vis);
         String[] bodyHead = deathHeadParts(pam);
         if (bodyHead != null) {
             for (String part : bodyHead) {
@@ -2312,14 +2387,21 @@ public final class LawnEntityRenderer {
         if (headGroup != null && firstLoadedClip(pam, "particles", null) != null) {
             // Gargantuar/Imp: the clip is already just the head; drawPart would whitelist butter.
             // All-Star: {_particles} is default-hidden, so the clip must be drawn via drawPart.
-            addLimbPop(pam, "particles", headGroup, snap.x, snap.y, 0f, dir, 0.2f, 0.85f, hold,
+            addLimbPop(pam, "particles", headGroup, snap.x, snap.y, 0f,
+                    randomHeadThrowDir(), HEAD_THROW_BACK_TILES, HEAD_THROW_HOP_TILES, hold,
                     !isAllStar(pam));
             return;
         }
         for (int i = 0; i < bits.size(); i++) {
-            float back = 0.1f + i * 0.1f;
-            float hop = 0.85f + (i % 2) * 0.3f;
-            addLimbPop(pam, "particles", bits.get(i), snap.x, snap.y, 0f, dir, back, hop, hold, false);
+            String part = bits.get(i);
+            if (lostHands.containsKey(zombie) && isArmPopPart(part)) {
+                continue;
+            }
+            boolean head = isHeadParticlePart(part);
+            float throwDir = head ? randomHeadThrowDir() : dir;
+            float back = head ? HEAD_THROW_BACK_TILES : 0.1f + i * 0.1f;
+            float hop = head ? HEAD_THROW_HOP_TILES : 0.85f + (i % 2) * 0.3f;
+            addLimbPop(pam, "particles", part, snap.x, snap.y, 0f, throwDir, back, hop, hold, false);
         }
     }
 
@@ -2504,10 +2586,6 @@ public final class LawnEntityRenderer {
         if (firstLoadedClip(pam, "particles", null) == null) {
             return bits;
         }
-        if (isIceAgeHunter(pam)) {
-            bits.addAll(List.of(HunterAnim.DEATH_PARTICLE_PARTS));
-            return bits;
-        }
         if (popsHeadAndArm(pam)) {
             bits.addAll(List.of(ARCADE_PARTICLE_PARTS));
             return bits;
@@ -2515,12 +2593,169 @@ public final class LawnEntityRenderer {
         String[] names = deathHeadGroup(pam) != null ? new String[]{deathHeadGroup(pam)}
                 : egyptDeathParts(pam)
                 ? DEATH_PARTS_EGYPT : DEATH_PARTS;
+        boolean particleHead = partDrawn(clips.getOrLoad(pam, "particles"), "particle_head");
+        if (particleHead && deathHeadGroup(pam) == null) {
+            bits.add("particle_head");
+        }
+        List<String> armParticles = particleArmParts(pam);
+        bits.addAll(armParticles);
+        boolean particleLimb = !armParticles.isEmpty();
         for (String part : names) {
-            if (player.partBounds(pam, "particles", 0f, part) != null) {
+            if (particleHead && (part.contains("skull") || part.contains("jaw"))) {
+                continue;
+            }
+            if (particleLimb && isArmPopPart(part) && !isParticleLimb(part)) {
+                continue;
+            }
+            if (partDrawn(clips.getOrLoad(pam, "particles"), part)) {
                 bits.add(part);
             }
         }
         return bits;
+    }
+
+    /** Detached {@code particle_arm} (or {@code particle_hand} if that group is missing). */
+    private List<String> particleArmParts(String pam) {
+        List<String> arms = new ArrayList<>();
+        List<String> hands = new ArrayList<>();
+        ClipRef particles = clips.getOrLoad(pam, "particles");
+        if (particles == null) {
+            return arms;
+        }
+        for (String name : ARM_PARTICLE_NAMES) {
+            if (!partDrawn(particles, name)) {
+                continue;
+            }
+            if (isParticleHandPart(name)) {
+                hands.add(name);
+            } else {
+                arms.add(name);
+            }
+        }
+        return arms.isEmpty() ? hands : arms;
+    }
+
+    private boolean partDrawn(ClipRef clip, String name) {
+        if (clip == null || name == null) {
+            return false;
+        }
+        Rectangle[] frames = player.partBoundsByFrame(clip, name);
+        if (frames == null) {
+            return false;
+        }
+        for (Rectangle frame : frames) {
+            if (frame != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String[] lostArmBodyParts(String pam) {
+        if (pam == null) {
+            return LOST_HAND_BODY_PARTS;
+        }
+        String[] cached = lostArmBodyByPam.get(pam);
+        if (cached != null) {
+            return cached.length == 0 ? LOST_HAND_BODY_PARTS : cached;
+        }
+        List<String> names = new ArrayList<>();
+        collectLostArmBodyParts(player.getParts(pam), names);
+        cached = names.toArray(String[]::new);
+        lostArmBodyByPam.put(pam, cached);
+        return cached.length == 0 ? LOST_HAND_BODY_PARTS : cached;
+    }
+
+    private static void collectLostArmBodyParts(PamPlayer.AnimationPart node, List<String> names) {
+        if (node == null) {
+            return;
+        }
+        if (isArmPopPart(node.name)) {
+            names.add(node.name);
+        }
+        if (node.children == null) {
+            return;
+        }
+        for (int i = 0; i < node.children.size(); i++) {
+            Object child = node.children.get(i);
+            if (child instanceof PamPlayer.AnimationPart part) {
+                collectLostArmBodyParts(part, names);
+            }
+        }
+    }
+
+    /** {@code particles} part that is the detached head, thrown on a random parabola. */
+    static boolean isHeadParticlePart(String part) {
+        return "particle_head".equals(part)
+                || ALLSTAR_PARTICLES.equals(part)
+                || GARGANTUAR_HEAD.equals(part);
+    }
+
+    static boolean isHeadPopPart(String part) {
+        return isHeadParticlePart(part)
+                || (part != null && part.contains("skull"));
+    }
+
+    private static void hideInkButter(Map<String, Boolean> vis) {
+        for (String part : INK_BUTTER_PARTS) {
+            vis.put(part, Boolean.FALSE);
+        }
+    }
+
+    private Map<String, Boolean> headPopVis(String part) {
+        popVis.clear();
+        hideInkButter(popVis);
+        for (String hide : HEAD_POP_HIDE) {
+            popVis.put(hide, Boolean.FALSE);
+        }
+        if (part != null) {
+            popVis.put(part, Boolean.TRUE);
+        }
+        return popVis;
+    }
+
+    static boolean isParticleLimb(String part) {
+        return isParticleArmPart(part) || isParticleHandPart(part);
+    }
+
+    static boolean isParticleArmPart(String part) {
+        return part != null && part.startsWith("particle_arm");
+    }
+
+    static boolean isParticleHandPart(String part) {
+        return part != null && part.startsWith("particle_hand");
+    }
+
+    static boolean isArmPopPart(String part) {
+        if (part == null || part.contains("bone")) {
+            return false;
+        }
+        return isParticleLimb(part)
+                || part.contains("arm_outer")
+                || part.contains("arms_outer")
+                || part.contains("hand_outer");
+    }
+
+    static boolean isHandParticlePart(String part) {
+        return isArmPopPart(part);
+    }
+
+    /** Body HP only — armor (cone, bucket) does not delay the arm drop. */
+    static boolean atOrBelowHalfHp(ZombieInstance zombie) {
+        if (zombie == null || zombie.getDefinition() == null) {
+            return false;
+        }
+        int max = zombie.getDefinition().getBaseHP();
+        return max > 0 && zombie.getCurrentHP() * 2 <= max;
+    }
+
+    /** +1 or −1 so the head flies toward the house or back toward the spawn. */
+    static float randomHeadThrowDir() {
+        return randomHeadThrowDir(ThreadLocalRandom.current());
+    }
+
+    static float randomHeadThrowDir(Random rng) {
+        return rng.nextBoolean() ? 1f : -1f;
     }
 
     private void addLimbPop(String pam, String clip, String part,
@@ -2528,6 +2763,7 @@ public final class LawnEntityRenderer {
                             float dir, float backTiles, float hopTiles, float hold,
                             boolean wholeClip) {
         float s = AnimScale.ZOMBIE;
+        clips.getOrLoad(pam, clip);
         Rectangle bounds = player.partBounds(pam, clip, time, part);
         float groundY = originY - layout.cellHeight() * 0.5f;
         if (bounds != null) {
@@ -2541,6 +2777,10 @@ public final class LawnEntityRenderer {
                 hopTiles * layout.cellHeight(),
                 ARMOR_POP_GRAVITY * layout.cellHeight());
         pop.hold = hold;
+        pop.clipTime = time;
+        if (isHeadParticlePart(part) || isArmPopPart(part)) {
+            pop.maxBounces = 0;
+        }
         armorPops.add(pop);
     }
 

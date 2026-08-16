@@ -101,6 +101,15 @@ public final class AnimPose {
                 PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
     }
 
+    /**
+     * Copy of this pose with additional PAM parts forced hidden
+     * (merged onto any existing visibility map).
+     */
+    public AnimPose withHiddenParts(String... partNames) {
+        return new AnimPose(pamPath, clipName, role, loop,
+                PamVisibility.hideAlso(visibility, partNames), scale, flipX, reverse);
+    }
+
     /** Copy of this pose with an entity-specific size multiplier (Gargantuar, Imp, …). */
     public AnimPose withScale(float scale) {
         return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
