@@ -167,8 +167,7 @@ public class SwimBehavior implements ZombieBehavior {
 
     /**
      * @return true if the zombie's current cell is a water tile (either
-     *         deep water or low-tide shallow water). Both are passable
-     *         only to swimming zombies and force the zombie to dive.
+     *         deep water or low-tide shallow water).
      */
     private boolean isOnWater(ZombieInstance zombie, BehaviorContext context) {
         int row = zombie.getGridY();

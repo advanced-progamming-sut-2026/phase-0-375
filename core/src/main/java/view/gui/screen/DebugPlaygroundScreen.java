@@ -23,6 +23,7 @@ import model.enums.MenuType;
 import model.enums.SunType;
 import model.game.core.GameModel;
 import model.game.map.Cell;
+import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.core.PvZGameLoop;
 import model.plant.PlantFactory;
@@ -37,6 +38,7 @@ import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
+import view.gui.lawn.WaterUnderlayerRenderer;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -59,6 +61,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private final GameplayMenuController gameplay = GameplayMenuController.getInstance();
     private final LawnLayout lawnLayout;
     private final LawnBackgroundRenderer lawnBackground;
+    private final WaterUnderlayerRenderer waterUnderlayer;
     private final LawnEntityRenderer entityRenderer;
     private final DebugEntityOverlay entityOverlay;
 
@@ -84,6 +87,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         lawnLayout = new LawnLayout(rows, cols);
         lawnBackground = new LawnBackgroundRenderer(assets.textures);
         lawnBackground.ensureLoaded();
+        waterUnderlayer = new WaterUnderlayerRenderer(assets, lawnLayout);
 
         BitmapFont font = resolveFont();
         entityOverlay = new DebugEntityOverlay(lawnLayout, font);
@@ -165,7 +169,13 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         panel.add(actionButton("Nuke", this::cheatNuke, "purple")).width(100f).height(44f);
         panel.row();
 
-        // Row 4 — sim control
+        // Row 4 — water band (same WaterBand / underlayer beach will use)
+        panel.add(actionButton("Water", this::toggleWater, "purple")).width(120f).height(44f);
+        panel.add(actionButton("Water left", this::waterLeft, "purple")).width(140f).height(44f);
+        panel.add(actionButton("Water right", this::waterRight, "purple")).width(150f).height(44f);
+        panel.row();
+
+        // Row 5 — sim control
         panel.add(actionButton("Pause/Resume", this::togglePause, "purple")).width(160f).height(44f);
         panel.add(actionButton("Exit", this::exitToAdventure, "brown")).width(100f).height(44f);
 
@@ -313,6 +323,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                         + " | Zombie: " + zombieStatusLabel()
                         + " | Sun: " + sun
                         + " | PF: " + pf
+                        + waterStatus()
                         + (paused ? " | PAUSED" : "")
                         + " | Click lawn to apply.");
     }
@@ -452,6 +463,40 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         return true;
     }
 
+    private String waterStatus() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        int cols = model == null || model.getMap() == null
+                ? 0
+                : WaterBand.columnsFromRight(model.getMap());
+        if (cols <= 0) {
+            return "";
+        }
+        return " | Water: " + cols + " col";
+    }
+
+    private void toggleWater() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        int current = model == null || model.getMap() == null
+                ? 0
+                : WaterBand.columnsFromRight(model.getMap());
+        int next = current > 0 ? 0 : WaterBand.DEFAULT_COLUMNS;
+        CommandResult<Void> r = gameplay.cheatSetWaterBand(next);
+        showToast(r.getMessage(), !r.isSuccess());
+        refreshStatus();
+    }
+
+    private void waterLeft() {
+        CommandResult<Void> r = gameplay.cheatNudgeWaterBand(1);
+        showToast(r.getMessage(), !r.isSuccess());
+        refreshStatus();
+    }
+
+    private void waterRight() {
+        CommandResult<Void> r = gameplay.cheatNudgeWaterBand(-1);
+        showToast(r.getMessage(), !r.isSuccess());
+        refreshStatus();
+    }
+
     private void cheatAddSun() {
         CommandResult<Void> r = gameplay.cheatAddSuns(1000);
         showToast(r.getMessage(), !r.isSuccess());
@@ -508,6 +553,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     @Override
     protected void renderWorld(float delta) {
         lawnBackground.draw(game.batch);
+        waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         drawHoverHighlight();
         entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
     }

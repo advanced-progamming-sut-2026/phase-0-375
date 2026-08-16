@@ -65,7 +65,9 @@ public class RegularLevel extends Level {
 
     /**
      * Applies the chapter terrain declared in the level config to the map:
-     * Big Wave Beach water / low-tide tiles, Frostbite Caves slide tiles and
+     * Big Wave Beach water / low-tide tiles ({@link model.game.map.WaterBand}
+     * for a right-edge default; GUI draws {@code WAVE_UPPERLAYER.PAM} over it),
+     * Frostbite Caves slide tiles and
      * initial ice blocks (each holding a frozen zombie), and Dark Ages
      * necromancy tiles.
      */

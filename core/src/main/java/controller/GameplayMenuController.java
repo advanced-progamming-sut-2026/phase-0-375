@@ -21,6 +21,7 @@ import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
+import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
 import model.item.Grave;
@@ -361,6 +362,45 @@ public class GameplayMenuController extends AppMenuController {
         cell.setGroundType(GroundType.ICE);
         cell.setTerrainStrategy(new IceTerrainStrategy(instance));
         return CommandResult.success("Iced '" + zombieType + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * Cheat / beach setup: flood the rightmost {@code columnsFromRight} columns
+     * with water (0 clears the band). Same helper Big Wave Beach should use.
+     */
+    public CommandResult<Void> cheatSetWaterBand(int columnsFromRight) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+        if (columnsFromRight < 0) {
+            return CommandResult.error("Water band width cannot be negative.");
+        }
+        GameModel model = requireGame();
+        GameMap map = model.getMap();
+        WaterBand.applyFromRight(map, columnsFromRight);
+        int live = WaterBand.columnsFromRight(map);
+        if (live == 0) {
+            return CommandResult.success("Cleared the water band.");
+        }
+        return CommandResult.success("Water on the rightmost " + live + " column(s).");
+    }
+
+    /**
+     * Moves the water line one tile inland (positive) or seaward (negative).
+     */
+    public CommandResult<Void> cheatNudgeWaterBand(int delta) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+        GameModel model = requireGame();
+        GameMap map = model.getMap();
+        int before = WaterBand.columnsFromRight(map);
+        int live = WaterBand.nudgeFromRight(map, delta);
+        if (live == before) {
+            return CommandResult.success(live >= map.getCols()
+                    ? "Water already reaches the leftmost column."
+                    : "Water is already gone.");
+        }
+        String dir = live > before ? "left" : "right";
+        return CommandResult.success("Water line moved " + dir + " 1 tile (" + live + " column(s)).");
     }
 
     /**

@@ -2,7 +2,6 @@ package model.game.map.terrain;
 
 import model.enums.PlacableLayer;
 import model.enums.PlantTags;
-import model.enums.ZombieBehaviorType;
 import model.item.placeable.Placeable;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.instance.ZombieInstance;
@@ -36,11 +35,10 @@ public class WaterTerrainStrategy implements TerrainStrategy {
 
     @Override
     public boolean isPassable(ZombieInstance zombie, Cell cell) {
-        if (zombie == null) {
-            return false;
-        }
-        // Swimming zombies dive through water, flying zombies soar over it.
-        return zombie.hasBehavior(ZombieBehaviorType.SWIM) || zombie.isFlying();
+        // Beach water is wadeable. Snorkels still dive via SwimBehavior;
+        // flyers ignore the surface. Blocking walkers here froze anyone
+        // spawned on (or crossing) a water tile.
+        return zombie != null;
     }
 
     @Override
