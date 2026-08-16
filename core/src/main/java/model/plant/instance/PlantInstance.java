@@ -132,7 +132,11 @@ public class PlantInstance implements Placeable {
         }
     }
 
-    /** Recharge/cooldown decay multiplier = dl/3 (higher difficulty = faster plant cooldowns). */
+    /**
+     * Seed-packet recharge decay multiplier = dl/3.
+     * Ability {@code actionInterval} is not scaled — that value is already
+     * in-game seconds (and {@link model.game.core.PvZGameLoop} applies game speed).
+     */
     private static float difficultyRechargeScale() {
         var model = App.getInstance().getCurrentGameModel();
         return model == null ? 1f : model.difficultyBoost();
@@ -167,10 +171,9 @@ public class PlantInstance implements Placeable {
     }
 
     private void tickAbilityCooldowns(float deltaTime) {
-        float scale = difficultyRechargeScale();
         for (AbilityState state : abilityStates.values()) {
             if (state.getCooldownRemaining() > 0) {
-                state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime * scale));
+                state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime));
             }
             if (state.isDigesting()) {
                 state.setDigestRemaining(Math.max(0f, state.getDigestRemaining() - deltaTime));
