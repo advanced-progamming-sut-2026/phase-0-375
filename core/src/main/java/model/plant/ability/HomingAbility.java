@@ -101,8 +101,8 @@ public class HomingAbility implements PlantAbility {
                 }
                 break;
             case PROJECTILE_BURST:
-                // cat-tail plant-food
-                burstProjectile(context, plant);
+                // Cat-tail: barrage of homing shots.
+                burstHomingVolley(context, plant);
                 break;
             default:
                 break;
@@ -248,14 +248,21 @@ public class HomingAbility implements PlantAbility {
     // --- Caulipower plant-food ---
 
     private void hypnotiseRandomZombies(PlantAbilityContext context, int count) {
-        for (int lane = 0; lane < context.getRowCount() && count > 0; lane++) {
-            List<ZombieInstance> zombiesInLine = context.getZombiesInLane(lane);
-            for (ZombieInstance zombie : zombiesInLine) {
-                if (count <= 0) break;
-                zombie.setState(ZombieState.HYPNOTIZED);
-                zombie.setMovingBackward(true);
-                count--;
+        List<ZombieInstance> allZombies = new ArrayList<>();
+        for (int lane = 0; lane < context.getRowCount(); lane++) {
+            allZombies.addAll(context.getZombiesInLane(lane));
+        }
+
+        while (count > 0 && !allZombies.isEmpty()) {
+            int randomZombieIndex = RNG.nextInt(allZombies.size());
+            ZombieInstance randomZombie = allZombies.get(randomZombieIndex);
+            if (randomZombie.isDead() || randomZombie.isHypnotized()) {
+                allZombies.remove(randomZombieIndex);
+                continue;
             }
+            randomZombie.setState(ZombieState.HYPNOTIZED);
+            randomZombie.setMovingBackward(true);
+            count--;
         }
     }
 
@@ -274,28 +281,54 @@ public class HomingAbility implements PlantAbility {
 
     // --- cat-tail plant-food ---
 
-    private void burstProjectile(PlantAbilityContext context, PlantInstance plant) {
-        ZombieInstance target = pickTarget(plant, context);
-        if (target == null) return;
-
+    private void burstHomingVolley(PlantAbilityContext context, PlantInstance plant) {
         Plant def = plant.getDefinition();
-        if (def == null) return;
+        if (def == null || plant.getPosition() == null) return;
+
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+
+        List<ZombieInstance> targets = listHomingTargets(context);
+        if (targets.isEmpty()) return;
 
         FloatPoint origin = new FloatPoint(
                 plant.getPosition().getX() + 0.5f,
                 plant.getPosition().getY()
         );
+        int row = plant.getPosition().getY();
+        int damage = Math.max(1, def.getDamage());
 
-        Pellet pellet = new Pellet(
-                BURST_PROJ_DAMAGE,
-                origin,
-                plant.getPosition().getY(),
-                PELLET_VELOCITY,
-                Projectile.Element.NONE,
-                +1
-        );
-        pellet.setHomingTarget(target);
-        context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+        for (int i = 0; i < volley; i++) {
+            ZombieInstance target = targets.get(i % targets.size());
+            if (target == null || target.isDead() || target.isHypnotized()) {
+                target = pickTarget(plant, context);
+                if (target == null) break;
+            }
+            float dx = (i % 5) * 0.08f;
+            float dy = ((i % 3) - 1) * 0.05f;
+            FloatPoint shotOrigin = new FloatPoint(origin.getX() + dx, origin.getY() + dy);
+            Pellet pellet = new Pellet(
+                    damage,
+                    shotOrigin,
+                    row,
+                    PELLET_VELOCITY * 1.25f,
+                    Projectile.Element.NONE,
+                    +1
+            );
+            pellet.setHomingTarget(target);
+            context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
+        }
+    }
+
+    private List<ZombieInstance> listHomingTargets(PlantAbilityContext context) {
+        List<ZombieInstance> targets = new ArrayList<>();
+        for (int lane = 0; lane < context.getRowCount(); lane++) {
+            for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
+                if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+                targets.add(zombie);
+            }
+        }
+        return targets;
     }
 
     // --- Target selection ---
