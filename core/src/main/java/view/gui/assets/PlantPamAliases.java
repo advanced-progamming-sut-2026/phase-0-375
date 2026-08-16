@@ -23,7 +23,7 @@ public final class PlantPamAliases {
         m.put("Magnet-shroom", "MAGNETSHROOM");
         m.put("Grave Buster", "GRAVEBUSTER");
         m.put("Potato Mine", "POTATOMINE");
-        m.put("Kernel-pult", "KERNELPULT");
+        m.put("Kernel-pult", "KERNALPULT");
         m.put("Cabbage-pult", "CABBAGEPULT");
         m.put("Melon-pult", "MELONPULT");
         m.put("Pepper-pult", "PEPPERPULT");

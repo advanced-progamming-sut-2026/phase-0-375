@@ -67,6 +67,7 @@ public class LobberAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!context.hasZombieInLane(plant.getPosition().getY())) return;
 
+        butter = false;
         int shots = (int) def.getAbilityValue();
         if (shots <= 0) shots = 1;
 
@@ -88,14 +89,19 @@ public class LobberAbility implements PlantAbility {
                     splashRadius
             );
             context.spawnProjectile(splash, splash.getX(), splash.getY());
-            butter = false;
         }
+    }
+
+    /** True after the last lob was butter. */
+    public boolean isButterShot() {
+        return butter;
     }
 
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
         if (def == null) return;
+        butter = false;
         int volley = (int) def.getPlantFoodValue();
         if (volley <= 0) return;
 

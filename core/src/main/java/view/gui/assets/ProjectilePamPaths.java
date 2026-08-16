@@ -10,7 +10,7 @@ import model.projectile.Projectile;
 import java.util.Map;
 
 /**
- * Shooter projectile PAM paths. Effect PAMs are not in {@link PamCatalog}
+ * Projectile PAM paths. Effect PAMs are not in {@link PamCatalog}
  * (it indexes plant/zombie packs only), so this table is the source of truth.
  */
 public final class ProjectilePamPaths {
@@ -46,6 +46,19 @@ public final class ProjectilePamPaths {
             "768/FULL/EFFECTS/BOWLINGBULB_PROJECTILE2/BOWLINGBULB_PROJECTILE2.PAM";
     public static final String BOWLING_ORANGE =
             "768/FULL/EFFECTS/BOWLINGBULB_PROJECTILE3/BOWLINGBULB_PROJECTILE3.PAM";
+    public static final String CABBAGE_PULT =
+            "768/INITIAL/EFFECTS/T_CABBAGEPULT_PROJECTILE/T_CABBAGEPULT_PROJECTILE.PAM";
+    public static final String KERNEL_PULT =
+            "768/INITIAL/EFFECTS/T_KERNALPULT_PROJECTILE/T_KERNALPULT_PROJECTILE.PAM";
+    public static final String MELON_PULT =
+            "768/INITIAL/EFFECTS/T_MELON_PROJECTILE/T_MELON_PROJECTILE.PAM";
+    public static final String WINTER_MELON =
+            "768/FULL/EFFECTS/T_WINTERMELON_PROJECTILE/T_WINTERMELON_PROJECTILE.PAM";
+    public static final String PEPPER_PULT =
+            "768/FULL/EFFECTS/T_PEPPERPULT_PROJECTILE/T_PEPPERPULT_PROJECTILE.PAM";
+
+    /** Butter clip on {@link #KERNEL_PULT} ({@code animation} is the kernel). */
+    public static final String KERNEL_BUTTER_CLIP = "animation3";
 
     /** Preferred clip names for effect PAMs (resolved against the loaded file). */
     public static final String[] CLIP_PREFERENCES = {
@@ -68,7 +81,12 @@ public final class ProjectilePamPaths {
             Map.entry("Sea-shroom", SEA_SHROOM),
             Map.entry("Puff-shroom", PUFF_SHROOM),
             Map.entry("Cactus", CACTUS),
-            Map.entry("Fume-shroom", FUME_SHROOM)
+            Map.entry("Fume-shroom", FUME_SHROOM),
+            Map.entry("Cabbage-pult", CABBAGE_PULT),
+            Map.entry("Kernel-pult", KERNEL_PULT),
+            Map.entry("Melon-pult", MELON_PULT),
+            Map.entry("Winter Melon", WINTER_MELON),
+            Map.entry("Pepper-pult", PEPPER_PULT)
     );
 
     /**

@@ -6,7 +6,7 @@ import view.gui.anim.AnimPose;
 import view.gui.assets.ProjectilePamPaths;
 
 /**
- * Shooter projectile defaults: model → PAM path → looping fly clip.
+ * Projectile defaults: model → PAM path → looping fly clip.
  *
  * <p>Do not mutate the model here. Unmapped projectiles return {@code null}
  * so the lawn renderer can skip or debug-overlay them.
@@ -24,8 +24,10 @@ public final class ProjectileAnimAdapter {
         if (projectile instanceof FumeCloud) {
             return AnimPose.once(pam, "special", ProjectileAnimRole.FLYING);
         }
-        AnimPose pose = AnimPose.looping(pam, ProjectilePamPaths.CLIP_PREFERENCES[0],
-                ProjectileAnimRole.FLYING);
+        String clip = projectile.isButter() && ProjectilePamPaths.KERNEL_PULT.equals(pam)
+                ? ProjectilePamPaths.KERNEL_BUTTER_CLIP
+                : ProjectilePamPaths.CLIP_PREFERENCES[0];
+        AnimPose pose = AnimPose.looping(pam, clip, ProjectileAnimRole.FLYING);
         if (projectile.getDirection() < 0) {
             pose = pose.withFlipX(true);
         }

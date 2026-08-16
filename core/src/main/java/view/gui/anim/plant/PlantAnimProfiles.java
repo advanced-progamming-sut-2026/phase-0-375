@@ -2,6 +2,7 @@ package view.gui.anim.plant;
 
 import view.gui.anim.plant.exclusive.BowlingBulbAnim;
 import view.gui.anim.plant.exclusive.FumeShroomAnim;
+import view.gui.anim.plant.exclusive.KernelPultAnim;
 import view.gui.anim.plant.exclusive.PeapodAnim;
 import view.gui.anim.plant.exclusive.PuffShroomAnim;
 import view.gui.anim.plant.exclusive.SplitPeaAnim;
@@ -24,6 +25,7 @@ public final class PlantAnimProfiles {
         SplitPeaAnim.register(overrides);
         PeapodAnim.register(overrides);
         BowlingBulbAnim.register(overrides);
+        KernelPultAnim.register(overrides);
         // TODO: SunshroomAnim.register(overrides);
         // TODO: PotatoMineAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);
