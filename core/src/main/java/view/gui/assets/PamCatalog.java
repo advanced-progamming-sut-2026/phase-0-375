@@ -201,7 +201,7 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/80S_ARCADE_CABINET/") && !upper.contains("BREAK")) {
             return true;
         }
-        if (upper.contains("/EFFECTS/ZOMBIE_LOSTCITY_JANE_ASH/")) {
+        if (upper.contains("/EFFECTS/ZOMBIE_") && upper.contains("_ASH/")) {
             return true;
         }
         if (upper.contains("/EFFECTS/CRYSTALSKULL_BEAM/")) {

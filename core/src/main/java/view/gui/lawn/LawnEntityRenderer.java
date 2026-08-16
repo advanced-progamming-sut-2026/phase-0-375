@@ -8,6 +8,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.PlacableLayer;
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieSize;
 import model.game.core.GameModel;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
@@ -172,8 +173,12 @@ public final class LawnEntityRenderer {
             "particle_jar_01", "particle_jar_02",
             "particle_key_01", "particle_key_02",
             "particle_note_01", "particle_note_02"};
-    /** Lost City Jane fire/explosion death — clip name is {@code animation}, not {@code die}. */
+    /** Fire/explosion death PAMs under EFFECTS — clip name is {@code animation}, not {@code die}. */
     private static final String JANE_ASH_PAM = "ZOMBIE_LOSTCITY_JANE_ASH";
+    private static final String BIG_ASH_PAM = "ZOMBIE_BIG_ASH";
+    private static final String GARGANTUAR_ASH_PAM = "ZOMBIE_GARGANTUAR_ASH";
+    private static final String IMP_ASH_PAM = "ZOMBIE_IMP_ASH";
+    private static final String ZOMBIE_ASH_PAM = "ZOMBIE_ASH";
     /** Crystal Skull laser — EFFECTS PAM, clip {@code laser_beam}. */
     private static final String CRYSTALSKULL_BEAM_PAM = "CRYSTALSKULL_BEAM";
     /** Lawn collectible — EFFECTS PAM. Yellow/normal is clip {@code animation}. */
@@ -2563,7 +2568,7 @@ public final class LawnEntityRenderer {
         if (snap == null || snap.pose == null) {
             return;
         }
-        if (trySpawnJaneAsh(zombie, snap)) {
+        if (trySpawnAsh(zombie, snap)) {
             return;
         }
         boolean barrelLeft = attachBarrelLeftover(model, zombie, snap);
@@ -2705,16 +2710,12 @@ public final class LawnEntityRenderer {
         return fallback;
     }
 
-    /** Jane's incineration PAM lives under EFFECTS and has clip {@code animation}, not {@code die}. */
-    private boolean trySpawnJaneAsh(ZombieInstance zombie, LiveSnap snap) {
+    /** Incineration PAM lives under EFFECTS and has clip {@code animation}, not {@code die}. */
+    private boolean trySpawnAsh(ZombieInstance zombie, LiveSnap snap) {
         if (zombie == null || !zombie.isBlownUp() || catalog == null) {
             return false;
         }
-        if (zombie.getDefinition() == null
-                || !"ZombieLostCityJane".equals(zombie.getDefinition().getName())) {
-            return false;
-        }
-        PamCatalog.PamEntry ash = catalog.byName(JANE_ASH_PAM);
+        PamCatalog.PamEntry ash = catalog.byName(ashPamFor(zombie));
         if (ash == null) {
             return false;
         }
@@ -2723,6 +2724,29 @@ public final class LawnEntityRenderer {
                 AnimPose.once(ash.path(), clip, ZombieAnimRole.DIE, null),
                 snap.x, snap.y));
         return true;
+    }
+
+    static String ashPamFor(ZombieInstance zombie) {
+        if (zombie == null || zombie.getDefinition() == null) {
+            return ZOMBIE_ASH_PAM;
+        }
+        String name = zombie.getDefinition().getName();
+        if ("ZombieLostCityJane".equals(name)) {
+            return JANE_ASH_PAM;
+        }
+        if ("ZombieArcade".equals(name)
+                || TroglobiteAnim.DEFINITION_NAME.equals(name)
+                || OctopusAnim.DEFINITION_NAME.equals(name)) {
+            return BIG_ASH_PAM;
+        }
+        ZombieSize size = zombie.getDefinition().getSize();
+        if (size == ZombieSize.LARGE) {
+            return GARGANTUAR_ASH_PAM;
+        }
+        if (size == ZombieSize.IMP) {
+            return IMP_ASH_PAM;
+        }
+        return ZOMBIE_ASH_PAM;
     }
 
     private void maybeGargantuarWalkStomp(ZombieInstance zombie, AnimPose pose, float time) {
