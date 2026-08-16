@@ -7,11 +7,15 @@ import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
 import model.enums.Chapter;
+import model.enums.PlacableLayer;
 import model.enums.ZombieBehaviorType;
 import model.game.core.GameModel;
+import model.game.map.Cell;
 import model.game.map.FloatPoint;
+import model.game.map.GameMap;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
+import model.item.Grave;
 import model.item.Sun;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
@@ -22,11 +26,13 @@ import model.zombie.behavior.BarrelRollerBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.StealSunBehavior;
+import model.zombie.behavior.SummonBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
+import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
@@ -146,6 +152,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final List<BlastFx> prospectorBlasts = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, Boolean> prospectorBlastSpawned = new IdentityHashMap<>();
+    private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
     private final Matrix4 batchTransform = new Matrix4();
@@ -202,6 +209,7 @@ public final class LawnEntityRenderer {
         }
         lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
 
+        drawGraves(batch, model, delta);
         for (PlantInstance plant : model.getAllPlants()) {
             drawPlant(batch, plant, delta);
         }
@@ -239,6 +247,7 @@ public final class LawnEntityRenderer {
         drawSuns(batch, model, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
@@ -258,6 +267,55 @@ public final class LawnEntityRenderer {
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
+    }
+
+    private void drawGraves(Batch batch, GameModel model, float delta) {
+        GameMap map = model.getMap();
+        if (map == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(GraveAnim.PAM);
+        if (entry == null) {
+            return;
+        }
+        String path = entry.path();
+        int rows = map.getRows();
+        int cols = map.getCols();
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                Cell cell = map.getCell(col, row);
+                if (cell == null) {
+                    continue;
+                }
+                if (cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave grave
+                        && !grave.isDestroyed()) {
+                    drawGrave(batch, grave, row, col, path, delta);
+                }
+            }
+        }
+    }
+
+    private void drawGrave(Batch batch, Grave grave, int row, int col,
+                           String path, float delta) {
+        ClipRef ref = clips.getOrLoad(path, GraveAnim.clipFor(grave));
+        if (ref == null) {
+            return;
+        }
+        seenThisFrame.add(grave);
+        float u = tickGraveEmerge(grave, delta);
+        float sxN = GraveAnim.scaleX(u);
+        float syN = GraveAnim.scaleY(u);
+        float s = AnimScale.PLANT;
+        float[] xy = layout.centerOf(row, col);
+        // Scale is about the PAM centre; pin the base so the pancake sits on the tile.
+        float y = xy[1] + (syN - 1f) * s * (GraveAnim.CANVAS * 0.5f);
+        player.draw(batch, ref, 0f, xy[0], y, s * sxN, s * syN, false);
+    }
+
+    private float tickGraveEmerge(Grave grave, float delta) {
+        float u = graveEmerge.getOrDefault(grave, 0f);
+        graveEmerge.put(grave, Math.min(1f, u + delta / GraveAnim.EMERGE_DURATION));
+        return u;
     }
 
     private void drawSuns(Batch batch, GameModel model, float delta) {
@@ -765,6 +823,7 @@ public final class LawnEntityRenderer {
 
         restartArcadePushClock(zombie, pose);
         restartProspectorJumpClock(zombie, pose);
+        restartTombRaiseClock(zombie, pose);
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -1002,6 +1061,20 @@ public final class LawnEntityRenderer {
         }
         PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
         if (push == null || !push.isPushing() || push.getPushTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /** First frame of a new {@code power}: rewind so the next raise doesn't keep the old time. */
+    private void restartTombRaiseClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !"power".equals(pose.clipName())) {
+            return;
+        }
+        SummonBehavior summon = (SummonBehavior) zombie.getBehavior(ZombieBehaviorType.SUMMON);
+        if (summon == null || !summon.isRaising() || summon.getRaiseTimer() != 0f) {
             return;
         }
         AnimClock clock = clockFor(zombie);

@@ -857,10 +857,19 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public boolean spawnGraveAt(int row, int col) {
-        return spawnGraveAt(row, col, GraveType.PLAIN);
+        return spawnGraveAt(row, col, GraveType.PLAIN, null);
+    }
+
+    @Override
+    public boolean spawnGraveAt(int row, int col, ZombieInstance raiser) {
+        return spawnGraveAt(row, col, GraveType.PLAIN, raiser);
     }
 
     public boolean spawnGraveAt(int row, int col, GraveType type) {
+        return spawnGraveAt(row, col, type, null);
+    }
+
+    public boolean spawnGraveAt(int row, int col, GraveType type, ZombieInstance raiser) {
         Cell cell = getCellAt(row, col);
         if (cell == null) {
             return false;
@@ -868,7 +877,12 @@ public class GameModel implements BehaviorContext {
         if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
             return false;
         }
-        boolean placed = cell.addPlaceable(new Grave(Grave.DEFAULT_HP, type));
+        if (!cell.getAllPlants().isEmpty()) {
+            return false;
+        }
+        Grave grave = new Grave(Grave.DEFAULT_HP, type);
+        grave.setRaiser(raiser);
+        boolean placed = cell.addPlaceable(grave);
         if (placed) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.GRAVE_SPAWNED));
             App.logToShell("[Grave] A " + (type == GraveType.PLAIN ? "plain" :
@@ -876,6 +890,25 @@ public class GameModel implements BehaviorContext {
                     + " grave surfaced at (" + col + ", " + row + ").");
         }
         return placed;
+    }
+
+    @Override
+    public int countGravesRaisedBy(ZombieInstance raiser) {
+        if (raiser == null || gameMap == null) {
+            return 0;
+        }
+        int n = 0;
+        int rows = gameMap.getRows();
+        int cols = gameMap.getCols();
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                Grave grave = getGraveAt(row, col);
+                if (grave != null && grave.getRaiser() == raiser && !grave.isDestroyed()) {
+                    n++;
+                }
+            }
+        }
+        return n;
     }
 
     public Grave getGraveAt(int row, int col) {

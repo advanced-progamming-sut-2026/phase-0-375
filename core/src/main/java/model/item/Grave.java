@@ -4,6 +4,7 @@ import model.app.App;
 import model.enums.PlacableLayer;
 import model.game.core.GameModel;
 import model.item.placeable.Placeable;
+import model.zombie.instance.ZombieInstance;
 
 /**
  * A gravestone dropped onto the field.
@@ -25,6 +26,9 @@ public class Grave extends GridItem implements Placeable {
 
     private GraveType type = GraveType.PLAIN;
 
+    /** Tomb Raiser that spawned this grave; {@code null} for level / Dark Ages graves. */
+    private ZombieInstance raiser;
+
     public Grave() {
         this(DEFAULT_HP, GraveType.PLAIN);
     }
@@ -44,6 +48,14 @@ public class Grave extends GridItem implements Placeable {
 
     public void setType(GraveType type) {
         this.type = type == null ? GraveType.PLAIN : type;
+    }
+
+    public ZombieInstance getRaiser() {
+        return raiser;
+    }
+
+    public void setRaiser(ZombieInstance raiser) {
+        this.raiser = raiser;
     }
 
     /** Spawns the grave's loot. Called once when the grave's HP hits zero. */
