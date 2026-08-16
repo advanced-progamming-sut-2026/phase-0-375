@@ -27,5 +27,6 @@ public final class ZombieAnimProfiles {
         HunterAnim.register(overrides);
         TombRaiserAnim.register(overrides);
         DodoAnim.register(overrides);
+        TroglobiteAnim.register(overrides);
     }
 }

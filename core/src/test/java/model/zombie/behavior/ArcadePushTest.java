@@ -1,17 +1,21 @@
 package model.zombie.behavior;
 
 import model.enums.Chapter;
+import model.enums.GroundType;
 import model.enums.PlantCategory;
 import model.enums.PushableItemType;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.enums.ZombieState;
+import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
+import model.game.map.terrain.IceTerrainStrategy;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
+import model.item.pushable.Pushable;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.definition.Zombie;
@@ -117,28 +121,35 @@ class ArcadePushTest {
     }
 
     @Test
-    void troglobiteStillPlacesAheadAndSnapsAfterDelay() {
-        IceBlock block = new IceBlock(600);
-        Zombie definition = new Zombie(
-                "ZombieTroglobite", 600, 0.18f, 100f, ZombieSize.NORMAL,
-                Chapter.FROSTBITE_CAVES, 1000, 1, List.of(),
-                PushableItemType.ICE_BLOCK, null,
-                List.of(ZombieBehaviorType.PUSH));
-        ZombieInstance zombie = new ZombieInstance(definition, List.of(), block);
-        block.setPusher(zombie);
-        zombie.setGridPosition(new Point(SPAWN_COL, 0));
-        zombie.setContinuousPosition(new FloatPoint(SPAWN_COL, 0));
+    void troglobiteWalksUntilIceThenPushesLikeArcade() {
+        IceTerrainStrategy ice = new IceTerrainStrategy();
+        int iceCol = SPAWN_COL - 2;
+        Cell cell = cellWithIce(iceCol, ice);
+        ZombieInstance zombie = troglobiteAt(SPAWN_COL);
         PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
-        BehaviorContext context = stubContext(null);
+        PlantInstance plant = wallnut();
+        BehaviorContext context = iceContext(cell, iceCol, plant, iceCol - 1);
 
         push.execute(zombie, context, TICK);
-        assertEquals(SPAWN_COL - 1, block.getCol());
+        assertNull(zombie.getPushableItem(), "does not spawn ice");
+        assertFalse(push.isPushing());
+        assertEquals(GroundType.ICE, cell.getGroundType());
+
+        zombie.setContinuousX(iceCol + PushBehavior.ARCADE_HAND_REACH_TILES);
+        push.execute(zombie, context, TICK);
+
+        Pushable claimed = zombie.getPushableItem();
+        assertTrue(claimed instanceof IceBlock);
+        assertEquals(iceCol, claimed.getCol());
         assertTrue(push.isPushing());
+        assertEquals(GroundType.NORMAL, cell.getGroundType(), "claimed ice leaves the tile");
+        assertTrue(plant.getCurrentHP() > 0, "plant lives until the ice arrives");
 
-        runFor(push, zombie, context, PushBehavior.PUSH_DURATION - TICK);
-        assertEquals(SPAWN_COL - 1, block.getCol());
+        runFor(push, zombie, context, PushBehavior.ARCADE_PUSH_DURATION - TICK);
+        assertEquals(iceCol, claimed.getCol());
         push.execute(zombie, context, TICK);
-        assertEquals(SPAWN_COL - 2, block.getCol());
+        assertEquals(iceCol - 1, claimed.getCol());
+        assertTrue(plant.getCurrentHP() <= 0);
         assertEquals(PushBehavior.PushPhase.WALKING, push.getPhase());
     }
 
@@ -242,6 +253,25 @@ class ArcadePushTest {
         return zombie;
     }
 
+    private static ZombieInstance troglobiteAt(int col) {
+        Zombie definition = new Zombie(
+                "ZombieIceAgeTroglobite", 470, 0.185f, 100f, ZombieSize.NORMAL,
+                Chapter.FROSTBITE_CAVES, 600, 1, List.of(),
+                PushableItemType.ICE_BLOCK, null,
+                List.of(ZombieBehaviorType.PUSH));
+        ZombieInstance zombie = new ZombieInstance(definition, List.of(), null);
+        zombie.setGridPosition(new Point(col, 0));
+        zombie.setContinuousPosition(new FloatPoint(col, 0));
+        return zombie;
+    }
+
+    private static Cell cellWithIce(int col, IceTerrainStrategy ice) {
+        Cell cell = new Cell(0, col);
+        cell.setGroundType(GroundType.ICE);
+        cell.setTerrainStrategy(ice);
+        return cell;
+    }
+
     private static ZombieInstance pianistAt(int col, Piano piano) {
         Zombie definition = new Zombie(
                 "ZombiePiano", 840, 0.12f, 4000f, ZombieSize.NORMAL,
@@ -295,6 +325,8 @@ class ArcadePushTest {
                         yield null;
                     }
                     case "getZombiesInLane" -> List.of();
+                    case "getCellAt" -> null;
+                    case "getOrphanedPushables" -> List.of();
                     default -> throw new UnsupportedOperationException(method.getName());
                 });
     }
@@ -305,6 +337,31 @@ class ArcadePushTest {
                 new Class<?>[]{BehaviorContext.class},
                 (proxy, method, args) -> switch (method.getName()) {
                     case "getColumnCount" -> 9;
+                    case "getPlantAt" -> (int) args[1] == plantCol ? plant : null;
+                    case "destroyPlant" -> {
+                        if (args[0] != null) {
+                            ((PlantInstance) args[0]).setCurrentHP(0);
+                        }
+                        yield null;
+                    }
+                    case "getZombiesInLane" -> List.of();
+                    case "getCellAt" -> null;
+                    case "getOrphanedPushables" -> List.of();
+                    default -> throw new UnsupportedOperationException(method.getName());
+                });
+    }
+
+    private static BehaviorContext iceContext(Cell iceCell, int iceCol,
+                                             PlantInstance plant, int plantCol) {
+        return (BehaviorContext) Proxy.newProxyInstance(
+                BehaviorContext.class.getClassLoader(),
+                new Class<?>[]{BehaviorContext.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getColumnCount" -> 9;
+                    case "getCellAt" -> (int) args[0] == 0 && (int) args[1] == iceCol
+                            ? iceCell : null;
+                    case "getOrphanedPushables" -> List.of();
+                    case "removeOrphanedPushable" -> null;
                     case "getPlantAt" -> (int) args[1] == plantCol ? plant : null;
                     case "destroyPlant" -> {
                         if (args[0] != null) {

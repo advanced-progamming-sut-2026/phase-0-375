@@ -105,7 +105,7 @@ public final class ZombieAnimAdapter {
     }
 
     /** Current armor PAM parts, plus the biome BASIC states group when that clip needs it. */
-    static Map<String, Boolean> armorVisibility(ZombieInstance zombie, PamCatalog.PamEntry entry) {
+    public static Map<String, Boolean> armorVisibility(ZombieInstance zombie, PamCatalog.PamEntry entry) {
         List<Armor> armors = zombie.getArmors();
         if (armors == null || armors.isEmpty()) {
             return null;

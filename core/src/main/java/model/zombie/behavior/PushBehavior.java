@@ -1,10 +1,14 @@
 package model.zombie.behavior;
 
+import model.enums.GroundType;
 import model.enums.PushableItemType;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieState;
+import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
+import model.game.map.terrain.IceTerrainStrategy;
+import model.game.map.terrain.NormalTerrainStrategy;
 import model.item.pushable.IceBlock;
 import model.item.pushable.Pushable;
 import model.plant.instance.PlantInstance;
@@ -26,7 +30,7 @@ public class PushBehavior implements ZombieBehavior {
      */
     public static final float PUSH_DURATION = 0.5f;
 
-    /** Arcade {@code push} clip length; art sets the pace. */
+    /** Arcade / Troglobite {@code push} clip length; art sets the pace. */
     public static final float ARCADE_PUSH_DURATION = 4.0333f;
 
     /**
@@ -55,17 +59,6 @@ public class PushBehavior implements ZombieBehavior {
     private float pushTimer = 0f;
 
     /**
-     * For Troglobite: how many ice blocks are still waiting in reserve
-     * (excluding the one currently being pushed). When the current
-     * pushable is destroyed, if this is greater than zero, a new ice block
-     * is spawned and the zombie resumes pushing.
-     */
-    private int sparePushablesRemaining = 0;
-
-    /** True once we've initialized {@link #sparePushablesRemaining} from the definition. */
-    private boolean pushableReserveInitialized = false;
-
-    /**
      * Tiles from zombie origin to the barrel centre (toward the house). Renderer
      * overwrites from PAM {@code partBounds}; tests keep the one-tile default.
      */
@@ -78,14 +71,14 @@ public class PushBehavior implements ZombieBehavior {
         if (zombie == null || context == null || zombie.isDead()) {
             return;
         }
-        initPushableReserveIfNeeded(zombie);
 
         Pushable pushable = zombie.getPushableItem();
 
-        // If the pushable was destroyed, drop it and either spawn the
-        // next spare or let the zombie walk freely.
         if (pushable == null || pushable.isDestroyed()) {
             handleLostPushable(zombie, pushable);
+            if (isIce(zombie)) {
+                tickHuntIce(zombie, context);
+            }
             return;
         }
 
@@ -115,42 +108,127 @@ public class PushBehavior implements ZombieBehavior {
         }
     }
 
-    /** Reads the zombie's spare-pushable reserve from its definition once. */
-    private void initPushableReserveIfNeeded(ZombieInstance zombie) {
-        if (pushableReserveInitialized) return;
-        int total = zombie.getDefinition().getBehaviorPropInt(
-                "NumberOfIceblocksToSpawnWith", 1);
-        sparePushablesRemaining = Math.max(0, total - 1);
-        pushableReserveInitialized = true;
-    }
-
     /**
-     * Called when the current pushable is gone: notifies its destruction,
-     * attaches the next spare ice block if one remains, and otherwise
-     * resets the zombie to plain walking.
+     * Called when the current pushable is gone. Troglobite does not spawn a
+     * replacement; {@link #tickHuntIce} looks for ice already on the lawn.
      */
     private void handleLostPushable(ZombieInstance zombie, Pushable pushable) {
         if (pushable != null && pushable.isDestroyed()) {
             pushable.onDestroyed(); // idempotent notification
         }
-        if (sparePushablesRemaining > 0) {
-            // Spawn the next ice block in front of the zombie.
-            Pushable next = createSparePushable(zombie);
-            if (next != null) {
-                sparePushablesRemaining--;
-                zombie.setPushableItem(next);
-                next.setPusher(zombie);
-                resetToWalking(zombie);
-                return;
-            }
-        }
         resetToWalking(zombie);
     }
 
     /**
-     * Cabinet on the spawn tile; zombie just past hand-contact so it walks in.
-     * Other pushers keep the pushable one cell ahead.
+     * Walk until ice already on the lawn sits in the tile ahead, then claim it
+     * and shove like Arcade (hand-reach at {@code iceCol + 1}).
      */
+    private void tickHuntIce(ZombieInstance zombie, BehaviorContext context) {
+        if (zombie.getState() == ZombieState.PUSHING
+                || zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
+        }
+        int iceCol = findIceAhead(zombie, context);
+        if (iceCol < 0) {
+            return;
+        }
+        if (!arcadeHandReachesCabinet(zombie.getContinuousX(), iceCol)) {
+            return;
+        }
+        IceBlock block = claimIce(zombie, context, iceCol);
+        if (block == null) {
+            return;
+        }
+        phase = PushPhase.PUSHING;
+        pushTimer = 0f;
+        zombie.setState(ZombieState.PUSHING);
+    }
+
+    /** Nearest ice toward the house (largest column still left of the origin). */
+    static int findIceAhead(ZombieInstance zombie, BehaviorContext context) {
+        float x = zombie.getContinuousX();
+        int row = zombie.getGridY();
+        int best = -1;
+        int cols = context.getColumnCount();
+        for (int col = 0; col < cols; col++) {
+            if (col >= x) {
+                continue;
+            }
+            if (hasIceAt(context, row, col)) {
+                best = col;
+            }
+        }
+        return best;
+    }
+
+    static boolean hasIceAt(BehaviorContext context, int row, int col) {
+        Cell cell = context.getCellAt(row, col);
+        if (cell != null && cell.getTerrainStrategy() instanceof IceTerrainStrategy ice
+                && !ice.isMelted()) {
+            return true;
+        }
+        List<Pushable> orphans = context.getOrphanedPushables();
+        if (orphans == null) {
+            return false;
+        }
+        for (Pushable item : orphans) {
+            if (item instanceof IceBlock block
+                    && !block.isDestroyed()
+                    && block.getPusher() == null
+                    && block.getRow() == row
+                    && block.getCol() == col) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private IceBlock claimIce(ZombieInstance zombie, BehaviorContext context, int col) {
+        int row = zombie.getGridY();
+        IceBlock orphan = takeOrphanIce(context, row, col);
+        if (orphan != null) {
+            orphan.setPusher(zombie);
+            zombie.setPushableItem(orphan);
+            if (orphan.getPosition() == null) {
+                orphan.setPosition(new Point(col, row));
+            }
+            return orphan;
+        }
+        Cell cell = context.getCellAt(row, col);
+        if (cell == null || !(cell.getTerrainStrategy() instanceof IceTerrainStrategy ice)
+                || ice.isMelted()) {
+            return null;
+        }
+        IceBlock block = new IceBlock(Math.max(1, ice.getHp()));
+        block.setContainedEntity(ice.getContainedEntity());
+        ice.setContainedEntity(null);
+        cell.setGroundType(GroundType.NORMAL);
+        cell.setTerrainStrategy(new NormalTerrainStrategy());
+        block.setPosition(new Point(col, row));
+        block.setPusher(zombie);
+        zombie.setPushableItem(block);
+        return block;
+    }
+
+    private static IceBlock takeOrphanIce(BehaviorContext context, int row, int col) {
+        List<Pushable> orphans = context.getOrphanedPushables();
+        if (orphans == null) {
+            return null;
+        }
+        for (Pushable item : orphans) {
+            if (item instanceof IceBlock block
+                    && !block.isDestroyed()
+                    && block.getPusher() == null
+                    && block.getRow() == row
+                    && block.getCol() == col) {
+                context.removeOrphanedPushable(block);
+                return block;
+            }
+        }
+        return null;
+    }
+
+    /** Cabinet on the spawn tile; zombie just past hand-contact so it walks in. */
     private void placePushableOnSpawn(ZombieInstance zombie, Pushable pushable) {
         int row = zombie.getGridY();
         int spawnCol = zombie.getGridX();
@@ -168,6 +246,9 @@ public class PushBehavior implements ZombieBehavior {
             pushable.setPosition(new Point(spawnCol, row));
             return;
         }
+        if (isIce(zombie)) {
+            return;
+        }
         int initCol = Math.max(0, spawnCol - 1);
         pushable.setPosition(new Point(initCol, row));
     }
@@ -175,6 +256,16 @@ public class PushBehavior implements ZombieBehavior {
     static boolean isArcade(ZombieInstance zombie) {
         return zombie.getDefinition() != null
                 && zombie.getDefinition().getPushableItemType() == PushableItemType.ARCADE_MACHINE;
+    }
+
+    static boolean isIce(ZombieInstance zombie) {
+        return zombie.getDefinition() != null
+                && zombie.getDefinition().getPushableItemType() == PushableItemType.ICE_BLOCK;
+    }
+
+    /** Cabinet and ice follow the {@code push} arm; snap when that clip ends. */
+    static boolean usesArmPushClip(ZombieInstance zombie) {
+        return isArcade(zombie) || isIce(zombie);
     }
 
     static boolean isPiano(ZombieInstance zombie) {
@@ -203,18 +294,24 @@ public class PushBehavior implements ZombieBehavior {
         pushTimer = 0f;
     }
 
-    /** Constructs a fresh ice block for the Troglobite's spare-reserve mechanic. */
-    private Pushable createSparePushable(ZombieInstance zombie) {
-        PushableItemType type = zombie.getDefinition().getPushableItemType();
-        if (type == PushableItemType.ICE_BLOCK) {
-            return new IceBlock(600);
-        }
-        return null;
-    }
-
     @Override
     public ZombieBehaviorType getType() {
         return ZombieBehaviorType.PUSH;
+    }
+
+    /** Ice stays on the lawn if Troglobite dies mid-push. */
+    @Override
+    public void onZombieDeath(ZombieInstance zombie, BehaviorContext context) {
+        if (zombie == null || context == null || !isIce(zombie)) {
+            return;
+        }
+        Pushable pushable = zombie.getPushableItem();
+        if (pushable == null || pushable.isDestroyed()) {
+            return;
+        }
+        zombie.setPushableItem(null);
+        pushable.setPusher(null);
+        context.orphanPushable(pushable);
     }
 
     /**
@@ -277,7 +374,7 @@ public class PushBehavior implements ZombieBehavior {
             zombie.setState(ZombieState.WALKING);
         }
 
-        if (isArcade(zombie)) {
+        if (isArcade(zombie) || isIce(zombie)) {
             if (pushable.getCol() <= 0) {
                 return;
             }
@@ -304,8 +401,8 @@ public class PushBehavior implements ZombieBehavior {
 
     /**
      * The zombie is in contact with the pushable and transferring force.
-     * After the push duration the item snaps one cell forward. Arcade holds
-     * for the {@code push} clip so the cabinet sprite can follow the arm.
+     * After the push duration the item snaps one cell forward. Arcade and
+     * Troglobite hold for the {@code push} clip so the prop can follow the arm.
      */
     private void tickPushing(ZombieInstance zombie, BehaviorContext context,
                              float deltaTime, Pushable pushable) {
@@ -315,7 +412,7 @@ public class PushBehavior implements ZombieBehavior {
         }
 
         pushTimer += deltaTime;
-        float duration = isArcade(zombie) ? ARCADE_PUSH_DURATION : PUSH_DURATION;
+        float duration = usesArmPushClip(zombie) ? ARCADE_PUSH_DURATION : PUSH_DURATION;
         if (pushTimer < duration) {
             return;
         }
@@ -415,14 +512,6 @@ public class PushBehavior implements ZombieBehavior {
 
     public void setPushTimer(float pushTimer) {
         this.pushTimer = pushTimer;
-    }
-
-    public int getSparePushablesRemaining() {
-        return sparePushablesRemaining;
-    }
-
-    public void setSparePushablesRemaining(int sparePushablesRemaining) {
-        this.sparePushablesRemaining = sparePushablesRemaining;
     }
 
     public float getBarrelFrontOffsetTiles() {

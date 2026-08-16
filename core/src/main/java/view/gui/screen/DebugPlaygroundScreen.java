@@ -22,6 +22,8 @@ import model.enums.GameState;
 import model.enums.MenuType;
 import model.enums.SunType;
 import model.game.core.GameModel;
+import model.game.map.Cell;
+import model.game.map.terrain.IceTerrainStrategy;
 import model.game.core.PvZGameLoop;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
@@ -44,10 +46,11 @@ import java.util.List;
  * Debug FrontLawn playground: tool panel + free plant/zombie placement, no win/lose.
  */
 public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
-    private enum Tool { PLANT, ZOMBIE, SHOVEL, FEED, COLLECT_SUN }
+    private enum Tool { PLANT, ZOMBIE, ICED, SHOVEL, FEED, COLLECT_SUN }
 
     private static final Color HOVER_PLANT = new Color(0.35f, 1f, 0.45f, 0.35f);
     private static final Color HOVER_ZOMBIE = new Color(1f, 0.35f, 0.35f, 0.35f);
+    private static final Color HOVER_ICED = new Color(0.45f, 0.85f, 1f, 0.35f);
     private static final Color HOVER_SHOVEL = new Color(1f, 0.85f, 0.2f, 0.35f);
     private static final Color HOVER_FEED = new Color(0.7f, 0.4f, 1f, 0.35f);
     private static final Color HOVER_SUN = new Color(1f, 0.9f, 0.2f, 0.35f);
@@ -65,6 +68,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private String selectedPlant = "Sunflower";
     private String selectedZombie = "ZombieDefault";
     private Chapter selectedZombieChapter = Chapter.ANCIENT_EGYPT;
+    private boolean icedPick;
     private boolean paused;
     private Texture placeholderAvatar;
     private Texture whitePixel;
@@ -146,6 +150,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         // Row 1 — tools that pick entities
         panel.add(toolButton("Plant", Tool.PLANT, true)).width(120f).height(44f);
         panel.add(toolButton("Zombie", Tool.ZOMBIE, true)).width(120f).height(44f);
+        panel.add(toolButton("Iced zombie", Tool.ICED, true)).width(150f).height(44f);
         panel.add(toolButton("Shovel", Tool.SHOVEL, false)).width(120f).height(44f);
         panel.row();
 
@@ -180,6 +185,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 tool = next;
+                icedPick = next == Tool.ICED;
                 if (openPicker) {
                     openPicker(next == Tool.PLANT);
                 } else {
@@ -243,7 +249,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                 addPickerRow(list, avatarDrawable, pick.label, () -> {
                     selectedZombie = chosen.name;
                     selectedZombieChapter = chosen.chapter;
-                    tool = Tool.ZOMBIE;
+                    tool = icedPick ? Tool.ICED : Tool.ZOMBIE;
                     closePicker();
                     refreshStatus();
                     showToast("Selected " + chosen.label, false);
@@ -422,13 +428,23 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                     entityRenderer.setArtChapter(zombies.get(zombies.size() - 1), selectedZombieChapter);
                 }
             }
+        } else if (tool == Tool.ICED) {
+            result = gameplay.cheatSpawnIcedZombie(selectedZombie, col, row);
+            if (result.isSuccess() && selectedZombieChapter != null) {
+                GameModel model = App.getInstance().getCurrentGameModel();
+                Cell cell = model == null ? null : model.getCellAt(row, col);
+                if (cell != null && cell.getTerrainStrategy() instanceof IceTerrainStrategy ice
+                        && ice.getContainedEntity() instanceof ZombieInstance zombie) {
+                    entityRenderer.setArtChapter(zombie, selectedZombieChapter);
+                }
+            }
         } else {
             result = switch (tool) {
                 case PLANT -> gameplay.plant(selectedPlant, col, row);
                 case SHOVEL -> gameplay.pluck(col, row);
                 case FEED -> gameplay.feed(col, row);
                 case COLLECT_SUN -> gameplay.collectSun(col, row);
-                case ZOMBIE -> gameplay.cheatSpawnZombie(selectedZombie, col, row);
+                case ZOMBIE, ICED -> gameplay.cheatSpawnZombie(selectedZombie, col, row);
             };
         }
         showToast(result.getMessage(), !result.isSuccess());
@@ -508,6 +524,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         Color fill = switch (tool) {
             case PLANT -> HOVER_PLANT;
             case ZOMBIE -> HOVER_ZOMBIE;
+            case ICED -> HOVER_ICED;
             case SHOVEL -> HOVER_SHOVEL;
             case FEED -> HOVER_FEED;
             case COLLECT_SUN -> HOVER_SUN;

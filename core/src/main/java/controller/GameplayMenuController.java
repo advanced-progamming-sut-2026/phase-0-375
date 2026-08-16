@@ -21,6 +21,7 @@ import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
+import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
 import model.item.Grave;
 import model.item.Sun;
@@ -322,6 +323,44 @@ public class GameplayMenuController extends AppMenuController {
         model.getZombies().add(instance);
         map.addZombie(instance, x, y);
         return CommandResult.success("Spawned '" + zombieType + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
+     * Cheat: plants a frozen zombie inside a Frostbite ice block at the cell.
+     * The zombie is not on the walking list until the ice melts.
+     */
+    public CommandResult<Void> cheatSpawnIcedZombie(String zombieType, int x, int y) {
+        if (zombieType == null || zombieType.isBlank()) {
+            return CommandResult.error("Zombie type cannot be empty.");
+        }
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds.");
+        }
+        Cell cell = model.getCellAt(y, x);
+        if (cell == null) {
+            return CommandResult.error("No cell at (" + x + ", " + y + ").");
+        }
+
+        ZombieInstance instance;
+        try {
+            instance = ZombieFactory.createInstance(zombieType);
+        } catch (Throwable t) {
+            instance = null;
+        }
+        if (instance == null) {
+            return CommandResult.error("Unknown zombie type: '" + zombieType
+                    + "'. Make sure ZombieFactory has been initialized.");
+        }
+        instance.setGridPosition(new Point(x, y));
+        instance.setContinuousPosition(new model.game.map.FloatPoint(x, y));
+        cell.setGroundType(GroundType.ICE);
+        cell.setTerrainStrategy(new IceTerrainStrategy(instance));
+        return CommandResult.success("Iced '" + zombieType + "' at (" + x + ", " + y + ").");
     }
 
     /**

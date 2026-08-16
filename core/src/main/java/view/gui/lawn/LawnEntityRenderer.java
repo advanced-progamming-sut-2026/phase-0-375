@@ -17,8 +17,12 @@ import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.item.Grave;
 import model.item.Sun;
+import model.enums.GroundType;
+import model.game.map.terrain.IceTerrainStrategy;
+import model.item.placeable.Placeable;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
+import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
@@ -39,6 +43,7 @@ import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.HunterAnim;
+import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
@@ -133,7 +138,7 @@ public final class LawnEntityRenderer {
     private static final String[] CRYSTALSKULL_SKULL_PARTS = {
             "zombie_egypt_ra_staff", CRYSTALSKULL_GLOW_PART, "zombie_skull"};
     private static final String[] CRYSTALSKULL_BEAM_PARTS = {"laser_beam", "beam"};
-    /** Outstretched pushing hand on {@code ZOMBIE_80S_ARCADE}. */
+    /** Outstretched pushing hand on Arcade and Troglobite {@code push}. */
     private static final String ARCADE_HAND_PART = "zombie_troglobite_hand_oute_push";
 
     private final LawnLayout layout;
@@ -156,6 +161,7 @@ public final class LawnEntityRenderer {
     private final List<DeathFx> deathFx = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, LiveSnap> lastLive = new IdentityHashMap<>();
     private final IdentityHashMap<Pushable, LiveSnap> lastCabinets = new IdentityHashMap<>();
+    private final IdentityHashMap<Cell, LiveSnap> lastTerrainIce = new IdentityHashMap<>();
     /** World-pixel skull alignment for a thrown Imp; lerped to 0 as it lands. */
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final List<BlastFx> prospectorBlasts = new ArrayList<>();
@@ -243,10 +249,13 @@ public final class LawnEntityRenderer {
                 drawPiano(batch, cabinet, delta);
             } else if (cabinet instanceof Barrel) {
                 drawBarrel(batch, cabinet, delta);
+            } else if (cabinet instanceof IceBlock) {
+                drawIceBlock(batch, model, cabinet, delta);
             } else {
                 drawCabinet(batch, cabinet, delta);
             }
         }
+        drawTerrainIce(batch, model, delta);
         for (ZombieInstance zombie : model.getZombies()) {
             Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
@@ -263,7 +272,9 @@ public final class LawnEntityRenderer {
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         hunterSplatSeq.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
-        artChapters.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
+        Set<ZombieInstance> keepArt = new HashSet<>(model.getZombies());
+        collectIcedOccupants(model, keepArt);
+        artChapters.keySet().removeIf(zombie -> !keepArt.contains(zombie));
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
@@ -446,6 +457,12 @@ public final class LawnEntityRenderer {
                 && !barrel.isDestroyed()
                 && barrel.getPosition() != null) {
             live.add(barrel);
+            return;
+        }
+        if (item instanceof IceBlock ice
+                && !ice.isDestroyed()
+                && ice.getPosition() != null) {
+            live.add(ice);
         }
     }
 
@@ -465,6 +482,139 @@ public final class LawnEntityRenderer {
         float x = xy[0] + arcadeArmPushDeltaX(cabinet);
         float time = drawPose(batch, cabinet, pose, x, xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
         lastCabinets.put(cabinet, new LiveSnap(pose, x, xy[1], false, time));
+    }
+
+    /** Pushed ice cube: same arm-follow as the arcade cabinet, ice PAM on the grid cell. */
+    private void drawIceBlock(Batch batch, GameModel model, Pushable ice, float delta) {
+        Point pos = ice.getPosition();
+        if (pos == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(TroglobiteAnim.ICE_PAM);
+        if (entry == null) {
+            return;
+        }
+        clips.getOrLoad(entry.path(), "idle");
+        preloadIceBreak();
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        float x = xy[0] + arcadeArmPushDeltaX(ice);
+        if (ice instanceof IceBlock block
+                && block.getContainedEntity() instanceof ZombieInstance occupant) {
+            drawIcedZombieIdle(batch, occupant, model, x, xy[1], delta);
+        }
+        String clip = catalog.resolveClip(entry, "idle");
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        float time = drawPose(batch, ice, pose, x, xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        lastCabinets.put(ice, new LiveSnap(pose, x, xy[1], false, time));
+    }
+
+    /**
+     * Frostbite ice tiles: occupant {@code idle} behind {@link TroglobiteAnim#ICE_PAM}.
+     */
+    private void drawTerrainIce(Batch batch, GameModel model, float delta) {
+        GameMap map = model.getMap();
+        if (map == null || catalog == null) {
+            return;
+        }
+        Set<Cell> live = new HashSet<>();
+        for (int row = 0; row < map.getRows(); row++) {
+            for (int col = 0; col < map.getCols(); col++) {
+                Cell cell = model.getCellAt(row, col);
+                if (!isLiveTerrainIce(cell)) {
+                    continue;
+                }
+                live.add(cell);
+            }
+        }
+        for (Cell cell : lastTerrainIce.keySet()) {
+            if (!live.contains(cell)) {
+                spawnIceShatter(lastTerrainIce.get(cell));
+            }
+        }
+        lastTerrainIce.entrySet().removeIf(e -> !live.contains(e.getKey()));
+        for (Cell cell : live) {
+            drawTerrainIceCell(batch, model, cell, delta);
+        }
+    }
+
+    private static boolean isLiveTerrainIce(Cell cell) {
+        if (cell == null || cell.getGroundType() != GroundType.ICE) {
+            return false;
+        }
+        if (!(cell.getTerrainStrategy() instanceof IceTerrainStrategy ice)) {
+            return false;
+        }
+        return !ice.isMelted();
+    }
+
+    private void drawTerrainIceCell(Batch batch, GameModel model, Cell cell, float delta) {
+        IceTerrainStrategy ice = (IceTerrainStrategy) cell.getTerrainStrategy();
+        float[] xy = layout.centerOf(cell.getRow(), cell.getColumn());
+        Placeable occupant = ice.getContainedEntity();
+        if (occupant instanceof ZombieInstance zombie) {
+            drawIcedZombieIdle(batch, zombie, model, xy[0], xy[1], delta);
+        }
+        PamCatalog.PamEntry entry = catalog.byName(TroglobiteAnim.ICE_PAM);
+        if (entry == null) {
+            return;
+        }
+        preloadIceBreak();
+        String clip = catalog.resolveClip(entry, "idle");
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        float time = drawPose(batch, cell, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        lastTerrainIce.put(cell, new LiveSnap(pose, xy[0], xy[1], false, time));
+    }
+
+    private void drawIcedZombieIdle(Batch batch, ZombieInstance zombie, GameModel model,
+                                    float x, float y, float delta) {
+        if (zombie == null || zombie.getDefinition() == null) {
+            return;
+        }
+        Chapter skin = artChapterFor(zombie, model.getChapter());
+        PamCatalog.PamEntry entry = catalog.forZombie(zombie.getDefinition().getName(), skin);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "walk");
+        if (clip == null) {
+            return;
+        }
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE,
+                ZombieAnimAdapter.armorVisibility(zombie, entry));
+        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+    }
+
+    private static void collectIcedOccupants(GameModel model, Set<ZombieInstance> into) {
+        GameMap map = model.getMap();
+        if (map == null) {
+            return;
+        }
+        for (int row = 0; row < map.getRows(); row++) {
+            for (int col = 0; col < map.getCols(); col++) {
+                Cell cell = model.getCellAt(row, col);
+                if (!(cell != null && cell.getTerrainStrategy() instanceof IceTerrainStrategy ice)) {
+                    continue;
+                }
+                if (ice.getContainedEntity() instanceof ZombieInstance zombie) {
+                    into.add(zombie);
+                }
+            }
+        }
+        for (ZombieInstance walker : model.getZombies()) {
+            addIceOccupant(walker.getPushableItem(), into);
+        }
+        if (model.getOrphanedPushables() != null) {
+            for (Pushable orphan : model.getOrphanedPushables()) {
+                addIceOccupant(orphan, into);
+            }
+        }
+    }
+
+    private static void addIceOccupant(Pushable item, Set<ZombieInstance> into) {
+        if (item instanceof IceBlock block
+                && block.getContainedEntity() instanceof ZombieInstance zombie) {
+            into.add(zombie);
+        }
     }
 
     /** Piano rides the pianist’s cell centre — no extra offset. */
@@ -709,9 +859,38 @@ public final class LawnEntityRenderer {
             spawnBarrelBreak(snap);
             return;
         }
+        if (TroglobiteAnim.isIcePropPam(pam)) {
+            spawnIceShatter(snap);
+            return;
+        }
         String clip = firstLoadedClip(pam, "death", snap.pose.clipName());
         deathFx.add(new DeathFx(
                 AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
+                snap.x, snap.y));
+    }
+
+    private void preloadIceBreak() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(TroglobiteAnim.ICE_BREAK_PAM);
+        if (entry != null) {
+            clips.getOrLoad(entry.path(), catalog.resolveClip(entry, "animation"));
+        }
+    }
+
+    private void spawnIceShatter(LiveSnap snap) {
+        if (snap == null) {
+            return;
+        }
+        preloadIceBreak();
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(TroglobiteAnim.ICE_BREAK_PAM);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "animation");
+        deathFx.add(new DeathFx(
+                AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
                 snap.x, snap.y));
     }
 

@@ -2,10 +2,11 @@ package model.item.pushable;
 
 import model.game.map.Point;
 import model.item.GridItem;
+import model.item.placeable.Placeable;
 import model.zombie.instance.ZombieInstance;
 
 /**
- * Ice block pushed by the Troglobite.
+ * Ice block pushed by the Troglobite after claiming a Frostbite ice tile.
  */
 public class IceBlock extends GridItem implements Pushable {
 
@@ -15,8 +16,19 @@ public class IceBlock extends GridItem implements Pushable {
     /** Current grid position of this block; null until the pusher places it. */
     private Point position;
 
+    /** Frozen occupant taken from the ice tile, or null if the cube was empty. */
+    private Placeable containedEntity;
+
     public IceBlock(int hp) {
         super(hp);
+    }
+
+    public Placeable getContainedEntity() {
+        return containedEntity;
+    }
+
+    public void setContainedEntity(Placeable containedEntity) {
+        this.containedEntity = containedEntity;
     }
 
     @Override
