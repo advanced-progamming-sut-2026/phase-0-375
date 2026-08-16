@@ -34,7 +34,12 @@ public final class PamClipCache {
         if (cached != null) {
             return cached;
         }
-        ClipRef ref = player.getClip(pamPath, clipName);
+        ClipRef ref;
+        try {
+            ref = player.getClip(pamPath, clipName);
+        } catch (IllegalArgumentException missing) {
+            return null;
+        }
         if (ref != null) {
             clips.put(key, ref);
             loading.remove(pamPath);

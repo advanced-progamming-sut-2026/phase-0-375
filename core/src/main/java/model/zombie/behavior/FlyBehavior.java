@@ -24,8 +24,17 @@ public class FlyBehavior implements ZombieBehavior {
 
     // --- State ---
 
+    /** {@code fly_start} length on {@code ZOMBIE_ICEAGE_DODORIDER}. */
+    public static final float FLY_START_DURATION = 0.9667f;
+
+    /** {@code fly_end} length on {@code ZOMBIE_ICEAGE_DODORIDER}. */
+    public static final float FLY_END_DURATION = 1.5f;
+
     /** Current phase of the fly lifecycle. Starts grounded; takes off only over flyable plants. */
     private FlyPhase phase = FlyPhase.LANDED;
+
+    /** Elapsed seconds in {@link FlyPhase#TAKEOFF} or {@link FlyPhase#LANDING}. */
+    private float flyTimer;
 
     /** The plant currently being eaten; null if not eating. */
     private PlantInstance eatingTarget;
@@ -47,6 +56,7 @@ public class FlyBehavior implements ZombieBehavior {
         }
 
         syncToPlant(zombie, context.getPlantAt(row, col));
+        tickFlight(deltaTime);
     }
 
     /**
@@ -57,10 +67,15 @@ public class FlyBehavior implements ZombieBehavior {
     public void syncToPlant(ZombieInstance zombie, PlantInstance plant) {
         boolean shouldFly = shouldFlyOver(plant);
 
-        if (shouldFly && phase != FlyPhase.FLYING) {
-            takeOff(zombie);
-        } else if (!shouldFly && phase != FlyPhase.LANDED) {
-            land(zombie);
+        if (shouldFly) {
+            if (phase == FlyPhase.LANDED) {
+                takeOff(zombie);
+            } else if (phase == FlyPhase.LANDING) {
+                phase = FlyPhase.FLYING;
+                flyTimer = 0f;
+            }
+        } else if (phase == FlyPhase.TAKEOFF || phase == FlyPhase.FLYING) {
+            startLanding();
         }
 
         if (phase == FlyPhase.LANDED) {
@@ -120,18 +135,41 @@ public class FlyBehavior implements ZombieBehavior {
 
     // --- State transitions ---
 
-    /** Transitions the zombie from LANDED to FLYING. */
+    /** Transitions the zombie from LANDED to TAKEOFF. */
     private void takeOff(ZombieInstance zombie) {
-        phase = FlyPhase.FLYING;
+        phase = FlyPhase.TAKEOFF;
+        flyTimer = 0f;
         eatingTarget = null;
-        if (zombie.isEating()) {
+        if (zombie != null && zombie.isEating()) {
             zombie.stopEating();
         }
     }
 
-    /** Transitions the zombie from FLYING to LANDED. */
-    private void land(ZombieInstance zombie) {
+    /** Starts {@code fly_end} after the last flyable obstacle. */
+    private void startLanding() {
+        phase = FlyPhase.LANDING;
+        flyTimer = 0f;
+    }
+
+    /** Transitions the zombie from the air to LANDED. */
+    private void land() {
         phase = FlyPhase.LANDED;
+        flyTimer = 0f;
+    }
+
+    private void tickFlight(float deltaTime) {
+        if (phase == FlyPhase.TAKEOFF) {
+            flyTimer += deltaTime;
+            if (flyTimer >= FLY_START_DURATION) {
+                phase = FlyPhase.FLYING;
+                flyTimer = 0f;
+            }
+        } else if (phase == FlyPhase.LANDING) {
+            flyTimer += deltaTime;
+            if (flyTimer >= FLY_END_DURATION) {
+                land();
+            }
+        }
     }
 
     /**
@@ -139,15 +177,19 @@ public class FlyBehavior implements ZombieBehavior {
      * Can be called by external systems.
      */
     public void forceLand() {
-        phase = FlyPhase.LANDED;
+        land();
         eatingTarget = null;
     }
 
     // --- Getters / setters ---
 
-    /** @return true if the zombie is currently airborne */
+    /** @return true while takeoff, cruise, or landing is in progress */
     public boolean isFlying() {
-        return phase == FlyPhase.FLYING;
+        return phase != FlyPhase.LANDED;
+    }
+
+    public float getFlyTimer() {
+        return flyTimer;
     }
 
     public FlyPhase getPhase() {
@@ -169,10 +211,12 @@ public class FlyBehavior implements ZombieBehavior {
     // --- Inner types ---
 
     /**
-     * The two phases of a flying zombie's lifecycle.
+     * Air cycle: {@code fly_start} → looping {@code fly_loop} → {@code fly_end}.
      */
     public enum FlyPhase {
         LANDED,
-        FLYING
+        TAKEOFF,
+        FLYING,
+        LANDING
     }
 }

@@ -171,7 +171,7 @@ public final class ZombiePamAliases {
         m.put("ZombieExplorer", "ZOMBIE_EGYPT_EXPLORER");
         m.put("ZombieTombRaiser", "ZOMBIE_EGYPT_TOMBRAISER");
         m.put("ZombieImp", "ZOMBIE_EGYPT_IMP");
-        m.put("ZombieIceAgeDodo", "ZOMBIE_ICEAGE_DODO");
+        m.put("ZombieIceAgeDodo", "ZOMBIE_ICEAGE_DODORIDER");
         m.put("ZombieIceAgeHunter", "ZOMBIE_ICEAGE_HUNTER");
         m.put("ZombieIceAgeTroglobite", "ZOMBIE_ICEAGE_TROGLOBITE");
         m.put("ZombieBeachFisherman", "ZOMBIE_BEACH_FISHERMAN");

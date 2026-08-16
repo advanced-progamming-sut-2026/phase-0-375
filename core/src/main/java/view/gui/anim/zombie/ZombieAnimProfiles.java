@@ -25,5 +25,6 @@ public final class ZombieAnimProfiles {
         BarrelRollerAnim.register(overrides);
         ExplorerAnim.register(overrides);
         TombRaiserAnim.register(overrides);
+        DodoAnim.register(overrides);
     }
 }

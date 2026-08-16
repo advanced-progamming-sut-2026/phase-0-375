@@ -23,6 +23,7 @@ import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.BarrelRollerBehavior;
+import model.zombie.behavior.FlyBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
 import model.zombie.behavior.StealSunBehavior;
@@ -824,6 +825,7 @@ public final class LawnEntityRenderer {
         restartArcadePushClock(zombie, pose);
         restartProspectorJumpClock(zombie, pose);
         restartTombRaiseClock(zombie, pose);
+        restartDodoFlyClock(zombie, pose);
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -1061,6 +1063,24 @@ public final class LawnEntityRenderer {
         }
         PushBehavior push = (PushBehavior) zombie.getBehavior(ZombieBehaviorType.PUSH);
         if (push == null || !push.isPushing() || push.getPushTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /** First frame of a new {@code fly_start} / {@code fly_end}: rewind so the next hop replays. */
+    private void restartDodoFlyClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!"fly_start".equals(clip) && !"fly_end".equals(clip)) {
+            return;
+        }
+        FlyBehavior fly = (FlyBehavior) zombie.getBehavior(ZombieBehaviorType.FLY);
+        if (fly == null || !fly.isFlying() || fly.getFlyTimer() != 0f) {
             return;
         }
         AnimClock clock = clockFor(zombie);
@@ -1689,11 +1709,7 @@ public final class LawnEntityRenderer {
         if (preferred == null) {
             return fallback;
         }
-        if (clips.getOrLoad(pam, preferred) != null) {
-            return preferred;
-        }
-        player.getParts(pam);
-        return player.getClip(pam, preferred) != null ? preferred : fallback;
+        return clips.getOrLoad(pam, preferred) != null ? preferred : fallback;
     }
 
     private static boolean egyptDeathParts(String pam) {
