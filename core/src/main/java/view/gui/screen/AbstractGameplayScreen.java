@@ -15,6 +15,7 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import view.gui.PvzGdxGame;
 import view.gui.assets.PvzAssets;
 import view.gui.lawn.LawnLayout;
+import view.gui.lawn.ScreenShake;
 import view.gui.ui.ToastBanner;
 
 /**
@@ -39,6 +40,7 @@ public abstract class AbstractGameplayScreen implements Screen {
     protected final Viewport uiViewport;
     protected final Stage uiStage;
     protected final ToastBanner toast;
+    protected final ScreenShake screenShake = new ScreenShake();
 
     private final Vector3 unprojectTmp = new Vector3();
     private InputProcessor worldInput;
@@ -150,8 +152,10 @@ public abstract class AbstractGameplayScreen implements Screen {
         Gdx.gl.glClearColor(0.05f, 0.07f, 0.05f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        screenShake.update(delta);
         worldViewport.apply(false);
         anchorCameraLeft(worldCamera);
+        screenShake.apply(worldCamera);
         game.batch.setProjectionMatrix(worldCamera.combined);
         game.batch.begin();
         renderWorld(delta);
@@ -159,8 +163,11 @@ public abstract class AbstractGameplayScreen implements Screen {
 
         uiViewport.apply(false);
         anchorCameraLeft(uiCamera);
+        screenShake.apply(uiCamera);
         uiStage.act(delta);
         uiStage.draw();
+        anchorCameraLeft(worldCamera);
+        anchorCameraLeft(uiCamera);
     }
 
     @Override

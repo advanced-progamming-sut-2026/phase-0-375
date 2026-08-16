@@ -50,6 +50,7 @@ import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
 import view.gui.anim.zombie.FishermanAnim;
+import view.gui.anim.zombie.GargantuarAnim;
 import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.JugglerAnim;
 import view.gui.anim.zombie.OctopusAnim;
@@ -227,6 +228,7 @@ public final class LawnEntityRenderer {
     private FishermanDrownShader drownShader;
     private float snorkelRippleTime;
     private boolean snorkelRippleLoaded;
+    private ScreenShake screenShake;
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
@@ -245,6 +247,10 @@ public final class LawnEntityRenderer {
         this.clips = new PamClipCache(assets.player);
         this.catalog = assets.pamCatalog;
         this.entityOverlay = entityOverlay;
+    }
+
+    public void setScreenShake(ScreenShake screenShake) {
+        this.screenShake = screenShake;
     }
 
     /** Debug sandbox: biome basics use this chapter's PAM instead of the lawn chapter. */
@@ -1280,6 +1286,7 @@ public final class LawnEntityRenderer {
             pose = pose.withHiddenParts(lostArmBodyParts(pose.pamPath()));
         }
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase, tickHitFlash(zombie, delta), delta);
+        maybeGargantuarWalkStomp(zombie, pose, time);
         if (snorkelMask != null) {
             drownShader().end(batch);
         }
@@ -2489,6 +2496,22 @@ public final class LawnEntityRenderer {
                 AnimPose.once(ash.path(), clip, ZombieAnimRole.DIE, null),
                 snap.x, snap.y));
         return true;
+    }
+
+    private void maybeGargantuarWalkStomp(ZombieInstance zombie, AnimPose pose, float time) {
+        if (screenShake == null || pose == null || !"walk".equals(pose.clipName())) {
+            return;
+        }
+        if (!isGargantuar(pose.pamPath())) {
+            return;
+        }
+        LiveSnap prev = lastLive.get(zombie);
+        float prevTime = prev != null && "walk".equals(prev.pose.clipName()) ? prev.time : -1f;
+        ClipRef walk = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        float duration = walk != null ? walk.duration : 0f;
+        if (GargantuarAnim.crossedWalkStomp(prevTime, time, duration)) {
+            screenShake.pulse();
+        }
     }
 
     private static boolean isGargantuar(String pam) {

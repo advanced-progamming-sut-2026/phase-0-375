@@ -92,6 +92,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         BitmapFont font = resolveFont();
         entityOverlay = new DebugEntityOverlay(lawnLayout, font);
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
+        entityRenderer.setScreenShake(screenShake);
 
         List<String> plants = plantNames();
         if (!plants.isEmpty()) {

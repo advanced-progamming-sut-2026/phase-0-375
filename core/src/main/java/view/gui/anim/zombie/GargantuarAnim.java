@@ -74,6 +74,39 @@ public final class GargantuarAnim {
         return AnimPose.looping(entry.path(), walk, role, vis);
     }
 
+    /** Walk-clip times (seconds) when a foot hits the ground. */
+    public static final float WALK_STOMP_A = 0.73f;
+    public static final float WALK_STOMP_B = 1.9f;
+
+    /**
+     * True when walk-clip time crossed a foot-stomp between the previous sample and
+     * {@code currTime}. First sample ({@code prevTime < 0}) never fires. Times wrap
+     * on {@code clipDuration} so gait cycles and unbounded wall-clock both work.
+     */
+    public static boolean crossedWalkStomp(float prevTime, float currTime, float clipDuration) {
+        if (prevTime < 0f) {
+            return false;
+        }
+        if (clipDuration > 0f) {
+            prevTime = cycleTime(prevTime, clipDuration);
+            currTime = cycleTime(currTime, clipDuration);
+        }
+        if (currTime >= prevTime) {
+            return stompIn(prevTime, currTime);
+        }
+        return stompIn(prevTime, Float.POSITIVE_INFINITY) || stompIn(-1f, currTime);
+    }
+
+    private static boolean stompIn(float prev, float curr) {
+        return (prev < WALK_STOMP_A && curr >= WALK_STOMP_A)
+                || (prev < WALK_STOMP_B && curr >= WALK_STOMP_B);
+    }
+
+    private static float cycleTime(float t, float duration) {
+        float m = t % duration;
+        return m < 0f ? m + duration : m;
+    }
+
     static Map<String, Boolean> hideCarriedImp(Map<String, Boolean> base, boolean hide) {
         if (!hide) {
             return base;
