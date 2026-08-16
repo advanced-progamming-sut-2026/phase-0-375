@@ -18,6 +18,7 @@ public final class ZombieGaitProfiles {
     private static Map<String, ZombieGait> createDefaults() {
         Map<String, ZombieGait> gaits = new HashMap<>();
         gaits.put("ZombiePiano", ZombieGait.disabled());
+        gaits.put(HunterAnim.DEFINITION_NAME, ZombieGait.of(1f / 3f));
         // TODO: gaits.put("ZombieGargantuar", ZombieGait.of(1f));
         return gaits;
     }

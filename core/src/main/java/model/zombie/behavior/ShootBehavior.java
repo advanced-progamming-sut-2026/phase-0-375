@@ -1,9 +1,15 @@
 package model.zombie.behavior;
 
+import model.enums.PlantTags;
+import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
+import model.game.map.Point;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
-import model.enums.ZombieBehaviorType;
+import java.util.Locale;
+import java.util.Set;
 
 /**
  * Shoot behavior.
@@ -29,6 +35,17 @@ public class ShootBehavior implements ZombieBehavior {
     /** Number of snowball hits required to freeze a plant solid. */
     public static final int HUNTER_HITS_TO_FREEZE = 3;
 
+    /** Tiles ahead a snowball can travel ({@code FarAttackRange} in zombies.json). */
+    public static final float HUNTER_RANGE = 4f;
+
+    /**
+     * Winter-mint / named immunes that are not {@link PlantTags#FIRE}.
+     * Fire plants use the tag; this set is the rest of the wiki list.
+     */
+    private static final Set<String> HUNTER_FREEZE_IMMUNE_NAMES = Set.of(
+            "snapdragon", "cold snapdragon", "winter melon", "missile toe", "iceweed",
+            "lava guava", "jack o' lantern", "jack o.lantern");
+
     // --- Beach Octopus constants ---
 
     /** Seconds between octopus throws. */
@@ -47,6 +64,15 @@ public class ShootBehavior implements ZombieBehavior {
 
     /** Seconds elapsed since the last snowball was thrown within a barrage. */
     private float snowballTimer = 0f;
+
+    /** Keep {@code throw} playing after the last ball so the clip is not cut at impact. */
+    private float throwHold = 0f;
+
+    /** Grid cell of the plant last hit by a snowball; renderer plays the splat here. */
+    private Point lastSnowballSplatAt;
+
+    /** Increments on each snowball that hits a plant. */
+    private int snowballSplatSeq = 0;
 
     // --- ZombieBehavior ---
 
@@ -141,21 +167,49 @@ public class ShootBehavior implements ZombieBehavior {
      * {@value #HUNTER_SNOWBALL_INTERVAL} seconds apart.
      */
     private void tickIceAgeHunter(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (throwHold > 0f) {
+            throwHold -= deltaTime;
+            if (throwHold <= 0f && snowballsRemainingInBarrage == 0) {
+                clearHunterThrow(zombie);
+            }
+        }
         if (snowballsRemainingInBarrage > 0) {
             snowballTimer += deltaTime;
             if (snowballTimer >= HUNTER_SNOWBALL_INTERVAL) {
                 snowballTimer -= HUNTER_SNOWBALL_INTERVAL;
                 throwSnowball(zombie, context);
                 snowballsRemainingInBarrage--;
+                if (snowballsRemainingInBarrage == 0) {
+                    throwHold = HUNTER_SNOWBALL_INTERVAL;
+                }
             }
             return;
         }
 
         castTimer += deltaTime;
-        if (castTimer >= HUNTER_BARRAGE_INTERVAL) {
-            castTimer -= HUNTER_BARRAGE_INTERVAL;
-            snowballsRemainingInBarrage = HUNTER_SNOWBALLS_PER_BARRAGE;
-            snowballTimer = 0f;
+        if (castTimer < HUNTER_BARRAGE_INTERVAL) {
+            return;
+        }
+        if (findHunterTarget(zombie, context) == null) {
+            castTimer = HUNTER_BARRAGE_INTERVAL;
+            return;
+        }
+        castTimer -= HUNTER_BARRAGE_INTERVAL;
+        snowballsRemainingInBarrage = HUNTER_SNOWBALLS_PER_BARRAGE;
+        snowballTimer = 0f;
+        throwHold = 0f;
+        beginHunterThrow(zombie);
+    }
+
+    private static void beginHunterThrow(ZombieInstance zombie) {
+        if (zombie.getState() != ZombieState.DYING && zombie.getState() != ZombieState.DEAD) {
+            zombie.setState(ZombieState.SPECIAL_ACTION);
+        }
+    }
+
+    private static void clearHunterThrow(ZombieInstance zombie) {
+        if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
         }
     }
 
@@ -164,11 +218,15 @@ public class ShootBehavior implements ZombieBehavior {
      * registering a freeze hit on it.
      */
     private void throwSnowball(ZombieInstance zombie, BehaviorContext context) {
-        PlantInstance target = findNearestPlantInLane(zombie, context);
+        PlantInstance target = findHunterTarget(zombie, context);
         if (target == null) {
             return;
         }
-        target.registerFreezeHit(HUNTER_HITS_TO_FREEZE);
+        if (!isHunterFreezeImmune(target)) {
+            target.registerFreezeHit(HUNTER_HITS_TO_FREEZE);
+        }
+        lastSnowballSplatAt = target.getPosition();
+        snowballSplatSeq++;
     }
 
     // --- Beach Octopus ---
@@ -192,6 +250,53 @@ public class ShootBehavior implements ZombieBehavior {
     }
 
     // --- Shared targeting helpers ---
+
+    /**
+     * Nearest plant ahead within {@link #HUNTER_RANGE}. Skips low {@link PlantTags#TRAP}
+     * plants (Spikeweed). Frozen plants stay eligible so they block the lane.
+     */
+    private PlantInstance findHunterTarget(ZombieInstance zombie, BehaviorContext context) {
+        PlantInstance nearest = null;
+        float nearestDist = Float.MAX_VALUE;
+        for (PlantInstance plant : context.getPlantsInLane(zombie.getGridY())) {
+            if (isHunterLowPlant(plant)) {
+                continue;
+            }
+            float d = hunterDistanceAhead(zombie, plant);
+            if (d <= 0f || d > HUNTER_RANGE) {
+                continue;
+            }
+            if (d < nearestDist) {
+                nearestDist = d;
+                nearest = plant;
+            }
+        }
+        return nearest;
+    }
+
+    private static float hunterDistanceAhead(ZombieInstance zombie, PlantInstance plant) {
+        if (plant == null || plant.getCurrentHP() <= 0 || plant.getPosition() == null) {
+            return -1f;
+        }
+        return zombie.getContinuousX() - plant.getPosition().getX();
+    }
+
+    private static boolean isHunterLowPlant(PlantInstance plant) {
+        Plant def = plant == null ? null : plant.getDefinition();
+        return def != null && def.hasTag(PlantTags.TRAP);
+    }
+
+    private static boolean isHunterFreezeImmune(PlantInstance plant) {
+        Plant def = plant == null ? null : plant.getDefinition();
+        if (def == null) {
+            return false;
+        }
+        if (def.hasTag(PlantTags.FIRE)) {
+            return true;
+        }
+        String name = def.getName();
+        return name != null && HUNTER_FREEZE_IMMUNE_NAMES.contains(name.toLowerCase(Locale.ROOT));
+    }
 
     /**
      * Finds the plant closest to the zombie's current position within its own lane.
@@ -254,6 +359,19 @@ public class ShootBehavior implements ZombieBehavior {
 
     public float getSnowballTimer() {
         return snowballTimer;
+    }
+
+    /** True while the Hunter's {@code throw} clip should play. */
+    public boolean isThrowing() {
+        return snowballsRemainingInBarrage > 0 || throwHold > 0f;
+    }
+
+    public Point getLastSnowballSplatAt() {
+        return lastSnowballSplatAt;
+    }
+
+    public int getSnowballSplatSeq() {
+        return snowballSplatSeq;
     }
 
     // --- Setters ---

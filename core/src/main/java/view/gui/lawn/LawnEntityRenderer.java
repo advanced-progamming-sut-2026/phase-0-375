@@ -26,6 +26,7 @@ import model.zombie.behavior.BarrelRollerBehavior;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
+import model.zombie.behavior.ShootBehavior;
 import model.zombie.behavior.StealSunBehavior;
 import model.zombie.behavior.SummonBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
@@ -37,6 +38,7 @@ import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
+import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
@@ -101,6 +103,11 @@ public final class LawnEntityRenderer {
             "particle_head", "particle_arm",
             "zombie_skull", "zombie_jaw",
             "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
+    /** Hunter {@code die} body parts that {@link HunterAnim#DEATH_PARTICLE_PARTS} stand in for. */
+    private static final String[] HUNTER_HEAD_PARTS = {
+            "particle_head", "particle_hand",
+            "zombie_skull", "zombie_jaw",
+            "zombie_arm_outer_lower", "zombie_arms_outer_upper"};
 
     /** Arcade cabinet effect PAM (not a zombie body). */
     private static final String ARCADE_CABINET_PAM = "80S_ARCADE_CABINET";
@@ -153,6 +160,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final List<BlastFx> prospectorBlasts = new ArrayList<>();
     private final IdentityHashMap<ZombieInstance, Boolean> prospectorBlastSpawned = new IdentityHashMap<>();
+    private final List<BlastFx> hunterSplats = new ArrayList<>();
+    private final IdentityHashMap<ZombieInstance, Integer> hunterSplatSeq = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final float[] xyTmp = new float[3];
@@ -242,6 +251,7 @@ public final class LawnEntityRenderer {
             Chapter skin = artChapterFor(zombie, model.getChapter());
             drawZombie(batch, zombie, skin, delta);
         }
+        drawHunterSplats(batch, delta);
         drawProspectorBlasts(batch, delta);
         drawDeathFx(batch, delta);
         drawArmorPops(batch, delta);
@@ -252,6 +262,7 @@ public final class LawnEntityRenderer {
         hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
+        hunterSplatSeq.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         artChapters.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
     }
 
@@ -826,6 +837,8 @@ public final class LawnEntityRenderer {
         restartProspectorJumpClock(zombie, pose);
         restartTombRaiseClock(zombie, pose);
         restartDodoFlyClock(zombie, pose);
+        restartHunterThrowClock(zombie, pose);
+        spawnHunterSplat(zombie);
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -1086,6 +1099,77 @@ public final class LawnEntityRenderer {
         AnimClock clock = clockFor(zombie);
         clock.clipKey = "";
         clock.time = 0f;
+    }
+
+    /** First frame of a new {@code throw}: rewind so the next barrage replays. */
+    private void restartHunterThrowClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !HunterAnim.THROW_CLIP.equals(pose.clipName())) {
+            return;
+        }
+        ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+        if (shoot == null || !shoot.isThrowing()) {
+            return;
+        }
+        if (shoot.getSnowballsRemainingInBarrage() != ShootBehavior.HUNTER_SNOWBALLS_PER_BARRAGE
+                || shoot.getSnowballTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    private void spawnHunterSplat(ZombieInstance zombie) {
+        ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+        if (shoot == null || !shoot.isIceAgeHunter(zombie)) {
+            return;
+        }
+        if (shoot.isThrowing()) {
+            preloadHunterSplat();
+        }
+        int seq = shoot.getSnowballSplatSeq();
+        int seen = hunterSplatSeq.getOrDefault(zombie, 0);
+        if (seq <= seen) {
+            return;
+        }
+        hunterSplatSeq.put(zombie, seq);
+        Point at = shoot.getLastSnowballSplatAt();
+        if (at == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry splat = catalog.byName(HunterAnim.SPLAT_PAM);
+        if (splat == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(splat, "animation");
+        float[] xy = layout.centerOf(at.getY(), at.getX());
+        for (int n = seen; n < seq; n++) {
+            hunterSplats.add(new BlastFx(splat.path(), clip, xy[0], xy[1]));
+        }
+    }
+
+    private void preloadHunterSplat() {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry splat = catalog.byName(HunterAnim.SPLAT_PAM);
+        if (splat != null) {
+            clips.getOrLoad(splat.path(), catalog.resolveClip(splat, "animation"));
+        }
+    }
+
+    private void drawHunterSplats(Batch batch, float delta) {
+        float scale = AnimScale.PLANT;
+        for (int i = hunterSplats.size() - 1; i >= 0; i--) {
+            BlastFx fx = hunterSplats.get(i);
+            ClipRef ref = clips.getOrLoad(fx.pamPath, fx.clip != null ? fx.clip : "animation");
+            if (ref == null || fx.time >= ref.duration) {
+                hunterSplats.remove(i);
+                continue;
+            }
+            player.draw(batch, ref, fx.time, fx.x, fx.y, scale, scale, false);
+            fx.time += delta;
+        }
     }
 
     /** First frame of a new {@code power}: rewind so the next raise doesn't keep the old time. */
@@ -1483,12 +1567,18 @@ public final class LawnEntityRenderer {
 
     private static final class BlastFx {
         final String pamPath;
+        final String clip;
         final float x;
         final float y;
         float time;
 
         BlastFx(String pamPath, float x, float y) {
+            this(pamPath, null, x, y);
+        }
+
+        BlastFx(String pamPath, String clip, float x, float y) {
             this.pamPath = pamPath;
+            this.clip = clip;
             this.x = x;
             this.y = y;
         }
@@ -1670,8 +1760,12 @@ public final class LawnEntityRenderer {
                 && !upper.contains("SMOKE");
     }
 
+    private static boolean isIceAgeHunter(String pam) {
+        return pam != null && pam.toUpperCase().contains("ZOMBIE_ICEAGE_HUNTER");
+    }
+
     private static boolean popsHeadAndArm(String pam) {
-        return isArcadeZombie(pam) || isProspector(pam);
+        return isArcadeZombie(pam) || isProspector(pam) || isIceAgeHunter(pam);
     }
 
     /** {@code particles} group used for ground Y; the clip itself is drawn whole. */
@@ -1699,6 +1793,9 @@ public final class LawnEntityRenderer {
         if (isAllStar(pam)) {
             return ALLSTAR_HEAD_PARTS;
         }
+        if (isIceAgeHunter(pam)) {
+            return HUNTER_HEAD_PARTS;
+        }
         if (popsHeadAndArm(pam)) {
             return ARCADE_HEAD_PARTS;
         }
@@ -1721,6 +1818,10 @@ public final class LawnEntityRenderer {
     private List<String> particleParts(String pam) {
         List<String> bits = new ArrayList<>();
         if (firstLoadedClip(pam, "particles", null) == null) {
+            return bits;
+        }
+        if (isIceAgeHunter(pam)) {
+            bits.addAll(List.of(HunterAnim.DEATH_PARTICLE_PARTS));
             return bits;
         }
         if (popsHeadAndArm(pam)) {
