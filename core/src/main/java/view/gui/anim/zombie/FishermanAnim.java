@@ -111,8 +111,6 @@ public final class FishermanAnim {
     }
 
     public static int rowAt(LawnLayout layout, float originY) {
-        float top = LawnLayout.LAWN_ORIGIN_Y + LawnLayout.GRID_HEIGHT;
-        int row = (int) Math.floor((top - originY) / layout.cellHeight());
-        return Math.max(0, Math.min(layout.rows() - 1, row));
+        return layout.rowAt(originY);
     }
 }

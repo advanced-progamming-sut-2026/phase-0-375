@@ -82,8 +82,11 @@ import java.util.concurrent.ThreadLocalRandom;
  * <p>Pipeline: model entity → {@link PlantAnimAdapter} / {@link ZombieAnimAdapter}
  * → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
  *
+ * <p>Draw order is back-to-front by lawn row (row 0 is the top of the screen),
+ * then graves → plants → props → zombies within a lane so lower rows cover
+ * taller sprites from the rows above.
+ *
  * <p>TODO: projectiles, plant-food FX, mowers, and grid props.
- * TODO: sort draw order by row (back → front) then Y within a lane.
  * TODO: freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
@@ -293,12 +296,6 @@ public final class LawnEntityRenderer {
         }
         lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
 
-        drawGraves(batch, model, delta);
-        drawGraveGhosts(batch, delta);
-        for (PlantInstance plant : model.getAllPlants()) {
-            drawPlant(batch, plant, delta);
-        }
-        drawPlantGhosts(batch, model, delta);
         Set<Pushable> liveCabinets = new HashSet<>();
         for (ZombieInstance zombie : model.getZombies()) {
             collectLiveCabinet(zombie.getPushableItem(), liveCabinets);
@@ -314,27 +311,49 @@ public final class LawnEntityRenderer {
             }
         }
         lastCabinets.entrySet().removeIf(e -> !liveCabinets.contains(e.getKey()));
-        for (Pushable cabinet : liveCabinets) {
-            if (cabinet instanceof Piano) {
-                drawPiano(batch, cabinet, delta);
-            } else if (cabinet instanceof Barrel) {
-                drawBarrel(batch, cabinet, delta);
-            } else if (cabinet instanceof IceBlock) {
-                drawIceBlock(batch, model, cabinet, delta);
-            } else {
-                drawCabinet(batch, cabinet, delta);
+        Set<Cell> liveIce = syncTerrainIce(model);
+
+        List<PlantInstance> plants = model.getAllPlants();
+        Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
+        livePlants.addAll(plants);
+        for (PlantInstance plant : plants) {
+            if (plantRow(plant) < 0) {
+                drawPlant(batch, plant, delta);
             }
         }
-        drawTerrainIce(batch, model, delta);
-        for (ZombieInstance zombie : model.getZombies()) {
-            Chapter skin = artChapterFor(zombie, model.getChapter());
-            drawZombie(batch, zombie, skin, delta);
+
+        GameMap map = model.getMap();
+        int rows = map != null ? map.getRows() : layout.rows();
+        // Row 0 is the top of the screen; later rows paint over it.
+        for (int row = 0; row < rows; row++) {
+            drawGraves(batch, model, delta, row);
+            drawGraveGhosts(batch, delta, row);
+            for (PlantInstance plant : plants) {
+                int lane = plantRow(plant);
+                if (lane >= 0 && clampRow(lane, rows) == row) {
+                    drawPlant(batch, plant, delta);
+                }
+            }
+            drawPlantGhosts(batch, livePlants, delta, row);
+            for (Pushable cabinet : liveCabinets) {
+                int lane = cabinet.getRow();
+                if (lane >= 0 && clampRow(lane, rows) == row) {
+                    drawPushable(batch, model, cabinet, delta);
+                }
+            }
+            drawTerrainIce(batch, model, liveIce, delta, row);
+            for (ZombieInstance zombie : model.getZombies()) {
+                if (clampRow(zombieRow(zombie), rows) == row) {
+                    Chapter skin = artChapterFor(zombie, model.getChapter());
+                    drawZombie(batch, zombie, skin, delta);
+                }
+            }
+            drawDeathFx(batch, delta, row);
+            drawArmorPops(batch, delta, row);
+            drawHunterSplats(batch, delta, row);
+            drawProspectorBlasts(batch, delta, row);
         }
         drawOctopi(batch, model, delta);
-        drawHunterSplats(batch, delta);
-        drawProspectorBlasts(batch, delta);
-        drawDeathFx(batch, delta);
-        drawArmorPops(batch, delta);
         drawSuns(batch, model, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
@@ -377,7 +396,7 @@ public final class LawnEntityRenderer {
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
 
-    private void drawGraves(Batch batch, GameModel model, float delta) {
+    private void drawGraves(Batch batch, GameModel model, float delta, int row) {
         GameMap map = model.getMap();
         if (map == null || catalog == null) {
             return;
@@ -387,18 +406,15 @@ public final class LawnEntityRenderer {
             return;
         }
         String path = entry.path();
-        int rows = map.getRows();
         int cols = map.getCols();
-        for (int row = 0; row < rows; row++) {
-            for (int col = 0; col < cols; col++) {
-                Cell cell = map.getCell(col, row);
-                if (cell == null) {
-                    continue;
-                }
-                if (cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave grave
-                        && !grave.isDestroyed()) {
-                    drawGrave(batch, grave, row, col, path, delta);
-                }
+        for (int col = 0; col < cols; col++) {
+            Cell cell = map.getCell(col, row);
+            if (cell == null) {
+                continue;
+            }
+            if (cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave grave
+                    && !grave.isDestroyed()) {
+                drawGrave(batch, grave, row, col, path, delta);
             }
         }
     }
@@ -426,16 +442,17 @@ public final class LawnEntityRenderer {
     }
 
     /** Killing blow removes the plant/grave before draw; hold last pose through the flash. */
-    private void drawPlantGhosts(Batch batch, GameModel model, float delta) {
-        Set<PlantInstance> live = Collections.newSetFromMap(new IdentityHashMap<>());
-        live.addAll(model.getAllPlants());
+    private void drawPlantGhosts(Batch batch, Set<PlantInstance> live, float delta, int row) {
         for (PlantInstance plant : new ArrayList<>(lastPlants.keySet())) {
             if (live.contains(plant)) {
                 continue;
             }
             LiveSnap snap = lastPlants.get(plant);
+            if (snap == null || layout.rowAt(snap.y) != row) {
+                continue;
+            }
             float flash = tickHitFlash(plant, 0, delta);
-            if (flash <= 0f || snap == null || snap.pose == null) {
+            if (flash <= 0f || snap.pose == null) {
                 lastPlants.remove(plant);
                 continue;
             }
@@ -443,14 +460,17 @@ public final class LawnEntityRenderer {
         }
     }
 
-    private void drawGraveGhosts(Batch batch, float delta) {
+    private void drawGraveGhosts(Batch batch, float delta, int row) {
         for (Grave grave : new ArrayList<>(lastGraves.keySet())) {
             if (seenThisFrame.contains(grave)) {
                 continue;
             }
             LiveSnap snap = lastGraves.get(grave);
+            if (snap == null || layout.rowAt(snap.y) != row) {
+                continue;
+            }
             float flash = tickHitFlash(grave, 0, delta);
-            if (flash <= 0f || snap == null || snap.pose == null) {
+            if (flash <= 0f || snap.pose == null) {
                 lastGraves.remove(grave);
                 continue;
             }
@@ -711,6 +731,18 @@ public final class LawnEntityRenderer {
         };
     }
 
+    private void drawPushable(Batch batch, GameModel model, Pushable item, float delta) {
+        if (item instanceof Piano) {
+            drawPiano(batch, item, delta);
+        } else if (item instanceof Barrel) {
+            drawBarrel(batch, item, delta);
+        } else if (item instanceof IceBlock) {
+            drawIceBlock(batch, model, item, delta);
+        } else {
+            drawCabinet(batch, item, delta);
+        }
+    }
+
     private static void collectLiveCabinet(Pushable item, Set<Pushable> live) {
         if (item instanceof ArcadeMachine cabinet
                 && !cabinet.isDestroyed()
@@ -785,12 +817,12 @@ public final class LawnEntityRenderer {
     /**
      * Frostbite ice tiles: occupant {@code idle} behind {@link TroglobiteAnim#ICE_PAM}.
      */
-    private void drawTerrainIce(Batch batch, GameModel model, float delta) {
+    private Set<Cell> syncTerrainIce(GameModel model) {
         GameMap map = model.getMap();
-        if (map == null || catalog == null) {
-            return;
-        }
         Set<Cell> live = new HashSet<>();
+        if (map == null || catalog == null) {
+            return live;
+        }
         for (int row = 0; row < map.getRows(); row++) {
             for (int col = 0; col < map.getCols(); col++) {
                 Cell cell = model.getCellAt(row, col);
@@ -806,8 +838,14 @@ public final class LawnEntityRenderer {
             }
         }
         lastTerrainIce.entrySet().removeIf(e -> !live.contains(e.getKey()));
+        return live;
+    }
+
+    private void drawTerrainIce(Batch batch, GameModel model, Set<Cell> live, float delta, int row) {
         for (Cell cell : live) {
-            drawTerrainIceCell(batch, model, cell, delta);
+            if (cell.getRow() == row) {
+                drawTerrainIceCell(batch, model, cell, delta);
+            }
         }
     }
 
@@ -1468,10 +1506,13 @@ public final class LawnEntityRenderer {
         prospectorBlastSpawned.put(zombie, Boolean.TRUE);
     }
 
-    private void drawProspectorBlasts(Batch batch, float delta) {
+    private void drawProspectorBlasts(Batch batch, float delta, int row) {
         float scale = AnimScale.ZOMBIE;
         for (int i = prospectorBlasts.size() - 1; i >= 0; i--) {
             BlastFx fx = prospectorBlasts.get(i);
+            if (layout.rowAt(fx.y) != row) {
+                continue;
+            }
             float maxDuration = 0f;
             boolean drew = false;
             for (String clip : PROSPECTOR_BLAST_CLIPS) {
@@ -1706,10 +1747,13 @@ public final class LawnEntityRenderer {
         }
     }
 
-    private void drawHunterSplats(Batch batch, float delta) {
+    private void drawHunterSplats(Batch batch, float delta, int row) {
         float scale = AnimScale.PLANT;
         for (int i = hunterSplats.size() - 1; i >= 0; i--) {
             BlastFx fx = hunterSplats.get(i);
+            if (layout.rowAt(fx.y) != row) {
+                continue;
+            }
             ClipRef ref = clips.getOrLoad(fx.pamPath, fx.clip != null ? fx.clip : "animation");
             if (ref == null || fx.time >= ref.duration) {
                 hunterSplats.remove(i);
@@ -2106,6 +2150,29 @@ public final class LawnEntityRenderer {
         return true;
     }
 
+    /** Grid lane; {@code -1} if the plant is not on a cell. */
+    static int plantRow(PlantInstance plant) {
+        Point pos = plant.getPosition();
+        return pos == null ? -1 : pos.getY();
+    }
+
+    /** Lane the zombie is drawn in; continuous Y wins so a lane-swap stays sorted. */
+    static int zombieRow(ZombieInstance zombie) {
+        FloatPoint cont = zombie.getContinuousPosition();
+        if (cont != null) {
+            return Math.round(cont.getY());
+        }
+        Point grid = zombie.getGridPosition();
+        return grid == null ? -1 : grid.getY();
+    }
+
+    static int clampRow(int row, int rows) {
+        if (rows <= 0 || row < 0) {
+            return 0;
+        }
+        return Math.min(rows - 1, row);
+    }
+
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta) {
         seenThisFrame.add(entity);
@@ -2321,9 +2388,12 @@ public final class LawnEntityRenderer {
         flash.prevDroppables = living;
     }
 
-    private void drawArmorPops(Batch batch, float delta) {
+    private void drawArmorPops(Batch batch, float delta, int row) {
         for (int i = armorPops.size() - 1; i >= 0; i--) {
             ArmorPop pop = armorPops.get(i);
+            if (layout.rowAt(pop.groundY + layout.cellHeight() * 0.5f) != row) {
+                continue;
+            }
             pop.life += delta;
             if (!pop.grounded) {
                 pop.vy += pop.gravity * delta;
@@ -2964,9 +3034,12 @@ public final class LawnEntityRenderer {
         armorPops.add(pop);
     }
 
-    private void drawDeathFx(Batch batch, float delta) {
+    private void drawDeathFx(Batch batch, float delta, int row) {
         for (int i = deathFx.size() - 1; i >= 0; i--) {
             DeathFx fx = deathFx.get(i);
+            if (layout.rowAt(fx.y) != row) {
+                continue;
+            }
             ClipRef ref = clips.getOrLoad(fx.pose.pamPath(), fx.pose.clipName());
             if (ref == null) {
                 continue;

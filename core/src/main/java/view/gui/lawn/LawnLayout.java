@@ -136,13 +136,22 @@ public final class LawnLayout {
     }
 
     /**
+     * Row index for a world Y. Row 0 is the top of the lawn; out-of-grid Y is
+     * clamped to the nearest lane so death FX still sort with their row.
+     */
+    public int rowAt(float worldY) {
+        float top = LAWN_ORIGIN_Y + GRID_HEIGHT;
+        int row = (int) Math.floor((top - worldY) / cellHeight);
+        return Math.max(0, Math.min(rows - 1, row));
+    }
+
+    /**
      * @return {@code true} if the world point maps to an in-bounds cell;
      *         writes col into {@code out[0]} and row into {@code out[1]}.
      */
     public boolean worldToCell(float worldX, float worldY, int[] out) {
         int col = (int) Math.floor((worldX - LAWN_ORIGIN_X) / cellWidth);
-        float top = LAWN_ORIGIN_Y + GRID_HEIGHT;
-        int row = (int) Math.floor((top - worldY) / cellHeight);
+        int row = (int) Math.floor((LAWN_ORIGIN_Y + GRID_HEIGHT - worldY) / cellHeight);
         if (col < 0 || col >= cols || row < 0 || row >= rows) {
             return false;
         }
