@@ -27,6 +27,7 @@ import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.BarrelRollerBehavior;
+import model.zombie.behavior.FishBehavior;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.behavior.JumpBehavior;
 import model.zombie.behavior.PushBehavior;
@@ -42,6 +43,7 @@ import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
+import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -175,6 +177,7 @@ public final class LawnEntityRenderer {
     private final Matrix4 popTransform = new Matrix4();
 
     private final DebugEntityOverlay entityOverlay;
+    private FishermanDrownShader drownShader;
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
@@ -1017,6 +1020,7 @@ public final class LawnEntityRenderer {
         restartTombRaiseClock(zombie, pose);
         restartDodoFlyClock(zombie, pose);
         restartHunterThrowClock(zombie, pose);
+        restartFishermanClock(zombie, pose);
         spawnHunterSplat(zombie);
 
         float x = xyTmp[0];
@@ -1358,6 +1362,33 @@ public final class LawnEntityRenderer {
         }
         SummonBehavior summon = (SummonBehavior) zombie.getBehavior(ZombieBehaviorType.SUMMON);
         if (summon == null || !summon.isRaising() || summon.getRaiseTimer() != 0f) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    /** First frame of a new {@code intro}/{@code cast}/{@code reel}: rewind so the next cycle replays. */
+    private void restartFishermanClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!"intro".equals(clip) && !"cast".equals(clip) && !"reel".equals(clip)) {
+            return;
+        }
+        FishBehavior fish = (FishBehavior) zombie.getBehavior(ZombieBehaviorType.FISH);
+        if (fish == null || fish.getPhaseTimer() != 0f) {
+            return;
+        }
+        boolean match = switch (fish.getPhase()) {
+            case INTRO -> "intro".equals(clip);
+            case CASTING -> "cast".equals(clip);
+            case REELING -> "reel".equals(clip);
+            case IDLE -> false;
+        };
+        if (!match) {
             return;
         }
         AnimClock clock = clockFor(zombie);
@@ -1735,12 +1766,19 @@ public final class LawnEntityRenderer {
         final AnimPose pose;
         final float x;
         final float y;
+        final boolean drown;
         float time;
+        float drownWaterY = Float.NaN;
 
         DeathFx(AnimPose pose, float x, float y) {
+            this(pose, x, y, false);
+        }
+
+        DeathFx(AnimPose pose, float x, float y, boolean drown) {
             this.pose = pose;
             this.x = x;
             this.y = y;
+            this.drown = drown;
         }
     }
 
@@ -1796,7 +1834,11 @@ public final class LawnEntityRenderer {
         if (snap.pose.flipX()) {
             diePose = diePose.flipped();
         }
-        deathFx.add(new DeathFx(diePose, snap.x, snap.y));
+        boolean drown = FishermanAnim.isFishermanPam(pam);
+        deathFx.add(new DeathFx(diePose, snap.x, snap.y, drown));
+        if (drown) {
+            return;
+        }
 
         // The head lies on the ground until the body has finished collapsing, then both fade together.
         ClipRef dieRef = clips.getOrLoad(pam, dieClip);
@@ -2053,10 +2095,51 @@ public final class LawnEntityRenderer {
             // Hold the collapsed last frame and fade it out instead of popping it off-screen.
             float scale = AnimScale.ZOMBIE * fx.pose.scale();
             float alpha = 1f - Math.max(0f, fx.time - ref.duration) / ARMOR_POP_FADE;
+            float time = Math.min(fx.time, ref.duration);
             batch.setColor(1f, 1f, 1f, alpha);
-            drawClip(batch, ref, fx.pose, Math.min(fx.time, ref.duration), fx.x, fx.y, scale);
+            if (fx.drown) {
+                freezeDrownWaterY(fx, ref, scale);
+            }
+            Rectangle mask = fx.drown && !Float.isNaN(fx.drownWaterY)
+                    ? FishermanAnim.drownMaskWorld(layout, fx.x, fx.y, fx.drownWaterY)
+                    : null;
+            Rectangle sprite = fx.drown
+                    ? FishermanAnim.spriteWorld(fx.x, fx.y,
+                    player.bounds(fx.pose.pamPath(), fx.pose.clipName()), scale, fx.pose.flipX())
+                    : null;
+            boolean clipBody = mask != null && (sprite == null || FishermanAnim.overlaps(mask, sprite));
+            if (clipBody) {
+                drownShader().begin(batch, mask);
+            }
+            drawClip(batch, ref, fx.pose, time, fx.x, fx.y, scale);
+            if (clipBody) {
+                drownShader().end(batch);
+            }
             batch.setColor(Color.WHITE);
             fx.time += delta;
+        }
+    }
+
+    private FishermanDrownShader drownShader() {
+        if (drownShader == null) {
+            drownShader = new FishermanDrownShader();
+        }
+        return drownShader;
+    }
+
+    private void freezeDrownWaterY(DeathFx fx, ClipRef die, float scale) {
+        if (!Float.isNaN(fx.drownWaterY)) {
+            return;
+        }
+        Rectangle tube = partAt(die, 0f, FishermanAnim.INNERTUBE_PART);
+        if (tube == null) {
+            tube = partAt(die, 0f, "zombie_innertube_layer");
+        }
+        if (tube == null) {
+            tube = partAt(clips.getOrLoad(fx.pose.pamPath(), "idle"), 0f, FishermanAnim.INNERTUBE_PART);
+        }
+        if (tube != null) {
+            fx.drownWaterY = FishermanAnim.waterY(fx.y, tube, scale);
         }
     }
 }

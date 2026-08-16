@@ -73,10 +73,19 @@ public final class WaterUnderlayerRenderer {
             return;
         }
         animTime += dt;
+        paint(batch);
+    }
+
+    /** Current tide pose, no time/slide advance. Used to cover a drowning Fisherman. */
+    public void paint(Batch batch) {
+        if (Float.isNaN(drawX)) {
+            return;
+        }
         ClipRef ref = clips.getOrLoad(pamPath, CLIP);
         if (ref == null) {
             return;
         }
+        float scale = scaleForHeight(clipHeight());
         player.draw(batch, ref, animTime, drawX, drawCenterY(scale), scale, scale, true);
     }
 
