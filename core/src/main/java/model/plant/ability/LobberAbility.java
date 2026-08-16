@@ -14,6 +14,7 @@ import model.projectile.Projectile;
 import model.projectile.Splash;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
@@ -115,8 +116,19 @@ public class LobberAbility implements PlantAbility {
             float splashRadius = inferSplashRadius(def, plant);
             int damage = inferDamage(def, plant);
 
-            ZombieInstance target = nearestZombieAhead(plant, context, +1);
-            for (int i = 0; i < volley; i++) {
+            List<ZombieInstance> allZombies = new ArrayList<>();
+            for (int i = 0; i < context.getRowCount(); i++) {
+                allZombies.addAll(context.getZombiesInLane(i));
+            }
+
+            List<Integer> targetZombiesIndex = new ArrayList<>();
+
+            for (int i = 0; i < 3 && i < allZombies.size(); i++) {
+                int randomZombieIndex;
+                while (targetZombiesIndex.contains(randomZombieIndex = RNG.nextInt(allZombies.size())));
+                targetZombiesIndex.add(randomZombieIndex);
+                ZombieInstance target = allZombies.get(randomZombieIndex);
+
                 FloatPoint shotOrigin = new FloatPoint(origin.getX() + i * 0.2f, origin.getY());
                 Splash splash = new Splash(
                         damage * 2,
