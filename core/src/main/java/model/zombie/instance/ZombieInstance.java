@@ -39,6 +39,8 @@ public class ZombieInstance implements Tickable, Placeable {
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
     private ZombieInstance combatTargetZombie;             // The opposing zombie this zombie is currently biting.
+    /** Leftover chew DPS so `(int)(dps * dt)` is not 0 at high FPS. */
+    private float eatDamageCarry;
 
     private float chillStackTimer = 0f;
     private float poisonTimer = 0f;
@@ -332,6 +334,21 @@ public class ZombieInstance implements Tickable, Placeable {
      * @return true if this zombie is eating a plant
      */
     public boolean isEating() { return state == ZombieState.EATING; }
+
+    /**
+     * Turns a fractional chew/fight DPS sample into whole HP. Carry is kept
+     * on this zombie so 100 DPS still lands at 144 FPS instead of truncating
+     * to 0 for long stretches.
+     */
+    public int addEatDamage(float rawDamage) {
+        if (rawDamage <= 0f) {
+            return 0;
+        }
+        eatDamageCarry += rawDamage;
+        int damage = (int) eatDamageCarry;
+        eatDamageCarry -= damage;
+        return damage;
+    }
     public boolean isDead() { return state == ZombieState.DEAD || state == ZombieState.DYING; }
     public boolean isAlive() { return currentHP > 0 && !isDead(); }
     public boolean isFrozen() { return chillLevel >= 3; }

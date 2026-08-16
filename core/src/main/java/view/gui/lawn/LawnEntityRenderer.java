@@ -1,7 +1,6 @@
 package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
@@ -16,6 +15,7 @@ import model.game.map.GameMap;
 import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.item.Grave;
+import model.item.GridItem;
 import model.item.Sun;
 import model.enums.GroundType;
 import model.game.map.terrain.IceTerrainStrategy;
@@ -66,6 +66,7 @@ import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -88,6 +89,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class LawnEntityRenderer {
     private static final float NO_PHASE = -1f;
     private static final float HIT_FLASH_SEC = 0.12f;
+    /** Peas drop this much; eat DPS is ~1 HP/frame and must pulse, not stay white. */
+    static final int HIT_FLASH_CHUNK = 8;
+    /** Min gap between chew pulses on plants (~one eat chomp). */
+    static final float CHEW_FLASH_COOLDOWN = 0.65f;
     private static final float ARMOR_POP_FADE = 0.55f;
     private static final float ARMOR_POP_HOP = 1.4f;
     private static final float ARMOR_POP_GRAVITY = -9f;
@@ -196,7 +201,7 @@ public final class LawnEntityRenderer {
     /** Crystal Skull / beam part names that actually exist on the loaded PAM. */
     private String crystalSkullPart;
     private String crystalBeamPart;
-    private final IdentityHashMap<ZombieInstance, HitFlash> hitFlashes = new IdentityHashMap<>();
+    private final IdentityHashMap<Object, HitFlash> hitFlashes = new IdentityHashMap<>();
     /** Body HP has crossed half; {@code particle_arm} already hopped off. */
     private final IdentityHashMap<ZombieInstance, Boolean> lostHands = new IdentityHashMap<>();
     /** Outer-arm part names on the live PAM, cached after the first half-HP pop. */
@@ -207,6 +212,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<ZombieInstance, LiveSnap> lastLive = new IdentityHashMap<>();
     private final IdentityHashMap<Pushable, LiveSnap> lastCabinets = new IdentityHashMap<>();
     private final IdentityHashMap<Cell, LiveSnap> lastTerrainIce = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, LiveSnap> lastPlants = new IdentityHashMap<>();
+    private final IdentityHashMap<Grave, LiveSnap> lastGraves = new IdentityHashMap<>();
     /** World-pixel skull alignment for a thrown Imp; lerped to 0 as it lands. */
     private final IdentityHashMap<ZombieInstance, float[]> tossAlign = new IdentityHashMap<>();
     private final List<BlastFx> prospectorBlasts = new ArrayList<>();
@@ -218,7 +225,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
-    private final Set<Object> seenThisFrame = new HashSet<>();
+    private final Set<Object> seenThisFrame =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private final float[] xyTmp = new float[3];
     private final Matrix4 batchTransform = new Matrix4();
     private final Matrix4 popTransform = new Matrix4();
@@ -226,6 +234,7 @@ public final class LawnEntityRenderer {
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
+    private HitFlashShader hitFlashShader;
     private float snorkelRippleTime;
     private boolean snorkelRippleLoaded;
     private ScreenShake screenShake;
@@ -285,9 +294,11 @@ public final class LawnEntityRenderer {
         lastLive.entrySet().removeIf(e -> !alive.contains(e.getKey()));
 
         drawGraves(batch, model, delta);
+        drawGraveGhosts(batch, delta);
         for (PlantInstance plant : model.getAllPlants()) {
             drawPlant(batch, plant, delta);
         }
+        drawPlantGhosts(batch, model, delta);
         Set<Pushable> liveCabinets = new HashSet<>();
         for (ZombieInstance zombie : model.getZombies()) {
             collectLiveCabinet(zombie.getPushableItem(), liveCabinets);
@@ -330,7 +341,8 @@ public final class LawnEntityRenderer {
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
                 && !plant.isTransformed());
-        hitFlashes.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        hitFlashes.entrySet().removeIf(e ->
+                !seenThisFrame.contains(e.getKey()) && e.getValue().remaining <= 0f);
         lostHands.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         tossAlign.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
         prospectorBlastSpawned.keySet().removeIf(zombie -> !model.getZombies().contains(zombie));
@@ -347,16 +359,22 @@ public final class LawnEntityRenderer {
         }
         Point pos = plant.getPosition();
         if (pos == null) {
+            seenThisFrame.add(plant);
+            tickHitFlash(plant, plantVitality(plant), delta);
             entityOverlay.drawPlant(batch, App.getInstance().getCurrentGameModel(), plant);
             return;
         }
         AnimPose pose = plantAdapter.poseFor(plant);
         if (pose == null) {
+            seenThisFrame.add(plant);
+            tickHitFlash(plant, plantVitality(plant), delta);
             entityOverlay.drawPlant(batch, App.getInstance().getCurrentGameModel(), plant);
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
+                tickHitFlash(plant, plantVitality(plant), delta), delta);
+        lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
 
     private void drawGraves(Batch batch, GameModel model, float delta) {
@@ -394,7 +412,11 @@ public final class LawnEntityRenderer {
         seenThisFrame.add(grave);
         float u = tickGraveEmerge(grave, delta);
         float[] xy = layout.centerOf(row, col);
-        drawSquashStretch(batch, ref, 0f, xy[0], xy[1], AnimScale.PLANT, u, false);
+        float flash = tickHitFlash(grave, grave.getHp(), delta);
+        drawSquashStretch(batch, ref, 0f, xy[0], xy[1], AnimScale.PLANT, u, false, flash);
+        lastGraves.put(grave, new LiveSnap(
+                AnimPose.looping(path, GraveAnim.clipFor(grave), ZombieAnimRole.IDLE),
+                xy[0], xy[1], false, u));
     }
 
     private float tickGraveEmerge(Grave grave, float delta) {
@@ -403,13 +425,62 @@ public final class LawnEntityRenderer {
         return u;
     }
 
+    /** Killing blow removes the plant/grave before draw; hold last pose through the flash. */
+    private void drawPlantGhosts(Batch batch, GameModel model, float delta) {
+        Set<PlantInstance> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        live.addAll(model.getAllPlants());
+        for (PlantInstance plant : new ArrayList<>(lastPlants.keySet())) {
+            if (live.contains(plant)) {
+                continue;
+            }
+            LiveSnap snap = lastPlants.get(plant);
+            float flash = tickHitFlash(plant, 0, delta);
+            if (flash <= 0f || snap == null || snap.pose == null) {
+                lastPlants.remove(plant);
+                continue;
+            }
+            drawPose(batch, plant, snap.pose, snap.x, snap.y, AnimScale.PLANT, NO_PHASE, flash, 0f);
+        }
+    }
+
+    private void drawGraveGhosts(Batch batch, float delta) {
+        for (Grave grave : new ArrayList<>(lastGraves.keySet())) {
+            if (seenThisFrame.contains(grave)) {
+                continue;
+            }
+            LiveSnap snap = lastGraves.get(grave);
+            float flash = tickHitFlash(grave, 0, delta);
+            if (flash <= 0f || snap == null || snap.pose == null) {
+                lastGraves.remove(grave);
+                continue;
+            }
+            ClipRef ref = clips.getOrLoad(snap.pose.pamPath(), snap.pose.clipName());
+            if (ref == null) {
+                lastGraves.remove(grave);
+                continue;
+            }
+            seenThisFrame.add(grave);
+            drawSquashStretch(batch, ref, 0f, snap.x, snap.y, AnimScale.PLANT, snap.time, false,
+                    flash);
+        }
+    }
+
     /** Tomb pop (and wizard plant vanish/emerge). {@code u} 0 is pancake, 1 is rest. */
     private void drawSquashStretch(Batch batch, ClipRef ref, float time,
                                    float x, float y, float baseScale, float u, boolean loop) {
+        drawSquashStretch(batch, ref, time, x, y, baseScale, u, loop, 0f);
+    }
+
+    private void drawSquashStretch(Batch batch, ClipRef ref, float time,
+                                   float x, float y, float baseScale, float u, boolean loop,
+                                   float flash) {
         float sxN = GraveAnim.scaleX(u);
         float syN = GraveAnim.scaleY(u);
         float yPin = y + (syN - 1f) * baseScale * (GraveAnim.CANVAS * 0.5f);
-        player.draw(batch, ref, time, x, yPin, baseScale * sxN, baseScale * syN, loop);
+        float sx = baseScale * sxN;
+        float sy = baseScale * syN;
+        player.draw(batch, ref, time, x, yPin, sx, sy, loop);
+        overlayHitFlash(batch, flash, () -> player.draw(batch, ref, time, x, yPin, sx, sy, loop));
     }
 
     /**
@@ -437,6 +508,7 @@ public final class LawnEntityRenderer {
             return false;
         }
         seenThisFrame.add(plant);
+        float flash = tickHitFlash(plant, plantVitality(plant), delta);
         Point pos = plant.getPosition();
         if (pos == null) {
             sheepFx.remove(plant);
@@ -446,7 +518,7 @@ public final class LawnEntityRenderer {
         preloadWizardSheepening();
         switch (fx.phase) {
             case VANISH -> {
-                if (drawPlantPop(batch, plant, xy[0], xy[1], 1f - popU(fx.time))) {
+                if (drawPlantPop(batch, plant, xy[0], xy[1], 1f - popU(fx.time), flash)) {
                     fx.time += delta;
                     if (fx.time >= GraveAnim.EMERGE_DURATION) {
                         fx.phase = SheepPhase.APPEAR;
@@ -456,13 +528,13 @@ public final class LawnEntityRenderer {
                 }
                 fx.phase = SheepPhase.APPEAR;
                 fx.time = 0f;
-                return drawSheepening(batch, xy[0], xy[1], fx, delta);
+                return drawSheepening(batch, xy[0], xy[1], fx, flash, delta);
             }
             case APPEAR, IDLE, LEAVE -> {
-                return drawSheepening(batch, xy[0], xy[1], fx, delta);
+                return drawSheepening(batch, xy[0], xy[1], fx, flash, delta);
             }
             case EMERGE -> {
-                if (drawPlantPop(batch, plant, xy[0], xy[1], popU(fx.time))) {
+                if (drawPlantPop(batch, plant, xy[0], xy[1], popU(fx.time), flash)) {
                     fx.time += delta;
                     if (fx.time >= GraveAnim.EMERGE_DURATION) {
                         sheepFx.remove(plant);
@@ -481,7 +553,7 @@ public final class LawnEntityRenderer {
     }
 
     private boolean drawPlantPop(Batch batch, PlantInstance plant,
-                                 float x, float y, float u) {
+                                 float x, float y, float u, float flash) {
         AnimPose pose = plantAdapter.poseFor(plant);
         if (pose == null) {
             return false;
@@ -490,11 +562,13 @@ public final class LawnEntityRenderer {
         if (ref == null) {
             return false;
         }
-        drawSquashStretch(batch, ref, 0f, x, y, AnimScale.PLANT * pose.scale(), u, pose.loop());
+        drawSquashStretch(batch, ref, 0f, x, y, AnimScale.PLANT * pose.scale(), u, pose.loop(),
+                flash);
         return true;
     }
 
-    private boolean drawSheepening(Batch batch, float x, float y, SheepFx fx, float delta) {
+    private boolean drawSheepening(Batch batch, float x, float y, SheepFx fx,
+                                   float flash, float delta) {
         PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(WizardAnim.SHEEPENING_PAM);
         if (entry == null) {
             fx.time += delta;
@@ -512,6 +586,8 @@ public final class LawnEntityRenderer {
             return true;
         }
         player.draw(batch, ref, fx.time, x, y, AnimScale.PLANT, AnimScale.PLANT, loop);
+        overlayHitFlash(batch, flash, () ->
+                player.draw(batch, ref, fx.time, x, y, AnimScale.PLANT, AnimScale.PLANT, loop));
         fx.time += delta;
         if (fx.phase == SheepPhase.APPEAR && fx.time >= ref.duration) {
             fx.phase = SheepPhase.IDLE;
@@ -676,7 +752,8 @@ public final class LawnEntityRenderer {
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE, damage);
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
         float x = xy[0] + arcadeArmPushDeltaX(cabinet);
-        float time = drawPose(batch, cabinet, pose, x, xy[1], AnimScale.PLANT, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, cabinet, pose, x, xy[1], AnimScale.PLANT, NO_PHASE,
+                tickHitFlash(cabinet, itemHp(cabinet), delta), delta);
         lastCabinets.put(cabinet, new LiveSnap(pose, x, xy[1], false, time));
     }
 
@@ -700,7 +777,8 @@ public final class LawnEntityRenderer {
         }
         String clip = catalog.resolveClip(entry, "idle");
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
-        float time = drawPose(batch, ice, pose, x, xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, ice, pose, x, xy[1], AnimScale.ZOMBIE, NO_PHASE,
+                tickHitFlash(ice, itemHp(ice), delta), delta);
         lastCabinets.put(ice, new LiveSnap(pose, x, xy[1], false, time));
     }
 
@@ -757,7 +835,8 @@ public final class LawnEntityRenderer {
         preloadIceBreak();
         String clip = catalog.resolveClip(entry, "idle");
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
-        float time = drawPose(batch, cell, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, cell, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE,
+                tickHitFlash(cell, ice.getHp(), delta), delta);
         lastTerrainIce.put(cell, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
 
@@ -841,7 +920,8 @@ public final class LawnEntityRenderer {
             x = xy[0];
             y = xy[1];
         }
-        float time = drawPose(batch, piano, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, piano, pose, x, y, AnimScale.ZOMBIE, NO_PHASE,
+                tickHitFlash(piano, itemHp(piano), delta), delta);
         lastCabinets.put(piano, new LiveSnap(pose, x, y, false, time));
     }
 
@@ -863,7 +943,8 @@ public final class LawnEntityRenderer {
         LiveSnap leftover = lastCabinets.get(barrel);
         if (leftover != null && leftover.pose != null
                 && BarrelRollerAnim.isPusherPam(leftover.pose.pamPath())) {
-            drawBarrelParts(batch, leftover);
+            seenThisFrame.add(barrel);
+            drawBarrelParts(batch, leftover, tickHitFlash(barrel, itemHp(barrel), delta));
             lastCabinets.put(barrel, leftover);
             return;
         }
@@ -875,7 +956,8 @@ public final class LawnEntityRenderer {
         String clip = catalog.resolveClip(entry, "roll");
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        float time = drawPose(batch, barrel, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        float time = drawPose(batch, barrel, pose, xy[0], xy[1], AnimScale.ZOMBIE, NO_PHASE,
+                tickHitFlash(barrel, itemHp(barrel), delta), delta);
         lastCabinets.put(barrel, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
 
@@ -920,7 +1002,15 @@ public final class LawnEntityRenderer {
     }
 
     /** Whitelist barrel PAM parts so the pusher body never draws on the leftover. */
-    private void drawBarrelParts(Batch batch, LiveSnap leftover) {
+    private void drawBarrelParts(Batch batch, LiveSnap leftover, float flash) {
+        if (leftover == null || leftover.pose == null) {
+            return;
+        }
+        paintBarrelParts(batch, leftover);
+        overlayHitFlash(batch, flash, () -> paintBarrelParts(batch, leftover));
+    }
+
+    private void paintBarrelParts(Batch batch, LiveSnap leftover) {
         if (leftover == null || leftover.pose == null) {
             return;
         }
@@ -1060,9 +1150,8 @@ public final class LawnEntityRenderer {
             return;
         }
         String clip = firstLoadedClip(pam, "death", snap.pose.clipName());
-        deathFx.add(new DeathFx(
-                AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
-                snap.x, snap.y));
+        addFlashingDeath(AnimPose.once(pam, clip, ZombieAnimRole.DIE, snap.pose.visibility()),
+                snap.x, snap.y);
     }
 
     private void preloadIceBreak() {
@@ -1085,9 +1174,8 @@ public final class LawnEntityRenderer {
             return;
         }
         String clip = catalog.resolveClip(entry, "animation");
-        deathFx.add(new DeathFx(
-                AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
-                snap.x, snap.y));
+        addFlashingDeath(AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
+                snap.x, snap.y);
     }
 
     private void spawnBarrelBreak(LiveSnap snap) {
@@ -1106,9 +1194,14 @@ public final class LawnEntityRenderer {
             x = xy[0];
             y = xy[1];
         }
-        deathFx.add(new DeathFx(
-                AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
-                x, y));
+        addFlashingDeath(AnimPose.once(entry.path(), clip, ZombieAnimRole.DIE, null),
+                x, y);
+    }
+
+    private void addFlashingDeath(AnimPose pose, float x, float y) {
+        DeathFx fx = new DeathFx(pose, x, y);
+        fx.hitFlash = HIT_FLASH_SEC;
+        deathFx.add(fx);
     }
 
     private float[] barrelWorldCenter(LiveSnap snap) {
@@ -1299,6 +1392,7 @@ public final class LawnEntityRenderer {
         captureOctopusRelease(zombie, pose, x, y, time);
         maybeDrawCrystalSkullBeam(batch, pose, x, y, time);
         syncBarrelFront(zombie, pose, time);
+        flashPushedBarrel(batch, zombie, delta);
     }
 
     /** Art-measured tiles from zombie origin to the barrel centre. */
@@ -1317,6 +1411,22 @@ public final class LawnEntityRenderer {
         float localCenterX = bounds.x + bounds.width * 0.5f;
         float tiles = -localCenterX * AnimScale.ZOMBIE * pose.scale() / layout.cellWidth();
         push.setBarrelFrontOffsetTiles(tiles);
+    }
+
+    /** Barrel art rides the pusher PAM; additive-flash just those parts when the barrel is hit. */
+    private void flashPushedBarrel(Batch batch, ZombieInstance zombie, float delta) {
+        if (zombie.isDead()
+                || !(zombie.getPushableItem() instanceof Barrel barrel)
+                || barrel.isDestroyed()) {
+            return;
+        }
+        seenThisFrame.add(barrel);
+        float flash = tickHitFlash(barrel, itemHp(barrel), delta);
+        LiveSnap snap = lastLive.get(zombie);
+        if (snap == null) {
+            return;
+        }
+        overlayHitFlash(batch, flash, () -> paintBarrelParts(batch, snap));
     }
 
     /** Kick the EFFECTS PAM load during {@code power_up} so {@code laser_beam} is ready at 0.63s. */
@@ -1772,6 +1882,9 @@ public final class LawnEntityRenderer {
                 : OctopusAnim.LOOP_CLIP;
         boolean loop = !fx.dying && OctopusAnim.LOOP_CLIP.equals(clip);
         ClipRef ref = clips.getOrLoad(path, clip);
+        seenThisFrame.add(fx);
+        int coatHp = plant.hasOctopusCoating() ? plant.getIceHp() : 0;
+        float flash = tickHitFlash(fx, coatHp, delta);
         if (ref == null) {
             fx.time += delta;
             return !fx.dying;
@@ -1780,6 +1893,8 @@ public final class LawnEntityRenderer {
                 ? Math.max(0f, fx.time - impactDuration(path))
                 : fx.time;
         player.draw(batch, ref, clipTime, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, loop);
+        overlayHitFlash(batch, flash,
+                () -> player.draw(batch, ref, clipTime, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, loop));
         fx.time += delta;
         if (fx.dying && fx.time >= ref.duration) {
             return false;
@@ -2010,14 +2125,9 @@ public final class LawnEntityRenderer {
             stateTime = Math.max(0f, ref.duration - Math.min(stateTime, ref.duration));
         }
         float scale = baseScale * pose.scale();
-        drawClip(batch, ref, pose, stateTime, x, y, scale);
-        if (flash > 0f) {
-            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
-            batch.setColor(1f, 1f, 1f, flash);
-            drawClip(batch, ref, pose, stateTime, x, y, scale);
-            batch.setColor(Color.WHITE);
-            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        }
+        float drawTime = stateTime;
+        drawClip(batch, ref, pose, drawTime, x, y, scale);
+        overlayHitFlash(batch, flash, () -> drawClip(batch, ref, pose, drawTime, x, y, scale));
         return stateTime;
     }
 
@@ -2031,19 +2141,30 @@ public final class LawnEntityRenderer {
         }
     }
 
-    /** White additive flash while body or armor HP dropped since last frame. */
+    /** White additive flash while HP dropped since last frame. */
     private float tickHitFlash(ZombieInstance zombie, float delta) {
-        int vitality = vitality(zombie);
-        HitFlash flash = hitFlashes.get(zombie);
+        return tickHitFlash(zombie, vitality(zombie), delta);
+    }
+
+    private float tickHitFlash(Object entity, int vitality, float delta) {
+        HitFlash flash = hitFlashes.get(entity);
         if (flash == null) {
             flash = new HitFlash();
             flash.vitality = vitality;
-            hitFlashes.put(zombie, flash);
+            hitFlashes.put(entity, flash);
         } else {
-            if (vitality < flash.vitality) {
+            boolean chewGate = entity instanceof PlantInstance;
+            if (shouldRestartHitFlash(flash.vitality, vitality, flash.remaining,
+                    chewGate ? flash.quiet : 0f)) {
                 flash.remaining = HIT_FLASH_SEC;
+                if (chewGate) {
+                    flash.quiet = CHEW_FLASH_COOLDOWN;
+                }
             }
             flash.vitality = vitality;
+            if (chewGate) {
+                flash.quiet = Math.max(0f, flash.quiet - delta);
+            }
         }
         if (flash.remaining <= 0f) {
             return 0f;
@@ -2051,6 +2172,39 @@ public final class LawnEntityRenderer {
         float strength = flash.remaining / HIT_FLASH_SEC;
         flash.remaining -= delta;
         return strength;
+    }
+
+    /** Chew ticks are 1 HP; peas restart immediately. Plants also wait {@code quiet}. */
+    static boolean shouldRestartHitFlash(int prevHp, int hp, float remaining, float quiet) {
+        if (hp >= prevHp) {
+            return false;
+        }
+        if (prevHp - hp >= HIT_FLASH_CHUNK) {
+            return true;
+        }
+        return remaining <= 0f && quiet <= 0f;
+    }
+
+    private void overlayHitFlash(Batch batch, float flash, Runnable draw) {
+        if (flash <= 0f) {
+            return;
+        }
+        hitFlashShader().begin(batch, flash);
+        draw.run();
+        hitFlashShader().end(batch);
+    }
+
+    /** Plant HP, plus hunter-ice coating when that ice has no octopus overlay. */
+    static int plantVitality(PlantInstance plant) {
+        int hp = plant.getCurrentHP();
+        if (plant.isFrozen() && !plant.hasOctopusCoating()) {
+            hp += plant.getIceHp();
+        }
+        return hp;
+    }
+
+    static int itemHp(Pushable item) {
+        return item instanceof GridItem grid ? grid.getHp() : 0;
     }
 
     private static int vitality(ZombieInstance zombie) {
@@ -2221,6 +2375,8 @@ public final class LawnEntityRenderer {
     private static final class HitFlash {
         int vitality;
         float remaining;
+        /** Seconds before a chew-sized drop may pulse again (plants only). */
+        float quiet;
         List<Armor> prevDroppables;
     }
 
@@ -2283,6 +2439,7 @@ public final class LawnEntityRenderer {
         float time;
         float drownWaterY = Float.NaN;
         float snorkelRise;
+        float hitFlash;
 
         DeathFx(AnimPose pose, float x, float y) {
             this(pose, x, y, false);
@@ -2845,7 +3002,11 @@ public final class LawnEntityRenderer {
             if (clipBody) {
                 drownShader().end(batch);
             }
+            float hit = fx.hitFlash / HIT_FLASH_SEC;
+            overlayHitFlash(batch, hit * alpha,
+                    () -> drawClip(batch, ref, fx.pose, time, fx.x, fx.y, scale));
             batch.setColor(Color.WHITE);
+            fx.hitFlash = Math.max(0f, fx.hitFlash - delta);
             fx.time += delta;
         }
     }
@@ -2855,6 +3016,13 @@ public final class LawnEntityRenderer {
             drownShader = new FishermanDrownShader();
         }
         return drownShader;
+    }
+
+    private HitFlashShader hitFlashShader() {
+        if (hitFlashShader == null) {
+            hitFlashShader = new HitFlashShader();
+        }
+        return hitFlashShader;
     }
 
     private void drawSnorkelRipple(Batch batch, AnimPose pose, ClipRef body, float time,

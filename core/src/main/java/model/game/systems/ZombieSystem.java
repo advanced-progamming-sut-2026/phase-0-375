@@ -306,7 +306,7 @@ public class ZombieSystem implements Tickable {
         float eatDPS = zombie.getDefinition().getEatDPS();
         eatDPS *= getEatDamageScale(zombie);
         eatDPS *= gameModel.difficultyBoost();
-        return (int) (eatDPS * deltaTime);
+        return zombie.addEatDamage(eatDPS * deltaTime);
     }
 
     /** Bites the plant on the tile whose facing border the zombie has stepped onto. */
