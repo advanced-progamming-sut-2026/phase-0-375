@@ -73,16 +73,6 @@ public final class AnimPose {
         return new AnimPose(pamPath, clipName, role, false, null);
     }
 
-    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
-                                   Map<String, Boolean> visibility) {
-        return new AnimPose(pamPath, clipName, role, false, visibility);
-    }
-
-    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
-                                   String... visibleParts) {
-        return new AnimPose(pamPath, clipName, role, false, PamVisibility.show(visibleParts));
-    }
-
     /**
      * Copy of this pose with additional PAM parts forced visible
      * (merged onto any existing visibility map).
