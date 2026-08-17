@@ -85,7 +85,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         int rows = model != null ? model.getMap().getRows() : LawnLayout.DEFAULT_ROWS;
         int cols = model != null ? model.getMap().getCols() : LawnLayout.DEFAULT_COLS;
         lawnLayout = new LawnLayout(rows, cols);
-        lawnBackground = new LawnBackgroundRenderer(assets.textures);
+        lawnBackground = new LawnBackgroundRenderer(assets.textures, LawnBackgroundRenderer.Style.FRONT_LAWN);
         lawnBackground.ensureLoaded();
         waterUnderlayer = new WaterUnderlayerRenderer(assets, lawnLayout);
 

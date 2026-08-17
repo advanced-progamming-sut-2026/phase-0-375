@@ -65,7 +65,7 @@ public final class WaterUnderlayerRenderer {
         float scale = scaleForHeight(clipHeight());
         float target = drawCenterX(layout, n, localLeft(), clipWidth(), scale);
         if (Float.isNaN(drawX)) {
-            drawX = drawCenterX(layout, 0, localLeft(), clipWidth(), scale);
+            drawX = drawCenterX(layout, n, localLeft(), clipWidth(), scale);
         }
         float dt = Math.max(0f, delta);
         drawX = moveToward(drawX, target, layout.cellWidth() / SLIDE_SECONDS_PER_TILE * dt);

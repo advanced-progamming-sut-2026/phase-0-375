@@ -1,5 +1,6 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
@@ -18,6 +19,7 @@ import model.plant.definition.Plant;
 import model.user.User;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.theme.AdventureTheme;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.SelectableMenuCard;
@@ -92,7 +94,7 @@ public final class PlantSelectionScreen extends AbstractMenuScreen {
                 CommandResult<Void> r = controller.startGame();
                 showToast(r.getMessage(), !r.isSuccess());
                 if (r.isSuccess()) {
-                    game.setScreen(new GameplayStubScreen(game));
+                    game.setScreen(openGameplay(game));
                 }
             }
         });
@@ -224,6 +226,17 @@ public final class PlantSelectionScreen extends AbstractMenuScreen {
     private static Level currentLevel() {
         GameModel model = App.getInstance().getCurrentGameModel();
         return model == null ? null : model.getCurrentLevel();
+    }
+
+    private static Screen openGameplay(PvzGdxGame game) {
+        Level level = currentLevel();
+        Chapter chapter = level == null || level.getConfig() == null
+                ? null
+                : level.getConfig().getChapter();
+        if (LawnBackgroundRenderer.Style.forChapter(chapter) != LawnBackgroundRenderer.Style.FRONT_LAWN) {
+            return new GameplayScreen(game);
+        }
+        return new GameplayStubScreen(game);
     }
 
     private static void clearTransientGame() {

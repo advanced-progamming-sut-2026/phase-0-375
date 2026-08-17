@@ -86,7 +86,7 @@ public class GameMenuController extends AppMenuController {
             if (!registry.hasLevel(chapter, levelId)) {
                 return CommandResult.errorTyped("Level " + levelId + " does not exist in " + chapter + ".");
             }
-            if (levelId > nextLevelId) {
+            if (levelId > nextLevelId && !debugUnlocksAll(user)) {
                 return CommandResult.errorTyped("Level " + levelId + " is locked. Beat level "
                         + (nextLevelId - 1) + " first (next unlocked: " + nextLevelId + ").");
             }
@@ -206,7 +206,7 @@ public class GameMenuController extends AppMenuController {
             summaries.add(new LevelSummary(
                     id,
                     config.getLevelType(),
-                    id <= nextLevelId,
+                    id <= nextLevelId || debugUnlocksAll(user),
                     id <= completed));
         }
         return CommandResult.successWithData("Levels loaded.", summaries);
@@ -342,7 +342,9 @@ public class GameMenuController extends AppMenuController {
     }
 
     private boolean isChapterUnlocked(User user, Chapter chapter) {
-        if (chapter == Chapter.ANCIENT_EGYPT) return true;
+        if (debugUnlocksAll(user) || chapter == Chapter.ANCIENT_EGYPT) {
+            return true;
+        }
         Chapter[] chapters = Chapter.values();
         for (int i = 1; i < chapters.length; i++) {
             if (chapters[i] == chapter) {
@@ -352,5 +354,9 @@ public class GameMenuController extends AppMenuController {
             }
         }
         return false;
+    }
+
+    private static boolean debugUnlocksAll(User user) {
+        return user != null && user.isDebugMode();
     }
 }

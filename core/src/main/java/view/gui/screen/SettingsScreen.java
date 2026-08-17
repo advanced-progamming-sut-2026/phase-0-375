@@ -125,7 +125,7 @@ public final class SettingsScreen extends AbstractMenuScreen {
         });
         card.add(lawnGrid).left().padBottom(8f).row();
 
-        debugMode = new CheckBox(" Debug mode (coins / gems / sun / plant food cheats)", skin);
+        debugMode = new CheckBox(" Debug mode (all levels / coins / gems / sun / plant food cheats)", skin);
         debugMode.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
