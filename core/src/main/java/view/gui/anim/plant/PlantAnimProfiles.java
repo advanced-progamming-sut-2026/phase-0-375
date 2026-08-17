@@ -27,6 +27,7 @@ public final class PlantAnimProfiles {
         HypnoShroomAnim.register(overrides);
         ImitaterAnim.register(overrides);
         LilyPadAnim.register(overrides);
+        MintAnim.register(overrides);
         // TODO: SunshroomAnim.register(overrides);
         // TODO: PotatoMineAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);

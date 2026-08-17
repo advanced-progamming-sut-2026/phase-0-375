@@ -222,6 +222,9 @@ public class PlantSystem implements Tickable {
 
             for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                 if (plant.getDefinition().getCategory() == family) {
+                    if (PlantInstance.isMint(plant.getDefinition())) {
+                        continue;
+                    }
                     plant.activatePlantFood(this);
                     if (resetCooldowns) {
                         // Clear every ability cooldown on this plant.

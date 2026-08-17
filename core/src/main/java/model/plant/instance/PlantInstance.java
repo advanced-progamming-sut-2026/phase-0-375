@@ -32,6 +32,7 @@ public class PlantInstance implements Placeable {
     private float currentRecharge;                     // seconds remaining before the seed is available again
     private boolean isPlantFoodActive;
     private float lifespanRemaining;                   // -1 = infinite
+    private float lifespanTotal;                       // >0 when a finite stay was scheduled (mints)
     private float plantFoodDurationRemaining;
     private boolean pendingPlantFoodEffect;
     private PlantAction activeAction; // Multi-tick ability sequence (attack anim, windup, …); at most one.
@@ -59,6 +60,7 @@ public class PlantInstance implements Placeable {
         this.activeAction = null;
         this.actionEpoch = 0;
         this.lifespanRemaining = -1f;
+        this.lifespanTotal = 0f;
         this.abilityStates = new EnumMap<>(PlantAbilityType.class);
         this.freezeHitCount = 0;
         this.stateBeforeFreeze = null;
@@ -93,6 +95,17 @@ public class PlantInstance implements Placeable {
                 this.currentHP = 300;
             }
         }
+        if (isMint(definition)) {
+            if (this.currentHP <= 0) {
+                this.currentHP = MINT_BASE_HP;
+            }
+            float stay = definition.getAbilityValue();
+            if (stay <= 0f) {
+                stay = MINT_DEFAULT_DURATION;
+            }
+            this.lifespanRemaining = stay;
+            this.lifespanTotal = stay;
+        }
     }
 
     /** @return true if the given definition represents an Imitater. */
@@ -107,6 +120,12 @@ public class PlantInstance implements Placeable {
     public static final float IMITATER_TRANSFORM_DELAY = 1.5f; // Matches IMITATER attack clip
     public static final float SHROOM_BASE_LIFESPAN = 60.0f; // Base lifespan for non-warm-up shrooms.
     public static final float PLANT_FOOD_DURATION = 5.0f;
+    public static final int MINT_BASE_HP = 300;
+    public static final float MINT_DEFAULT_DURATION = 10.0f;
+
+    public static boolean isMint(Plant def) {
+        return def != null && def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST;
+    }
 
     // --- Tick ---
     /** Advances this plant by one game tick. */
@@ -121,6 +140,9 @@ public class PlantInstance implements Placeable {
         tickRecharge(deltaTime);
         tickPlantFood(deltaTime);
         tickLifespan(deltaTime, context);
+        if (state == PlantState.DYING) {
+            return;
+        }
         tickAbilityCooldowns(deltaTime);
         if (pendingPlantFoodEffect) {
             pendingPlantFoodEffect = false;
@@ -192,6 +214,9 @@ public class PlantInstance implements Placeable {
     private boolean canAct() {
         if (state == PlantState.STUNNED || transformCountdown >= 0f ||
             state == PlantState.PLANT_FOOD) return false;
+        if (isMint(definition) && mintBoostConsumed()) {
+            return false;
+        }
         Plant def = definition;
         if (def.getActionInterval() <= 0) {
             return true;
@@ -206,10 +231,25 @@ public class PlantInstance implements Placeable {
 
         PlantAction action = strategy.beginAction(this, context);
         applyAbilityCooldown(strategy);
+        if (isMint(definition)) {
+            markMintBoostConsumed();
+        }
 
         if (action != null) {
             activeAction = action;
             activeAction.start(this, context);
+        }
+    }
+
+    private boolean mintBoostConsumed() {
+        AbilityState state = abilityStates.get(definition.getAbilityType());
+        return state != null && state.isArmed();
+    }
+
+    private void markMintBoostConsumed() {
+        AbilityState state = abilityStates.get(definition.getAbilityType());
+        if (state != null) {
+            state.setArmed(true);
         }
     }
 
@@ -367,6 +407,12 @@ public class PlantInstance implements Placeable {
                 break;
             case DURATION_EXT:
                 plantFoodDurationRemaining += upgrade.getValue();
+                if (lifespanRemaining > 0f) {
+                    lifespanRemaining += upgrade.getValue();
+                    if (lifespanTotal > 0f) {
+                        lifespanTotal += upgrade.getValue();
+                    }
+                }
                 break;
             default:
                 break;
@@ -529,6 +575,8 @@ public class PlantInstance implements Placeable {
     public Map<PlantAbilityType, AbilityState> getAbilityStates() { return abilityStates; }
     public AbilityState getAbilityState(PlantAbilityType type) { return abilityStates.get(type); }
     public float getPlantFoodDurationRemaining() { return plantFoodDurationRemaining; }
+    public float getLifespanRemaining() { return lifespanRemaining; }
+    public float getLifespanTotal() { return lifespanTotal; }
     public boolean isPlantFoodActive() { return isPlantFoodActive; }
     public int getActionEpoch() { return actionEpoch; }
     public boolean hasActiveAction() { return activeAction != null; }
