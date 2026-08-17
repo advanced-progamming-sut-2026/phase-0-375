@@ -220,11 +220,13 @@ public class PlantSystem implements Tickable {
                 }
             }
 
+            PlantInstance mint = currentPlant;
             for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
                 if (plant.getDefinition().getCategory() == family) {
                     if (PlantInstance.isMint(plant.getDefinition())) {
                         continue;
                     }
+                    setCurrentPlant(plant);
                     plant.activatePlantFood(this);
                     if (resetCooldowns) {
                         // Clear every ability cooldown on this plant.
@@ -235,6 +237,7 @@ public class PlantSystem implements Tickable {
                     }
                 }
             }
+            setCurrentPlant(mint);
         }
 
         /** @return true if the plant has the RESET_FAMILY_COOLDOWNS upgrade. */
