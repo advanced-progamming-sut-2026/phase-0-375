@@ -256,8 +256,7 @@ public class HomingAbility implements PlantAbility {
                 allZombies.remove(randomZombieIndex);
                 continue;
             }
-            randomZombie.setState(ZombieState.HYPNOTIZED);
-            randomZombie.setMovingBackward(true);
+            randomZombie.hypnotise();
             count--;
         }
     }

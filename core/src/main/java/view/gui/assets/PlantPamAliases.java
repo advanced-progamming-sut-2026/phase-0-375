@@ -20,6 +20,8 @@ public final class PlantPamAliases {
         m.put("Fume-shroom", "FUMESHROOM");
         m.put("Ice-shroom", "ICESHROOM");
         m.put("Hypno-shroom", "HYPNOSHROOM");
+        m.put("Torchwood", "TORCHWOOD");
+        m.put("Imitater", "IMITATER");
         m.put("Caulipower", "CAULIPOWER");
         m.put("Electric Blueberry", "ELECTRICBLUEBERRY");
         m.put("Magnet-shroom", "MAGNETSHROOM");

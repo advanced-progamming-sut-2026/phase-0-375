@@ -23,6 +23,10 @@ public final class PlantAnimProfiles {
         KernelPultAnim.register(overrides);
         MagnetShroomAnim.register(overrides);
         CaulipowerAnim.register(overrides);
+        TorchwoodAnim.register(overrides);
+        HypnoShroomAnim.register(overrides);
+        ImitaterAnim.register(overrides);
+        LilyPadAnim.register(overrides);
         // TODO: SunshroomAnim.register(overrides);
         // TODO: PotatoMineAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);

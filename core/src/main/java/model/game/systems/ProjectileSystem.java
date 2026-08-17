@@ -297,38 +297,59 @@ public class ProjectileSystem implements Tickable {
 
     /**
      * Modifier hook for {@code Torchwood}: if the given projectile is a
-     * straight-line pea ({@link Pellet}) that is not already FIRE-aligned
-     * and its current tile is occupied by a Torchwood, the pea is ignited
-     * (its element becomes {@link Projectile.Element#FIRE}) and its damage
-     * is multiplied by the Torchwood's {@code abilityValue}.
+     * straight-line pea ({@link Pellet}) on a tile occupied by a Torchwood,
+     * the pea is ignited ({@link Projectile.Element#FIRE}), its damage is
+     * multiplied (2×, or 3× blue flame during plant-food), and ice it later
+     * crosses will melt.
      */
     private void applyTorchwood(Projectile projectile) {
         if (!(projectile instanceof Pellet)) return;
-        if (projectile.isFire()) return;
         if (projectile.isReflected()) return;
+        if (projectile.isTorchwoodBoosted()) return;
 
         int row = projectile.getRow();
         int col = (int) Math.floor(projectile.getX());
         if (col < 0 || col >= gameModel.getColumnCount()) return;
 
-        PlantInstance plant = gameModel.getPlantAt(row, col);
+        PlantInstance plant = findTorchwood(row, col);
         if (plant == null) return;
         Plant def = plant.getDefinition();
         if (def == null) return;
-        if (def.getCategory() != PlantCategory.MODIFIER) return;
-        if (!def.hasTag(PlantTags.FIRE)) return;
 
-        // Ignite the pea
-        projectile.setElement(Projectile.Element.FIRE);
-
-        // Boost damage by the Torchwood's ability value
-        float multiplier = def.getAbilityValue();
-        if (plant.getAbilityStrategy() instanceof ModifierAbility) {
-            multiplier = ((ModifierAbility) plant.getAbilityStrategy()).getTorchwoodDamageMultiplier();
+        float multiplier = DEFAULT_TORCHWOOD_MULTIPLIER;
+        boolean blueFlame = false;
+        if (plant.getAbilityStrategy() instanceof ModifierAbility modifier) {
+            multiplier = modifier.getTorchwoodDamageMultiplier(plant);
+            blueFlame = modifier.isBlueFlameActive(plant);
+        } else if (def.getAbilityValue() > 0f) {
+            multiplier = def.getAbilityValue();
         }
-        if (multiplier <= 0f) multiplier = 2.0f;
+        if (multiplier <= 0f) multiplier = DEFAULT_TORCHWOOD_MULTIPLIER;
+
+        projectile.setElement(Projectile.Element.FIRE);
+        projectile.setBlueFire(blueFlame);
         int boosted = Math.max(projectile.getDamage(), Math.round(projectile.getDamage() * multiplier));
         projectile.setDamage(boosted);
+        projectile.setTorchwoodBoosted(true);
+    }
+
+    private static final float DEFAULT_TORCHWOOD_MULTIPLIER = 2f;
+
+    private PlantInstance findTorchwood(int row, int col) {
+        for (PlantInstance plant : gameModel.getAllPlantsAt(row, col)) {
+            if (isTorchwood(plant)) {
+                return plant;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isTorchwood(PlantInstance plant) {
+        if (plant == null) return false;
+        Plant def = plant.getDefinition();
+        if (def == null) return false;
+        if (def.getCategory() != PlantCategory.MODIFIER) return false;
+        return def.hasTag(PlantTags.FIRE);
     }
 
     // --- Collision ---
@@ -518,8 +539,7 @@ public class ProjectileSystem implements Tickable {
         if (source != null
                 && source.getCategory() == PlantCategory.HOMING
                 && source.hasTag(PlantTags.MAGIC)) {
-            zombie.setState(ZombieState.HYPNOTIZED);
-            zombie.setMovingBackward(true);
+            zombie.hypnotise();
         }
     }
 

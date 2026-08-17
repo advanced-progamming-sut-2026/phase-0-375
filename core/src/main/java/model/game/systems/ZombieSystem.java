@@ -300,6 +300,9 @@ public class ZombieSystem implements Tickable {
                             int row, int col, float deltaTime) {
         PlantInstance plant = context.getPlantAt(row, col);
         if (plant == null || plant.getCurrentHP() <= 0 || plant.isTransformed()) {
+            if (plant != null && plant.getCurrentHP() <= 0 && plant.isHypnoShroom()) {
+                hypnotise(zombie);
+            }
             if (zombie.isEating()) {
                 zombie.stopEating();
             }
@@ -334,7 +337,7 @@ public class ZombieSystem implements Tickable {
         }
 
         if (plant.getCurrentHP() <= 0) {
-            if (isHypnoShroom(plant)) {
+            if (plant.isHypnoShroom()) {
                 hypnotise(zombie);
             }
             zombie.stopEating();
@@ -387,21 +390,10 @@ public class ZombieSystem implements Tickable {
         return new GameModelAbilityContext(gameModel);
     }
 
-    /** @return true if the given plant is a Hypno-shroom. */
-    private boolean isHypnoShroom(PlantInstance plant) {
-        if (plant == null) return false;
-        model.plant.definition.Plant def = plant.getDefinition();
-        if (def == null) return false;
-        if (def.getCategory() != model.enums.PlantCategory.MODIFIER) return false;
-        String name = def.getName();
-        return name != null && name.toLowerCase().contains("hypno");
-    }
-
     /** Hypnotizes a zombie. */
     private void hypnotise(ZombieInstance zombie) {
         if (zombie == null) return;
-        zombie.setState(ZombieState.HYPNOTIZED);
-        zombie.setMovingBackward(true);
+        zombie.hypnotise();
         if (eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.STATUS_APPLIED));
         }

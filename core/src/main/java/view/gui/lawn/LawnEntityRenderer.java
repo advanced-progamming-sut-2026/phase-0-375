@@ -3,6 +3,7 @@ package view.gui.lawn;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Matrix4;
 import model.app.App;
+import model.enums.PlacableLayer;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
@@ -20,8 +21,10 @@ import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,7 +34,6 @@ import java.util.Set;
  * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
  *
  * <p>TODO: plant-food FX, mowers, and grid props.
- * TODO: sort draw order by row (back → front) then Y within a lane.
  * TODO: tint / freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
@@ -80,7 +82,11 @@ public final class LawnEntityRenderer {
         }
         seenThisFrame.clear();
 
-        for (PlantInstance plant : model.getAllPlants()) {
+        // GROUND (Lily Pad) behind MAIN, OVERLAY (Pumpkin) in front;
+        // back rows before front rows so nearer plants occlude.
+        List<PlantInstance> plants = new ArrayList<>(model.getAllPlants());
+        plants.sort(LawnEntityRenderer::compareDrawOrder);
+        for (PlantInstance plant : plants) {
             drawPlant(batch, plant, delta);
         }
         for (ZombieInstance zombie : model.getZombies()) {
@@ -197,6 +203,28 @@ public final class LawnEntityRenderer {
         if (useBatch) {
             batch.setTransformMatrix(batchTransform);
         }
+    }
+
+    /**
+     * Back rows first, then layer: GROUND → MAIN → OVERLAY.
+     */
+    private static int compareDrawOrder(PlantInstance a, PlantInstance b) {
+        int rowA = rowOf(a);
+        int rowB = rowOf(b);
+        if (rowA != rowB) {
+            return Integer.compare(rowA, rowB);
+        }
+        return Integer.compare(layerOrdinal(a), layerOrdinal(b));
+    }
+
+    private static int rowOf(PlantInstance plant) {
+        Point pos = plant == null ? null : plant.getPosition();
+        return pos == null ? 0 : pos.getY();
+    }
+
+    private static int layerOrdinal(PlantInstance plant) {
+        PlacableLayer layer = plant == null ? null : plant.getLayer();
+        return layer == null ? PlacableLayer.MAIN.ordinal() : layer.ordinal();
     }
 
     private float advanceClock(Object entity, String clipKey, float delta) {

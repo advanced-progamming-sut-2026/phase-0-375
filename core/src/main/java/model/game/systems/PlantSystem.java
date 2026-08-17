@@ -43,6 +43,9 @@ public class PlantSystem implements Tickable {
             if (plant.getState() == PlantState.DYING) continue;
             context.setCurrentPlant(plant); // attribute this tick's damage/projectiles
             plant.tick(deltaTime, context);
+            if (plant.isImitating()) {
+                continue;
+            }
             if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING) {
                 // Explode-o-nut: trigger the death explosion before
                 // removing the plant from the field.

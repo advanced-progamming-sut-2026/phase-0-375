@@ -89,11 +89,14 @@ public class PlantInstance implements Placeable {
         this.transformCountdown = -1f;
         if (isImitater(definition)) {
             this.transformCountdown = IMITATER_TRANSFORM_DELAY;
+            if (this.currentHP <= 0) {
+                this.currentHP = 300;
+            }
         }
     }
 
     /** @return true if the given definition represents an Imitater. */
-    private static boolean isImitater(Plant def) {
+    public static boolean isImitater(Plant def) {
         return def != null
                 && def.getCategory() == PlantCategory.MODIFIER
                 && def.getAbilityType() == PlantAbilityType.MODIFIER_UTILITY
@@ -101,7 +104,7 @@ public class PlantInstance implements Placeable {
                 && def.getName().toLowerCase().contains("imitat");
     }
 
-    public static final float IMITATER_TRANSFORM_DELAY = 1.0f; // Default delay before it morphs into its target
+    public static final float IMITATER_TRANSFORM_DELAY = 1.5f; // Matches IMITATER attack clip
     public static final float SHROOM_BASE_LIFESPAN = 60.0f; // Base lifespan for non-warm-up shrooms.
     public static final float PLANT_FOOD_DURATION = 5.0f;
 
@@ -510,6 +513,7 @@ public class PlantInstance implements Placeable {
         }
         this.abilityStrategy = null;
         this.imitateTarget = null;
+        bumpActionEpoch();
         if (newDefinition.isShroom() && !isImitater(newDefinition)) {
             this.lifespanRemaining = SHROOM_BASE_LIFESPAN;
         } else {
@@ -525,8 +529,25 @@ public class PlantInstance implements Placeable {
     public Map<PlantAbilityType, AbilityState> getAbilityStates() { return abilityStates; }
     public AbilityState getAbilityState(PlantAbilityType type) { return abilityStates.get(type); }
     public float getPlantFoodDurationRemaining() { return plantFoodDurationRemaining; }
+    public boolean isPlantFoodActive() { return isPlantFoodActive; }
     public int getActionEpoch() { return actionEpoch; }
     public boolean hasActiveAction() { return activeAction != null; }
+    /** @return true while an Imitater is still counting down to morph. */
+    public boolean isImitating() { return transformCountdown >= 0f; }
+    /** @return true if this instance is a Hypno-shroom (eaten → hypnotize). */
+    public boolean isHypnoShroom() {
+        Plant def = definition;
+        if (def == null) return false;
+        String name = def.getName();
+        if (name != null && name.toLowerCase().contains("hypno")) {
+            return true;
+        }
+        return def.getCategory() == PlantCategory.MODIFIER
+                && def.hasTag(PlantTags.SHROOM)
+                && def.hasTag(PlantTags.MAGIC);
+    }
+    /** @return the plant name this Imitater will morph into, or {@code null}. */
+    public String getImitateTarget() { return imitateTarget; }
 
     @Override public PlacableLayer getLayer() {
         Plant def = definition;
@@ -567,7 +588,20 @@ public class PlantInstance implements Placeable {
     public void setPosition(Point position) { this.position = position; }
     public void setCurrentRecharge(float currentRecharge) { this.currentRecharge = currentRecharge; }
     /** Sets the plant name this Imitater should morph into. */
-    public void setImitateTarget(String imitateTarget) { this.imitateTarget = imitateTarget; }
+    public void setImitateTarget(String imitateTarget) {
+        this.imitateTarget = imitateTarget;
+        if (!isImitater(definition) || imitateTarget == null || imitateTarget.isEmpty()) {
+            return;
+        }
+        try {
+            Plant target = PlantFactory.getDefinition(imitateTarget);
+            if (target != null && target.getBaseHP() > 0) {
+                this.currentHP = target.getBaseHP();
+            }
+        } catch (IllegalStateException ignored) {
+            // PlantFactory not initialized yet.
+        }
+    }
 
     public void setLifespanRemaining(float lifespanRemaining) { this.lifespanRemaining = lifespanRemaining; }
 }

@@ -120,6 +120,7 @@ public class PlantSelectionMenuController extends AppMenuController {
         }
 
         selected.add(type);
+        model.setImitaterCopyTarget(type);
         return CommandResult.success("'" + type + "' added to selection.");
     }
 

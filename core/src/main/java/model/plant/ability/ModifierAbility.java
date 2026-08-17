@@ -1,17 +1,15 @@
 package model.plant.ability;
 
 import model.enums.*;
-import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.plant.PlantFactory;
+import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
-import model.projectile.Pellet;
-import model.projectile.Projectile;
-import model.zombie.ZombieFactory;
-import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -19,10 +17,9 @@ import java.util.List;
  */
 public class ModifierAbility implements PlantAbility {
 
-    /** Velocity of plant-food fire peas. */
-    private static final float PF_FIRE_PEA_VELOCITY = 1.25f;
-
-    private float torchwoodDamageMultiplier = 2f;
+    private static final String ALLIED_GARGANTUAR = "ZombieGargantuar";
+    private static final float DEFAULT_FIRE_MULTIPLIER = 2f;
+    private static final float DEFAULT_BLUE_FIRE_MULTIPLIER = 3f;
 
     @Override
     public PlantCategory getCategory() { return PlantCategory.MODIFIER; }
@@ -61,17 +58,16 @@ public class ModifierAbility implements PlantAbility {
 
         switch (def.getPlantFoodType()) {
             case PROJECTILE_BURST:
-                // Torchwood plant-food: increases the damage multiplier
-                // which affects the projectiles that pass through it
-                applyTorchwoodPlantFoodBuff();
+                // Torchwood: blue flame for the plant-food window. Damage
+                // is read from plant-food state in getTorchwoodDamageMultiplier.
                 break;
             case RANDOM_HYPNOTIZE:
-                // Hypno-shroom plant-food: hypnotize the eater zombie and
-                // transform it to a gargantuar.
+                // Hypno-shroom: turn the eating (or nearest) zombie into
+                // an allied Gargantuar.
                 hypnotiseTheEater(plant, context);
                 break;
             case SPAWN_CLONES:
-                // Lily Pad plant-food: spawn clones on adjacent water tiles.
+                // Lily Pad: spawn copies on empty water tiles.
                 spawnLilyPadClones(plant, context, (int) def.getPlantFoodValue());
                 break;
             default:
@@ -79,43 +75,81 @@ public class ModifierAbility implements PlantAbility {
         }
     }
 
-    // --- Torchwood plant-food ---
+    // --- Torchwood ---
 
-    public void applyTorchwoodPlantFoodBuff() {
-        this.torchwoodDamageMultiplier = 3f;
+    /**
+     * Damage multiplier for peas passing through this Torchwood: 2× normally,
+     * 3× (blue flame) while plant-food is active.
+     */
+    public float getTorchwoodDamageMultiplier(PlantInstance plant) {
+        Plant def = plant == null ? null : plant.getDefinition();
+        if (plant != null && plant.isPlantFoodActive()) {
+            float blue = def != null ? def.getPlantFoodValue() : 0f;
+            return blue > 0f ? blue : DEFAULT_BLUE_FIRE_MULTIPLIER;
+        }
+        float base = def != null ? def.getAbilityValue() : 0f;
+        return base > 0f ? base : DEFAULT_FIRE_MULTIPLIER;
     }
 
-    public float getTorchwoodDamageMultiplier() {
-        return torchwoodDamageMultiplier;
+    public boolean isBlueFlameActive(PlantInstance plant) {
+        return plant != null && plant.isPlantFoodActive();
     }
 
     // --- Hypno-shroom plant-food ---
 
     /**
-     * transform the zombie that eats him into a Gargantuar
-     * with increased health from a regular one.
+     * Turns the zombie eating this Hypno-shroom (or the nearest one in its
+     * lane) into a hypnotized Gargantuar.
      */
     private void hypnotiseTheEater(PlantInstance plant, PlantAbilityContext context) {
         ZombieInstance eater = getEaterOf(plant, context);
+        if (eater == null) {
+            eater = nearestZombieInLane(plant, context);
+        }
         if (eater == null) return;
 
-        if(eater.getDefinition().getSize() == ZombieSize.LARGE) {
-            hypnotise(eater);
+        convertToAlliedGargantuar(plant, eater, context);
+    }
+
+    /**
+     * Replaces {@code zombie} with a hypnotized Gargantuar unless it is
+     * already {@link ZombieSize#LARGE}, in which case it is only hypnotized.
+     */
+    public void convertToAlliedGargantuar(PlantInstance plant, ZombieInstance zombie,
+                                          PlantAbilityContext context) {
+        if (zombie == null) return;
+        if (zombie.getDefinition() != null && zombie.getDefinition().getSize() == ZombieSize.LARGE) {
+            hypnotise(zombie);
+            applyGargantuarBuffs(plant, zombie);
             return;
         }
 
-        ZombieInstance newGargantuar = context.spawnZombieAt(
-                "ZombieGargantuar", eater.getGridY(), eater.getGridX()
-                );
-        if(newGargantuar == null) return;
-        hypnotise(newGargantuar);
-        context.removeZombie(eater);
+        int row = zombie.getGridY();
+        int col = zombie.getGridX();
+        ZombieInstance gargantuar = context.spawnZombieAt(ALLIED_GARGANTUAR, row, col);
+        if (gargantuar == null) {
+            hypnotise(zombie);
+            return;
+        }
+        gargantuar.setContinuousPosition(new FloatPoint(
+                zombie.getContinuousX(), zombie.getContinuousY()));
+        hypnotise(gargantuar);
+        applyGargantuarBuffs(plant, gargantuar);
+        context.removeZombie(zombie);
+    }
+
+    private void applyGargantuarBuffs(PlantInstance plant, ZombieInstance zombie) {
+        if (plant == null || zombie == null) return;
+        float hpMul = specialValue(plant, PlantSpecialTag.ZOMBIE_HEALTH_MULTIPLIER);
+        if (hpMul > 0f && hpMul != 1f) {
+            zombie.setCurrentHP(Math.max(1, Math.round(zombie.getCurrentHP() * hpMul)));
+        }
     }
 
     /** Flips a zombie to the player's side. */
-    private static void hypnotise(ZombieInstance zombie) {
-        zombie.setState(ZombieState.HYPNOTIZED);
-        zombie.setMovingBackward(true);
+    public static void hypnotise(ZombieInstance zombie) {
+        if (zombie == null) return;
+        zombie.hypnotise();
     }
 
     /** @return the zombie that is eating the {@code plant}. {@code null} if none. */
@@ -131,37 +165,64 @@ public class ModifierAbility implements PlantAbility {
         return null;
     }
 
+    private ZombieInstance nearestZombieInLane(PlantInstance plant, PlantAbilityContext context) {
+        int row = plant.getPosition().getY();
+        float col = plant.getPosition().getX();
+        ZombieInstance best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+            if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+            float dist = Math.abs(zombie.getContinuousX() - col);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = zombie;
+            }
+        }
+        return best;
+    }
+
+    private static float specialValue(PlantInstance plant, PlantSpecialTag tag) {
+        if (plant == null || plant.getDefinition() == null || tag == null) return 0f;
+        Plant def = plant.getDefinition();
+        if (def.getLevels() == null) return 0f;
+        float total = 0f;
+        for (int lvl = 2; lvl <= plant.getLevel(); lvl++) {
+            LevelUpgrade upgrade = def.getLevels().getUpgrade(lvl);
+            if (upgrade != null && upgrade.isSpecialMechanic() && upgrade.getSpecialTag() == tag) {
+                total += upgrade.getValue();
+            }
+        }
+        return total;
+    }
+
     // --- Lily Pad plant-food ---
 
     /**
-     * Spawns up to {@code count} Lily Pad clones on adjacent water tiles
-     * (8-neighborhood) that are currently empty. Each clone is a fresh
-     * level-1 Lily Pad instance placed via the context.
+     * Spawns up to {@code count} Lily Pad clones on empty water tiles,
+     * nearest first. Each clone is a fresh level-1 Lily Pad.
      */
     private void spawnLilyPadClones(PlantInstance plant, PlantAbilityContext context, int count) {
         if (count <= 0) return;
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
+
+        List<int[]> tiles = new ArrayList<>();
+        for (int r = 0; r < context.getRowCount(); r++) {
+            for (int c = 0; c < context.getColumnCount(); c++) {
+                if (r == row && c == col) continue;
+                if (!context.isWaterTile(r, c)) continue;
+                tiles.add(new int[]{r, c});
+            }
+        }
+        tiles.sort(Comparator.comparingInt(t -> Math.abs(t[0] - row) + Math.abs(t[1] - col)));
+
         int spawned = 0;
-
-        for (int rowDist = -1; rowDist <= 1 && spawned < count; rowDist++) {
-            for (int colDist = -1; colDist <= 1 && spawned < count; colDist++) {
-                if (rowDist == 0 && colDist == 0) continue;
-                int targetRow = row + rowDist;
-                int targetCol = col + colDist;
-                if (targetRow < 0 || targetCol < 0 ||
-                    targetRow >= context.getRowCount() ||
-                    targetCol >= context.getColumnCount()) {
-                        continue;
-                }
-                if (!context.isWaterTile(targetRow, targetCol)) continue;
-                if (context.getPlantAt(targetRow, targetCol) != null) continue;
-
-                PlantInstance clone = PlantFactory.createInstance("Lily Pad");
-                if (clone == null) continue;
-                if (context.placePlant(clone, targetRow, targetCol)) {
-                    spawned++;
-                }
+        for (int[] tile : tiles) {
+            if (spawned >= count) break;
+            PlantInstance clone = PlantFactory.createInstance("Lily Pad");
+            if (clone == null) continue;
+            if (context.placePlant(clone, tile[0], tile[1])) {
+                spawned++;
             }
         }
     }

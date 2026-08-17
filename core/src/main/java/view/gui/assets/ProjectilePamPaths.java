@@ -22,6 +22,8 @@ public final class ProjectilePamPaths {
             "768/INITIAL/EFFECTS/T_SNOW_PEA/T_SNOW_PEA.PAM";
     public static final String FIRE_PEA =
             "768/INITIAL/EFFECTS/T_FIRE_PEA/T_FIRE_PEA.PAM";
+    public static final String FIRE_PEA_BLUE =
+            "768/INITIAL/EFFECTS/T_FIRE_PEA_BLUE/T_FIRE_PEA_BLUE.PAM";
     public static final String GOO_PEA =
             "768/INITIAL/EFFECTS/GOOPEASHOOTER_PROJECTILES/GOOPEASHOOTER_PROJECTILES.PAM";
     public static final String MEGA_GATLING =
@@ -114,7 +116,10 @@ public final class ProjectilePamPaths {
         }
         Plant source = projectile.getSourcePlant();
         String name = source != null ? source.getName() : null;
-        if (projectile.isFire() && isPeaFamily(source, name)) {
+        if (projectile.isBlueFire()) {
+            return FIRE_PEA_BLUE;
+        }
+        if (projectile.isTorchwoodBoosted() || (projectile.isFire() && isPeaFamily(source, name))) {
             return FIRE_PEA;
         }
         if (name != null) {

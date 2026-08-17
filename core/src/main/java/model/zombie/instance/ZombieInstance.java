@@ -30,6 +30,8 @@ public class ZombieInstance implements Tickable, Placeable {
     private boolean isGlowing;                             // a glowing zombie drops plant food after dying
     private int chillLevel;
     private boolean movingBackward;                        // true while this zombie moves away from the house
+    /** Persists across EATING / SPECIAL_ACTION so hypnosis is not lost when state changes. */
+    private boolean hypnotized;
 
     private List<Armor> armors;                            // instantiated armor pieces
     private Pushable pushableItem;                         // null if not a pusher
@@ -72,6 +74,7 @@ public class ZombieInstance implements Tickable, Placeable {
         this.pushableItem = null;
         this.behaviors = new ArrayList<>();
         this.eatingTarget = null;
+        this.hypnotized = false;
         this.fireDamageMultiplier = definition.getFireDamageMultiplier();
 
         // Add a ZombieBehavior to behaviors for every behavior type on the definition.
@@ -100,7 +103,21 @@ public class ZombieInstance implements Tickable, Placeable {
     // --- Hypnosis helpers ---
 
     /** @return true if this zombie has been hypnotized. */
-    public boolean isHypnotized() { return state == ZombieState.HYPNOTIZED; }
+    public boolean isHypnotized() {
+        return hypnotized || state == ZombieState.HYPNOTIZED;
+    }
+
+    /** Flips this zombie to the player's side. */
+    public void hypnotise() {
+        if (isDead()) return;
+        this.hypnotized = true;
+        this.movingBackward = true;
+        this.eatingTarget = null;
+        this.combatTargetZombie = null;
+        if (state != ZombieState.SPECIAL_ACTION) {
+            this.state = ZombieState.HYPNOTIZED;
+        }
+    }
 
     // --- Tick & lifecycle ---
 
@@ -313,7 +330,7 @@ public class ZombieInstance implements Tickable, Placeable {
         this.eatingTarget = null;
         this.combatTargetZombie = null;
         if (state == ZombieState.EATING) {
-            state = movingBackward ? ZombieState.HYPNOTIZED : ZombieState.WALKING;
+            state = (hypnotized || movingBackward) ? ZombieState.HYPNOTIZED : ZombieState.WALKING;
         }
     }
 

@@ -76,6 +76,7 @@ public class GameModel implements BehaviorContext {
 
     private EventBus eventBus;
     private List<String> selectedPlants;       // plant types chosen for this level
+    private String imitaterCopyTarget; // Plant Imitater should morph into; last non-Imitater the player picked or planted
 
     // End-game bookkeeping (read by EndGameCondition implementations)
     private boolean houseBreached;
@@ -599,6 +600,26 @@ public class GameModel implements BehaviorContext {
         this.selectedPlants = selectedPlants;
     }
 
+    /** @return the plant Imitater is bound to copy, or {@code null} if unset. */
+    public String getImitaterCopyTarget() {
+        return imitaterCopyTarget;
+    }
+
+    /**
+     * Remembers {@code plantName} as Imitater's copy target. Imitater and mint
+     * names are ignored so picking Imitater itself does not overwrite the bind.
+     */
+    public void setImitaterCopyTarget(String plantName) {
+        if (plantName == null || plantName.isBlank()) {
+            return;
+        }
+        String lower = plantName.toLowerCase();
+        if (lower.contains("imitat") || lower.contains("-mint")) {
+            return;
+        }
+        this.imitaterCopyTarget = plantName;
+    }
+
     public int getZombieCount() {
         return activeZombies.size();
     }
@@ -657,6 +678,7 @@ public class GameModel implements BehaviorContext {
         plant.setCurrentHP(newHP);
         if (wasAlive && newHP == 0) {
             plantsLost++;
+            hypnotiseHypnoShroomEaters(plant);
         }
     }
 
@@ -698,8 +720,33 @@ public class GameModel implements BehaviorContext {
         if (plant.getCurrentHP() > 0) {
             plantsLost++;
         }
+        hypnotiseHypnoShroomEaters(plant);
         plant.setCurrentHP(0);
         eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_DESTROYED));
+    }
+
+    /**
+     * Hypno-shroom: the zombie that finished eating (or is standing on)
+     * this plant joins the player's side.
+     */
+    private void hypnotiseHypnoShroomEaters(PlantInstance plant) {
+        if (plant == null || !plant.isHypnoShroom() || activeZombies == null) {
+            return;
+        }
+        Point pos = plant.getPosition();
+        for (ZombieInstance zombie : activeZombies) {
+            if (zombie == null || zombie.isDead()) continue;
+            if (zombie.getEatingTarget() == plant) {
+                zombie.hypnotise();
+                continue;
+            }
+            if (pos != null
+                    && zombie.getGridY() == pos.getY()
+                    && zombie.getGridX() == pos.getX()
+                    && zombie.isEating()) {
+                zombie.hypnotise();
+            }
+        }
     }
 
 

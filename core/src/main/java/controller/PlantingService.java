@@ -45,6 +45,9 @@ import static controller.GameplayGuards.*;
  */
 final class PlantingService {
 
+    /** Typical seed-bar size; larger lists are the debug sandbox roster, not a loadout. */
+    private static final int MAX_SEED_LOADOUT = 8;
+
     /**
      * Places a plant of the given type at the given grid position.
      */
@@ -160,18 +163,25 @@ final class PlantingService {
                     + String.format("%.1f", model.getSeedCooldown(definition.getName())) + "s left.");
         }
 
-        // --- Sun cost (leveled definition may discount it) ---
-        int cost = conveyor ? 0 : instance.getDefinition().getCost();
+        instance.setPosition(new Point(x, y));
+
+        if (PlantInstance.isImitater(definition)) {
+            wireImitateTargetIfNeeded(instance, definition, model);
+            if (instance.getImitateTarget() == null || instance.getImitateTarget().isEmpty()) {
+                return CommandResult.error(
+                        "Imitater needs a plant to copy. Select or plant that plant first, then plant Imitater.");
+            }
+        } else {
+            model.setImitaterCopyTarget(type);
+        }
+        Plant billing = billingDefinition(instance, definition);
+
+        // --- Sun cost (Imitater bills the copied plant) ---
+        int cost = conveyor ? 0 : billing.getCost();
         if (!model.spendSun(cost)) {
             return CommandResult.error("Not enough sun. Need " + cost
                     + ", have " + model.getSunAmount() + ".");
         }
-
-        instance.setPosition(new Point(x, y));
-
-        // Imitater: default the imitate target to the first non-Imitater
-        // plant in the player's selection.
-        wireImitateTargetIfNeeded(instance, definition, model.getSelectedPlants());
 
         boolean placed = model.placePlant(instance, y, x);
         if (!placed) {
@@ -182,15 +192,22 @@ final class PlantingService {
         if (conveyor) {
             selected.remove(type); // consume the seed packet from the belt
         } else {
-            model.startSeedRecharge(definition.getName(), instance.getDefinition().getRechargeTime());
+            float recharge = billing.getRechargeTime();
+            if (recharge <= 0f) {
+                recharge = instance.getDefinition().getRechargeTime();
+            }
+            model.startSeedRecharge(definition.getName(), Math.max(0f, recharge));
         }
         String note = consumeBoostIfAny(instance) ? " Boost consumed: plant food activated!" : "";
         String stackNote = definition.hasTag(PlantTags.STACK)
                 ? " (STACK: layer=" + targetLayer + ")"
                 : "";
+        String copyNote = PlantInstance.isImitater(definition) && instance.getImitateTarget() != null
+                ? " Copies " + instance.getImitateTarget() + "."
+                : "";
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
                 + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount()
-                + "." + stackNote + note);
+                + "." + stackNote + note + copyNote);
     }
 
     /**
@@ -337,6 +354,11 @@ final class PlantingService {
         }
         PlantInstance instance = new PlantInstance(packet.getPlant());
         instance.setPosition(new Point(x, y));
+        if (PlantInstance.isImitater(packet.getPlant())) {
+            wireImitateTargetIfNeeded(instance, packet.getPlant(), model);
+        } else {
+            model.setImitaterCopyTarget(packet.getPlant().getName());
+        }
         cell.addPlaceable(instance);
         return CommandResult.success("Planted " + packet.getPlant().getName()
                 + " at (" + x + ", " + y + ") for free.");
@@ -364,29 +386,91 @@ final class PlantingService {
     }
 
     /**
-     * If the placed plant is an Imitater, sets its imitate target to the
-     * first non-Imitater plant in the player's selection.
+     * Binds Imitater to the plant the player actually chose to copy — the last
+     * non-Imitater they selected or planted — not the first name in the seed list.
+     * A sandbox roster of every plant is ignored so it cannot snap to a HashMap
+     * accident (e.g. always Phat Beet).
      */
     private void wireImitateTargetIfNeeded(PlantInstance instance, Plant definition,
-                                           List<String> selectedPlants) {
-        if (instance == null || definition == null) return;
-        String name = definition.getName();
-        if (name == null) return;
-        if (!name.toLowerCase().contains("imitat")) return;
-        if (selectedPlants == null || selectedPlants.isEmpty()) return;
+                                           GameModel model) {
+        if (instance == null || definition == null || model == null) return;
+        if (!PlantInstance.isImitater(definition)) return;
 
-        for (String candidate : selectedPlants) {
-            if (candidate == null) continue;
-            if (candidate.equalsIgnoreCase(name)) continue; // skip self
-            // Skip other Imitaters.
-            if (candidate.toLowerCase().contains("imitat")) continue;
-            // Skip mints (they're one-shot boosts, not useful copy targets).
-            if (candidate.toLowerCase().contains("-mint")) continue;
-            // Make sure the candidate actually exists in the factory.
-            if (!PlantFactory.hasDefinition(candidate)) continue;
-            instance.setImitateTarget(candidate);
+        String name = definition.getName();
+        if (trySetImitateTarget(instance, model.getImitaterCopyTarget(), name)) {
             return;
         }
+
+        List<String> selectedPlants = model.getSelectedPlants();
+        if (selectedPlants == null || selectedPlants.isEmpty()) return;
+        // Debug sandbox puts the whole roster here; do not pick an arbitrary first plant.
+        if (selectedPlants.size() > MAX_SEED_LOADOUT) return;
+
+        List<String> others = new ArrayList<>();
+        for (String candidate : selectedPlants) {
+            if (candidate == null) continue;
+            if (candidate.equalsIgnoreCase(name) || candidate.toLowerCase().contains("imitat")) continue;
+            if (candidate.toLowerCase().contains("-mint")) continue;
+            others.add(candidate);
+        }
+        if (others.size() == 1) {
+            trySetImitateTarget(instance, others.get(0), name);
+            return;
+        }
+
+        int selfIndex = indexOfIgnoreCase(selectedPlants, name);
+        if (selfIndex > 0) {
+            for (int i = selfIndex - 1; i >= 0; i--) {
+                if (trySetImitateTarget(instance, selectedPlants.get(i), name)) {
+                    return;
+                }
+            }
+        }
+        for (String candidate : others) {
+            if (trySetImitateTarget(instance, candidate, name)) {
+                return;
+            }
+        }
+    }
+
+    private static int indexOfIgnoreCase(List<String> names, String want) {
+        if (names == null || want == null) return -1;
+        for (int i = 0; i < names.size(); i++) {
+            String name = names.get(i);
+            if (name != null && name.equalsIgnoreCase(want)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean trySetImitateTarget(PlantInstance instance, String candidate, String imitaterName) {
+        if (candidate == null) return false;
+        if (candidate.equalsIgnoreCase(imitaterName)) return false;
+        if (candidate.toLowerCase().contains("imitat")) return false;
+        if (candidate.toLowerCase().contains("-mint")) return false;
+        if (!PlantFactory.hasDefinition(candidate)) return false;
+        instance.setImitateTarget(candidate);
+        return true;
+    }
+
+    /**
+     * Imitater bills sun and recharge as the copied plant; other plants use
+     * their own (possibly leveled) definition.
+     */
+    private static Plant billingDefinition(PlantInstance instance, Plant definition) {
+        Plant own = instance != null && instance.getDefinition() != null
+                ? instance.getDefinition()
+                : definition;
+        if (!PlantInstance.isImitater(definition) || instance == null) {
+            return own;
+        }
+        String target = instance.getImitateTarget();
+        if (target == null || target.isEmpty() || !PlantFactory.hasDefinition(target)) {
+            return own;
+        }
+        Plant copied = PlantFactory.getDefinition(target);
+        return copied != null ? copied : own;
     }
 
     /**

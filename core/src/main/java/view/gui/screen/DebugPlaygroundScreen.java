@@ -216,6 +216,10 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                     if (plants) {
                         selectedPlant = selectedName;
                         tool = Tool.PLANT;
+                        GameModel model = App.getInstance().getCurrentGameModel();
+                        if (model != null) {
+                            model.setImitaterCopyTarget(selectedName);
+                        }
                     } else {
                         selectedZombie = selectedName;
                         tool = Tool.ZOMBIE;

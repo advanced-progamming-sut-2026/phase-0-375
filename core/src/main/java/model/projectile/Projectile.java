@@ -70,6 +70,15 @@ public abstract class Projectile {
     /** Definition of the plant that fired this projectile; null for non-plant sources. */
     protected Plant sourcePlant;
 
+    /**
+     * True after a Torchwood has ignited / boosted this pea, so a pea sitting
+     * on the same tile is not multiplied every frame.
+     */
+    protected boolean torchwoodBoosted;
+
+    /** True when Torchwood plant-food restyled this pea as a blue fire pea. */
+    protected boolean blueFire;
+
     public Plant getSourcePlant() { return sourcePlant; }
 
     public void setSourcePlant(Plant sourcePlant) { this.sourcePlant = sourcePlant; }
@@ -224,6 +233,24 @@ public abstract class Projectile {
     /** Butter. */
     public boolean isButter() {
         return element == Element.BUTTER;
+    }
+
+    /** @return true if Torchwood has already ignited / boosted this projectile. */
+    public boolean isTorchwoodBoosted() {
+        return torchwoodBoosted;
+    }
+
+    public void setTorchwoodBoosted(boolean torchwoodBoosted) {
+        this.torchwoodBoosted = torchwoodBoosted;
+    }
+
+    /** @return true if this is a Torchwood plant-food blue fire pea. */
+    public boolean isBlueFire() {
+        return blueFire;
+    }
+
+    public void setBlueFire(boolean blueFire) {
+        this.blueFire = blueFire;
     }
 
     /** @return true if a juggler (or similar) deflected this projectile back toward plants. */
