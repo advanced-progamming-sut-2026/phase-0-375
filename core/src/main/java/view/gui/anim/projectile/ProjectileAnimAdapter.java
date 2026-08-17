@@ -32,6 +32,11 @@ public final class ProjectileAnimAdapter {
             return AnimPose.looping(pam, ProjectilePamPaths.GRAPESHOT_CLIP,
                     ProjectileAnimRole.FLYING);
         }
+        if (ProjectilePamPaths.GOO_PEA.equals(pam)) {
+            AnimPose goo = AnimPose.looping(pam, ProjectilePamPaths.GOO_PEA_FLY_CLIP,
+                    ProjectileAnimRole.FLYING);
+            return projectile.getDirection() < 0 ? goo.withFlipX(true) : goo;
+        }
         String clip = projectile.isButter() && ProjectilePamPaths.KERNEL_PULT.equals(pam)
                 ? ProjectilePamPaths.KERNEL_BUTTER_CLIP
                 : ProjectilePamPaths.CLIP_PREFERENCES[0];

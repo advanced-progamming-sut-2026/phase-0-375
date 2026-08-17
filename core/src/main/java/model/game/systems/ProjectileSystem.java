@@ -55,6 +55,7 @@ public class ProjectileSystem implements Tickable {
 
     @Override
     public void tick(float deltaTime) {
+        gameModel.discardUnreadProjectileHits();
         List<Projectile> projectiles = gameModel.getProjectiles();
         if (projectiles == null || projectiles.isEmpty()) return;
 
@@ -186,6 +187,10 @@ public class ProjectileSystem implements Tickable {
             return;
         }
 
+        if (projectile.pierce()) {
+            gameModel.recordProjectileHit(projectile);
+        }
+
         if (!projectile.pierce()) {
             discard(projectile, true);
         }
@@ -195,8 +200,13 @@ public class ProjectileSystem implements Tickable {
     private void discard(Projectile projectile, boolean dispatchHitEvent) {
         gameModel.removeProjectile(projectile);
         iceDamagedColumns.remove(projectile);
-        if (dispatchHitEvent && eventBus != null) {
-            eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+        if (dispatchHitEvent) {
+            if (!(projectile instanceof FumeCloud)) {
+                gameModel.recordProjectileHit(projectile);
+            }
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
+            }
         }
     }
 
@@ -562,6 +572,7 @@ public class ProjectileSystem implements Tickable {
             explodeBulb(bulb, target);
             gameModel.removeProjectile(bulb);
             iceDamagedColumns.remove(bulb);
+            gameModel.recordProjectileHit(bulb);
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
             }
@@ -576,6 +587,7 @@ public class ProjectileSystem implements Tickable {
         // Bounces exhausted: bulb is consumed on this hit.
         gameModel.removeProjectile(bulb);
         iceDamagedColumns.remove(bulb);
+        gameModel.recordProjectileHit(bulb);
         if (eventBus != null) {
             eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_HIT));
         }

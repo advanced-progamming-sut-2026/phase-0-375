@@ -74,10 +74,20 @@ public final class ProjectilePamPaths {
     /** Butter clip on {@link #KERNEL_PULT} ({@code animation} is the kernel). */
     public static final String KERNEL_BUTTER_CLIP = "animation3";
 
+    /** Goo Peashooter fly / impact clips (no {@code animation} clip on this PAM). */
+    public static final String GOO_PEA_FLY_CLIP = "projectile_t1";
+    public static final String GOO_PEA_HIT_CLIP = "hit_t1";
+
+    /** Storm-cloud dissipate clip used as the impact pose. */
+    public static final String ELECTRIC_BLUEBERRY_HIT_CLIP = "death";
+
     /** Preferred clip names for effect PAMs (resolved against the loaded file). */
     public static final String[] CLIP_PREFERENCES = {
             "animation", "idle", "loop", "projectile"
     };
+
+    /** One-shot impact PAM + clip. */
+    public record HitPam(String path, String clip) {}
 
     private static final Map<String, String> BY_PLANT = Map.ofEntries(
             Map.entry("Peashooter", PEA),
@@ -104,6 +114,31 @@ public final class ProjectilePamPaths {
             Map.entry("Caulipower", CAULIPOWER),
             Map.entry("Electric Blueberry", ELECTRIC_BLUEBERRY),
             Map.entry("Grapeshot", GRAPESHOT)
+    );
+
+    private static final Map<String, HitPam> HIT_BY_PLANT = Map.ofEntries(
+            Map.entry("Peashooter", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Repeater", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Threepeater", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Pea Pod", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Split Pea", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Mega Gatling Pea", splat(EffectPamPaths.SPLAT_PEA)),
+            Map.entry("Snow Pea", splat(EffectPamPaths.SPLAT_SNOW_PEA)),
+            Map.entry("Fire Peashooter", splat(EffectPamPaths.SPLAT_FIRE_PEA)),
+            Map.entry("Goo Peashooter", new HitPam(GOO_PEA, GOO_PEA_HIT_CLIP)),
+            Map.entry("Starfruit", new HitPam(EffectPamPaths.HIT_STARFRUIT, EffectPamPaths.STARFRUIT_HIT_CLIP)),
+            Map.entry("Cactus", splat(EffectPamPaths.HIT_CACTUS)),
+            Map.entry("Puff-shroom", splat(EffectPamPaths.HIT_PUFF_SHROOM)),
+            Map.entry("Fume-shroom", splat(EffectPamPaths.HIT_FUME)),
+            Map.entry("Cabbage-pult", splat(EffectPamPaths.SPLAT_CABBAGE)),
+            Map.entry("Kernel-pult", splat(EffectPamPaths.SPLAT_KERNEL)),
+            Map.entry("Melon-pult", splat(EffectPamPaths.SPLAT_MELON)),
+            Map.entry("Winter Melon", splat(EffectPamPaths.SPLAT_WINTER_MELON)),
+            Map.entry("Pepper-pult", splat(EffectPamPaths.SPLAT_PEPPER)),
+            Map.entry("Citron", splat(EffectPamPaths.HIT_CITRON)),
+            Map.entry("Rotobaga", splat(EffectPamPaths.HIT_ROTOBAGA)),
+            Map.entry("Grapeshot", splat(EffectPamPaths.HIT_GRAPESHOT)),
+            Map.entry("Electric Blueberry", new HitPam(ELECTRIC_BLUEBERRY, ELECTRIC_BLUEBERRY_HIT_CLIP))
     );
 
     /**
@@ -137,6 +172,37 @@ public final class ProjectilePamPaths {
         return null;
     }
 
+    /**
+     * Impact PAM for this projectile, or {@code null} when no splat/hit pack exists.
+     */
+    public static HitPam hitFor(Projectile projectile) {
+        if (projectile == null) {
+            return null;
+        }
+        if (projectile instanceof BowlingBulb bulb && bulb.isExplosive()) {
+            return new HitPam(EffectPamPaths.BOWLING_BULB_EXPLOSION,
+                    EffectPamPaths.BOWLING_BULB_EXPLOSION_CLIP);
+        }
+        if (projectile instanceof FumeCloud) {
+            return splat(EffectPamPaths.HIT_FUME);
+        }
+        if (projectile.isBlueFire()) {
+            return splat(EffectPamPaths.SPLAT_FIRE_PEA_BLUE);
+        }
+        Plant source = projectile.getSourcePlant();
+        String name = source != null ? source.getName() : null;
+        if (projectile.isTorchwoodBoosted() || (projectile.isFire() && isPeaFamily(source, name))) {
+            return splat(EffectPamPaths.SPLAT_FIRE_PEA);
+        }
+        if (projectile.isButter()) {
+            return splat(EffectPamPaths.SPLAT_BUTTER);
+        }
+        if (name != null) {
+            return HIT_BY_PLANT.get(name);
+        }
+        return null;
+    }
+
     public static String pathForBulb(BowlingBulbType type) {
         if (type == null) {
             return BOWLING_CYAN;
@@ -160,5 +226,9 @@ public final class ProjectilePamPaths {
             return false;
         }
         return "Goo Peashooter".equals(name) || "Mega Gatling Pea".equals(name);
+    }
+
+    private static HitPam splat(String path) {
+        return new HitPam(path, CLIP_PREFERENCES[0]);
     }
 }

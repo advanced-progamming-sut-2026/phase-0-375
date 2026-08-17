@@ -71,6 +71,7 @@ public class GameModel implements BehaviorContext {
     private GameMap gameMap;
     private List<ZombieInstance> activeZombies;
     private List<Projectile> activeProjectiles;
+    private final List<Projectile> projectileHitCues;
     private List<Sun> activeSuns;
     private List<LootDrop> pendingLootDrops;
     private List<Pushable> orphanedPushables;
@@ -116,6 +117,7 @@ public class GameModel implements BehaviorContext {
 
         this.activeZombies = new ArrayList<>();
         this.activeProjectiles = new ArrayList<>();
+        this.projectileHitCues = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
         this.orphanedPushables = new ArrayList<>();
@@ -224,6 +226,31 @@ public class GameModel implements BehaviorContext {
 
     public List<Projectile> getProjectiles() {
         return activeProjectiles;
+    }
+
+    /** Records a projectile impact for one-shot splat / hit PAM playback. */
+    public void recordProjectileHit(Projectile projectile) {
+        if (projectile != null) {
+            projectileHitCues.add(projectile);
+        }
+    }
+
+    /**
+     * Projectile impacts since the last drain. The lawn renderer consumes this
+     * each frame; empty when nothing hit.
+     */
+    public List<Projectile> drainProjectileHits() {
+        if (projectileHitCues.isEmpty()) {
+            return List.of();
+        }
+        List<Projectile> drained = new ArrayList<>(projectileHitCues);
+        projectileHitCues.clear();
+        return drained;
+    }
+
+    /** Drops cues the view never consumed (TUI, skipped frames). */
+    public void discardUnreadProjectileHits() {
+        projectileHitCues.clear();
     }
 
     @Override

@@ -15,11 +15,12 @@ import pvz.libpvz.pam.ClipRef;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
-import view.gui.anim.plant.exclusive.PotatoMineAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.ProjectilePamPaths;
 import view.gui.assets.PvzAssets;
 
 import java.util.ArrayList;
@@ -49,7 +50,9 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
-    private final List<OneShotFx> effects = new ArrayList<>();
+    private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
+    private final List<OneShotFx> backEffects = new ArrayList<>();
+    private final List<OneShotFx> frontEffects = new ArrayList<>();
     private final float[] xyTmp = new float[2];
     private final Matrix4 poseTransform = new Matrix4();
     private final Matrix4 batchTransform = new Matrix4();
@@ -90,6 +93,15 @@ public final class LawnEntityRenderer {
         // back rows before front rows so nearer plants occlude.
         List<PlantInstance> plants = new ArrayList<>(model.getAllPlants());
         plants.sort(LawnEntityRenderer::compareDrawOrder);
+        IdentityHashMap<PlantInstance, float[]> deathBlastNow = new IdentityHashMap<>();
+        for (PlantInstance plant : plants) {
+            maybeSpawnPlantExplosion(plant, deathBlastNow);
+        }
+        spawnMissingDeathBlasts(deathBlastNow);
+        deathBlastSeen.clear();
+        deathBlastSeen.putAll(deathBlastNow);
+
+        drawEffects(batch, backEffects, delta);
         for (PlantInstance plant : plants) {
             drawPlant(batch, plant, delta);
         }
@@ -101,7 +113,8 @@ public final class LawnEntityRenderer {
                 drawProjectile(batch, projectile, delta);
             }
         }
-        drawEffects(batch, delta);
+        harvestProjectileHits(model);
+        drawEffects(batch, frontEffects, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
@@ -119,22 +132,89 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
-        maybeSpawnPotatoMineExplosion(plant, pose, xy[0], xy[1]);
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta,
                 pose.cacheKey() + "#" + plant.getActionEpoch());
     }
 
-    private void maybeSpawnPotatoMineExplosion(PlantInstance plant, AnimPose pose, float x, float y) {
-        if (!PotatoMineAnim.shouldSpawnExplosion(plant, pose)) {
+    private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
+        Point pos = plant.getPosition();
+        if (pos == null) {
+            return;
+        }
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        if (ExplosivePlantFx.isDeathDetonator(plant)) {
+            deathBlastNow.put(plant, new float[]{xy[0], xy[1]});
+            return;
+        }
+        AnimPose pose = plantAdapter.poseFor(plant);
+        if (!ExplosivePlantFx.shouldSpawn(plant, pose)) {
             return;
         }
         if (explosionSpawned.put(plant, Boolean.TRUE) != null) {
             return;
         }
-        effects.add(new OneShotFx(PotatoMineAnim.explosionPamPath(), x, y));
+        spawnExplosionSpecs(ExplosivePlantFx.specsFor(plant), pos, xy[0], xy[1]);
     }
 
-    private void drawEffects(Batch batch, float delta) {
+    private void spawnMissingDeathBlasts(IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
+        for (var entry : deathBlastSeen.entrySet()) {
+            if (deathBlastNow.containsKey(entry.getKey())) {
+                continue;
+            }
+            float[] xy = entry.getValue();
+            spawnExplosionSpecs(ExplosivePlantFx.specsFor(entry.getKey()), null, xy[0], xy[1]);
+        }
+    }
+
+    private void spawnExplosionSpecs(List<ExplosivePlantFx.Spec> specs, Point pos, float x, float y) {
+        if (specs == null || specs.isEmpty()) {
+            return;
+        }
+        for (ExplosivePlantFx.Spec spec : specs) {
+            if (spec.placement() == ExplosivePlantFx.Placement.ALONG_LANE && pos != null) {
+                int row = pos.getY();
+                for (int col = 0; col < layout.cols(); col++) {
+                    float[] tile = layout.centerOf(row, col);
+                    addEffect(spec.layer(), spec.pamPath(), ExplosivePlantFx.jalapenoClip(col),
+                            tile[0], tile[1], AnimScale.PLANT);
+                }
+            } else {
+                addEffect(spec.layer(), spec.pamPath(), spec.clipName(), x, y, AnimScale.PLANT);
+            }
+        }
+    }
+
+    private void addEffect(ExplosivePlantFx.Layer layer, String pamPath, String clipName,
+                           float x, float y, float scale) {
+        OneShotFx fx = new OneShotFx(pamPath, clipName, x, y, scale);
+        if (layer == ExplosivePlantFx.Layer.BACK) {
+            backEffects.add(fx);
+        } else {
+            frontEffects.add(fx);
+        }
+    }
+
+    private void harvestProjectileHits(GameModel model) {
+        List<Projectile> hits = model.drainProjectileHits();
+        for (Projectile projectile : hits) {
+            if (projectile == null) {
+                continue;
+            }
+            projectileWorldCenter(projectile, xyTmp);
+            spawnProjectileHit(projectile, xyTmp[0], xyTmp[1]);
+        }
+    }
+
+    private void spawnProjectileHit(Projectile projectile, float x, float y) {
+        ProjectilePamPaths.HitPam hit = ProjectilePamPaths.hitFor(projectile);
+        if (hit == null || hit.path() == null) {
+            return;
+        }
+        String clip = hit.clip() != null ? hit.clip() : ProjectilePamPaths.CLIP_PREFERENCES[0];
+        frontEffects.add(new OneShotFx(hit.path(), clip, x, y, AnimScale.PROJECTILE));
+    }
+
+    private void drawEffects(Batch batch, List<OneShotFx> effects, float delta) {
         Iterator<OneShotFx> it = effects.iterator();
         while (it.hasNext()) {
             OneShotFx fx = it.next();
@@ -149,7 +229,7 @@ public final class LawnEntityRenderer {
             } else {
                 fx.time += delta;
             }
-            player.draw(batch, ref, fx.time, fx.x, fx.y, AnimScale.PLANT, AnimScale.PLANT, false);
+            player.draw(batch, ref, fx.time, fx.x, fx.y, fx.scale, fx.scale, false);
             if (fx.duration > 0f && fx.time >= fx.duration) {
                 it.remove();
             }
@@ -299,17 +379,20 @@ public final class LawnEntityRenderer {
 
     private static final class OneShotFx {
         final String pamPath;
-        final String clipName = "animation";
+        final String clipName;
         final float x;
         final float y;
+        final float scale;
         float time;
         float duration;
         boolean started;
 
-        OneShotFx(String pamPath, float x, float y) {
+        OneShotFx(String pamPath, String clipName, float x, float y, float scale) {
             this.pamPath = pamPath;
+            this.clipName = clipName;
             this.x = x;
             this.y = y;
+            this.scale = scale > 0f ? scale : 1f;
         }
     }
 }
