@@ -34,6 +34,8 @@ public final class TerrainStrategyFactory {
                 // Necromancy spawn is wave-driven; the tile itself behaves
                 // like ordinary ground for planting / movement purposes.
                 return new NormalTerrainStrategy();
+            case CRATER:
+                return new CraterTerrainStrategy();
             default:
                 return new NormalTerrainStrategy();
         }

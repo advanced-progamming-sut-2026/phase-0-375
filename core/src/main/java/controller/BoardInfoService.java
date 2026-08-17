@@ -220,6 +220,7 @@ final class BoardInfoService {
             case SLIDE_DOWN: return 'v';
             case NECROMANCY: return 'N';
             case ICE: return '*';
+            case CRATER: return 'O';
             default: return '.';
         }
     }

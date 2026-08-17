@@ -7,5 +7,6 @@ public enum GroundType {
     SLIDE_UP,
     SLIDE_DOWN,
     LOW_TIDE,
-    NECROMANCY
+    NECROMANCY,
+    CRATER
 }

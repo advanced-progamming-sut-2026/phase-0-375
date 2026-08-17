@@ -115,6 +115,21 @@ final class GameModelAbilityContext implements PlantAbilityContext {
     }
 
     @Override
+    public boolean removeGraveAt(int row, int col) {
+        model.item.Grave grave = gameModel.getGraveAt(row, col);
+        if (grave == null) {
+            return false;
+        }
+        grave.applyLoot(gameModel);
+        return gameModel.removeGraveAt(row, col);
+    }
+
+    @Override
+    public void createCraterAt(int row, int col) {
+        gameModel.createCraterAt(row, col);
+    }
+
+    @Override
     public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
         return gameModel.spawnZombieAt(zombieDefinitionName, row, col);
     }

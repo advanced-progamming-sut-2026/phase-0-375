@@ -91,9 +91,9 @@ public final class PlantAnimAdapter {
     /**
      * Global plant role mapping. Idle, attack, and plant-food intro/loop/outro.
      *
-     * <p>TODO: map {@link PlantState#ARMED}/{@code ARMING} → ARMED,
-     * {@link PlantState#GROWING} → GROWING,
-     * {@link PlantState#DYING} → DIE.
+     * {@link PlantState#ARMING} and {@link PlantState#ARMED} use IDLE so
+     * exclusive charge plants (Potato Mine) can pick buried vs ready clips.
+     * {@link PlantState#GROWING} and {@link PlantState#DYING} still fall through.
      */
     private PlantAnimRole roleForPresentation(PlantInstance plant, PamCatalog.PamEntry entry,
                                              PlantState presentation) {

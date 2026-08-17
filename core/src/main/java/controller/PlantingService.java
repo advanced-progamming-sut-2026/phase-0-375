@@ -102,6 +102,15 @@ final class PlantingService {
             return CommandResult.error("Unknown plant type: '" + type + "'.");
         }
 
+        if ("Grave Buster".equalsIgnoreCase(definition.getName())
+                && !(cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave)) {
+            return CommandResult.error("Grave Buster can only be planted on a grave.");
+        }
+        if ("Hot Potato".equalsIgnoreCase(definition.getName())
+                && cell.getGroundType() != GroundType.ICE) {
+            return CommandResult.error("Hot Potato can only be planted on ice.");
+        }
+
         PlacableLayer targetLayer = computeLayer(definition);
 
         // --- Same-type stacker (Pea Pod) ---
@@ -135,10 +144,14 @@ final class PlantingService {
         }
 
         // For MAIN-layer plants, also reject if the cell has a
-        // non-plant placeable on the GROUND layer.
+        // non-plant placeable on the GROUND layer — except Grave Buster,
+        // which must be planted onto graves.
         if (targetLayer == PlacableLayer.MAIN && cell.getPlaceable(PlacableLayer.GROUND) != null) {
             Placeable ground = cell.getPlaceable(PlacableLayer.GROUND);
             if (!(ground instanceof PlantInstance)) {
+                if (ground instanceof Grave && type != null && type.equalsIgnoreCase("Grave Buster")) {
+                    return null;
+                }
                 return CommandResult.error("An item is already placed at (" + x + ", " + y + ").");
             }
         }

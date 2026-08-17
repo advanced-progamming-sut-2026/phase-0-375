@@ -49,11 +49,17 @@ public class TerrainSystem implements Tickable {
                 Placeable mainOccupant = cell.getPlaceable(PlacableLayer.MAIN);
                 strategy.onTick(cell, mainOccupant, gameModel, deltaTime);
 
-                // Ice-shatter: free the contained entity when the ice breaks.
+                // Ice-shatter: free the contained entity when the ice breaks,
+                // then convert the tile back to ordinary ground.
                 if (strategy instanceof IceTerrainStrategy) {
                     IceTerrainStrategy ice = (IceTerrainStrategy) strategy;
-                    if (ice.isMelted() && ice.getContainedEntity() != null) {
-                        releaseContainedEntity(cell, ice);
+                    if (ice.isMelted()) {
+                        if (ice.getContainedEntity() != null) {
+                            releaseContainedEntity(cell, ice);
+                        } else {
+                            cell.setGroundType(GroundType.NORMAL);
+                            cell.setTerrainStrategy(new NormalTerrainStrategy());
+                        }
                         anyIceMelted = true;
                     }
                 }

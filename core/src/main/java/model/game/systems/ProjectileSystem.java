@@ -78,10 +78,17 @@ public class ProjectileSystem implements Tickable {
             return false;
         }
 
+        if (projectile instanceof Pellet pellet && pellet.tickLifetime(deltaTime)) {
+            discard(pellet, false);
+            return false;
+        }
+
         moveProjectile(projectile, deltaTime);
 
         if (projectile instanceof BowlingBulb) {
-            bounceOffLaneEdges((BowlingBulb) projectile);
+            bounceOffLaneEdges(projectile);
+        } else if (projectile instanceof Pellet pellet && pellet.isBouncing()) {
+            bounceOffLaneEdges(projectile);
         }
         applyTorchwood(projectile);
 
@@ -104,8 +111,11 @@ public class ProjectileSystem implements Tickable {
             return false;
         }
 
-        // Homing shots (Caulipower, …) pass through graves and other blockers.
-        if (projectile instanceof Pellet && !projectile.isHoming() && hitGridItemsIfAny(projectile)) {
+        // Homing shots (Caulipower, …) and bouncing grapes pass through graves.
+        if (projectile instanceof Pellet pellet
+                && !projectile.isHoming()
+                && !pellet.isBouncing()
+                && hitGridItemsIfAny(projectile)) {
             discard(projectile, true);
             return true;
         }
@@ -571,21 +581,21 @@ public class ProjectileSystem implements Tickable {
         }
     }
 
-    /** Reflects a Bowling Bulb when it crosses the top or bottom edge of the lawn. */
-    private void bounceOffLaneEdges(BowlingBulb bulb) {
+    /** Reflects a bouncing projectile when it crosses the top or bottom edge of the lawn. */
+    private void bounceOffLaneEdges(Projectile projectile) {
         int rows = gameModel.getRowCount();
         if (rows <= 0) return;
-        float y = bulb.getY();
+        float y = projectile.getY();
         if (y < 0f) {
-            bulb.setY(-y);
-            bulb.setYVelocity(-bulb.getYVelocity());
+            projectile.setY(-y);
+            projectile.setYVelocity(-projectile.getYVelocity());
         } else if (y > rows - 1) {
-            bulb.setY(2 * (rows - 1) - y);
-            bulb.setYVelocity(-bulb.getYVelocity());
+            projectile.setY(2 * (rows - 1) - y);
+            projectile.setYVelocity(-projectile.getYVelocity());
         }
-        int newRow = Math.round(bulb.getY());
-        if (newRow != bulb.getRow()) {
-            bulb.setRow(newRow);
+        int newRow = Math.round(projectile.getY());
+        if (newRow != projectile.getRow()) {
+            projectile.setRow(newRow);
         }
     }
 

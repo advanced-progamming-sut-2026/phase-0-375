@@ -15,6 +15,7 @@ import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.map.Lane;
+import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.TerrainStrategy;
 import model.game.systems.TerrainSystem;
@@ -257,7 +258,8 @@ public class GameModel implements BehaviorContext {
      */
     public boolean isWaterTile(int row, int col) {
         Cell cell = getCellAt(row, col);
-        return cell != null && cell.getGroundType() == GroundType.WATER;
+        return cell != null && (cell.getGroundType() == GroundType.WATER
+                || cell.getGroundType() == GroundType.LOW_TIDE);
     }
 
     /**
@@ -938,6 +940,18 @@ public class GameModel implements BehaviorContext {
         Cell cell = getCellAt(row, col);
         cell.removePlaceable(grave);
         return true;
+    }
+
+    /**
+     * Turns the cell into an unplantable crater.
+     */
+    public void createCraterAt(int row, int col) {
+        Cell cell = getCellAt(row, col);
+        if (cell == null) {
+            return;
+        }
+        cell.setGroundType(GroundType.CRATER);
+        cell.setTerrainStrategy(new CraterTerrainStrategy());
     }
 
     // --- Terrain helpers ---

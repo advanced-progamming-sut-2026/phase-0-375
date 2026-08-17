@@ -129,6 +129,20 @@ public interface PlantAbilityContext {
     void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage);
 
     /**
+     * Removes the grave on the GROUND layer of {@code (row, col)}, paying
+     * out loot. {@code false} if that cell has no grave.
+     */
+    default boolean removeGraveAt(int row, int col) {
+        return false;
+    }
+
+    /**
+     * Marks {@code (row, col)} as an unplantable crater.
+     */
+    default void createCraterAt(int row, int col) {
+    }
+
+    /**
      * Spawns a zombie at the ({@code col}, {@code row}) coords
      * based on the given {@code zombieDefinitionName}.
      */

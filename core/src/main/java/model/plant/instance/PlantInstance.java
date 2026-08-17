@@ -68,11 +68,12 @@ public class PlantInstance implements Placeable {
         this.stackCount = 1;
         if (definition.getAbilityType() != null) {
             AbilityState abilityState = new AbilityState(definition.getAbilityType());
-            // Traps start disarmed; armed state is ticked by the system.
+            // Traps start disarmed; CHARGE mines wait actionInterval to arm.
             if (definition.hasTag(PlantTags.TRAP)) {
                 abilityState.setArmed(false);
                 if (definition.hasTag(PlantTags.CHARGE) && definition.getActionInterval() > 0) {
                     abilityState.setCooldownRemaining(definition.getActionInterval());
+                    this.state = PlantState.ARMING;
                 }
             }
             abilityStates.put(definition.getAbilityType(), abilityState);

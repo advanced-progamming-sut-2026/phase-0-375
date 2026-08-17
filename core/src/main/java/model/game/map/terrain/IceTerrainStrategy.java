@@ -46,8 +46,11 @@ public class IceTerrainStrategy implements TerrainStrategy {
 
     @Override
     public boolean canPlant(Plant plant, Cell cell) {
-        // Frozen ground never accepts a new plant.
-        return false;
+        if (melted) {
+            return true;
+        }
+        // Hot Potato is planted onto ice specifically to thaw it.
+        return plant != null && "Hot Potato".equals(plant.getName());
     }
 
     @Override

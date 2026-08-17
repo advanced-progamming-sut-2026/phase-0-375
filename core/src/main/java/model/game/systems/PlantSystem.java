@@ -46,7 +46,9 @@ public class PlantSystem implements Tickable {
             if (plant.isImitating()) {
                 continue;
             }
-            if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING) {
+            if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING
+                    && plant.getState() != PlantState.ATTACKING
+                    && !plant.hasActiveAction()) {
                 // Explode-o-nut: trigger the death explosion before
                 // removing the plant from the field.
                 triggerDeathExplosionIfNeeded(plant);
@@ -259,6 +261,21 @@ public class PlantSystem implements Tickable {
         @Override
         public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
             gameModel.damageIceInArea(row, col, rowRadius, colRadius, damage);
+        }
+
+        @Override
+        public boolean removeGraveAt(int row, int col) {
+            model.item.Grave grave = gameModel.getGraveAt(row, col);
+            if (grave == null) {
+                return false;
+            }
+            grave.applyLoot(gameModel);
+            return gameModel.removeGraveAt(row, col);
+        }
+
+        @Override
+        public void createCraterAt(int row, int col) {
+            gameModel.createCraterAt(row, col);
         }
 
         @Override

@@ -35,9 +35,8 @@ public final class PlantPamAliases {
         m.put("Bonk Choy", "BONKCHOY");
         m.put("Snapdragon", "SNAPDRAGON");
         m.put("Cold Snapdragon", "COLD_SNAPDRAGON");
-        m.put("Iceberg Lettuce", "ICEBERGLETTUCE");
-        // PvZ2 shipped Homing Thistle, not Cat-tail — no CATTAIL PAM in this pack.
-        m.put("Cat-tail", "CATTAIL");
+        m.put("Iceberg Lettuce", "ICEBURG");
+        m.put("Cat-tail", "CATTAIL"); // TODO: find something for cat-tail animation
         m.put("Lily Pad", "LILYPAD");
         m.put("Gold Bloom", "GOLDBLOOM");
         m.put("Hot Potato", "HOTPOTATO");

@@ -28,6 +28,10 @@ public final class ProjectileAnimAdapter {
             return AnimPose.looping(pam, ProjectilePamPaths.ELECTRIC_BLUEBERRY_CLIP,
                     ProjectileAnimRole.FLYING);
         }
+        if (ProjectilePamPaths.GRAPESHOT.equals(pam)) {
+            return AnimPose.looping(pam, ProjectilePamPaths.GRAPESHOT_CLIP,
+                    ProjectileAnimRole.FLYING);
+        }
         String clip = projectile.isButter() && ProjectilePamPaths.KERNEL_PULT.equals(pam)
                 ? ProjectilePamPaths.KERNEL_BUTTER_CLIP
                 : ProjectilePamPaths.CLIP_PREFERENCES[0];
