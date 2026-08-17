@@ -12,6 +12,7 @@ public class AbilityState {
     private float chargeProgress;     // 0..1 for charge-type abilities
     private boolean isActive;         // whether the ability is currently performing its action
     private boolean isArmed;          // true for traps that have finished arming
+    private float armedElapsed;       // seconds since the trap finished arming
     private int growthStage;          // current growth stage for staged plants
     private boolean isDigesting;      // true for Chomper after swallowing a zombie
     private float digestRemaining;    // seconds left in digestion
@@ -42,6 +43,11 @@ public class AbilityState {
 
     public boolean isArmed() {
         return isArmed;
+    }
+
+    /** Seconds since {@link #setArmed(boolean) setArmed(true)}; {@code 0} while disarmed. */
+    public float getArmedElapsed() {
+        return armedElapsed;
     }
 
     public int getGrowthStage() {
@@ -79,7 +85,18 @@ public class AbilityState {
     }
 
     public void setArmed(boolean armed) {
+        if (armed && !isArmed) {
+            armedElapsed = 0f;
+        } else if (!armed) {
+            armedElapsed = 0f;
+        }
         isArmed = armed;
+    }
+
+    public void addArmedElapsed(float deltaTime) {
+        if (isArmed && deltaTime > 0f) {
+            armedElapsed += deltaTime;
+        }
     }
 
     public void setGrowthStage(int growthStage) {

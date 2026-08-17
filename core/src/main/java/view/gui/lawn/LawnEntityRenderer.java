@@ -16,6 +16,7 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.PlantAnimAdapter;
+import view.gui.anim.plant.exclusive.PotatoMineAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.PamCatalog;
@@ -24,6 +25,7 @@ import view.gui.assets.PvzAssets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -46,6 +48,8 @@ public final class LawnEntityRenderer {
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
+    private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
+    private final List<OneShotFx> effects = new ArrayList<>();
     private final float[] xyTmp = new float[2];
     private final Matrix4 poseTransform = new Matrix4();
     private final Matrix4 batchTransform = new Matrix4();
@@ -97,8 +101,10 @@ public final class LawnEntityRenderer {
                 drawProjectile(batch, projectile, delta);
             }
         }
+        drawEffects(batch, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
@@ -113,8 +119,52 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        maybeSpawnPotatoMineExplosion(plant, pose, xy[0], xy[1]);
         drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, delta,
                 pose.cacheKey() + "#" + plant.getActionEpoch());
+    }
+
+    private void maybeSpawnPotatoMineExplosion(PlantInstance plant, AnimPose pose, float x, float y) {
+        if (!PotatoMineAnim.shouldSpawnExplosion(plant, pose)) {
+            return;
+        }
+        if (explosionSpawned.put(plant, Boolean.TRUE) != null) {
+            return;
+        }
+        effects.add(new OneShotFx(PotatoMineAnim.explosionPamPath(), x, y));
+    }
+
+    private void drawEffects(Batch batch, float delta) {
+        Iterator<OneShotFx> it = effects.iterator();
+        while (it.hasNext()) {
+            OneShotFx fx = it.next();
+            ClipRef ref = clips.getOrLoad(fx.pamPath, fx.clipName);
+            if (ref == null) {
+                continue;
+            }
+            if (!fx.started) {
+                fx.started = true;
+                fx.time = 0f;
+                fx.duration = clipDurationSeconds(ref, fx.pamPath, fx.clipName);
+            } else {
+                fx.time += delta;
+            }
+            player.draw(batch, ref, fx.time, fx.x, fx.y, AnimScale.PLANT, AnimScale.PLANT, false);
+            if (fx.duration > 0f && fx.time >= fx.duration) {
+                it.remove();
+            }
+        }
+    }
+
+    private float clipDurationSeconds(ClipRef ref, String pamPath, String clipName) {
+        float seconds = player.clipDurationSeconds(pamPath, clipName);
+        if (seconds > 0f) {
+            return seconds;
+        }
+        if (ref != null && ref.duration > 0f) {
+            return ref.duration;
+        }
+        return 1.5f;
     }
 
     private void drawZombie(Batch batch, ZombieInstance zombie, float delta) {
@@ -245,5 +295,21 @@ public final class LawnEntityRenderer {
     private static final class AnimClock {
         String clipKey;
         float time;
+    }
+
+    private static final class OneShotFx {
+        final String pamPath;
+        final String clipName = "animation";
+        final float x;
+        final float y;
+        float time;
+        float duration;
+        boolean started;
+
+        OneShotFx(String pamPath, float x, float y) {
+            this.pamPath = pamPath;
+            this.x = x;
+            this.y = y;
+        }
     }
 }

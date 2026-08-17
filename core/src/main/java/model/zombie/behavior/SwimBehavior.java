@@ -78,7 +78,7 @@ public class SwimBehavior implements ZombieBehavior {
         }
 
         PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
-        if (plantHere != null && plantHere.getCurrentHP() > 0) {
+        if (plantHere != null && plantHere.getCurrentHP() > 0 && !plantHere.isIgnoredByZombies()) {
             // Surface and start eating immediately; apply this tick's damage too.
             phase = SwimPhase.SURFACED;
             eatingTarget = plantHere;
@@ -97,7 +97,7 @@ public class SwimBehavior implements ZombieBehavior {
     private void tickSurfaced(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
 
-        if (plantHere == null || plantHere.getCurrentHP() <= 0) {
+        if (plantHere == null || plantHere.getCurrentHP() <= 0 || plantHere.isIgnoredByZombies()) {
             // Plant gone - stop eating and pick the next phase based on terrain.
             if (eatingTarget != null) {
                 eatingTarget = null;

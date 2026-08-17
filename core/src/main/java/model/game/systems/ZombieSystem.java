@@ -299,7 +299,8 @@ public class ZombieSystem implements Tickable {
     private void eatPlantAt(ZombieInstance zombie, BehaviorContext context,
                             int row, int col, float deltaTime) {
         PlantInstance plant = context.getPlantAt(row, col);
-        if (plant == null || plant.getCurrentHP() <= 0 || plant.isTransformed()) {
+        if (plant == null || plant.getCurrentHP() <= 0 || plant.isTransformed()
+                || plant.isIgnoredByZombies()) {
             if (plant != null && plant.getCurrentHP() <= 0 && plant.isHypnoShroom()) {
                 hypnotise(zombie);
             }

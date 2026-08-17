@@ -201,6 +201,9 @@ public class PlantInstance implements Placeable {
             if (state.getCooldownRemaining() > 0) {
                 state.setCooldownRemaining(Math.max(0, state.getCooldownRemaining() - deltaTime));
             }
+            if (state.isArmed()) {
+                state.addArmedElapsed(deltaTime);
+            }
             if (state.isDigesting()) {
                 state.setDigestRemaining(Math.max(0f, state.getDigestRemaining() - deltaTime));
                 if (state.getDigestRemaining() <= 0f) {
@@ -581,6 +584,20 @@ public class PlantInstance implements Placeable {
     public boolean isPlantFoodActive() { return isPlantFoodActive; }
     public int getActionEpoch() { return actionEpoch; }
     public boolean hasActiveAction() { return activeAction != null; }
+
+    /**
+     * Buried charge mines (Potato Mine, Primal Potato Mine) are walked over
+     * until they finish arming — zombies must not chew them in that window.
+     */
+    public boolean isIgnoredByZombies() {
+        if (definition == null
+                || !definition.hasTag(PlantTags.CHARGE)
+                || !definition.hasTag(PlantTags.TRAP)) {
+            return false;
+        }
+        AbilityState state = abilityStates.get(PlantAbilityType.DELAYED_EXPLOSIVE);
+        return state == null || !state.isArmed();
+    }
     /** @return true while an Imitater is still counting down to morph. */
     public boolean isImitating() { return transformCountdown >= 0f; }
     /** @return true if this instance is a Hypno-shroom (eaten → hypnotize). */

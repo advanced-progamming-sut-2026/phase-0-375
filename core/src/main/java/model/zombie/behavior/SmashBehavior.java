@@ -83,7 +83,7 @@ public class SmashBehavior implements ZombieBehavior {
      */
     private void tickGargantuarWalking(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         PlantInstance plant = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
-        if (plant == null || plant.getCurrentHP() <= 0) {
+        if (plant == null || plant.getCurrentHP() <= 0 || plant.isIgnoredByZombies()) {
             return;
         }
 
@@ -140,7 +140,7 @@ public class SmashBehavior implements ZombieBehavior {
         boolean smashed = false;
 
         PlantInstance plant = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
-        if (plant != null && plant.getCurrentHP() > 0) {
+        if (plant != null && plant.getCurrentHP() > 0 && !plant.isIgnoredByZombies()) {
             context.damagePlant(plant, smashDamage);
             smashed = true;
         } else {

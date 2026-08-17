@@ -129,7 +129,7 @@ public class JumpBehavior implements ZombieBehavior {
     private void tickReversedWalk(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
 
-        if (plantHere == null || plantHere.getCurrentHP() <= 0) {
+        if (plantHere == null || plantHere.getCurrentHP() <= 0 || plantHere.isIgnoredByZombies()) {
             if (currentTarget != null) {
                 currentTarget = null;
                 zombie.stopEating();
