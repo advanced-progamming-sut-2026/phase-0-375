@@ -136,4 +136,8 @@ public class PvZGameLoop implements GameLoop {
     public void setPlantClipDurations(model.plant.ability.PlantClipDurations clipDurations) {
         plantSystem.setClipDurations(clipDurations);
     }
+
+    public void setPlantProjectileOrigins(model.plant.ability.PlantProjectileOrigins projectileOrigins) {
+        plantSystem.setProjectileOrigins(projectileOrigins);
+    }
 }

@@ -13,9 +13,11 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import model.app.App;
+import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import view.gui.PvzGdxGame;
 import view.gui.assets.PamPlantClipDurations;
+import view.gui.assets.PamPlantProjectileOrigins;
 import view.gui.assets.PvzAssets;
 import view.gui.lawn.LawnLayout;
 import view.gui.ui.ToastBanner;
@@ -128,7 +130,7 @@ public abstract class AbstractGameplayScreen implements Screen {
 
     @Override
     public void show() {
-        wirePlantClipDurations();
+        wirePlantPresentation();
         InputMultiplexer mux = new InputMultiplexer();
         mux.addProcessor(uiStage);
         if (worldInput != null) {
@@ -137,13 +139,18 @@ public abstract class AbstractGameplayScreen implements Screen {
         Gdx.input.setInputProcessor(mux);
     }
 
-    /** Lets timed plant actions use real PAM clip lengths from animations.json. */
-    private void wirePlantClipDurations() {
+    /** Lets timed plant actions use real PAM clip lengths and muzzle part bounds. */
+    private void wirePlantPresentation() {
         PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
         if (loop == null || assets == null || assets.pamCatalog == null) {
             return;
         }
         loop.setPlantClipDurations(new PamPlantClipDurations(assets.pamCatalog));
+        GameModel model = App.getInstance().getCurrentGameModel();
+        LawnLayout layout = (model == null)
+                ? LawnLayout.frontLawnDefault()
+                : new LawnLayout(model.getRowCount(), model.getColumnCount());
+        loop.setPlantProjectileOrigins(new PamPlantProjectileOrigins(assets, layout));
     }
 
     @Override

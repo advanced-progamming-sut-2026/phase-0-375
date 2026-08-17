@@ -7,6 +7,7 @@ import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.PlantClipDurations;
+import model.plant.ability.PlantProjectileOrigins;
 import model.plant.ability.WallAbility;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -29,6 +30,10 @@ public class PlantSystem implements Tickable {
 
     public void setClipDurations(PlantClipDurations clipDurations) {
         context.setClipDurations(clipDurations != null ? clipDurations : PlantClipDurations.NONE);
+    }
+
+    public void setProjectileOrigins(PlantProjectileOrigins projectileOrigins) {
+        context.setProjectileOrigins(projectileOrigins != null ? projectileOrigins : PlantProjectileOrigins.NONE);
     }
 
     @Override
@@ -70,6 +75,7 @@ public class PlantSystem implements Tickable {
         private final GameModel gameModel;
         private PlantInstance currentPlant; // plant currently ticking (kill attribution)
         private PlantClipDurations clipDurations = PlantClipDurations.NONE;
+        private PlantProjectileOrigins projectileOrigins = PlantProjectileOrigins.NONE;
 
         GameModelPlantAbilityContext(GameModel gameModel) {
             this.gameModel = gameModel;
@@ -79,6 +85,10 @@ public class PlantSystem implements Tickable {
 
         void setClipDurations(PlantClipDurations clipDurations) {
             this.clipDurations = clipDurations != null ? clipDurations : PlantClipDurations.NONE;
+        }
+
+        void setProjectileOrigins(PlantProjectileOrigins projectileOrigins) {
+            this.projectileOrigins = projectileOrigins != null ? projectileOrigins : PlantProjectileOrigins.NONE;
         }
 
         private Plant currentDef() {
@@ -255,6 +265,11 @@ public class PlantSystem implements Tickable {
         @Override
         public float plantPresentationDuration(PlantInstance plant, PlantState presentation) {
             return clipDurations.duration(plant, presentation);
+        }
+
+        @Override
+        public model.game.map.FloatPoint plantProjectileOrigin(PlantInstance plant) {
+            return projectileOrigins.origin(plant);
         }
     }
 }

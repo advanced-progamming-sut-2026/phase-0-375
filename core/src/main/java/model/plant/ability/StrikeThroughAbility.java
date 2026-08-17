@@ -55,8 +55,7 @@ public class StrikeThroughAbility implements PlantAbility {
             return null;
         }
 
-        execute(plant, context);
-        return TimedPlantAction.attackHold(plant, context);
+        return TimedPlantAction.attackAt(plant, context, this::execute);
     }
 
     @Override
@@ -79,7 +78,7 @@ public class StrikeThroughAbility implements PlantAbility {
         if (!context.hasZombieInLane(plant.getPosition().getY())) return;
 
         int row = plant.getPosition().getY();
-        FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
 
         Pellet pellet = new Pellet(
                 def.getDamage(),
@@ -164,7 +163,8 @@ public class StrikeThroughAbility implements PlantAbility {
             int row = plant.getPosition().getY();
             for (int i = 0; i < context.getZombiesInLane(row).size(); i++) {
                 float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
-                FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f + rangeBonus, row);
+                FloatPoint muzzle = context.plantProjectileOriginOrCell(plant);
+                FloatPoint origin = new FloatPoint(muzzle.getX() + rangeBonus, muzzle.getY());
                 for (int j = 0; j < BURST_PROJ_COUNT; j++) {
                     Pellet pellet = new Pellet(
                             def.getDamage(),

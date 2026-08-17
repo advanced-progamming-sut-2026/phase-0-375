@@ -43,8 +43,7 @@ public class HomingAbility implements PlantAbility {
 
         if (def.getAbilityType() == PlantAbilityType.SHOOT_PROJECTILE) {
             if (pickTarget(plant, context) == null) return null;
-            execute(plant, context);
-            return TimedPlantAction.attackHold(plant, context);
+            return TimedPlantAction.attackAt(plant, context, this::execute);
         }
 
         if (def.getAbilityType() == PlantAbilityType.MODIFIER_UTILITY) {
@@ -116,10 +115,7 @@ public class HomingAbility implements PlantAbility {
         ZombieInstance target = pickTarget(plant, context);
         if (target == null) return;
 
-        FloatPoint origin = new FloatPoint(
-                plant.getPosition().getX() + 0.5f,
-                plant.getPosition().getY()
-        );
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
         // Caulipower's bolt hypnotizes on hit instead of dealing lethal damage.
         int damage = def.hasTag(PlantTags.MAGIC) ? 0 : def.getDamage();
         Pellet pellet = new Pellet(
@@ -291,10 +287,7 @@ public class HomingAbility implements PlantAbility {
         List<ZombieInstance> targets = listHomingTargets(context);
         if (targets.isEmpty()) return;
 
-        FloatPoint origin = new FloatPoint(
-                plant.getPosition().getX() + 0.5f,
-                plant.getPosition().getY()
-        );
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
         int row = plant.getPosition().getY();
         int damage = Math.max(1, def.getDamage());
 

@@ -35,9 +35,12 @@ public final class BowlingBulbAnim {
                 return null;
             }
 
-            int justShotIndex = (state.getGrowthStage() == 0) ? 2 : state.getGrowthStage() - 1;
-            BowlingBulbType justShot = bowlingBulbAbility.bulbTypeForCycleIndex(justShotIndex);
-            return switch (justShot) {
+            int nextIndex = state.getGrowthStage() % 3;
+            if (nextIndex < 0) {
+                nextIndex = 0;
+            }
+            BowlingBulbType nextShot = bowlingBulbAbility.bulbTypeForCycleIndex(nextIndex);
+            return switch (nextShot) {
                 case CYAN -> AnimPose.once(entry.path(), "special", role);
                 case BLUE -> AnimPose.once(entry.path(), "special2", role);
                 case ORANGE -> AnimPose.once(entry.path(), "special3", role);

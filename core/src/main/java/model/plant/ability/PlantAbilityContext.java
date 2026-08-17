@@ -2,7 +2,7 @@ package model.plant.ability;
 
 import model.enums.PlantCategory;
 import model.enums.PlantState;
-import model.game.map.Point;
+import model.game.map.FloatPoint;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.item.Sun;
@@ -145,5 +145,27 @@ public interface PlantAbilityContext {
      */
     default float plantPresentationDuration(PlantInstance plant, PlantState presentation) {
         return 0f;
+    }
+
+    /**
+     * Grid-space muzzle for a projectile fired by {@code plant}, or {@code null}
+     * to spawn on the plant's cell. Wired from PAM part bounds in the GUI.
+     */
+    default FloatPoint plantProjectileOrigin(PlantInstance plant) {
+        return null;
+    }
+
+    /**
+     * {@link #plantProjectileOrigin} when known, otherwise the plant's cell.
+     */
+    default FloatPoint plantProjectileOriginOrCell(PlantInstance plant) {
+        FloatPoint origin = plantProjectileOrigin(plant);
+        if (origin != null) {
+            return origin;
+        }
+        if (plant == null || plant.getPosition() == null) {
+            return new FloatPoint(0f, 0f);
+        }
+        return new FloatPoint(plant.getPosition().getX(), plant.getPosition().getY());
     }
 }

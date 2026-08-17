@@ -28,7 +28,18 @@ public final class PlantAnimAdapter {
         if (plant == null || plant.getDefinition() == null) {
             return null;
         }
-        return poseForPresentation(plant, plant.getState());
+        return poseFor(plant, plant.getState());
+    }
+
+    /**
+     * Pose for an intended presentation, which may differ from {@code plant.getState()}
+     * (e.g. sampling the attack muzzle after the plant has already left ATTACKING).
+     */
+    public AnimPose poseFor(PlantInstance plant, PlantState presentation) {
+        if (plant == null || plant.getDefinition() == null || presentation == null) {
+            return null;
+        }
+        return poseForPresentation(plant, presentation);
     }
 
     /**

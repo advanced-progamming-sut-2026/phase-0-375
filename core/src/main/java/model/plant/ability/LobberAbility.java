@@ -32,6 +32,9 @@ public class LobberAbility implements PlantAbility {
     /** Butter. */
     private boolean butter = false;
 
+    /** True when {@link #butter} was rolled for the in-progress attack clip. */
+    private boolean shotPrepared = false;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.LOBBER; }
 
@@ -50,12 +53,20 @@ public class LobberAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
         if (!context.hasZombieInLane(plant.getPosition().getY())) return null;
 
-        execute(plant, context);
-        return TimedPlantAction.attackHold(plant, context);
+        prepareKernelShot(plant);
+        return TimedPlantAction.attackAt(plant, context, this::execute);
     }
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
+        try {
+            executeShot(plant, context);
+        } finally {
+            shotPrepared = false;
+        }
+    }
+
+    private void executeShot(PlantInstance plant, PlantAbilityContext context) {
         if (plant.getPosition() == null) return;
         Plant def = plant.getDefinition();
         if (def == null) return;
@@ -69,7 +80,10 @@ public class LobberAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
         if (!context.hasZombieInLane(plant.getPosition().getY())) return;
 
-        butter = false;
+        if (!shotPrepared) {
+            prepareKernelShot(plant);
+        }
+
         int shots = (int) def.getAbilityValue();
         if (shots <= 0) shots = 1;
 
@@ -78,7 +92,7 @@ public class LobberAbility implements PlantAbility {
         int damage = inferDamage(def, plant);
 
         int row = plant.getPosition().getY();
-        FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
         ZombieInstance target = nearestZombieAhead(plant, context, +1);
 
         for (int i = 0; i < shots; i++) {
@@ -105,13 +119,14 @@ public class LobberAbility implements PlantAbility {
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
         if (def == null) return;
+        shotPrepared = false;
         butter = false;
         int volley = (int) def.getPlantFoodValue();
         if (volley <= 0) return;
 
         if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
             int row = plant.getPosition().getY();
-            FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+            FloatPoint origin = context.plantProjectileOriginOrCell(plant);
             Projectile.Element element = inferElement(def, plant);
             float splashRadius = inferSplashRadius(def, plant);
             int damage = inferDamage(def, plant);
@@ -146,7 +161,7 @@ public class LobberAbility implements PlantAbility {
 
         else if (def.getPlantFoodType() == PlantFoodType.MAP_WIDE_FREEZE) {
             int row = plant.getPosition().getY();
-            FloatPoint origin = new FloatPoint(plant.getPosition().getX() + 0.5f, row);
+            FloatPoint origin = context.plantProjectileOriginOrCell(plant);
             float splashRadius = inferSplashRadius(def, plant);
             for (int i = 0; i < context.getRowCount(); i++) {
                 for (ZombieInstance zombie : context.getZombiesInLane(i)) {
@@ -192,16 +207,28 @@ public class LobberAbility implements PlantAbility {
      */
     private int inferDamage(Plant def, PlantInstance plant) {
         int baseDamage = def.getDamage();
-        // Kernel-pult: chance to throw a butter for double damage.
         if (isKernelPult(def)) {
-            float butterChance = BASE_BUTTER_CHANCE
-                    + cumulativeSpecialValue(plant, PlantSpecialTag.BUTTER_CHANCE_BUFF);
-            if (RNG.nextFloat() < butterChance) {
-                butter = true;
+            if (!shotPrepared) {
+                prepareKernelShot(plant);
+            }
+            if (butter) {
                 return baseDamage * 2;
             }
         }
         return baseDamage;
+    }
+
+    /** Rolls butter now so the attack clip (and later lob) share the same outcome. */
+    private void prepareKernelShot(PlantInstance plant) {
+        butter = false;
+        shotPrepared = true;
+        Plant def = plant != null ? plant.getDefinition() : null;
+        if (!isKernelPult(def)) {
+            return;
+        }
+        float butterChance = BASE_BUTTER_CHANCE
+                + cumulativeSpecialValue(plant, PlantSpecialTag.BUTTER_CHANCE_BUFF);
+        butter = RNG.nextFloat() < butterChance;
     }
 
     private static void aimLob(Splash splash, FloatPoint origin, ZombieInstance target, int columnCount) {
@@ -259,8 +286,9 @@ public class LobberAbility implements PlantAbility {
 
     /** @return true if this plant is a Kernel-pult. */
     private boolean isKernelPult(Plant def) {
-        return def.getName() != null
-                && def.getName().toLowerCase().contains("kernel");
+        return def != null
+            && def.getName() != null
+            && def.getName().toLowerCase().contains("kernel");
     }
 
     /** Sums up every upgrade value with the given special tag. */

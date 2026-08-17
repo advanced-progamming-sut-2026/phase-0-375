@@ -134,6 +134,18 @@ public final class LawnLayout {
         return new float[]{centerX(col), centerY(row)};
     }
 
+    /**
+     * Inverse of {@link #centerOf(float, float)}: world point to continuous grid
+     * ({@code [column, row]}, row 0 is the top lane).
+     */
+    public float[] gridOf(float worldX, float worldY) {
+        float top = LAWN_ORIGIN_Y + GRID_HEIGHT;
+        return new float[]{
+                (worldX - LAWN_ORIGIN_X) / cellWidth - 0.5f,
+                (top - worldY) / cellHeight - 0.5f
+        };
+    }
+
     /** Bottom-left of a cell in libGDX world space. */
     public float cellLeft(int col) {
         return LAWN_ORIGIN_X + col * cellWidth;
