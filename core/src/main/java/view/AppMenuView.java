@@ -54,7 +54,11 @@ public class AppMenuView {
             String command = rawCommand.trim();
             // In TUI mode an empty submit just repaints; plain mode keeps
             // the original "Empty command." behavior of each menu view.
-            if (TuiShell.getActive() != null && command.isEmpty()) continue;
+            try {
+                if (TuiShell.getActive() != null && command.isEmpty()) continue;
+            } catch (Exception e) {
+                System.out.println(e);
+            }
 
             // Phase 1: universal commands (work in any menu)
             if (CommonCommand.MENU_ENTER.matches(command)) {
@@ -95,9 +99,13 @@ public class AppMenuView {
      * active, otherwise from stdin like the original CLI.
      */
     private String readCommandLine() {
-        TuiShell shell = TuiShell.getActive();
-        if (shell != null) {
-            return shell.readCommand();
+        try {
+            TuiShell shell = TuiShell.getActive();
+            if (shell != null) {
+                return shell.readCommand();
+            }
+        } catch (Exception e) {
+            System.out.println(e);
         }
         if (!scanner.hasNextLine()) return null;
         return scanner.nextLine();
@@ -206,21 +214,11 @@ public class AppMenuView {
     // ── Display helpers ──
 
     public void displayMessage(String message) {
-        TuiShell shell = TuiShell.getActive();
-        if (shell != null) {
-            shell.log(message);
-        } else {
-            System.out.println(message);
-        }
+        TuiShell.tryLog(message);
     }
 
     public void displayError(String error) {
-        TuiShell shell = TuiShell.getActive();
-        if (shell != null) {
-            shell.logError(error);
-        } else {
-            System.err.println(error);
-        }
+        TuiShell.tryLogError(error);
     }
 
     public void displayCommandResult(CommandResult<?> result) {

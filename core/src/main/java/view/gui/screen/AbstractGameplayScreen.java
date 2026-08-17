@@ -113,6 +113,49 @@ public abstract class AbstractGameplayScreen implements Screen {
         };
     }
 
+    protected InputProcessor createWorldClickInput(
+            LawnLayout layout, WorldClickListener listener, CellHoverListener hoverListener) {
+        return new InputAdapter() {
+            private final int[] cell = new int[2];
+
+            private boolean updateHover(int screenX, int screenY) {
+                if (hoverListener == null) {
+                    return false;
+                }
+                worldViewport.unproject(unprojectTmp.set(screenX, screenY, 0f));
+                if (!layout.worldToCell(unprojectTmp.x, unprojectTmp.y, cell)) {
+                    hoverListener.onCellHover(-1, -1);
+                    return false;
+                }
+                hoverListener.onCellHover(cell[0], cell[1]);
+                return false;
+            }
+
+            @Override
+            public boolean mouseMoved(int screenX, int screenY) {
+                return updateHover(screenX, screenY);
+            }
+
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                updateHover(screenX, screenY);
+                return false;
+            }
+
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                worldViewport.unproject(unprojectTmp.set(screenX, screenY, 0f));
+                return listener.onWorldClick(unprojectTmp.x, unprojectTmp.y);
+            }
+        };
+    }
+
+    @FunctionalInterface
+    public interface WorldClickListener {
+        /** @return true if the click was consumed */
+        boolean onWorldClick(float worldX, float worldY);
+    }
+
     @FunctionalInterface
     public interface CellPickListener {
         /** @return true if the click was consumed */

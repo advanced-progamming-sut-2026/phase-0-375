@@ -39,7 +39,6 @@ import model.zombie.ZombieFactory;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
-import view.tui.TuiShell;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -380,9 +379,9 @@ public class GameModel implements BehaviorContext {
             return;
         }
         if (wave.isFinalWave()) {
-            TuiShell.getActive().log("The final wave has come.");
+            App.logToShell("The final wave has come.");
         } else {
-            TuiShell.getActive().log("Wave " + wave.getWaveNumber() + " started.");
+            App.logToShell("Wave " + wave.getWaveNumber() + " started.");
         }
     }
 

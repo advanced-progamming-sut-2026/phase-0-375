@@ -1,38 +1,95 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import controller.GameplayMenuController;
+import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
+import model.enums.GameState;
 import model.enums.MenuType;
 import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
 import model.game.level.Level;
+import model.item.Sun;
+import model.plant.PlantFactory;
+import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
+import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
+import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
+import view.gui.ui.SeedPacketActor;
+import view.gui.ui.SunHud;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * In-game lawn. Chapter backgrounds use the same left/center/right camera as debug FrontLawn.
  */
 public final class GameplayScreen extends AbstractGameplayScreen {
+    private final GameplayMenuController gameplay = GameplayMenuController.getInstance();
+    private final LawnLayout lawnLayout;
     private final LawnBackgroundRenderer lawnBackground;
     private final WaterUnderlayerRenderer waterUnderlayer;
+    private final LawnEntityRenderer entityRenderer;
+    private final DebugEntityOverlay entityOverlay;
+    private final Vector2 logoTmp = new Vector2();
+    private final Vector2 stageToScreen = new Vector2();
+    private final Vector3 worldTmp = new Vector3();
+    private final float[] sunPosTmp = new float[2];
+    private final int[] cellTmp = new int[2];
+
+    private SunHud sunHud;
+    private Table packetColumn;
+    private LawnRowColHighlight rowColHighlight;
+    private String previewPlant;
+    private float previewTime;
+    private int hoverCol = -1;
+    private int hoverRow = -1;
+    private List<String> shownPackets = List.of();
 
     public GameplayScreen(PvzGdxGame game) {
         super(game);
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
+        lawnLayout = lawnLayout();
         Chapter chapter = currentChapter();
         lawnBackground = new LawnBackgroundRenderer(
                 assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
         lawnBackground.ensureLoaded();
         waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
-                ? new WaterUnderlayerRenderer(assets, lawnLayout())
+                ? new WaterUnderlayerRenderer(assets, lawnLayout)
                 : null;
+        entityOverlay = new DebugEntityOverlay(lawnLayout, resolveFont());
+        entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
+        entityRenderer.setScreenShake(screenShake);
+        assets.textures.loadSync("UI_SeedPackets_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
+        setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, null));
         buildHud();
+    }
+
+    private BitmapFont resolveFont() {
+        try {
+            Label.LabelStyle style = skin.get("medium", Label.LabelStyle.class);
+            if (style != null && style.font != null) {
+                return style.font;
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        return skin.get(BitmapFont.class);
     }
 
     private static LawnLayout lawnLayout() {
@@ -43,17 +100,36 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private static Chapter currentChapter() {
-        GameModel model = App.getInstance().getCurrentGameModel();
-        Level level = model == null ? null : model.getCurrentLevel();
+        Level level = currentLevel();
         return level == null || level.getConfig() == null ? null : level.getConfig().getChapter();
     }
 
+    private static Level currentLevel() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        return model == null ? null : model.getCurrentLevel();
+    }
+
     private void buildHud() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        boolean sunBank = SunHud.showFor(model);
+
+        Table left = new Table();
+        left.setFillParent(true);
+        left.setTouchable(Touchable.childrenOnly);
+        left.top().left().pad(8f);
+        if (sunBank) {
+            sunHud = new SunHud(skin);
+            sunHud.setAmount(model == null ? 0 : model.getSunAmount());
+            left.add(sunHud).left().padBottom(8f).row();
+        }
+        packetColumn = new Table();
+        left.add(packetColumn).left().top();
+        uiStage.addActor(left);
+
         Table topRight = new Table();
         topRight.setFillParent(true);
         topRight.setTouchable(Touchable.childrenOnly);
         topRight.top().right().pad(12f);
-
         TextButton back = new TextButton("Back to levels", skin, "brown");
         back.addListener(new ChangeListener() {
             @Override
@@ -63,6 +139,119 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         });
         topRight.add(back).width(220f).height(48f);
         uiStage.addActor(topRight);
+        toast.toFront();
+        refreshPackets();
+    }
+
+    private void refreshPackets() {
+        List<String> selected = selectedPlants();
+        shownPackets = new ArrayList<>(selected);
+        packetColumn.clearChildren();
+        for (String name : selected) {
+            SeedPacketActor packet = new SeedPacketActor(
+                    assets.textures, skin, name, plantCost(name), plantLevel(name),
+                    boosted(name), false);
+            packet.onDragPlant(new SeedPacketActor.DragPlant() {
+                @Override
+                public void dragStart(SeedPacketActor packet) {
+                    previewPlant = name;
+                    previewTime = 0f;
+                    entityRenderer.preloadPlantIdle(name);
+                    stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
+                    packet.localToStageCoordinates(stageToScreen);
+                    followPlantDrag(stageToScreen.x, stageToScreen.y);
+                }
+
+                @Override
+                public void drag(SeedPacketActor packet, float stageX, float stageY) {
+                    followPlantDrag(stageX, stageY);
+                }
+
+                @Override
+                public void dragEnd(SeedPacketActor packet, float stageX, float stageY) {
+                    dropPlant(name, stageX, stageY);
+                    previewPlant = null;
+                    hoverCol = -1;
+                    hoverRow = -1;
+                }
+            });
+            packetColumn.add(packet)
+                    .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+                    .padBottom(6f).row();
+        }
+        refreshPacketChrome();
+    }
+
+    private void refreshPacketChrome() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        int sun = model == null ? 0 : model.getSunAmount();
+        for (Actor actor : packetColumn.getChildren()) {
+            if (!(actor instanceof SeedPacketActor packet) || packet.plantName() == null) {
+                continue;
+            }
+            String name = packet.plantName();
+            boolean ready = model == null || model.isSeedReady(name);
+            boolean afford = plantCost(name) <= sun;
+            packet.setDimmed(!ready || !afford);
+        }
+    }
+
+    private void followPlantDrag(float stageX, float stageY) {
+        stageToWorld(stageX, stageY);
+        if (lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
+            hoverCol = cellTmp[0];
+            hoverRow = cellTmp[1];
+        } else {
+            hoverCol = -1;
+            hoverRow = -1;
+        }
+    }
+
+    private void stageToWorld(float stageX, float stageY) {
+        stageToScreen.set(stageX, stageY);
+        uiStage.stageToScreenCoordinates(stageToScreen);
+        worldViewport.unproject(worldTmp.set(stageToScreen.x, stageToScreen.y, 0f));
+    }
+
+    private void dropPlant(String plantName, float stageX, float stageY) {
+        stageToWorld(stageX, stageY);
+        if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
+        showToast(result.getMessage(), !result.isSuccess());
+        refreshPacketChrome();
+    }
+
+    private boolean onWorldClick(float worldX, float worldY) {
+        return tryCollectSun(worldX, worldY);
+    }
+
+    private boolean tryCollectSun(float worldX, float worldY) {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null) {
+            return false;
+        }
+        Sun sun = entityRenderer.pickSun(model, worldX, worldY);
+        if (sun == null) {
+            return false;
+        }
+        entityRenderer.writeSunDrawPos(sun, sunPosTmp);
+        CommandResult<Void> result = gameplay.collectSun(sun);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        float destX = sunPosTmp[0];
+        float destY = sunPosTmp[1];
+        if (sunHud != null) {
+            sunHud.logoCenter(logoTmp);
+            destX = logoTmp.x;
+            destY = logoTmp.y;
+            sunHud.setAmount(model.getSunAmount());
+        }
+        entityRenderer.startSunCollect(sun, sunPosTmp[0], sunPosTmp[1], destX, destY);
+        refreshPacketChrome();
+        return true;
     }
 
     private void exitToLevels() {
@@ -79,7 +268,22 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     @Override
     protected void updateLogic(float delta) {
-        // Background only for now; waves / planting come later.
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop != null && loop.getGameState() == GameState.RUNNING) {
+            loop.update(delta);
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (sunHud != null && model != null) {
+            sunHud.setAmount(model.getSunAmount());
+        }
+        if (previewPlant != null) {
+            previewTime += delta;
+        }
+        if (!selectedPlants().equals(shownPackets)) {
+            refreshPackets();
+        } else {
+            refreshPacketChrome();
+        }
     }
 
     @Override
@@ -88,5 +292,59 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
+        if (previewPlant != null && hoverCol >= 0) {
+            if (rowColHighlight == null) {
+                rowColHighlight = new LawnRowColHighlight();
+            }
+            rowColHighlight.draw(game.batch, lawnLayout, hoverCol, hoverRow);
+        }
+        entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
+        if (previewPlant != null) {
+            entityRenderer.drawPlantIdle(game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime);
+        }
+    }
+
+    private static List<String> selectedPlants() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null || model.getSelectedPlants() == null) {
+            return List.of();
+        }
+        return model.getSelectedPlants();
+    }
+
+    private static int plantCost(String name) {
+        try {
+            if (!PlantFactory.hasDefinition(name)) {
+                return 0;
+            }
+            return PlantFactory.getDefinition(name).getCost();
+        } catch (IllegalStateException e) {
+            return 0;
+        }
+    }
+
+    private static int plantLevel(String name) {
+        User user = App.getInstance().getCurrentUser();
+        Map<String, Integer> levels = user == null ? null : user.getPlantLevels();
+        if (name == null || levels == null) {
+            return 1;
+        }
+        Integer level = levels.get(name);
+        return level == null || level < 1 ? 1 : level;
+    }
+
+    private static boolean boosted(String name) {
+        User user = App.getInstance().getCurrentUser();
+        Map<String, Boolean> boosts = user == null ? null : user.getPlantBoosts();
+        return name != null && boosts != null && Boolean.TRUE.equals(boosts.get(name));
+    }
+
+    @Override
+    public void dispose() {
+        entityOverlay.dispose();
+        if (rowColHighlight != null) {
+            rowColHighlight.dispose();
+        }
+        super.dispose();
     }
 }

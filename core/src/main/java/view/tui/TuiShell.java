@@ -43,6 +43,31 @@ public final class TuiShell {
         return active;
     }
 
+    /** GUI has no TUI; log here or fall back to stdout. */
+    public static void tryLog(String message) {
+        try {
+            TuiShell shell = active;
+            if (shell == null) {
+                throw new IllegalStateException("no tui shell");
+            }
+            shell.log(message);
+        } catch (Exception e) {
+            System.out.println(message);
+        }
+    }
+
+    public static void tryLogError(String message) {
+        try {
+            TuiShell shell = active;
+            if (shell == null) {
+                throw new IllegalStateException("no tui shell");
+            }
+            shell.logError(message);
+        } catch (Exception e) {
+            System.out.println(message);
+        }
+    }
+
     /**
      * Starts the TUI on the system terminal.
      */

@@ -14,6 +14,7 @@ import model.zombie.ZombieFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -149,6 +150,9 @@ public class PlantSelectionMenuController extends AppMenuController {
             return CommandResult.error("Need 2 gems, have " + user.getGems() + ".");
         }
 
+        if (user.getPlantBoosts() == null) {
+            user.setPlantBoosts(new HashMap<>());
+        }
         user.setGems(user.getGems() - 2);
         user.getPlantBoosts().put(type, true);
         App.getInstance().getUserRepository().flush();

@@ -211,8 +211,20 @@ public class GameplayMenuController extends AppMenuController {
         if (picked == null) {
             return CommandResult.error("No sun at (" + x + ", " + y + ").");
         }
-        model.collectSun(picked);
-        return CommandResult.success("Collected " + picked.getValue() + " sun."
+        return collectSun(picked);
+    }
+
+    /** Collects a specific token (GUI hit-tests the sprite, not the spawn tile). */
+    public CommandResult<Void> collectSun(Sun sun) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (sun == null || model.getActiveSuns() == null || !model.getActiveSuns().contains(sun)) {
+            return CommandResult.error("No sun there.");
+        }
+        model.collectSun(sun);
+        return CommandResult.success("Collected " + sun.getValue() + " sun."
                 + " Total: " + model.getSunAmount() + ".");
     }
 

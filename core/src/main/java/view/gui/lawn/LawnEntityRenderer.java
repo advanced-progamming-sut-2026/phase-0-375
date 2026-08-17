@@ -233,6 +233,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
+    private final List<SunFlight> sunFlights = new ArrayList<>();
     private final Set<Object> seenThisFrame =
             Collections.newSetFromMap(new IdentityHashMap<>());
     private final float[] xyTmp = new float[3];
@@ -399,6 +400,30 @@ public final class LawnEntityRenderer {
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
                 tickHitFlash(plant, plantVitality(plant), delta), delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
+    }
+
+    /** Idle PAM at a world point — drag-to-plant cursor ghost. */
+    public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time) {
+        ClipRef ref = plantIdleClip(plantName);
+        if (ref != null) {
+            player.draw(batch, ref, time, x, y, AnimScale.PLANT, AnimScale.PLANT, true);
+        }
+    }
+
+    public void preloadPlantIdle(String plantName) {
+        plantIdleClip(plantName);
+    }
+
+    private ClipRef plantIdleClip(String plantName) {
+        if (plantName == null || catalog == null) {
+            return null;
+        }
+        PamCatalog.PamEntry entry = catalog.forPlant(plantName);
+        if (entry == null) {
+            return null;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "idle2", "idle1", "loop");
+        return clip == null ? null : clips.getOrLoad(entry.path(), clip);
     }
 
     private void drawGraves(Batch batch, GameModel model, float delta, int row) {
@@ -639,7 +664,7 @@ public final class LawnEntityRenderer {
     }
 
     private void drawSuns(Batch batch, GameModel model, float delta) {
-        IdentityHashMap<Sun, StealSunBehavior.SunPull> pulled = new IdentityHashMap<>();
+        IdentityHashMap<Sun, StealSunBehavior.SunPull> pulled = pulledSuns(model);
         for (ZombieInstance zombie : model.getZombies()) {
             StealSunBehavior steal = (StealSunBehavior) zombie.getBehavior(ZombieBehaviorType.STEAL_SUN);
             if (steal == null || steal.getPulls().isEmpty()) {
@@ -655,7 +680,6 @@ public final class LawnEntityRenderer {
                 if (sun == null) {
                     continue;
                 }
-                pulled.put(sun, pull);
                 float[] start = pullWorld(pull);
                 float u = Math.max(0f, Math.min(1f, pull.t()));
                 u = u * u * (3f - 2f * u);
@@ -667,25 +691,110 @@ public final class LawnEntityRenderer {
         }
         List<Sun> tokens = model.getActiveSuns();
         if (tokens == null) {
+            drawSunFlights(batch, delta);
             return;
         }
         for (Sun sun : tokens) {
             if (pulled.containsKey(sun)) {
                 continue;
             }
-            float[] dest = sunWorld(sun);
-            float x = dest[0];
-            float y = dest[1];
-            if (sun.isFalling()) {
-                float t = Math.max(0f, Math.min(1f, sun.fallProgress()));
-                t = t * t * (3f - 2f * t);
-                float[] start = sun.hasOrigin()
-                        ? originWorld(sun)
-                        : new float[]{dest[0], LawnLayout.WORLD_HEIGHT};
-                x = start[0] + (dest[0] - start[0]) * t;
-                y = start[1] + (dest[1] - start[1]) * t;
+            writeSunDrawPos(sun, xyTmp);
+            drawSunToken(batch, sun, xyTmp[0], xyTmp[1], delta);
+        }
+        drawSunFlights(batch, delta);
+    }
+
+    public Sun pickSun(GameModel model, float worldX, float worldY) {
+        if (model == null || model.getActiveSuns() == null) {
+            return null;
+        }
+        IdentityHashMap<Sun, StealSunBehavior.SunPull> pulled = pulledSuns(model);
+        Sun best = null;
+        float bestD = 0f;
+        for (Sun sun : model.getActiveSuns()) {
+            if (pulled.containsKey(sun)) {
+                continue;
             }
-            drawSunToken(batch, sun, x, y, delta);
+            writeSunDrawPos(sun, xyTmp);
+            if (!SunCollect.hits(xyTmp[0], xyTmp[1], worldX, worldY)) {
+                continue;
+            }
+            float dx = worldX - xyTmp[0];
+            float dy = worldY - xyTmp[1];
+            float d = dx * dx + dy * dy;
+            if (best == null || d < bestD) {
+                best = sun;
+                bestD = d;
+            }
+        }
+        return best;
+    }
+
+    public void writeSunDrawPos(Sun sun, float[] out) {
+        float[] dest = sunWorld(sun);
+        float x = dest[0];
+        float y = dest[1];
+        if (sun.isFalling()) {
+            float t = Math.max(0f, Math.min(1f, sun.fallProgress()));
+            t = t * t * (3f - 2f * t);
+            float[] start = sun.hasOrigin()
+                    ? originWorld(sun)
+                    : new float[]{dest[0], LawnLayout.WORLD_HEIGHT};
+            x = start[0] + (dest[0] - start[0]) * t;
+            y = start[1] + (dest[1] - start[1]) * t;
+        }
+        out[0] = x;
+        out[1] = y;
+    }
+
+    public void startSunCollect(Sun sun, float x0, float y0, float x1, float y1) {
+        if (sun == null) {
+            return;
+        }
+        sunFlights.add(new SunFlight(sun, x0, y0, x1, y1));
+    }
+
+    private IdentityHashMap<Sun, StealSunBehavior.SunPull> pulledSuns(GameModel model) {
+        IdentityHashMap<Sun, StealSunBehavior.SunPull> pulled = new IdentityHashMap<>();
+        if (model.getZombies() == null) {
+            return pulled;
+        }
+        for (ZombieInstance zombie : model.getZombies()) {
+            StealSunBehavior steal = (StealSunBehavior) zombie.getBehavior(ZombieBehaviorType.STEAL_SUN);
+            if (steal == null || steal.getPulls().isEmpty()) {
+                continue;
+            }
+            for (StealSunBehavior.SunPull pull : steal.getPulls()) {
+                if (pull.sun() != null) {
+                    pulled.put(pull.sun(), pull);
+                }
+            }
+        }
+        return pulled;
+    }
+
+    private void drawSunFlights(Batch batch, float delta) {
+        for (int i = sunFlights.size() - 1; i >= 0; i--) {
+            SunFlight flight = sunFlights.get(i);
+            flight.elapsed += delta;
+            if (SunCollect.done(flight.elapsed)) {
+                sunFlights.remove(i);
+                continue;
+            }
+            float x = flight.x1;
+            float y = flight.y1;
+            float sx = 1f;
+            float sy = 1f;
+            if (SunCollect.flying(flight.elapsed)) {
+                float u = SunCollect.flyU(flight.elapsed);
+                x = flight.x0 + (flight.x1 - flight.x0) * u;
+                y = flight.y0 + (flight.y1 - flight.y0) * u;
+            } else {
+                float u = SunCollect.vanishU(flight.elapsed);
+                sx = GraveAnim.scaleX(u);
+                sy = GraveAnim.scaleY(u);
+            }
+            drawSunToken(batch, flight.sun, x, y, delta, sx, sy);
         }
     }
 
@@ -713,6 +822,11 @@ public final class LawnEntityRenderer {
     }
 
     private void drawSunToken(Batch batch, Sun sun, float x, float y, float delta) {
+        drawSunToken(batch, sun, x, y, delta, 1f, 1f);
+    }
+
+    private void drawSunToken(Batch batch, Sun sun, float x, float y, float delta,
+                             float sxN, float syN) {
         if (catalog == null) {
             return;
         }
@@ -722,7 +836,18 @@ public final class LawnEntityRenderer {
         }
         String clip = catalog.resolveClip(entry, sunClip(sun), "animation");
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
-        drawPose(batch, sun, pose, x, y, AnimScale.SUN, NO_PHASE, 0f, delta);
+        if (sxN == 1f && syN == 1f) {
+            drawPose(batch, sun, pose, x, y, AnimScale.SUN, NO_PHASE, 0f, delta);
+            return;
+        }
+        seenThisFrame.add(sun);
+        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        if (ref == null) {
+            return;
+        }
+        float stateTime = advanceClock(sun, pose.cacheKey(), delta);
+        player.draw(batch, ref, stateTime, x, y,
+                AnimScale.SUN * sxN, AnimScale.SUN * syN, pose.loop());
     }
 
     private static String sunClip(Sun sun) {
@@ -2487,6 +2612,23 @@ public final class LawnEntityRenderer {
             this.vx = vx;
             this.vy = vy;
             this.gravity = gravity;
+        }
+    }
+
+    private static final class SunFlight {
+        final Sun sun;
+        final float x0;
+        final float y0;
+        final float x1;
+        final float y1;
+        float elapsed;
+
+        SunFlight(Sun sun, float x0, float y0, float x1, float y1) {
+            this.sun = sun;
+            this.x0 = x0;
+            this.y0 = y0;
+            this.x1 = x1;
+            this.y1 = y1;
         }
     }
 
