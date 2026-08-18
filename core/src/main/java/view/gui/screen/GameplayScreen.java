@@ -9,6 +9,7 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -68,9 +69,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private List<String> shownPackets = List.of();
 
     private boolean plantfoodMode;
+    private boolean shovelMode;
+    private ImageButton shovelButton;
     private Cursor hiddenCursor;
     private TextureRegion plantfoodCursorRegion;
+    private TextureRegion shovelCursorRegion;
     private final Vector3 cursorUnprojectTmp = new Vector3();
+
+    private static final String SHOVEL_CURSOR_ID = "IMAGE_UI_HUD_INGAME_SHOVEL_ICON";
+    /** Native 768 {@code IMAGE_UI_HUD_INGAME_SHOVEL_BUTTON} size. */
+    private static final float SHOVEL_SIZE = 79f;
 
     public GameplayScreen(PvzGdxGame game) {
         super(game);
@@ -165,49 +173,67 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         bottomLeft.add(plantFoodBank).left().bottom();
         uiStage.addActor(bottomLeft);
 
-        buildDebugToolbar(model);
+        buildBottomRight(model);
 
         toast.toFront();
         refreshPackets();
     }
 
-    private void buildDebugToolbar(GameModel model) {
-        if (model == null || !model.isDebugMode()) {
+    private void buildBottomRight(GameModel model) {
+        boolean debug = model != null && model.isDebugMode();
+        boolean shovel = shovelEnabled(model);
+        if (!debug && !shovel) {
             return;
         }
         Table bottomRight = new Table();
         bottomRight.setFillParent(true);
         bottomRight.setTouchable(Touchable.childrenOnly);
-        bottomRight.bottom().right().pad(12f);
+        bottomRight.bottom().right().pad(8f);
 
-        TextButton addSun = new TextButton("+100 sun", skin, "brown");
-        addSun.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> result = gameplay.cheatAddSuns(100);
-                showToast(result.getMessage(), !result.isSuccess());
-                if (sunHud != null && result.isSuccess()) {
-                    sunHud.setAmount(App.getInstance().getCurrentGameModel().getSunAmount());
+        if (debug) {
+            TextButton addSun = new TextButton("+100 sun", skin, "brown");
+            addSun.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    CommandResult<Void> result = gameplay.cheatAddSuns(100);
+                    showToast(result.getMessage(), !result.isSuccess());
+                    if (sunHud != null && result.isSuccess()) {
+                        sunHud.setAmount(App.getInstance().getCurrentGameModel().getSunAmount());
+                    }
+                    refreshPacketChrome();
                 }
-                refreshPacketChrome();
-            }
-        });
+            });
 
-        TextButton addPlantFood = new TextButton("+1 plant food", skin, "brown");
-        addPlantFood.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> result = gameplay.cheatAddPlantFood();
-                showToast(result.getMessage(), !result.isSuccess());
-                if (plantFoodBank != null && result.isSuccess()) {
-                    plantFoodBank.setCount(App.getInstance().getCurrentGameModel().getPlantFoodCount());
+            TextButton addPlantFood = new TextButton("+1 plant food", skin, "brown");
+            addPlantFood.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    CommandResult<Void> result = gameplay.cheatAddPlantFood();
+                    showToast(result.getMessage(), !result.isSuccess());
+                    if (plantFoodBank != null && result.isSuccess()) {
+                        plantFoodBank.setCount(App.getInstance().getCurrentGameModel().getPlantFoodCount());
+                    }
+                    refreshPacketChrome();
                 }
-                refreshPacketChrome();
-            }
-        });
+            });
 
-        bottomRight.add(addSun).width(160f).height(44f).padRight(8f);
-        bottomRight.add(addPlantFood).width(180f).height(44f);
+            Table cheats = new Table();
+            cheats.add(addSun).width(160f).height(44f).padRight(8f);
+            cheats.add(addPlantFood).width(180f).height(44f);
+            bottomRight.add(cheats).right().padBottom(8f).row();
+        }
+
+        if (shovel) {
+            shovelButton = new ImageButton(skin, "ingame_shovel");
+            shovelButton.setProgrammaticChangeEvents(false);
+            shovelButton.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    setShovelMode(!shovelMode);
+                }
+            });
+            bottomRight.add(shovelButton).size(SHOVEL_SIZE).right();
+        }
         uiStage.addActor(bottomRight);
     }
 
@@ -297,11 +323,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setPlantfoodMode(false);
             return true;
         }
+        if (shovelMode) {
+            tryPluck(worldX, worldY);
+            setShovelMode(false);
+            return true;
+        }
         return tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY);
     }
 
     private void onCellHover(int col, int row) {
-        if (!plantfoodMode) {
+        if (!plantfoodMode && !shovelMode) {
             return;
         }
         hoverCol = col;
@@ -316,17 +347,45 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         showToast(result.getMessage(), !result.isSuccess());
     }
 
+    private void tryPluck(float worldX, float worldY) {
+        if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.pluck(cellTmp[0], cellTmp[1]);
+        showToast(result.getMessage(), !result.isSuccess());
+    }
+
     private void setPlantfoodMode(boolean armed) {
         if (armed == plantfoodMode) {
             return;
+        }
+        if (armed) {
+            setShovelMode(false);
         }
         plantfoodMode = armed;
         if (plantFoodBank != null) {
             plantFoodBank.setButtonChecked(plantfoodMode);
         }
-        if (plantfoodMode) {
+        applyArmedCursor();
+    }
+
+    private void setShovelMode(boolean armed) {
+        if (armed == shovelMode) {
+            return;
+        }
+        if (armed) {
+            setPlantfoodMode(false);
+        }
+        shovelMode = armed;
+        if (shovelButton != null) {
+            shovelButton.setChecked(shovelMode);
+        }
+        applyArmedCursor();
+    }
+
+    private void applyArmedCursor() {
+        if (plantfoodMode || shovelMode) {
             hideOsCursor();
-            // Drop any in-flight plant preview so the two interactions never overlap.
             previewPlant = null;
             previewTime = 0f;
         } else {
@@ -447,7 +506,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
-        boolean highlight = (previewPlant != null || plantfoodMode) && hoverCol >= 0;
+        boolean highlight = (previewPlant != null || plantfoodMode || shovelMode) && hoverCol >= 0;
         if (highlight) {
             if (rowColHighlight == null) {
                 rowColHighlight = new LawnRowColHighlight();
@@ -464,38 +523,52 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     protected void renderGraphics(float delta) {
         super.renderGraphics(delta);
         if (plantfoodMode) {
-            drawPlantfoodCursor();
+            if (plantfoodCursorRegion == null) {
+                plantfoodCursorRegion = assets.textures.region(PlantFoodBankHud.CURSOR_ID);
+            }
+            drawHudCursor(plantfoodCursorRegion, CURSOR_SIZE);
+        } else if (shovelMode) {
+            if (shovelCursorRegion == null) {
+                shovelCursorRegion = assets.textures.region(SHOVEL_CURSOR_ID);
+            }
+            float w = shovelCursorRegion == null || shovelCursorRegion.getRegionWidth() <= 0
+                ? CURSOR_SIZE
+                : shovelCursorRegion.getRegionWidth();
+            drawHudCursor(shovelCursorRegion, w);
         }
     }
 
     /** Display size of the cursor image, in UI units (matches the 768 atlas scale). */
     private static final float CURSOR_SIZE = 64f;
 
-    private void drawPlantfoodCursor() {
-        if (plantfoodCursorRegion == null) {
-            plantfoodCursorRegion = assets.textures.region(PlantFoodBankHud.CURSOR_ID);
-            if (plantfoodCursorRegion == null) {
-                return; // atlas still loading — leave the OS cursor hidden for now
-            }
+    private void drawHudCursor(TextureRegion region, float w) {
+        if (region == null) {
+            return;
         }
-        // Unproject the OS mouse position into UI space so the cursor image
-        // tracks the mouse exactly even with the ExtendViewport letterboxing.
         cursorUnprojectTmp.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
         uiViewport.unproject(cursorUnprojectTmp);
-        float w = CURSOR_SIZE;
-        float h = plantfoodCursorRegion.getRegionWidth() <= 0f
-            ? CURSOR_SIZE
-            : CURSOR_SIZE * (plantfoodCursorRegion.getRegionHeight()
-            / (float) plantfoodCursorRegion.getRegionWidth());
-        // Centre the image on the mouse hotspot (PvZ2 centers the orb on the cursor).
+        float h = region.getRegionWidth() <= 0f
+            ? w
+            : w * (region.getRegionHeight() / (float) region.getRegionWidth());
         game.batch.setProjectionMatrix(uiCamera.combined);
         game.batch.begin();
         game.batch.draw(
-            plantfoodCursorRegion,
+            region,
             cursorUnprojectTmp.x - w * 0.5f,
             cursorUnprojectTmp.y - h * 0.5f,
             w, h);
         game.batch.end();
+    }
+
+    private static boolean shovelEnabled(GameModel model) {
+        if (model == null) {
+            return true;
+        }
+        Level level = model.getCurrentLevel();
+        if (level == null || level.getConfig() == null || level.getConfig().getRules() == null) {
+            return true;
+        }
+        return level.getConfig().getRules().isShovelEnabled();
     }
 
     private static List<String> selectedPlants() {
@@ -539,6 +612,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         // restore the OS cursor so the rest of the app is usable.
         if (plantfoodMode) {
             setPlantfoodMode(false);
+        }
+        if (shovelMode) {
+            setShovelMode(false);
         }
         super.hide();
     }
