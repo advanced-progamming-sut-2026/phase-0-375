@@ -25,6 +25,7 @@ import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
 import model.item.Grave;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
@@ -226,6 +227,21 @@ public class GameplayMenuController extends AppMenuController {
         model.collectSun(sun);
         return CommandResult.success("Collected " + sun.getValue() + " sun."
                 + " Total: " + model.getSunAmount() + ".");
+    }
+
+    /** Collects a plant-food token from the lawn (GUI hit-tests the sprite). */
+    public CommandResult<Void> collectPlantFood(PlantFoodPickup food) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (food == null || model.getActivePlantFood() == null
+                || !model.getActivePlantFood().contains(food)) {
+            return CommandResult.error("No plant food there.");
+        }
+        model.collectPlantFood(food);
+        return CommandResult.success("Collected plant food. Total: "
+                + model.getPlantFoodCount() + ".");
     }
 
     /**

@@ -27,6 +27,7 @@ import model.game.systems.ChapterEffectsSystem;
 import model.item.Grave;
 import model.item.Grave.GraveType;
 import model.item.LootDrop;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.pushable.Pushable;
 import model.item.placeable.Placeable;
@@ -70,6 +71,7 @@ public class GameModel implements BehaviorContext {
     private List<ZombieInstance> activeZombies;
     private List<Projectile> activeProjectiles;
     private List<Sun> activeSuns;
+    private List<PlantFoodPickup> activePlantFood;
     private List<LootDrop> pendingLootDrops;
     private List<Pushable> orphanedPushables;
 
@@ -114,6 +116,7 @@ public class GameModel implements BehaviorContext {
         this.activeZombies = new ArrayList<>();
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
+        this.activePlantFood = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
         this.orphanedPushables = new ArrayList<>();
 
@@ -226,6 +229,10 @@ public class GameModel implements BehaviorContext {
     @Override
     public List<Sun> getActiveSuns() {
         return activeSuns;
+    }
+
+    public List<PlantFoodPickup> getActivePlantFood() {
+        return activePlantFood;
     }
 
     public boolean isNightLevel() {
@@ -458,6 +465,20 @@ public class GameModel implements BehaviorContext {
         activeSuns.remove(sun);
         resources.addSun(sun.getValue());
         questStats.onSunCollected(sun.getValue());
+    }
+
+    public void spawnPlantFood(PlantFoodPickup pickup) {
+        if (pickup != null) {
+            activePlantFood.add(pickup);
+        }
+    }
+
+    public void collectPlantFood(PlantFoodPickup pickup) {
+        if (pickup == null) {
+            return;
+        }
+        activePlantFood.remove(pickup);
+        resources.addPlantFood();
     }
 
     public void tick(float deltaTime) {

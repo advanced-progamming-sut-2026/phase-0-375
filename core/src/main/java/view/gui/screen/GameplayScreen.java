@@ -1,6 +1,10 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Cursor;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -18,6 +22,7 @@ import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
 import model.user.User;
@@ -28,6 +33,7 @@ import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
+import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SunHud;
 
@@ -52,6 +58,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final int[] cellTmp = new int[2];
 
     private SunHud sunHud;
+    private PlantFoodBankHud plantFoodBank;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private String previewPlant;
@@ -60,23 +67,32 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private int hoverRow = -1;
     private List<String> shownPackets = List.of();
 
+    private boolean plantfoodMode;
+    private Cursor hiddenCursor;
+    private TextureRegion plantfoodCursorRegion;
+    private final Vector3 cursorUnprojectTmp = new Vector3();
+
     public GameplayScreen(PvzGdxGame game) {
         super(game);
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         lawnLayout = lawnLayout();
         Chapter chapter = currentChapter();
         lawnBackground = new LawnBackgroundRenderer(
-                assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
+            assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
         lawnBackground.ensureLoaded();
         waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
-                ? new WaterUnderlayerRenderer(assets, lawnLayout)
-                : null;
+            ? new WaterUnderlayerRenderer(assets, lawnLayout)
+            : null;
         entityOverlay = new DebugEntityOverlay(lawnLayout, resolveFont());
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
         assets.textures.loadSync("UI_SeedPackets_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
-        setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, null));
+
+        assets.textures.loadSync(PlantFoodBankHud.ATLAS_GROUP);
+        assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_0);
+        assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_1);
+        setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         buildHud();
     }
 
@@ -139,8 +155,60 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         });
         topRight.add(back).width(220f).height(48f);
         uiStage.addActor(topRight);
+
+        plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
+        plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
+        Table bottomLeft = new Table();
+        bottomLeft.setFillParent(true);
+        bottomLeft.setTouchable(Touchable.childrenOnly);
+        bottomLeft.bottom().left().pad(8f);
+        bottomLeft.add(plantFoodBank).left().bottom();
+        uiStage.addActor(bottomLeft);
+
+        buildDebugToolbar(model);
+
         toast.toFront();
         refreshPackets();
+    }
+
+    private void buildDebugToolbar(GameModel model) {
+        if (model == null || !model.isDebugMode()) {
+            return;
+        }
+        Table bottomRight = new Table();
+        bottomRight.setFillParent(true);
+        bottomRight.setTouchable(Touchable.childrenOnly);
+        bottomRight.bottom().right().pad(12f);
+
+        TextButton addSun = new TextButton("+100 sun", skin, "brown");
+        addSun.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> result = gameplay.cheatAddSuns(100);
+                showToast(result.getMessage(), !result.isSuccess());
+                if (sunHud != null && result.isSuccess()) {
+                    sunHud.setAmount(App.getInstance().getCurrentGameModel().getSunAmount());
+                }
+                refreshPacketChrome();
+            }
+        });
+
+        TextButton addPlantFood = new TextButton("+1 plant food", skin, "brown");
+        addPlantFood.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> result = gameplay.cheatAddPlantFood();
+                showToast(result.getMessage(), !result.isSuccess());
+                if (plantFoodBank != null && result.isSuccess()) {
+                    plantFoodBank.setCount(App.getInstance().getCurrentGameModel().getPlantFoodCount());
+                }
+                refreshPacketChrome();
+            }
+        });
+
+        bottomRight.add(addSun).width(160f).height(44f).padRight(8f);
+        bottomRight.add(addPlantFood).width(180f).height(44f);
+        uiStage.addActor(bottomRight);
     }
 
     private void refreshPackets() {
@@ -149,8 +217,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         packetColumn.clearChildren();
         for (String name : selected) {
             SeedPacketActor packet = new SeedPacketActor(
-                    assets.textures, skin, name, plantCost(name), plantLevel(name),
-                    boosted(name), false);
+                assets.textures, skin, name, plantCost(name), plantLevel(name),
+                boosted(name), false);
             packet.onDragPlant(new SeedPacketActor.DragPlant() {
                 @Override
                 public void dragStart(SeedPacketActor packet) {
@@ -176,8 +244,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 }
             });
             packetColumn.add(packet)
-                    .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
-                    .padBottom(6f).row();
+                .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+                .padBottom(6f).row();
         }
         refreshPacketChrome();
     }
@@ -224,7 +292,91 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private boolean onWorldClick(float worldX, float worldY) {
-        return tryCollectSun(worldX, worldY);
+        if (plantfoodMode) {
+            tryFeedPlantFood(worldX, worldY);
+            setPlantfoodMode(false);
+            return true;
+        }
+        return tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY);
+    }
+
+    private void onCellHover(int col, int row) {
+        if (!plantfoodMode) {
+            return;
+        }
+        hoverCol = col;
+        hoverRow = row;
+    }
+
+    private void tryFeedPlantFood(float worldX, float worldY) {
+        if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.feed(cellTmp[0], cellTmp[1]);
+        showToast(result.getMessage(), !result.isSuccess());
+    }
+
+    private void setPlantfoodMode(boolean armed) {
+        if (armed == plantfoodMode) {
+            return;
+        }
+        plantfoodMode = armed;
+        if (plantFoodBank != null) {
+            plantFoodBank.setButtonChecked(plantfoodMode);
+        }
+        if (plantfoodMode) {
+            hideOsCursor();
+            // Drop any in-flight plant preview so the two interactions never overlap.
+            previewPlant = null;
+            previewTime = 0f;
+        } else {
+            restoreOsCursor();
+            hoverCol = -1;
+            hoverRow = -1;
+        }
+    }
+
+    private void hideOsCursor() {
+        if (hiddenCursor == null) {
+            Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+            pixmap.setColor(0f, 0f, 0f, 0f);
+            pixmap.fill();
+            hiddenCursor = Gdx.graphics.newCursor(pixmap, 0, 0);
+            pixmap.dispose();
+        }
+        if (hiddenCursor != null) {
+            Gdx.graphics.setCursor(hiddenCursor);
+        }
+    }
+
+    private void restoreOsCursor() {
+        Gdx.graphics.setSystemCursor(Cursor.SystemCursor.Arrow);
+    }
+
+    private boolean tryCollectPlantFood(float worldX, float worldY) {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null) {
+            return false;
+        }
+        PlantFoodPickup food = entityRenderer.pickPlantFood(model, worldX, worldY);
+        if (food == null) {
+            return false;
+        }
+        CommandResult<Void> result = gameplay.collectPlantFood(food);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        entityRenderer.writePlantFoodDrawPos(food, sunPosTmp);
+        float destX = sunPosTmp[0];
+        float destY = sunPosTmp[1];
+        if (plantFoodBank != null) {
+            plantFoodBank.logoCenter(logoTmp);
+            destX = logoTmp.x;
+            destY = logoTmp.y;
+            plantFoodBank.setCount(model.getPlantFoodCount());
+        }
+        entityRenderer.startPlantFoodCollect(food, sunPosTmp[0], sunPosTmp[1], destX, destY);
+        return true;
     }
 
     private boolean tryCollectSun(float worldX, float worldY) {
@@ -276,6 +428,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());
         }
+        if (plantFoodBank != null && model != null) {
+            plantFoodBank.setCount(model.getPlantFoodCount());
+        }
         if (previewPlant != null) {
             previewTime += delta;
         }
@@ -292,7 +447,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
-        if (previewPlant != null && hoverCol >= 0) {
+        boolean highlight = (previewPlant != null || plantfoodMode) && hoverCol >= 0;
+        if (highlight) {
             if (rowColHighlight == null) {
                 rowColHighlight = new LawnRowColHighlight();
             }
@@ -302,6 +458,44 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (previewPlant != null) {
             entityRenderer.drawPlantIdle(game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime);
         }
+    }
+
+    @Override
+    protected void renderGraphics(float delta) {
+        super.renderGraphics(delta);
+        if (plantfoodMode) {
+            drawPlantfoodCursor();
+        }
+    }
+
+    /** Display size of the cursor image, in UI units (matches the 768 atlas scale). */
+    private static final float CURSOR_SIZE = 64f;
+
+    private void drawPlantfoodCursor() {
+        if (plantfoodCursorRegion == null) {
+            plantfoodCursorRegion = assets.textures.region(PlantFoodBankHud.CURSOR_ID);
+            if (plantfoodCursorRegion == null) {
+                return; // atlas still loading — leave the OS cursor hidden for now
+            }
+        }
+        // Unproject the OS mouse position into UI space so the cursor image
+        // tracks the mouse exactly even with the ExtendViewport letterboxing.
+        cursorUnprojectTmp.set(Gdx.input.getX(), Gdx.input.getY(), 0f);
+        uiViewport.unproject(cursorUnprojectTmp);
+        float w = CURSOR_SIZE;
+        float h = plantfoodCursorRegion.getRegionWidth() <= 0f
+            ? CURSOR_SIZE
+            : CURSOR_SIZE * (plantfoodCursorRegion.getRegionHeight()
+            / (float) plantfoodCursorRegion.getRegionWidth());
+        // Centre the image on the mouse hotspot (PvZ2 centers the orb on the cursor).
+        game.batch.setProjectionMatrix(uiCamera.combined);
+        game.batch.begin();
+        game.batch.draw(
+            plantfoodCursorRegion,
+            cursorUnprojectTmp.x - w * 0.5f,
+            cursorUnprojectTmp.y - h * 0.5f,
+            w, h);
+        game.batch.end();
     }
 
     private static List<String> selectedPlants() {
@@ -340,10 +534,25 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     @Override
+    public void hide() {
+        // If the player leaves gameplay while the plant-food cursor is armed,
+        // restore the OS cursor so the rest of the app is usable.
+        if (plantfoodMode) {
+            setPlantfoodMode(false);
+        }
+        super.hide();
+    }
+
+    @Override
     public void dispose() {
         entityOverlay.dispose();
         if (rowColHighlight != null) {
             rowColHighlight.dispose();
+        }
+        restoreOsCursor();
+        if (hiddenCursor != null) {
+            hiddenCursor.dispose();
+            hiddenCursor = null;
         }
         super.dispose();
     }

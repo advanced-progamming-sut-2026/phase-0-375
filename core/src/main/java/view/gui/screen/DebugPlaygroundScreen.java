@@ -27,6 +27,7 @@ import model.game.map.Cell;
 import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.core.PvZGameLoop;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
@@ -441,13 +442,33 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     }
 
     private boolean onWorldClick(float worldX, float worldY) {
-        if (tryCollectSun(worldX, worldY)) {
+        if (tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY)) {
             return true;
         }
         if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
             return false;
         }
         return onCellPicked(cellTmp[0], cellTmp[1]);
+    }
+
+    private boolean tryCollectPlantFood(float worldX, float worldY) {
+        if (pickerPanel.isVisible()) {
+            return false;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null) {
+            return false;
+        }
+        PlantFoodPickup food = entityRenderer.pickPlantFood(model, worldX, worldY);
+        if (food == null) {
+            return false;
+        }
+        CommandResult<Void> result = gameplay.collectPlantFood(food);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        refreshStatus();
+        return true;
     }
 
     private boolean tryCollectSun(float worldX, float worldY) {

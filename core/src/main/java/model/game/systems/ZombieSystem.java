@@ -19,6 +19,7 @@ import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
 import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
+import model.item.PlantFoodPickup;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
 
@@ -448,9 +449,12 @@ public class ZombieSystem implements Tickable {
             if (zombie.getState() == ZombieState.DYING) {
                 zombie.fireOnDeathBehaviors(context);
 
-                // Drop plant food if glowing.
+                // Drop plant food on the death tile if glowing (click to collect).
                 if (zombie.isGlowing()) {
-                    gameModel.addPlantFood();
+                    var pos = zombie.getGridPosition();
+                    if (pos != null) {
+                        gameModel.spawnPlantFood(new PlantFoodPickup(pos.getX(), pos.getY()));
+                    }
                 }
 
                 zombie.setState(ZombieState.DEAD);
