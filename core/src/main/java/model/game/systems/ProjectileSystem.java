@@ -609,6 +609,12 @@ public class ProjectileSystem implements Tickable {
         if (newRow != projectile.getRow()) {
             projectile.setRow(newRow);
         }
+
+        float x = projectile.getX();
+        if (x < 0) {
+            projectile.setX(-x);
+            projectile.setVelocity(-projectile.getVelocity());
+        }
     }
 
     private void deflectBulb(BowlingBulb bulb) {

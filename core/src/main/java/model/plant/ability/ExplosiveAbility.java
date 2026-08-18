@@ -375,13 +375,14 @@ public class ExplosiveAbility implements PlantAbility {
             if (lane < 0 || lane >= context.getRowCount()) continue;
 
             for (int i = 0; i < grapesPerLane; i++) {
+                int direction = (i < grapesPerLane / 2) ? -1 : +1;
                 Pellet grape = new Pellet(
                         GRAPE_DAMAGE,
                         new FloatPoint(originX + i * 0.3f, lane),
                         lane,
                         GRAPE_VELOCITY,
                         Projectile.Element.NONE,
-                        +1
+                        direction
                 );
                 grape.setPierce(true);
                 grape.setBouncing(true);
