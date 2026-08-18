@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.math.Matrix4;
 import model.app.App;
 import model.enums.PlacableLayer;
+import model.enums.PlantState;
 import model.game.core.GameModel;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
@@ -16,6 +17,7 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.ExplosivePlantFx;
+import view.gui.anim.plant.MeleePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -50,6 +52,9 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Integer> meleeAttackFxEpoch = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, OneShotFx> meleeIdlePulses = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
@@ -96,6 +101,8 @@ public final class LawnEntityRenderer {
         IdentityHashMap<PlantInstance, float[]> deathBlastNow = new IdentityHashMap<>();
         for (PlantInstance plant : plants) {
             maybeSpawnPlantExplosion(plant, deathBlastNow);
+            maybeSpawnMeleeFx(plant);
+            updateMeleeIdlePulse(plant);
         }
         spawnMissingDeathBlasts(deathBlastNow);
         deathBlastSeen.clear();
@@ -118,6 +125,16 @@ public final class LawnEntityRenderer {
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        meleeAttackFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        meleePlantFoodFxSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        meleeIdlePulses.entrySet().removeIf(entry -> {
+            if (seenThisFrame.contains(entry.getKey())) {
+                return false;
+            }
+            backEffects.remove(entry.getValue());
+            frontEffects.remove(entry.getValue());
+            return true;
+        });
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
@@ -156,6 +173,93 @@ public final class LawnEntityRenderer {
         spawnExplosionSpecs(ExplosivePlantFx.specsFor(plant), pos, xy[0], xy[1]);
     }
 
+    private void maybeSpawnMeleeFx(PlantInstance plant) {
+        Point pos = plant.getPosition();
+        if (pos == null) {
+            return;
+        }
+        seenThisFrame.add(plant);
+        AnimPose pose = plantAdapter.poseFor(plant);
+        if (!MeleePlantFx.shouldSpawn(plant, pose)) {
+            meleePlantFoodFxSpawned.remove(plant);
+            return;
+        }
+        boolean plantFood = plant.getState() == PlantState.PLANT_FOOD;
+        if (plantFood) {
+            if (meleePlantFoodFxSpawned.put(plant, Boolean.TRUE) != null) {
+                return;
+            }
+        } else {
+            meleePlantFoodFxSpawned.remove(plant);
+            int epoch = plant.getActionEpoch();
+            Integer last = meleeAttackFxEpoch.get(plant);
+            if (last != null && last == epoch) {
+                return;
+            }
+            meleeAttackFxEpoch.put(plant, epoch);
+        }
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        int radius = MeleePlantFx.tileRadius(plant, plantFood);
+        for (MeleePlantFx.Spec spec : MeleePlantFx.specsFor(plant, plantFood)) {
+            if (spec.kind() == MeleePlantFx.Kind.TILE_HIT) {
+                spawnMeleeTileHits(spec, pos, radius);
+            } else {
+                addEffect(toExplosiveLayer(spec.layer()), spec.pamPath(), spec.clipName(),
+                        xy[0], xy[1], AnimScale.PLANT, false);
+            }
+        }
+    }
+
+    private void updateMeleeIdlePulse(PlantInstance plant) {
+        MeleePlantFx.Spec spec = MeleePlantFx.idlePulseSpec(plant);
+        Point pos = plant.getPosition();
+        boolean show = spec != null && pos != null
+                && plant.getState() != PlantState.ATTACKING
+                && plant.getState() != PlantState.PLANT_FOOD
+                && plant.getState() != PlantState.DYING;
+        if (!show) {
+            removeMeleeIdlePulse(plant);
+            return;
+        }
+        if (meleeIdlePulses.containsKey(plant)) {
+            return;
+        }
+        float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        OneShotFx fx = addEffect(toExplosiveLayer(spec.layer()), spec.pamPath(), spec.clipName(),
+                xy[0], xy[1], AnimScale.PLANT, true);
+        meleeIdlePulses.put(plant, fx);
+    }
+
+    private void removeMeleeIdlePulse(PlantInstance plant) {
+        OneShotFx fx = meleeIdlePulses.remove(plant);
+        if (fx == null) {
+            return;
+        }
+        backEffects.remove(fx);
+        frontEffects.remove(fx);
+    }
+
+    private void spawnMeleeTileHits(MeleePlantFx.Spec spec, Point pos, int radius) {
+        int row = pos.getY();
+        int col = pos.getX();
+        for (int dr = -radius; dr <= radius; dr++) {
+            for (int dc = -radius; dc <= radius; dc++) {
+                int r = row + dr;
+                int c = col + dc;
+                if (r < 0 || c < 0 || r >= layout.rows() || c >= layout.cols()) {
+                    continue;
+                }
+                float[] tile = layout.centerOf(r, c);
+                addEffect(toExplosiveLayer(spec.layer()), spec.pamPath(), spec.clipName(),
+                        tile[0], tile[1], AnimScale.PLANT, false);
+            }
+        }
+    }
+
+    private static ExplosivePlantFx.Layer toExplosiveLayer(MeleePlantFx.Layer layer) {
+        return layer == MeleePlantFx.Layer.BACK ? ExplosivePlantFx.Layer.BACK : ExplosivePlantFx.Layer.FRONT;
+    }
+
     private void spawnMissingDeathBlasts(IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
         for (var entry : deathBlastSeen.entrySet()) {
             if (deathBlastNow.containsKey(entry.getKey())) {
@@ -176,22 +280,23 @@ public final class LawnEntityRenderer {
                 for (int col = 0; col < layout.cols(); col++) {
                     float[] tile = layout.centerOf(row, col);
                     addEffect(spec.layer(), spec.pamPath(), ExplosivePlantFx.jalapenoClip(col),
-                            tile[0], tile[1], AnimScale.PLANT);
+                            tile[0], tile[1], AnimScale.PLANT, false);
                 }
             } else {
-                addEffect(spec.layer(), spec.pamPath(), spec.clipName(), x, y, AnimScale.PLANT);
+                addEffect(spec.layer(), spec.pamPath(), spec.clipName(), x, y, AnimScale.PLANT, false);
             }
         }
     }
 
-    private void addEffect(ExplosivePlantFx.Layer layer, String pamPath, String clipName,
-                           float x, float y, float scale) {
-        OneShotFx fx = new OneShotFx(pamPath, clipName, x, y, scale);
+    private OneShotFx addEffect(ExplosivePlantFx.Layer layer, String pamPath, String clipName,
+                                float x, float y, float scale, boolean loop) {
+        OneShotFx fx = new OneShotFx(pamPath, clipName, x, y, scale, loop);
         if (layer == ExplosivePlantFx.Layer.BACK) {
             backEffects.add(fx);
         } else {
             frontEffects.add(fx);
         }
+        return fx;
     }
 
     private void harvestProjectileHits(GameModel model) {
@@ -211,7 +316,7 @@ public final class LawnEntityRenderer {
             return;
         }
         String clip = hit.clip() != null ? hit.clip() : ProjectilePamPaths.CLIP_PREFERENCES[0];
-        frontEffects.add(new OneShotFx(hit.path(), clip, x, y, AnimScale.PROJECTILE));
+        frontEffects.add(new OneShotFx(hit.path(), clip, x, y, AnimScale.PROJECTILE, false));
     }
 
     private void drawEffects(Batch batch, List<OneShotFx> effects, float delta) {
@@ -229,8 +334,8 @@ public final class LawnEntityRenderer {
             } else {
                 fx.time += delta;
             }
-            player.draw(batch, ref, fx.time, fx.x, fx.y, fx.scale, fx.scale, false);
-            if (fx.duration > 0f && fx.time >= fx.duration) {
+            player.draw(batch, ref, fx.time, fx.x, fx.y, fx.scale, fx.scale, fx.loop);
+            if (!fx.loop && fx.duration > 0f && fx.time >= fx.duration) {
                 it.remove();
             }
         }
@@ -383,16 +488,18 @@ public final class LawnEntityRenderer {
         final float x;
         final float y;
         final float scale;
+        final boolean loop;
         float time;
         float duration;
         boolean started;
 
-        OneShotFx(String pamPath, String clipName, float x, float y, float scale) {
+        OneShotFx(String pamPath, String clipName, float x, float y, float scale, boolean loop) {
             this.pamPath = pamPath;
             this.clipName = clipName;
             this.x = x;
             this.y = y;
             this.scale = scale > 0f ? scale : 1f;
+            this.loop = loop;
         }
     }
 }

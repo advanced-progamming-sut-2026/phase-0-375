@@ -145,6 +145,10 @@ public class PlantInstance implements Placeable {
             return;
         }
         tickAbilityCooldowns(deltaTime);
+        PlantAbility ticking = getAbilityStrategy();
+        if (ticking != null) {
+            ticking.tick(this, deltaTime);
+        }
         if (pendingPlantFoodEffect) {
             pendingPlantFoodEffect = false;
             firePlantFoodEffect(context);

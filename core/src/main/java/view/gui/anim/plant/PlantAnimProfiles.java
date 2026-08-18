@@ -33,6 +33,11 @@ public final class PlantAnimProfiles {
         SquashAnim.register(overrides);
         TangleKelpAnim.register(overrides);
         GraveBusterAnim.register(overrides);
+        BonkChoyAnim.register(overrides);
+        WasabiWhipAnim.register(overrides);
+        PhatBeetAnim.register(overrides);
+        KiwibeastAnim.register(overrides);
+        ChomperAnim.register(overrides);
         // TODO: SunshroomAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);
     }

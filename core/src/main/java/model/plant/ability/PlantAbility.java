@@ -42,4 +42,11 @@ public interface PlantAbility extends Ability {
     default float getNextActionCooldown(PlantInstance plant) {
         return -1f;
     }
+
+    /**
+     * Optional per-tick bookkeeping (growth, digestion visuals, …).
+     * Default: no-op.
+     */
+    default void tick(PlantInstance plant, float deltaTime) {
+    }
 }

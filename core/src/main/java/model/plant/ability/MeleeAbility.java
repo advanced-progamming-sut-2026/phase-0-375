@@ -1,6 +1,7 @@
 package model.plant.ability;
 
 import model.enums.*;
+import model.game.map.terrain.IceTerrainStrategy;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.definition.PlantLevels;
@@ -9,6 +10,8 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -19,8 +22,59 @@ public class MeleeAbility implements PlantAbility {
     /** Maximum number of zombies that chomper can digest when it's on plant food. */
     private static final int DIGESTING_ZOMBIES = 3;
 
+    /** Default digestion time (seconds) after the Chomper swallows a zombie. */
+    private static final float CHOMPER_DIGEST_DURATION = 40.0f;
+    /** Damage dealt to the swallowed zombie (intentionally huge to one-shot). */
+    private static final int CHOMPER_SWALLOW_DAMAGE = 6767;
+
+    /** Kiwibeast elapsed time to reach stage 2. */
+    private static final float KIWIBEAST_STAGE2_SECONDS = 24f;
+    /** Kiwibeast elapsed time to reach stage 3. */
+    private static final float KIWIBEAST_STAGE3_SECONDS = 72f;
+
+    private static final int AREA_3X3_VALUE = 9;
+    private static final int AREA_5X5_VALUE = 25;
+
+    private final List<ZombieInstance> targets = new ArrayList<>();
+    private boolean consumedAction;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.MELEE; }
+
+    @Override
+    public void tick(PlantInstance plant, float deltaTime) {
+        if (plant == null || deltaTime <= 0f) return;
+        Plant def = plant.getDefinition();
+        if (def == null || !named(def, "Kiwibeast")) return;
+        AbilityState state = plant.getAbilityState(def.getAbilityType());
+        if (state == null) return;
+        state.setChargeProgress(state.getChargeProgress() + deltaTime);
+        state.setGrowthStage(kiwibeastStageFromElapsed(state.getChargeProgress()));
+    }
+
+    @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        consumedAction = false;
+        targets.clear();
+        if (plant.getPosition() == null) return null;
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            consumedAction = true;
+            context.triggerFamilyPlantFood(PlantCategory.MELEE);
+            return null;
+        }
+
+        switch (def.getAbilityType()) {
+            case MELEE_ATTACK:
+                return beginMeleeAttack(plant, context);
+            case DELAYED_EXPLOSIVE:
+                return beginChomper(plant, context);
+            default:
+                return null;
+        }
+    }
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
@@ -28,82 +82,121 @@ public class MeleeAbility implements PlantAbility {
         Plant def = plant.getDefinition();
         if (def == null) return;
 
-        // Enforce-mint: trigger plant-food on every MELEE plant.
         if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
             context.triggerFamilyPlantFood(PlantCategory.MELEE);
             return;
         }
 
-        // Chomper: swallow-then-digest cycle.
         if (def.getAbilityType() == PlantAbilityType.DELAYED_EXPLOSIVE) {
-            handleChomper(plant, context);
+            swallowStoredTargets(plant, context);
             return;
         }
 
         if (def.getAbilityType() != PlantAbilityType.MELEE_ATTACK) return;
+        strikeTargets(plant, context, collectHitTargets(plant, context), false);
+    }
 
-        int row = plant.getPosition().getY();
-        int col = plant.getPosition().getX();
+    @Override
+    public float getNextActionCooldown(PlantInstance plant) {
+        return consumedAction ? -1f : 0f;
+    }
 
-        // AoE melee: hit everything in a small area
-        int radius = (int) def.getAbilityValue();
-        if (radius >= 9) {
-            // Big swipe - 3x3 around the plant
-            List<ZombieInstance> targets = context.getZombiesInArea(row, col, 1, 1);
-            for (ZombieInstance zombie : targets) {
-                context.damageZombie(zombie, computePlantDamage(plant));
+    // --- animation windows ---
+
+    private TimedPlantAction beginMeleeAttack(PlantInstance plant, PlantAbilityContext context) {
+        List<ZombieInstance> hits = collectHitTargets(plant, context);
+        if (hits.isEmpty()) return null;
+        targets.clear();
+        targets.addAll(hits);
+        consumedAction = true;
+        return TimedPlantAction.attackThen(plant, context, this::execute);
+    }
+
+    private TimedPlantAction beginChomper(PlantInstance plant, PlantAbilityContext context) {
+        AbilityState state = plant.getAbilityState(PlantAbilityType.DELAYED_EXPLOSIVE);
+        if (state == null || state.isDigesting()) return null;
+
+        ZombieInstance target = firstSwallowCandidate(plant, context);
+        if (target == null) return null;
+
+        targets.clear();
+        targets.add(target);
+        consumedAction = true;
+        return TimedPlantAction.attackThen(plant, context, this::execute);
+    }
+
+    // --- Melee attack ---
+
+    private void strikeTargets(PlantInstance plant, PlantAbilityContext context,
+                               List<ZombieInstance> hits, boolean plantFood) {
+        targets.clear();
+        Plant def = plant.getDefinition();
+        if (def == null || hits == null || hits.isEmpty()) return;
+
+        boolean fire = def.hasTag(PlantTags.FIRE);
+        int damage = computePlantDamage(plant);
+        if (plantFood) {
+            damage *= plantFoodDamageMultiplier(def);
+        }
+        if (damage <= 0) return;
+
+        for (ZombieInstance zombie : hits) {
+            if (zombie == null || zombie.isDead()) continue;
+            if (fire) {
+                context.damageZombieWithFire(zombie, damage);
+            } else {
+                context.damageZombie(zombie, damage);
             }
-            return;
+            targets.add(zombie);
         }
 
-        // Single-target melee - hit the first zombie in any of the 8 neighbors
-        for (int rowDist = -1; rowDist <= 1; rowDist++) {
-            for (int colDist = -1; colDist <= 1; colDist++) {
-                if (rowDist == 0 && colDist == 0) continue;
-                List<ZombieInstance> targets = context.getZombiesInArea(row + rowDist, col + colDist, 0, 0);
-                if (!targets.isEmpty()) {
-                    context.damageZombie(targets.getFirst(), def.getDamage());
-                    return;
-                }
-            }
+        if (fire && plant.getPosition() != null) {
+            int radius = plantFood ? plantFoodRadius(plant) : attackRadius(plant);
+            context.damageIceInArea(
+                    plant.getPosition().getY(), plant.getPosition().getX(),
+                    radius, radius, IceTerrainStrategy.MAX_HP
+            );
         }
     }
 
     // --- Chomper swallow + digest cycle ---
 
-    /** Default digestion time (seconds) after the Chomper swallows a zombie. */
-    private static final float CHOMPER_DIGEST_DURATION = 40.0f;
-    /** Damage dealt to the swallowed zombie (intentionally huge to one-shot). */
-    private static final int CHOMPER_SWALLOW_DAMAGE = 6767;
+    private ZombieInstance firstSwallowCandidate(PlantInstance plant, PlantAbilityContext context) {
+        int row = plant.getPosition().getY();
+        int col = plant.getPosition().getX();
+        int reach = Math.max(1, (int) plant.getDefinition().getAbilityValue());
+        List<ZombieInstance> candidates = context.getZombiesInArea(row, col, 0, reach);
+        for (ZombieInstance zombie : candidates) {
+            if (zombie != null && !zombie.isDead()) {
+                return zombie;
+            }
+        }
+        return null;
+    }
 
-    /** Implements the Chomper's signature swallow-then-digest cycle. */
-    private void handleChomper(PlantInstance plant, PlantAbilityContext context) {
+    private void swallowStoredTargets(PlantInstance plant, PlantAbilityContext context) {
         AbilityState state = plant.getAbilityState(PlantAbilityType.DELAYED_EXPLOSIVE);
         if (state == null) return;
 
-        // Phase 1: still digesting, wait.
-        if (state.isDigesting()) return;
-
-        // Phase 2: look for a swallowable zombie.
-        int row = plant.getPosition().getY();
-        int col = plant.getPosition().getX();
-        List<ZombieInstance> candidates = context.getZombiesInArea(row, col, 0, 1);
-        ZombieInstance target = null;
-        for (ZombieInstance zombie : candidates) {
-            if (zombie == null || zombie.isDead()) continue;
-            target = zombie;
-            break;
+        List<ZombieInstance> toSwallow = new ArrayList<>();
+        for (ZombieInstance zombie : targets) {
+            if (zombie != null && !zombie.isDead()) {
+                toSwallow.add(zombie);
+            }
         }
-        if (target == null) return;
+        if (toSwallow.isEmpty()) {
+            ZombieInstance fallback = firstSwallowCandidate(plant, context);
+            if (fallback != null) {
+                toSwallow.add(fallback);
+            }
+        }
+        if (toSwallow.isEmpty()) return;
 
-        // Swallow the zombie.
-        context.damageZombie(target, CHOMPER_SWALLOW_DAMAGE);
+        for (ZombieInstance target : toSwallow) {
+            context.damageZombie(target, CHOMPER_SWALLOW_DAMAGE);
+        }
 
-        // Enter digestion phase.
-        float digestDuration = CHOMPER_DIGEST_DURATION;
-        float reduction = cumulativeDigestReduction(plant);
-        digestDuration = Math.max(5f, digestDuration - reduction);
-
+        float digestDuration = Math.max(5f, CHOMPER_DIGEST_DURATION - cumulativeDigestReduction(plant));
         state.setDigesting(true);
         state.setDigestRemaining(digestDuration);
         state.setCooldownRemaining(digestDuration);
@@ -114,62 +207,34 @@ public class MeleeAbility implements PlantAbility {
      * value the plant has accumulated via its level upgrades.
      */
     private float cumulativeDigestReduction(PlantInstance plant) {
-        Plant def = plant.getDefinition();
-        if (def == null || def.getLevels() == null) return 0f;
-        PlantLevels levels = def.getLevels();
-        float total = 0f;
-        for (int lvl = 2; lvl <= 4; lvl++) {
-            if (lvl > plant.getLevel()) break;
-            LevelUpgrade upgrade = levels.getUpgrade(lvl);
-            if (upgrade == null) continue;
-            if (upgrade.isSpecialMechanic()
-                    && upgrade.getSpecialTag() == PlantSpecialTag.DIGEST_REDUCTION) {
-                total += upgrade.getValue();
-            }
-        }
-        return total;
+        return cumulativeSpecialValue(plant, PlantSpecialTag.DIGEST_REDUCTION);
     }
 
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
-        if (def == null) return;
+        if (def == null || plant.getPosition() == null) return;
 
         if (def.getPlantFoodType() == PlantFoodType.LOCAL_AOE_ATTACK) {
-            int radius = (int) def.getPlantFoodValue();
-            if (radius <= 0) radius = 1;
+            int radius = plantFoodRadius(plant);
             int row = plant.getPosition().getY();
             int col = plant.getPosition().getX();
-            for (ZombieInstance zombie : context.getZombiesInArea(row, col, radius, radius)) {
-                context.damageZombie(zombie, def.getDamage() * 3);
-            }
-        }
-
-        else if (def.getPlantFoodType() == PlantFoodType.PULL_UNDERWATER) {
+            strikeTargets(plant, context, context.getZombiesInArea(row, col, radius, radius), true);
+        } else if (def.getPlantFoodType() == PlantFoodType.PULL_UNDERWATER) {
             AbilityState state = plant.getAbilityState(PlantAbilityType.DELAYED_EXPLOSIVE);
             if (state == null) return;
 
             int row = plant.getPosition().getY();
-            List<ZombieInstance> candidates = context.getZombiesInLane(row);
-            List<ZombieInstance> targets = new ArrayList<>();
+            int col = plant.getPosition().getX();
+            List<ZombieInstance> candidates = new ArrayList<>(context.getZombiesInLane(row));
+            candidates.removeIf(z -> z == null || z.isDead() || z.getGridPosition() == null);
+            candidates.sort(Comparator.comparingInt(z -> Math.abs(z.getGridX() - col)));
+            targets.clear();
             for (ZombieInstance zombie : candidates) {
-                if (targets.size() >= 3) break;
-                if (zombie == null || zombie.isDead()) continue;
+                if (targets.size() >= DIGESTING_ZOMBIES) break;
                 targets.add(zombie);
             }
-            if (targets.isEmpty()) return;
-
-            for (ZombieInstance target : targets) {
-                context.damageZombie(target, CHOMPER_SWALLOW_DAMAGE);
-            }
-
-            float digestDuration = CHOMPER_DIGEST_DURATION;
-            float reduction = cumulativeDigestReduction(plant);
-            digestDuration = Math.max(5f, digestDuration - reduction);
-
-            state.setDigesting(true);
-            state.setDigestRemaining(digestDuration);
-            state.setCooldownRemaining(digestDuration);
+            swallowStoredTargets(plant, context);
         }
     }
 
@@ -184,8 +249,121 @@ public class MeleeAbility implements PlantAbility {
         }
 
         AbilityState state = plant.getAbilityState(PlantAbilityType.MELEE_ATTACK);
-        if (state == null) return 0;
-        int stage = Math.min(2, state.getGrowthStage());
+        if (state == null) return base;
+        int stage = Math.min(2, Math.max(0, state.getGrowthStage()));
         return base * (1 + stage);
+    }
+
+    /**
+     * radius of this plant's current melee hit (0 = own tile).
+     * Used by the view for pulse / tile-hit placement.
+     */
+    public int attackRadius(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def == null) return 0;
+        if (named(def, "Kiwibeast")) {
+            AbilityState state = plant.getAbilityState(def.getAbilityType());
+            int stage = state == null ? 0 : Math.max(0, state.getGrowthStage());
+            return 1 + Math.min(1, stage);
+        }
+        return radiusFromAbilityValue(def.getAbilityValue());
+    }
+
+    /** radius of the plant-food smash / pulse. */
+    public int plantFoodRadius(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def == null) return 1;
+        if (named(def, "Phat Beet")) {
+            return 2;
+        }
+        return radiusFromFoodValue(def.getPlantFoodValue());
+    }
+
+    // --- Helpers ---
+
+    private List<ZombieInstance> collectHitTargets(PlantInstance plant, PlantAbilityContext context) {
+        if (plant == null || context == null || plant.getPosition() == null) {
+            return Collections.emptyList();
+        }
+        Plant def = plant.getDefinition();
+        if (def == null) return Collections.emptyList();
+
+        int col = plant.getPosition().getX();
+        int row = plant.getPosition().getY();
+
+        if (def.hasTag(PlantTags.AOE) || named(def, "Phat Beet") || named(def, "Kiwibeast")) {
+            int radius = attackRadius(plant);
+            return liveCopy(context.getZombiesInArea(row, col, radius, radius));
+        }
+
+        int reach = Math.max(1, (int) def.getAbilityValue());
+        reach += (int) cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
+        return liveCopy(context.getZombiesInArea(row, col, 0, reach));
+    }
+
+    private static List<ZombieInstance> liveCopy(List<ZombieInstance> source) {
+        List<ZombieInstance> live = new ArrayList<>();
+        if (source == null) return live;
+        for (ZombieInstance zombie : source) {
+            if (zombie != null && !zombie.isDead()) {
+                live.add(zombie);
+            }
+        }
+        return live;
+    }
+
+    private static int radiusFromAbilityValue(float value) {
+        int encoded = (int) value;
+        if (encoded >= AREA_5X5_VALUE) return 2;
+        if (encoded >= AREA_3X3_VALUE) return 1;
+        return Math.max(0, encoded);
+    }
+
+    private static int radiusFromFoodValue(float value) {
+        int encoded = (int) value;
+        if (encoded >= AREA_5X5_VALUE) return 2;
+        if (encoded >= AREA_3X3_VALUE) return 1;
+        if (encoded <= 0) return 1;
+        return encoded;
+    }
+
+    private static int plantFoodDamageMultiplier(Plant def) {
+        if (named(def, "Phat Beet")) return 5;
+        if (named(def, "Kiwibeast")) return 4;
+        return 3;
+    }
+
+    private static int kiwibeastStageFromElapsed(float elapsed) {
+        if (elapsed >= KIWIBEAST_STAGE3_SECONDS) {
+            return 2;
+        }
+        if (elapsed >= KIWIBEAST_STAGE2_SECONDS) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private float cumulativeSpecialValue(PlantInstance plant, PlantSpecialTag tag) {
+        Plant def = plant.getDefinition();
+        if (def == null || def.getLevels() == null || tag == null) return 0f;
+        PlantLevels levels = def.getLevels();
+        float total = 0f;
+        for (int lvl = 2; lvl <= 4; lvl++) {
+            if (lvl > plant.getLevel()) break;
+            LevelUpgrade upgrade = levels.getUpgrade(lvl);
+            if (upgrade == null) continue;
+            if (upgrade.isSpecialMechanic() && upgrade.getSpecialTag() == tag) {
+                total += upgrade.getValue();
+            }
+        }
+        return total;
+    }
+
+    private static boolean named(Plant def, String name) {
+        return def != null && def.getName() != null && def.getName().equalsIgnoreCase(name);
+    }
+
+    public List<ZombieInstance> getTargets() {
+        return Collections.unmodifiableList(targets);
     }
 }

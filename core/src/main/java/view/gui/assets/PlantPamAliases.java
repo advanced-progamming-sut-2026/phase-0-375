@@ -33,6 +33,10 @@ public final class PlantPamAliases {
         m.put("Pepper-pult", "PEPPERPULT");
         m.put("Winter Melon", "WINTERMELON");
         m.put("Bonk Choy", "BONKCHOY");
+        m.put("Phat Beet", "PHATBEETS");
+        m.put("Wasabi Whip", "WASABIWHIP");
+        m.put("Chomper", "CHOMPER");
+        m.put("Kiwibeast", "KIWIBEAST");
         m.put("Snapdragon", "SNAPDRAGON");
         m.put("Cold Snapdragon", "COLD_SNAPDRAGON");
         m.put("Iceberg Lettuce", "ICEBURG");
