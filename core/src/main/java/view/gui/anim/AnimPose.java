@@ -22,19 +22,26 @@ public final class AnimPose {
     private final Map<String, Boolean> visibility;
     private final float scale;
     private final boolean flipX;
+    private final boolean reverse;
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility) {
-        this(pamPath, clipName, role, loop, visibility, 1f, false);
+        this(pamPath, clipName, role, loop, visibility, 1f, false, false);
     }
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility, float scale) {
-        this(pamPath, clipName, role, loop, visibility, scale, false);
+        this(pamPath, clipName, role, loop, visibility, scale, false, false);
     }
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility, float scale, boolean flipX) {
+        this(pamPath, clipName, role, loop, visibility, scale, flipX, false);
+    }
+
+    private AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
+                     Map<String, Boolean> visibility, float scale,
+                     boolean flipX, boolean reverse) {
         this.pamPath = pamPath;
         this.clipName = clipName;
         this.role = role;
@@ -44,6 +51,7 @@ public final class AnimPose {
                 : Collections.unmodifiableMap(visibility);
         this.scale = scale > 0f ? scale : 1f;
         this.flipX = flipX;
+        this.reverse = reverse;
     }
 
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role) {
@@ -53,6 +61,12 @@ public final class AnimPose {
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role,
                                    Map<String, Boolean> visibility) {
         return new AnimPose(pamPath, clipName, role, true, visibility);
+    }
+
+    /** One-shot clip (death); does not loop. */
+    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
+                                Map<String, Boolean> visibility) {
+        return new AnimPose(pamPath, clipName, role, false, visibility);
     }
 
     /** Looping pose with the given PAM parts forced visible. */
@@ -65,23 +79,13 @@ public final class AnimPose {
         return new AnimPose(pamPath, clipName, role, false, null);
     }
 
-    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
-                                   Map<String, Boolean> visibility) {
-        return new AnimPose(pamPath, clipName, role, false, visibility);
-    }
-
-    public static AnimPose once(String pamPath, String clipName, Enum<?> role,
-                                   String... visibleParts) {
-        return new AnimPose(pamPath, clipName, role, false, PamVisibility.show(visibleParts));
-    }
-
     /**
      * Copy of this pose with additional PAM parts forced visible
      * (merged onto any existing visibility map).
      */
     public AnimPose withVisibleParts(String... partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale, flipX);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
     }
 
     /**
@@ -90,17 +94,36 @@ public final class AnimPose {
      */
     public AnimPose withVisibleParts(Iterable<String> partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale, flipX);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
+    }
+
+    /**
+     * Copy of this pose with additional PAM parts forced hidden
+     * (merged onto any existing visibility map).
+     */
+    public AnimPose withHiddenParts(String... partNames) {
+        return new AnimPose(pamPath, clipName, role, loop,
+                PamVisibility.hideAlso(visibility, partNames), scale, flipX, reverse);
     }
 
     /** Copy of this pose with an entity-specific size multiplier (Gargantuar, Imp, …). */
     public AnimPose withScale(float scale) {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
     }
 
     /** Copy of this pose mirrored horizontally (leftward shots). */
     public AnimPose withFlipX(boolean flipX) {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
+    }
+
+    /** Mirror horizontally around the PAM canvas centre. */
+    public AnimPose flipped() {
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, true, reverse);
+    }
+
+    /** Play the clip last-frame-first. */
+    public AnimPose reversed() {
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, true);
     }
 
     public String pamPath() {
@@ -133,6 +156,10 @@ public final class AnimPose {
     /** When true, {@link view.gui.lawn.LawnEntityRenderer} draws with negative X scale. */
     public boolean flipX() {
         return flipX;
+    }
+
+    public boolean reverse() {
+        return reverse;
     }
 
     public String cacheKey() {

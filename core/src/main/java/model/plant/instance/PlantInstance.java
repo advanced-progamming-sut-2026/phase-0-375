@@ -50,6 +50,7 @@ public class PlantInstance implements Placeable {
     private PlantState stateBeforeTransform;
     private int iceHp = 0;
     public static final int DEFAULT_ICE_HP = 600;
+    private boolean octopusCoating;
     private String imitateTarget; // Imitater support: null for non-Imitaters
     private float transformCountdown; // Imitater support: -1 means already transformed
     private int stackCount;
@@ -525,18 +526,37 @@ public class PlantInstance implements Placeable {
         if (freezeHitCount >= hitsToFreeze) freeze();
     }
     public void freeze() {
-        if (isFrozen()) return;
-        cancelActiveAction();
-        stateBeforeFreeze = state;
-        state = PlantState.FROZEN;
-        iceHp = DEFAULT_ICE_HP;
+        freeze(false);
     }
+
+    /** Beach Octopus wrap: same ice rules, tagged so the renderer plays the octopus PAM. */
+    public void freezeFromOctopus() {
+        freeze(true);
+    }
+
+    private void freeze(boolean octopus) {
+        if (!isFrozen()) {
+            cancelActiveAction();
+            stateBeforeFreeze = state;
+            state = PlantState.FROZEN;
+            iceHp = DEFAULT_ICE_HP;
+        }
+        if (octopus) {
+            octopusCoating = true;
+        }
+    }
+
     public void unfreeze() {
         if (!isFrozen()) return;
         state = (stateBeforeFreeze != null) ? stateBeforeFreeze : PlantState.IDLE;
         stateBeforeFreeze = null;
         freezeHitCount = 0;
         iceHp = 0;
+        octopusCoating = false;
+    }
+
+    public boolean hasOctopusCoating() {
+        return octopusCoating;
     }
 
     /** @return remaining ice/octopus coating HP while frozen. */

@@ -10,7 +10,7 @@ public enum ZombieAnimRole {
     IDLE,
     EATING,
     WALK,
+    DIE,
 
-    // TODO: DIE — death clips
     // TODO: SPECIAL — smash / push / item / rage poses
 }

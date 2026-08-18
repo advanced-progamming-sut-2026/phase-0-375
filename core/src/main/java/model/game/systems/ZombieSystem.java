@@ -14,6 +14,8 @@ import model.plant.ability.WallAbility;
 import model.plant.instance.PlantInstance;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
+import model.item.pushable.Barrel;
+import model.item.pushable.Piano;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
 
@@ -202,8 +204,8 @@ public class ZombieSystem implements Tickable {
     // --- Eating ---
 
     /**
-     * Each tick, if the zombie is on a cell with a live plant and the zombie
-     * is not currently in a special-action, the zombie eats the plant.
+     * Each tick, if the zombie has stepped onto the facing border of a tile
+     * that holds a live plant, and is not in a special-action, it eats.
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         boolean hypnotized = zombie.isHypnotized();
@@ -239,7 +241,14 @@ public class ZombieSystem implements Tickable {
             return;
         }
 
-        eatPlantAt(zombie, context, row, col, deltaTime);
+        int eatCol = zombie.plantColumnAtFacingBorder();
+        if (eatCol < 0 || eatCol >= context.getColumnCount()) {
+            if (zombie.isEating()) {
+                zombie.stopEating();
+            }
+            return;
+        }
+        eatPlantAt(zombie, context, row, eatCol, deltaTime);
     }
 
     /** Keeps {@link FlyBehavior} in sync with the plant under the zombie. */
@@ -253,9 +262,14 @@ public class ZombieSystem implements Tickable {
 
     /** Special actions and movement modes during which a zombie cannot eat. */
     private boolean isEatingSuppressed(ZombieInstance zombie) {
+        if (zombie.getState() == ZombieState.SPECIAL_ACTION) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.FISH)) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.BUFF)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return true;
-        return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing();
+        return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()
+                || zombie.getPushableItem() instanceof Piano
+                || zombie.getPushableItem() instanceof Barrel;
     }
 
     /**
@@ -289,10 +303,10 @@ public class ZombieSystem implements Tickable {
         float eatDPS = zombie.getDefinition().getEatDPS();
         eatDPS *= getEatDamageScale(zombie);
         eatDPS *= gameModel.difficultyBoost();
-        return (int) (eatDPS * deltaTime);
+        return zombie.addEatDamage(eatDPS * deltaTime);
     }
 
-    /** Bites the plant on the zombie's cell, if there is a live one. */
+    /** Bites the plant on the tile whose facing border the zombie has stepped onto. */
     private void eatPlantAt(ZombieInstance zombie, BehaviorContext context,
                             int row, int col, float deltaTime) {
         PlantInstance plant = context.getPlantAt(row, col);

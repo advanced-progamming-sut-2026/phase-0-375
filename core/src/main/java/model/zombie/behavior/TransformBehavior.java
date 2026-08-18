@@ -1,6 +1,7 @@
 package model.zombie.behavior;
 
 import model.enums.ZombieBehaviorType;
+import model.enums.ZombieState;
 import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
@@ -9,24 +10,31 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Transform behavior.
+ * Dark Ages Wizard: every {@link #TRANSFORM_INTERVAL} seconds (or on contact)
+ * plays {@code sheep} and turns a plant into a sheep until this Wizard dies.
  */
 public class TransformBehavior implements ZombieBehavior {
 
-    // --- Constants ---
-
-    /** Seconds between two consecutive transformations. */
+    /** Seconds between two consecutive casts. */
     public static final float TRANSFORM_INTERVAL = 5.0f;
 
-    // --- State ---
+    /** {@code sheep} clip length on {@code ZOMBIE_DARK_WIZARD}. */
+    public static final float SHEEP_DURATION = 2.3f;
 
-    /** Seconds elapsed since the last transformation. */
+    /** Seconds elapsed since the last cast started. */
     private float castTimer = 0f;
+
+    /** True while {@code sheep} plays. */
+    private boolean casting = false;
+
+    /** Seconds elapsed in {@link #SHEEP_DURATION}. */
+    private float sheepTimer = 0f;
+
+    /** Plant this cast is converting; {@code null} when idle. */
+    private PlantInstance currentTarget;
 
     /** Plants this Wizard has transformed, so they can be reverted on its death. */
     private final List<PlantInstance> transformedPlants = new ArrayList<>();
-
-    // --- ZombieBehavior ---
 
     @Override
     public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
@@ -34,11 +42,23 @@ public class TransformBehavior implements ZombieBehavior {
             return;
         }
 
-        // If the Wizard has walked directly onto a plant, transform it on
-        // contact instead of eating it.
+        if (casting) {
+            sheepTimer += deltaTime;
+            if (sheepTimer >= SHEEP_DURATION) {
+                casting = false;
+                sheepTimer = 0f;
+                currentTarget = null;
+                if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
+                    zombie.setState(ZombieState.WALKING);
+                }
+            }
+            return;
+        }
+
         PlantInstance plantHere = context.getPlantAt(zombie.getGridY(), zombie.getGridX());
-        if (plantHere != null && plantHere.getCurrentHP() > 0 && !plantHere.isTransformed()) {
-            transformPlant(plantHere);
+        if (canTransform(plantHere)) {
+            startCast(zombie, plantHere);
+            return;
         }
 
         castTimer += deltaTime;
@@ -49,7 +69,7 @@ public class TransformBehavior implements ZombieBehavior {
 
         PlantInstance target = pickRandomTransformablePlant(context);
         if (target != null) {
-            transformPlant(target);
+            startCast(zombie, target);
         }
     }
 
@@ -58,15 +78,14 @@ public class TransformBehavior implements ZombieBehavior {
         return ZombieBehaviorType.TRANSFORM;
     }
 
-    // --- Core logic ---
+    private static boolean canTransform(PlantInstance plant) {
+        return plant != null && plant.getCurrentHP() > 0 && !plant.isTransformed();
+    }
 
-    /**
-     * Picks a random plant on the field that isn't already transformed.
-     */
     private PlantInstance pickRandomTransformablePlant(BehaviorContext context) {
         List<PlantInstance> candidates = new ArrayList<>();
         for (PlantInstance plant : context.getAllPlants()) {
-            if (plant != null && plant.getCurrentHP() > 0 && !plant.isTransformed()) {
+            if (canTransform(plant)) {
                 candidates.add(plant);
             }
         }
@@ -77,16 +96,14 @@ public class TransformBehavior implements ZombieBehavior {
         return candidates.get(index);
     }
 
-    /**
-     * Transforms the given plant into a cat and tracks it so it can be
-     * reverted once this Wizard dies.
-     */
-    private void transformPlant(PlantInstance plant) {
+    private void startCast(ZombieInstance zombie, PlantInstance plant) {
         plant.transform();
         transformedPlants.add(plant);
+        currentTarget = plant;
+        casting = true;
+        sheepTimer = 0f;
+        zombie.setState(ZombieState.SPECIAL_ACTION);
     }
-
-    // --- Death handling ---
 
     /**
      * Called by the ZombieSystem when this Wizard is killed. Reverts every
@@ -100,19 +117,30 @@ public class TransformBehavior implements ZombieBehavior {
             }
         }
         transformedPlants.clear();
+        casting = false;
+        sheepTimer = 0f;
+        currentTarget = null;
     }
-
-    // --- Getters ---
 
     public float getCastTimer() {
         return castTimer;
     }
 
+    public boolean isCasting() {
+        return casting;
+    }
+
+    public float getSheepTimer() {
+        return sheepTimer;
+    }
+
+    public PlantInstance getCurrentTarget() {
+        return currentTarget;
+    }
+
     public List<PlantInstance> getTransformedPlants() {
         return transformedPlants;
     }
-
-    // --- Setters ---
 
     public void setCastTimer(float castTimer) {
         this.castTimer = castTimer;

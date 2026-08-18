@@ -22,6 +22,12 @@ public class JuggleBehavior implements ZombieBehavior {
     /** Seconds the zombie keeps spinning after the last projectile was reflected. */
     public static final float SPIN_TIMEOUT = 1.0f;
 
+    /** {@code spinup} clip length in {@code ZOMBIE_DARK_JESTER}. */
+    public static final float SPINUP_DURATION = 0.8667f;
+
+    /** {@code spindown} clip length in {@code ZOMBIE_DARK_JESTER}. */
+    public static final float SPINDOWN_DURATION = 0.5f;
+
     /** When true, only {@link Pellet} projectiles are reflected. */
     public static final boolean RESTRICT_TO_JUGGLEABLE = true;
 
@@ -29,6 +35,9 @@ public class JuggleBehavior implements ZombieBehavior {
 
     /** Current phase of the juggle cycle. */
     private JugglePhase phase = JugglePhase.IDLE;
+
+    /** Seconds in the current {@link JugglePhase#SPINUP} / {@link JugglePhase#SPINDOWN} clip. */
+    private float clipTimer = 0f;
 
     /** Seconds since the last projectile was reflected while spinning. */
     private float timeSinceLastProjectile = 0f;
@@ -48,8 +57,12 @@ public class JuggleBehavior implements ZombieBehavior {
             case IDLE:
                 tickIdle(zombie, context, deltaTime);
                 break;
-            case SPINNING:
+            case SPINUP:
+            case SPIN:
                 tickSpinning(zombie, context, deltaTime);
+                break;
+            case SPINDOWN:
+                tickSpinDown(zombie, context, deltaTime);
                 break;
             default:
                 break;
@@ -64,10 +77,7 @@ public class JuggleBehavior implements ZombieBehavior {
     // --- IDLE phase ---
 
     private void tickIdle(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        // Keep walking while scanning; spinning uses a speed boost, not a halt.
-        if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
-            zombie.setState(ZombieState.WALKING);
-        }
+        keepWalking(zombie);
 
         if (findIncomingProjectile(zombie, context) != null) {
             startSpinning(zombie);
@@ -75,23 +85,48 @@ public class JuggleBehavior implements ZombieBehavior {
         }
     }
 
-    // --- SPINNING phase ---
+    // --- SPINUP / SPIN ---
 
     private void tickSpinning(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        // Stay in a walkable state so ZombieSystem keeps advancing the zombie.
-        if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
-            zombie.setState(ZombieState.WALKING);
-        }
+        keepWalking(zombie);
 
         boolean reflectedAny = reflectIncomingProjectiles(zombie, context);
-
         if (reflectedAny) {
             timeSinceLastProjectile = 0f;
-        } else {
+        }
+
+        if (phase == JugglePhase.SPINUP) {
+            clipTimer += deltaTime;
+            if (clipTimer >= SPINUP_DURATION) {
+                phase = JugglePhase.SPIN;
+                clipTimer = 0f;
+                timeSinceLastProjectile = 0f;
+            }
+            return;
+        }
+
+        if (!reflectedAny) {
             timeSinceLastProjectile += deltaTime;
             if (timeSinceLastProjectile >= SPIN_TIMEOUT) {
-                stopSpinning(zombie);
+                beginSpinDown(zombie);
             }
+        }
+    }
+
+    // --- SPINDOWN ---
+
+    private void tickSpinDown(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        keepWalking(zombie);
+
+        if (findIncomingProjectile(zombie, context) != null) {
+            startSpinning(zombie);
+            reflectIncomingProjectiles(zombie, context);
+            return;
+        }
+
+        clipTimer += deltaTime;
+        if (clipTimer >= SPINDOWN_DURATION) {
+            stopSpinning(zombie);
         }
     }
 
@@ -178,37 +213,50 @@ public class JuggleBehavior implements ZombieBehavior {
 
     // --- State transitions ---
 
-    /** Transitions the zombie from IDLE to SPINNING: boosts speed, keeps walking. */
+    /** Transitions into {@link JugglePhase#SPINUP}: boosts speed, keeps walking. */
     private void startSpinning(ZombieInstance zombie) {
-        phase = JugglePhase.SPINNING;
+        phase = JugglePhase.SPINUP;
+        clipTimer = 0f;
         timeSinceLastProjectile = 0f;
         float spinSpeed = zombie.getDefinition().getBehaviorPropFloat(
                 "MoveSpeedMultiplierWhileJuggling", DEFAULT_SPIN_SPEED_MULTIPLIER);
         if (spinSpeed <= 0f) spinSpeed = DEFAULT_SPIN_SPEED_MULTIPLIER;
         zombie.applySpeedModifier(spinSpeed);
-        // Keep WALKING so movement is not blocked by SPECIAL_ACTION.
-        if (zombie.getState() != ZombieState.EATING) {
-            zombie.setState(ZombieState.WALKING);
-        }
+        keepWalking(zombie);
     }
 
-    /** Transitions the zombie from SPINNING back to IDLE: restores speed, sets state. */
+    /** Spinning ended: play {@code spindown}, restore walk speed. */
+    private void beginSpinDown(ZombieInstance zombie) {
+        phase = JugglePhase.SPINDOWN;
+        clipTimer = 0f;
+        zombie.clearSpeedModifier();
+        keepWalking(zombie);
+    }
+
+    /** Transitions back to IDLE after {@code spindown}. */
     private void stopSpinning(ZombieInstance zombie) {
         phase = JugglePhase.IDLE;
+        clipTimer = 0f;
         timeSinceLastProjectile = 0f;
         zombie.clearSpeedModifier();
-        if (zombie.getState() != ZombieState.EATING) {
+        keepWalking(zombie);
+    }
+
+    /** Stay walkable so {@code ZombieSystem} keeps advancing the zombie. */
+    private static void keepWalking(ZombieInstance zombie) {
+        if (zombie.getState() == ZombieState.SPECIAL_ACTION) {
+            zombie.setState(ZombieState.WALKING);
+        } else if (zombie.getState() != ZombieState.EATING) {
             zombie.setState(ZombieState.WALKING);
         }
     }
 
     // --- Getters / setters ---
 
-    /** @return true while the zombie is currently spinning. */
+    /** @return true while reflecting ({@code spinup} / looping {@code spin}). */
     public boolean isSpinning() {
-        return phase == JugglePhase.SPINNING;
+        return phase == JugglePhase.SPINUP || phase == JugglePhase.SPIN;
     }
-
 
     public JugglePhase getPhase() {
         return phase;
@@ -216,6 +264,11 @@ public class JuggleBehavior implements ZombieBehavior {
 
     public void setPhase(JugglePhase phase) {
         this.phase = phase;
+    }
+
+    /** Elapsed seconds in {@code spinup} / {@code spindown}; 0 at the first frame of each. */
+    public float getClipTimer() {
+        return clipTimer;
     }
 
     public float getTimeSinceLastProjectile() {
@@ -237,10 +290,12 @@ public class JuggleBehavior implements ZombieBehavior {
     // --- Inner types ---
 
     /**
-     * The two phases of the Juggler's cycle.
+     * Walk → {@code spinup} → looping {@code spin} → {@code spindown} → walk.
      */
     public enum JugglePhase {
-        IDLE, // Walking slowly, scanning for incoming projectiles.
-        SPINNING // Spinning, moving faster, reflecting all incoming projectiles.
+        IDLE,
+        SPINUP,
+        SPIN,
+        SPINDOWN
     }
 }

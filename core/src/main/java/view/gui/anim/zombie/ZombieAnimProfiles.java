@@ -13,8 +13,26 @@ public final class ZombieAnimProfiles {
         if (overrides == null) {
             return;
         }
-        // TODO: NewspaperAnim.register(overrides);
-        // TODO: GargantuarAnim.register(overrides);
-        // TODO: ExplorerAnim.register(overrides);
+        GargantuarAnim.register(overrides);
+        ImpAnim.register(overrides);
+        AllStarAnim.register(overrides);
+        ArcadeAnim.register(overrides);
+        CrystalSkullAnim.register(overrides);
+        RaAnim.register(overrides);
+        ProspectorAnim.register(overrides);
+        PianoAnim.register(overrides);
+        NewspaperAnim.register(overrides);
+        BarrelRollerAnim.register(overrides);
+        ExplorerAnim.register(overrides);
+        HunterAnim.register(overrides);
+        TombRaiserAnim.register(overrides);
+        DodoAnim.register(overrides);
+        TroglobiteAnim.register(overrides);
+        FishermanAnim.register(overrides);
+        OctopusAnim.register(overrides);
+        SnorkelerAnim.register(overrides);
+        JugglerAnim.register(overrides);
+        WizardAnim.register(overrides);
+        DarkKingAnim.register(overrides);
     }
 }

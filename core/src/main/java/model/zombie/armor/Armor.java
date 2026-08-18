@@ -59,23 +59,29 @@ public class Armor {
     public boolean isDestroyed() { return currentHealth <= 0; }
 
     /**
-     * @return the current damage layer index
+     * {@code ArmorLayerHealth} values are remaining-HP fractions, high to low
+     * (e.g. 0.666, 0.333). Layer 0 above the first, last layer at or below the last.
      */
     public int getCurrentDamageLayer() {
-        int lastLayerHealth = baseHealth;
-
-        for(int i = 0; i < layerThresholds.size(); i++) {
-            float currentLayerThreshold = layerThresholds.get(i);
-            int minLayerHealth = lastLayerHealth - (int) (baseHealth * currentLayerThreshold);
-
-            if(currentHealth > minLayerHealth && currentHealth <= lastLayerHealth) {
+        int n = damageLayers == null ? 0 : damageLayers.size();
+        if (n <= 1 || layerThresholds == null || layerThresholds.isEmpty() || baseHealth <= 0) {
+            return 0;
+        }
+        float frac = (float) currentHealth / (float) baseHealth;
+        for (int i = 0; i < layerThresholds.size(); i++) {
+            if (frac > layerThresholds.get(i)) {
                 return i;
             }
-
-            lastLayerHealth = minLayerHealth;
         }
+        return n - 1;
+    }
 
-        return layerThresholds.size() - 1;
+    /** Last damage sprite — the piece that pops off when this armor breaks. */
+    public String popLayer() {
+        if (damageLayers == null || damageLayers.isEmpty()) {
+            return null;
+        }
+        return damageLayers.get(damageLayers.size() - 1);
     }
 
     // --- Getters ---

@@ -4,9 +4,11 @@ import pvz.libpvz.pam.ClipRef;
 import pvz.libpvz.pam.PamPlayer;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Caches {@link ClipRef} handles and kicks async PAM loads when a clip is not ready yet.
@@ -20,6 +22,7 @@ public final class PamClipCache {
 
     private final PamPlayer player;
     private final Map<String, ClipRef> clips = new HashMap<>();
+    private final Set<String> loading = new HashSet<>();
 
     public PamClipCache(PamPlayer player) {
         this.player = player;
@@ -38,10 +41,19 @@ public final class PamClipCache {
             return cached;
         }
 
-        ClipRef baked = player.getClip(pamPath, "");
+        ClipRef baked;
+        try {
+            baked = player.getClip(pamPath, "");
+        } catch (IllegalArgumentException missing) {
+            baked = null;
+        }
         if (baked == null) {
+            if (loading.add(pamPath)) {
+                player.loadAsync(pamPath, () -> loading.remove(pamPath));
+            }
             return null;
         }
+        loading.remove(pamPath);
 
         ClipRef resolved = resolveLoadedClip(pamPath, clipName, baked);
         if (resolved != null) {

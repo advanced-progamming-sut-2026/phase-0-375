@@ -185,7 +185,7 @@ public class ExplosiveAbility implements PlantAbility {
             int damage = def.getDamage();
             damage += (int) cumulativeSpecialValue(plant, PlantSpecialTag.EXPLODE_DAMAGE_BUFF);
             for (ZombieInstance zombie : triggers) {
-                applyExplosionDamage(context, zombie, damage, false);
+                applyExplosionDamage(context, zombie, damage, false, false);
             }
         } else {
             detonate(plant, context);
@@ -277,6 +277,7 @@ public class ExplosiveAbility implements PlantAbility {
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
         boolean isFire = def.hasTag(PlantTags.FIRE);
+        boolean ash = !isSquash(def);
         int damage = def.getDamage();
         // EXPLODE_DAMAGE_BUFF adds to the explosion damage.
         damage += (int) cumulativeSpecialValue(plant, PlantSpecialTag.EXPLODE_DAMAGE_BUFF);
@@ -285,7 +286,7 @@ public class ExplosiveAbility implements PlantAbility {
         if (radius >= MAPWIDE_THRESHOLD) {
             for (int lane = 0; lane < context.getRowCount(); lane++) {
                 for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
-                    applyExplosionDamage(context, zombie, damage, isFire);
+                    applyExplosionDamage(context, zombie, damage, isFire, ash);
                 }
             }
             // Heat melts every ice block on the map.
@@ -297,7 +298,7 @@ public class ExplosiveAbility implements PlantAbility {
         // Lane-clearing explosion (Jalapeno).
         if (isFire && radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInLane(row)) {
-                applyExplosionDamage(context, zombie, damage, isFire);
+                applyExplosionDamage(context, zombie, damage, isFire, ash);
             }
             // Jalapeno scorches the entire lane - melt all ice in it.
             context.damageIceInArea(
@@ -308,7 +309,7 @@ public class ExplosiveAbility implements PlantAbility {
         // 3x3 AoE (Cherry Bomb, Grapeshot, Primal Potato Mine).
         if (radius >= LARGE_RADIUS) {
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
-                applyExplosionDamage(context, zombie, damage, isFire);
+                applyExplosionDamage(context, zombie, damage, isFire, ash);
             }
             context.damageIceInArea(row, col, 1, 1, Math.max(damage, 1));
             return;
@@ -316,18 +317,22 @@ public class ExplosiveAbility implements PlantAbility {
         // Localised explosion (Potato Mine): abilityValue 1 is the contact tile.
         int localRadius = radius <= 1 ? 0 : radius;
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, localRadius, localRadius)) {
-            applyExplosionDamage(context, zombie, damage, isFire);
+            applyExplosionDamage(context, zombie, damage, isFire, ash);
         }
         context.damageIceInArea(row, col, localRadius, localRadius, Math.max(damage, 1));
     }
 
     /** Applies explosion damage to a single zombie (attributed via context). */
-    private void applyExplosionDamage(PlantAbilityContext context, ZombieInstance zombie, int damage, boolean isFire) {
+    private void applyExplosionDamage(PlantAbilityContext context, ZombieInstance zombie,
+                                      int damage, boolean isFire, boolean ash) {
         if (zombie == null || zombie.isDead() || damage <= 0) return;
         if (isFire) {
             context.damageZombieWithFire(zombie, damage);
         } else {
             context.damageZombie(zombie, damage);
+        }
+        if (ash && zombie.getCurrentHP() <= 0) {
+            zombie.markBlownUp();
         }
     }
 
@@ -493,7 +498,7 @@ public class ExplosiveAbility implements PlantAbility {
         int remaining = Math.min(count, candidates.size());
         while (remaining > 0 && !candidates.isEmpty()) {
             ZombieInstance target = candidates.remove(RNG.nextInt(candidates.size()));
-            applyExplosionDamage(context, target, damage, false);
+            applyExplosionDamage(context, target, damage, false, false);
             remaining--;
         }
     }

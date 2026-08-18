@@ -6,21 +6,28 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 /**
- * Fish behavior.
+ * Fisherman: intro, then idle in place and periodically {@code cast} → hook a
+ * plant one tile closer (or toss it) → {@code reel}.
  */
 public class FishBehavior implements ZombieBehavior {
 
-    // --- Constants ---
+    public enum FishPhase { INTRO, IDLE, CASTING, REELING }
 
+    /** {@code intro} on {@code ZOMBIE_BEACH_FISHERMAN}. */
+    public static final float INTRO_DURATION = 1.6333f;
+    /** {@code cast} clip length. */
+    public static final float CAST_DURATION = 1.2667f;
+    /** {@code reel} clip length. */
+    public static final float REEL_DURATION = 1.4667f;
     /** Seconds between two consecutive hook casts. */
     public static final float DELAY_BETWEEN_CASTING = 2.5f;
+    /** Pause after the hook lands before {@code reel}. */
+    public static final float DELAY_BEFORE_REELING = 0.3f;
 
-    // --- State ---
-
-    /** Seconds elapsed since the last cast. */
+    private FishPhase phase = FishPhase.INTRO;
+    private float phaseTimer = 0f;
     private float castTimer = 0f;
-
-    // --- ZombieBehavior ---
+    private boolean plantHooked;
 
     @Override
     public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
@@ -28,18 +35,53 @@ public class FishBehavior implements ZombieBehavior {
             return;
         }
 
-        if (zombie.getGridPosition().getX() <= context.getColumnCount()
-                && zombie.getState() != ZombieState.SPECIAL_ACTION) {
-            zombie.setState(ZombieState.SPECIAL_ACTION);
+        if (phase == FishPhase.INTRO) {
+            zombie.setState(ZombieState.SPAWNING);
+            phaseTimer += deltaTime;
+            if (phaseTimer >= INTRO_DURATION) {
+                phase = FishPhase.IDLE;
+                phaseTimer = 0f;
+                holdStation(zombie);
+            }
+            return;
+        }
+
+        holdStation(zombie);
+
+        if (phase == FishPhase.CASTING) {
+            phaseTimer += deltaTime;
+            if (!plantHooked && phaseTimer >= CAST_DURATION) {
+                plantHooked = true;
+                castHook(zombie, context);
+            }
+            if (phaseTimer >= CAST_DURATION + DELAY_BEFORE_REELING) {
+                phase = FishPhase.REELING;
+                phaseTimer = 0f;
+            }
+            return;
+        }
+
+        if (phase == FishPhase.REELING) {
+            phaseTimer += deltaTime;
+            if (phaseTimer >= REEL_DURATION) {
+                phase = FishPhase.IDLE;
+                phaseTimer = 0f;
+                castTimer = 0f;
+            }
+            return;
         }
 
         castTimer += deltaTime;
-        if (castTimer < DELAY_BETWEEN_CASTING) {
+        if (castTimer < delayBetween(zombie)) {
             return;
         }
-        castTimer -= DELAY_BETWEEN_CASTING;
-
-        castHook(zombie, context);
+        if (findNearestPlantInLane(zombie, context) == null) {
+            return;
+        }
+        castTimer = 0f;
+        phase = FishPhase.CASTING;
+        phaseTimer = 0f;
+        plantHooked = false;
     }
 
     @Override
@@ -47,7 +89,22 @@ public class FishBehavior implements ZombieBehavior {
         return ZombieBehaviorType.FISH;
     }
 
-    // --- Core logic ---
+    private static void holdStation(ZombieInstance zombie) {
+        if (zombie.getState() != ZombieState.SPECIAL_ACTION
+                && zombie.getState() != ZombieState.DYING
+                && zombie.getState() != ZombieState.DEAD) {
+            zombie.setState(ZombieState.SPECIAL_ACTION);
+        }
+    }
+
+    private static float delayBetween(ZombieInstance zombie) {
+        if (zombie.getDefinition() == null) {
+            return DELAY_BETWEEN_CASTING;
+        }
+        float delay = zombie.getDefinition().getBehaviorPropFloat(
+                "DelayBetweenCasting", DELAY_BETWEEN_CASTING);
+        return delay > 0f ? delay : DELAY_BETWEEN_CASTING;
+    }
 
     /**
      * Hooks the plant in the Fisherman's row, if any, and reels it in.
@@ -57,18 +114,16 @@ public class FishBehavior implements ZombieBehavior {
         if (hookedPlant == null || hookedPlant.getCurrentHP() <= 0) {
             return;
         }
-
         reelIn(hookedPlant, context);
     }
 
     /**
      * Pulls the hooked plant one tile forward. If that tile is
-     * occupied,the plant is thrown away and destroyed instead.
+     * occupied, the plant is thrown away and destroyed instead.
      */
     private void reelIn(PlantInstance hookedPlant, BehaviorContext context) {
         int currentCol = hookedPlant.getPosition().getX();
         int targetCol = currentCol + 1;
-
         int currentRow = hookedPlant.getPosition().getY();
 
         if (targetCol >= context.getColumnCount() || context.getPlantAt(currentRow, targetCol) != null) {
@@ -94,7 +149,7 @@ public class FishBehavior implements ZombieBehavior {
             }
             int col = plant.getPosition() != null ? plant.getPosition().getX() : -1;
             if (col < 0 || col >= zombieCol) {
-                continue; // only plants ahead of (to the left of) the zombie are valid targets
+                continue;
             }
             if (col > nearestCol) {
                 nearestCol = col;
@@ -104,15 +159,31 @@ public class FishBehavior implements ZombieBehavior {
         return nearest;
     }
 
-    // --- Getters ---
+    public FishPhase getPhase() {
+        return phase;
+    }
+
+    public float getPhaseTimer() {
+        return phaseTimer;
+    }
 
     public float getCastTimer() {
         return castTimer;
     }
 
-    // --- Setters ---
+    public boolean isPlantHooked() {
+        return plantHooked;
+    }
 
     public void setCastTimer(float castTimer) {
         this.castTimer = castTimer;
+    }
+
+    public void setPhase(FishPhase phase) {
+        this.phase = phase != null ? phase : FishPhase.IDLE;
+    }
+
+    public void setPhaseTimer(float phaseTimer) {
+        this.phaseTimer = phaseTimer;
     }
 }

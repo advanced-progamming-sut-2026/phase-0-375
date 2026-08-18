@@ -10,7 +10,6 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -23,8 +22,8 @@ import java.util.Random;
  *       {@code x = max(6 + 0.05 * t, 12)} and {@code t} is the number of
  *       seconds since the level started. The level's sun drop rate modifier
  *       scales this rate.</li>
- *   <li>A falling sun lands after 5 seconds and only then becomes
- *       collectible (it is added to the game model's active suns).</li>
+     *   <li>A falling sun lands after 5 seconds. It is collectible as soon as it
+     *       appears in the air.</li>
  *   <li>Sun types: 80% NORMAL (25 sun), 15% SPECIAL (100 sun),
  *       5% RADIOACTIVE (150 sun).</li>
  *   <li>A radioactive sun deals 80 damage when it lands: to zombies in the
@@ -33,7 +32,7 @@ import java.util.Random;
  */
 public class SunFallSystem implements Tickable {
 
-    private static final float FALL_TIME_SECONDS = 5f;
+    public static final float FALL_TIME_SECONDS = 5f;
     private static final int NORMAL_SUN_VALUE = 25;
     private static final int SPECIAL_SUN_VALUE = 100;
     private static final int RADIOACTIVE_SUN_VALUE = 150;
@@ -45,7 +44,6 @@ public class SunFallSystem implements Tickable {
 
     private float elapsedSeconds;
     private float dropTimer;
-    private final List<FallingSun> fallingSuns = new ArrayList<>();
     private final Random random = new Random();
 
     public SunFallSystem(GameModel gameModel, float sunDropRateModifier, boolean skyDropEnabled) {
@@ -76,11 +74,14 @@ public class SunFallSystem implements Tickable {
     }
 
     /**
-     * Starts a sun of the given type falling toward cell (x, y).
-     * It lands (and becomes collectible) after {@link #FALL_TIME_SECONDS}.
+     * Starts a sun of the given type falling toward a random point on cell (x, y).
+     * Collectible immediately; lands after {@link #FALL_TIME_SECONDS}.
      */
     public void spawnSkySun(int x, int y, SunType type) {
-        fallingSuns.add(new FallingSun(new Sun(type, valueOf(type), x, y)));
+        Sun sun = new Sun(type, valueOf(type), x, y);
+        sun.setOffset((random.nextFloat() - 0.5f) * 0.8f, (random.nextFloat() - 0.5f) * 0.8f);
+        sun.setFall(FALL_TIME_SECONDS, FALL_TIME_SECONDS);
+        gameModel.spawnSun(sun);
     }
 
     public void toggleSkyDrop(boolean enabled) {
@@ -121,20 +122,26 @@ public class SunFallSystem implements Tickable {
     }
 
     private void tickFallingSuns(float deltaTime) {
-        Iterator<FallingSun> it = fallingSuns.iterator();
-        while (it.hasNext()) {
-            FallingSun falling = it.next();
-            falling.remainingFallTime -= deltaTime;
-            if (falling.remainingFallTime <= 0f) {
-                it.remove();
-                land(falling.sun);
+        List<Sun> active = gameModel.getActiveSuns();
+        if (active == null || active.isEmpty()) {
+            return;
+        }
+        for (Sun sun : new ArrayList<>(active)) {
+            if (!sun.isFalling()) {
+                continue;
+            }
+            sun.tickFall(deltaTime);
+            if (!sun.isFalling()) {
+                land(sun);
             }
         }
     }
 
-    /** The sun touches the ground: it becomes collectible and radioactive suns explode. */
+    /** The sun touches the ground. Collected mid-air suns skip landing effects. */
     private void land(Sun sun) {
-        gameModel.spawnSun(sun);
+        if (!gameModel.getActiveSuns().contains(sun)) {
+            return;
+        }
         dispatch(GameEvent.Type.SUN_DROPPED);
 
         if (sun.getType() == SunType.RADIOACTIVE) {
@@ -162,16 +169,6 @@ public class SunFallSystem implements Tickable {
         EventBus bus = gameModel.getEventBus();
         if (bus != null) {
             bus.dispatch(new GameEvent(type));
-        }
-    }
-
-    /** A sun that is still in the air. */
-    private static final class FallingSun {
-        final Sun sun;
-        float remainingFallTime = FALL_TIME_SECONDS;
-
-        FallingSun(Sun sun) {
-            this.sun = sun;
         }
     }
 }

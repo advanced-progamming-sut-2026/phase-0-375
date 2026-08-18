@@ -41,6 +41,8 @@ public class ZombieInstance implements Tickable, Placeable {
 
     private PlantInstance eatingTarget;                    // null if this zombie isn't eating any plants
     private ZombieInstance combatTargetZombie;             // The opposing zombie this zombie is currently biting.
+    /** Leftover chew DPS so `(int)(dps * dt)` is not 0 at high FPS. */
+    private float eatDamageCarry;
 
     private float chillStackTimer = 0f;
     private float poisonTimer = 0f;
@@ -60,6 +62,9 @@ public class ZombieInstance implements Tickable, Placeable {
 
     /** True if any non-plant source (mower, environment, zombie) damaged this zombie. */
     private boolean nonPlantDamaged = false;
+
+    /** Killing blow was fire or an explosion — play ash instead of {@code die}. */
+    private boolean blownUp;
 
     public ZombieInstance(Zombie definition) {
         this.definition = definition;
@@ -174,6 +179,9 @@ public class ZombieInstance implements Tickable, Placeable {
         int scaled = (int) (damage * fireDamageMultiplier);
         if (scaled <= 0) return 0;
         takeDamage(scaled);
+        if (currentHP <= 0) {
+            blownUp = true;
+        }
         return scaled;
     }
 
@@ -330,7 +338,12 @@ public class ZombieInstance implements Tickable, Placeable {
         this.eatingTarget = null;
         this.combatTargetZombie = null;
         if (state == ZombieState.EATING) {
-            state = (hypnotized || movingBackward) ? ZombieState.HYPNOTIZED : ZombieState.WALKING;
+            JumpBehavior jump = (JumpBehavior) getBehavior(ZombieBehaviorType.JUMP);
+            boolean reversedWalk = jump != null
+                    && jump.getPhase() == JumpBehavior.JumpPhase.REVERSED_WALK;
+            state = movingBackward && !reversedWalk
+                    ? ZombieState.HYPNOTIZED
+                    : ZombieState.WALKING;
         }
     }
 
@@ -338,6 +351,21 @@ public class ZombieInstance implements Tickable, Placeable {
      * @return true if this zombie is eating a plant
      */
     public boolean isEating() { return state == ZombieState.EATING; }
+
+    /**
+     * Turns a fractional chew/fight DPS sample into whole HP. Carry is kept
+     * on this zombie so 100 DPS still lands at 144 FPS instead of truncating
+     * to 0 for long stretches.
+     */
+    public int addEatDamage(float rawDamage) {
+        if (rawDamage <= 0f) {
+            return 0;
+        }
+        eatDamageCarry += rawDamage;
+        int damage = (int) eatDamageCarry;
+        eatDamageCarry -= damage;
+        return damage;
+    }
     public boolean isDead() { return state == ZombieState.DEAD || state == ZombieState.DYING; }
     public boolean isAlive() { return currentHP > 0 && !isDead(); }
     public boolean isFrozen() { return chillLevel >= 3; }
@@ -364,6 +392,35 @@ public class ZombieInstance implements Tickable, Placeable {
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;
+    }
+
+    /**
+     * Half a tile. Integer continuous X is a tile centre (plants sit there);
+     * {@code col ± TILE_BORDER} is that tile's facing edge.
+     */
+    public static final float TILE_BORDER = 0.5f;
+
+    /**
+     * Column of the plant tile this zombie has stepped onto, or {@code -1} if still
+     * approaching that tile's facing border.
+     *
+     * <p>Continuous X is a column index: integers are tile centres, half-integers are
+     * the lines between tiles. Walking left bites column {@code C} at {@code C+0.5};
+     * walking right bites it at {@code C-0.5}.
+     */
+    public int plantColumnAtFacingBorder() {
+        if (continuousPosition == null) {
+            return -1;
+        }
+        return plantColumnAtFacingBorder(continuousPosition.getX(), movingBackward);
+    }
+
+    static int plantColumnAtFacingBorder(float x, boolean movingBackward) {
+        if (movingBackward) {
+            return (int) Math.floor(x + TILE_BORDER);
+        }
+        int col = (int) Math.floor(x);
+        return x <= col + TILE_BORDER ? col : -1;
     }
 
     /** Reverses (or restores) this zombie's walking direction. */
@@ -479,6 +536,9 @@ public class ZombieInstance implements Tickable, Placeable {
     /** @return the last source that damaged this zombie, or null if unknown. */
     public Object getLastDamageSource() { return lastDamageSource; }
     public void setLastDamageSource(Object lastDamageSource) { this.lastDamageSource = lastDamageSource;}
+    /** Cherry Bomb / Jalapeno / Potato Mine / Explode-o-nut — ash death, not {@code die}. */
+    public void markBlownUp() { blownUp = true; }
+    public boolean isBlownUp() { return blownUp; }
     public FloatPoint getContinuousPosition() { return continuousPosition; }
     public float getContinuousX() { return continuousPosition.getX(); }
     public float getContinuousY() { return continuousPosition.getY(); }

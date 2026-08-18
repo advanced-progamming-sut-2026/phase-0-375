@@ -15,7 +15,6 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class PlantSystem implements Tickable {
@@ -38,7 +37,6 @@ public class PlantSystem implements Tickable {
 
     @Override
     public void tick(float deltaTime) {
-        handleDeadPlants();
         List<PlantInstance> snapshot = new ArrayList<>(gameModel.getAllPlants());
         for (PlantInstance plant : snapshot) {
             if (plant.getState() == PlantState.DYING) continue;
@@ -61,26 +59,40 @@ public class PlantSystem implements Tickable {
             }
         }
         context.setCurrentPlant(null);
+        sweepDeadPlants();
     }
 
-    private void handleDeadPlants() {
-        Iterator<PlantInstance> iterator = gameModel.getAllPlants().iterator();
+    /**
+     * Instant explosives (Doom-shroom, Cherry Bomb, ...) spawn at 0 HP so they
+     * must tick once and start their attack clip before leaving the cell.
+     */
+    static boolean shouldLeaveField(PlantInstance plant) {
+        if (plant == null) {
+            return false;
+        }
+        if (plant.getState() == PlantState.DYING) {
+            return true;
+        }
+        if (plant.getCurrentHP() > 0) {
+            return false;
+        }
+        return plant.getState() != PlantState.ATTACKING && !plant.hasActiveAction();
+    }
 
-        while (iterator.hasNext()) {
-            PlantInstance plant = iterator.next();
-            iterator.remove();
-            if (plant == null) continue;
-            if (plant.getState() == PlantState.DYING || plant.getCurrentHP() <= 0) {
-                PlantAbility ability = plant.getAbilityStrategy();
-                if (ability != null) {
-                    ability.onPlantDeath(plant, context);
-                }
-                Point pos = plant.getPosition();
-                if (pos != null) {
-                    Cell cell = gameModel.getCellAt(pos.getY(), pos.getX());
-                    if (cell != null) {
-                        cell.removePlaceable(plant);
-                    }
+    private void sweepDeadPlants() {
+        for (PlantInstance plant : new ArrayList<>(gameModel.getAllPlants())) {
+            if (!shouldLeaveField(plant)) {
+                continue;
+            }
+            PlantAbility ability = plant.getAbilityStrategy();
+            if (ability != null) {
+                ability.onPlantDeath(plant, context);
+            }
+            Point pos = plant.getPosition();
+            if (pos != null) {
+                Cell cell = gameModel.getCellAt(pos.getY(), pos.getX());
+                if (cell != null) {
+                    cell.removePlaceable(plant);
                 }
             }
         }
@@ -108,6 +120,7 @@ public class PlantSystem implements Tickable {
         private PlantInstance currentPlant; // plant currently ticking (kill attribution)
         private PlantClipDurations clipDurations = PlantClipDurations.NONE;
         private PlantProjectileOrigins projectileOrigins = PlantProjectileOrigins.NONE;
+
 
         GameModelPlantAbilityContext(GameModel gameModel) {
             this.gameModel = gameModel;

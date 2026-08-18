@@ -6,7 +6,6 @@ import model.enums.ArmorType;
 import model.enums.PushableItemType;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
-import model.item.pushable.IceBlock;
 import model.item.pushable.Piano;
 import model.item.pushable.Pushable;
 import model.zombie.armor.Armor;
@@ -24,8 +23,6 @@ import java.util.Map;
  * Single entry point for all zombie creation.
  */
 public class ZombieFactory {
-    private static final int ICE_BLOCK_HP = 600;
-
     /** HP of the Barrel Roller's barrel. */
     private static final int BARREL_HP = 600;
 
@@ -133,7 +130,7 @@ public class ZombieFactory {
 
         switch (type) {
             case ARCADE_MACHINE: return new ArcadeMachine(definition.getBaseHP());
-            case ICE_BLOCK: return new IceBlock(ICE_BLOCK_HP);
+            case ICE_BLOCK: return null; // Troglobite claims ice already on the lawn
             case PIANO: return new Piano(definition.getBaseHP());
             case BARREL: return new Barrel(BARREL_HP);
             default:

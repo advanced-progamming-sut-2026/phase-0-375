@@ -140,7 +140,7 @@ public class ShooterAbility implements PlantAbility {
 
         if (shootsGiantPea(def)) {
             for (int i = 0; i < plant.getStackCount(); i++) {
-                float offset = Math.powExact(-1, i) * 0.1f * ((i + 1) / 2);
+                float offset = ((i & 1) == 0 ? 1 : -1) * 0.1f * ((i + 1) / 2);
                 FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
                 shootOne(context, plant.getDefinition().getDamage() * GIANT_PEA_DAMAGE_MULTIPLIER,
                         pelletOrigin, plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);

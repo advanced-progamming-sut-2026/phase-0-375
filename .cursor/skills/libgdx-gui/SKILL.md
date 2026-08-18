@@ -15,7 +15,7 @@ reimplement game rules in actors or screens. Controllers remain the only mutator
 `App` / `GameModel` / `PvZGameLoop` and continue returning `CommandResult`.
 
 Upstream library: [pizpizi/libPVZ](https://github.com/pizpizi/libPVZ) (JitPack:
-`com.github.pizpizi:libPVZ:v0.1.3`, LibGDX 1.12.1+).
+`com.github.pizpizi:libPVZ:v0.1.6`, LibGDX 1.12.1+).
 
 This skill is self-contained. Do not open other local repos for GUI patterns.
 

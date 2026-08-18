@@ -3,6 +3,7 @@ package view.gui.assets;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.utils.JsonReader;
 import com.badlogic.gdx.utils.JsonValue;
+import model.enums.Chapter;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -22,12 +23,10 @@ public final class PamCatalog {
 
     private final Map<String, PamEntry> byNormName;
     private final Map<String, String> plantOverrides;
-    private final Map<String, String> zombieOverrides;
 
     private PamCatalog(Map<String, PamEntry> byNormName) {
         this.byNormName = byNormName;
         this.plantOverrides = PlantPamAliases.all();
-        this.zombieOverrides = ZombiePamAliases.all();
     }
 
     public static PamCatalog load(FileHandle assetsRoot) {
@@ -82,10 +81,14 @@ public final class PamCatalog {
     }
 
     public PamEntry forZombie(String definitionName) {
+        return forZombie(definitionName, null);
+    }
+
+    public PamEntry forZombie(String definitionName, Chapter chapter) {
         if (definitionName == null) {
             return null;
         }
-        String override = zombieOverrides.get(definitionName);
+        String override = ZombiePamAliases.pamName(definitionName, chapter);
         if (override != null) {
             PamEntry e = byNormName.get(normalize(override));
             if (e != null) {
@@ -195,6 +198,46 @@ public final class PamCatalog {
 
     private static boolean isGameplayPam(String path) {
         String upper = path.toUpperCase(Locale.ROOT);
+        if (upper.contains("/EFFECTS/80S_ARCADE_CABINET/") && !upper.contains("BREAK")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/ZOMBIE_") && upper.contains("_ASH/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/CRYSTALSKULL_BEAM/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/ZOMBIE_PROSPECTOR_BLAST_OFF/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/ZOMBIE_HUNTER_SNOWBALL_SPLAT/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/ZOMBIE_OCTOPUS_PROJECTILE/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/DARK_WIZARD_SHEEPENING/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_ZOMBIE/")
+                && !upper.contains("BEHIND")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/SUN/")) {
+            return true;
+        }
+        if (upper.contains("/GRAVESTONES/")) {
+            return true;
+        }
+        if (upper.contains("/BACKGROUNDS/WAVE_UPPERLAYER/")) {
+            return true;
+        }
+        if (upper.contains("/BACKGROUNDS/WATER_ZOMBIE_RIPPLE/")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/")) {
             return false;
         }
@@ -202,6 +245,14 @@ public final class PamCatalog {
             return false;
         }
         return upper.contains("/PLANT/") || upper.contains("/ZOMBIE/");
+    }
+
+    /** Catalog entry by animations.json {@code name}, or {@code null}. */
+    public PamEntry byName(String pamName) {
+        if (pamName == null) {
+            return null;
+        }
+        return byNormName.get(normalize(pamName));
     }
 
     /** Prefer INITIAL gameplay packs over FULL / holiday variants. */

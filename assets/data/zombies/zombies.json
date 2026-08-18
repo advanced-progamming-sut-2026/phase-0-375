@@ -1855,7 +1855,7 @@
         "mY": 10
       },
       "Hitpoints": 1100,
-      "RunningSpeedScale": 0.5,
+      "RunningSpeedScale": 1.0,
       "ScaledProps": [
         {
           "Arg1": 1.3,
@@ -2470,6 +2470,22 @@
           "Value": "speed3"
         }
       ]
+    }
+  },
+  {
+    "aliases": [
+      "ZombiePirateImp"
+    ],
+    "objclass": "ZombiePropertySheet",
+    "objdata": {
+      "CanSpawnPlantFood": false,
+      "Cost": 50,
+      "EatDPS": 200,
+      "Hitpoints": 190,
+      "Size": "imp",
+      "Speed": 0.22,
+      "WavePointCost": 50,
+      "Weight": 0
     }
   },
   {

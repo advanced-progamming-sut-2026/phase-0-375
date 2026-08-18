@@ -52,6 +52,15 @@ public interface BehaviorContext {
      */
     boolean spawnGraveAt(int row, int col);
 
+    /**
+     * Like {@link #spawnGraveAt(int, int)}, tagging the grave as owned by {@code raiser}
+     * for that zombie's tomb cap.
+     */
+    boolean spawnGraveAt(int row, int col, ZombieInstance raiser);
+
+    /** Live graves on the board spawned by {@code raiser}. */
+    int countGravesRaisedBy(ZombieInstance raiser);
+
     // --- Plants ---
 
     /**

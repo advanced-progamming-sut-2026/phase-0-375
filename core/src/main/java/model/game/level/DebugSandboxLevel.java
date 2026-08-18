@@ -35,16 +35,16 @@ public final class DebugSandboxLevel extends Level {
         config.setEndGameCondition(new NeverEndCondition());
 
         GameRules rules = new GameRules(
-                false,
+                true,
                 true,
                 99_999,
-                0.0,
+                1.2,
                 0,
                 999,
                 Collections.emptySet(),
                 Collections.emptySet(),
                 Collections.emptySet());
-        rules.setSunFallsFromSky(false);
+        rules.setSunFallsFromSky(true);
         rules.setSunProducingPlantsAllowed(true);
         rules.setPlantFoodDrops(false);
         rules.setLawnMowersEnabled(false);
