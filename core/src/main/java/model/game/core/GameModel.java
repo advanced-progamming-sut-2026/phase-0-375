@@ -96,6 +96,9 @@ public class GameModel implements BehaviorContext {
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
+    /** Last CLI wave sting; GUI consumes it the same frame. */
+    private String pendingWaveAnnouncement;
+
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
     private int coinCount;
@@ -392,11 +395,18 @@ public class GameModel implements BehaviorContext {
         if (wave == null) {
             return;
         }
-        if (wave.isFinalWave()) {
-            App.logToShell("The final wave has come.");
-        } else {
-            App.logToShell("Wave " + wave.getWaveNumber() + " started.");
-        }
+        String text = wave.isFinalWave()
+            ? "The final wave has come."
+            : "Wave " + wave.getWaveNumber() + " started.";
+        pendingWaveAnnouncement = text;
+        App.logToShell(text);
+    }
+
+    /** GUI sting: same string as the CLI print, or {@code null} if none pending. */
+    public String consumeWaveAnnouncement() {
+        String text = pendingWaveAnnouncement;
+        pendingWaveAnnouncement = null;
+        return text;
     }
 
     @Override

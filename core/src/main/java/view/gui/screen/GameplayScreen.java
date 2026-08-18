@@ -38,8 +38,11 @@ import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
 import view.gui.ui.LootRewardPopup;
 import view.gui.ui.PlantFoodBankHud;
+import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SunHud;
+import view.gui.ui.WaveAnnounceBanner;
+import view.gui.ui.WaveAnnounceBanner;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +68,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private CoinHud coinHud;
     private PlantFoodBankHud plantFoodBank;
     private LootRewardPopup lootRewardPopup;
+    private ReadySetPlantBanner readySetPlant;
+    private WaveAnnounceBanner waveAnnounce;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private String previewPlant;
@@ -141,6 +146,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return model == null ? null : model.getCurrentLevel();
     }
 
+    private boolean isPregame() {
+        return entityRenderer.isMowerIntroPlaying()
+            || (readySetPlant != null && readySetPlant.isPlaying());
+    }
+
     private static boolean lawnMowersEnabled() {
         Level level = currentLevel();
         return level != null
@@ -202,6 +212,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(bottomLeft);
 
         buildBottomRight(model);
+
+        readySetPlant = new ReadySetPlantBanner(skin);
+        uiStage.addActor(readySetPlant);
+        readySetPlant.play();
+
+        waveAnnounce = new WaveAnnounceBanner(skin);
+        uiStage.addActor(waveAnnounce);
 
         toast.toFront();
         refreshPackets();
@@ -336,7 +353,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void dropPlant(String plantName, float stageX, float stageY) {
-        if (entityRenderer.isMowerIntroPlaying()) {
+        if (isPregame()) {
             return;
         }
         stageToWorld(stageX, stageY);
@@ -511,7 +528,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     @Override
     protected void updateLogic(float delta) {
         GameModel model = App.getInstance().getCurrentGameModel();
-        if (entityRenderer.isMowerIntroPlaying()) {
+        if (isPregame()) {
             entityRenderer.tickMowerIntro(delta);
         } else {
             PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
@@ -520,6 +537,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             if (model != null) {
                 entityRenderer.tickMowers(model, delta);
+            }
+        }
+        if (model != null) {
+            String waveText = model.consumeWaveAnnouncement();
+            if (waveText != null && waveAnnounce != null) {
+                waveAnnounce.show(waveText);
             }
         }
         if (sunHud != null && model != null) {
