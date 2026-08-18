@@ -38,7 +38,8 @@ public final class PlantAnimProfiles {
         PhatBeetAnim.register(overrides);
         KiwibeastAnim.register(overrides);
         ChomperAnim.register(overrides);
-        // TODO: SunshroomAnim.register(overrides);
+        SunshroomAnim.register(overrides);
+        GoldBloomAnim.register(overrides);
         // TODO: ChardGuardAnim.register(overrides);
     }
 }

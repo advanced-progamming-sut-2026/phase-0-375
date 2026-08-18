@@ -25,6 +25,7 @@ public final class ChomperAnim {
             case PLANT_FOOD_ON -> AnimPose.once(entry.path(), "plantfood_on", role);
             case PLANT_FOOD -> AnimPose.looping(entry.path(), "plantfood", role);
             case PLANT_FOOD_OFF -> AnimPose.once(entry.path(), "plantfood_off", role);
+            default -> null;
         };
     }
 

@@ -109,6 +109,10 @@ public final class PlantAnimAdapter {
             return PlantAnimRole.ATTACK;
         }
 
+        if (presentation == PlantState.PRODUCING) {
+            return PlantAnimRole.SPECIAL;
+        }
+
         return PlantAnimRole.IDLE;
     }
 
@@ -138,10 +142,10 @@ public final class PlantAnimAdapter {
             case PLANT_FOOD -> new String[]{"plantfood_loop", "plantfood", "plantfood_idle", "idle"};
             case PLANT_FOOD_OFF -> new String[]{"plantfood_off"};
             case ATTACK -> new String[]{"attack", "idle"};
+            case SPECIAL ->  new String[]{"special"};
             // TODO: case GROWING -> new String[]{"idle", "idle_stage1"};
             // TODO: case ARMED -> new String[]{"ready_idle", "idle"};
             // TODO: case DIE -> new String[]{"die", "death"};
-            // TODO: case SPECIAL -> ...
         };
     }
 

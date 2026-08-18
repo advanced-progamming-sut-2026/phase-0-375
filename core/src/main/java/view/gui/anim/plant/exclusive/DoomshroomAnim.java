@@ -20,7 +20,7 @@ public final class DoomshroomAnim {
         return switch (role) {
             case IDLE -> AnimPose.looping(entry.path(), "stage1_idle", role);
             case ATTACK -> AnimPose.once(entry.path(), "stage1_explode", role);
-            case PLANT_FOOD_ON, PLANT_FOOD, PLANT_FOOD_OFF -> null;
+            default -> null;
         };
     }
 }

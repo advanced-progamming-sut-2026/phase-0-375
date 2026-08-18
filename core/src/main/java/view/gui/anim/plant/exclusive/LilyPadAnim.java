@@ -23,7 +23,7 @@ public final class LilyPadAnim {
             case IDLE -> AnimPose.looping(entry.path(), idleClip(plant), role);
             case PLANT_FOOD_ON, PLANT_FOOD, PLANT_FOOD_OFF ->
                     AnimPose.looping(entry.path(), "plantfood", role);
-            case ATTACK -> null;
+            default -> null;
         };
     }
 

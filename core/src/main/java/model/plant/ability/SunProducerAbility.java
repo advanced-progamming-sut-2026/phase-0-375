@@ -4,9 +4,9 @@ import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.enums.PlantFoodType;
 import model.enums.PlantSpecialTag;
+import model.enums.PlantState;
 import model.enums.PlantTags;
 import model.enums.SunType;
-import model.game.map.FloatPoint;
 import model.item.Sun;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -23,8 +23,51 @@ public class SunProducerAbility implements PlantAbility {
 
     private static final Random RNG = new Random();
 
+    /** Sun-shroom elapsed time to reach stage 2. */
+    private static final float SUNSHROOM_STAGE2_SECONDS = 24f;
+    /** Sun-shroom elapsed time to reach stage 3. */
+    private static final float SUNSHROOM_STAGE3_SECONDS = 72f;
+    /** Sun-shroom max growth stage index (0-based). */
+    private static final int SUNSHROOM_MAX_STAGE = 2;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.SUN_PRODUCER; }
+
+    @Override
+    public void tick(PlantInstance plant, float deltaTime) {
+        if (plant == null || deltaTime <= 0f) return;
+        Plant def = plant.getDefinition();
+        if (def == null || !def.hasTag(PlantTags.WARM_UP)) return;
+
+        AbilityState state = plant.getAbilityState(PlantAbilityType.PRODUCE_SUN);
+        if (state == null) return;
+
+        state.setChargeProgress(state.getChargeProgress() + deltaTime);
+        float stage2At = sunshroomStage2Threshold(plant);
+        float stage3At = sunshroomStage3Threshold(plant);
+        state.setGrowthStage(sunshroomStageFromElapsed(state.getChargeProgress(), stage2At, stage3At));
+    }
+
+    @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            execute(plant, context);
+            return null;
+        }
+
+        if (def.getAbilityType() == PlantAbilityType.INSTANT_SUN_BURST) {
+            return beginGoldBloomBurst(plant, context);
+        }
+
+        if (def.getAbilityType() == PlantAbilityType.PRODUCE_SUN) {
+            return TimedPlantAction.produceAt(plant, context, this::execute);
+        }
+
+        return null;
+    }
 
     @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
@@ -38,8 +81,7 @@ public class SunProducerAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() == PlantAbilityType.INSTANT_SUN_BURST) {
-            dropMultipleSuns(plant, context, (int) def.getAbilityValue());
-            context.destroyPlant(plant);
+            dropGoldBloomBurst(plant, context);
             return;
         }
 
@@ -57,25 +99,15 @@ public class SunProducerAbility implements PlantAbility {
         if (def.getPlantFoodType() != PlantFoodType.SPAWN_SUN_ITEMS) return;
         if (plant.getPosition() == null) return;
 
-        int count = (int) def.getPlantFoodValue() / Math.max(1, computeSunAmount(plant));
-        if (count <= 0) count = 1;
-        for (int i = 0; i < count; i++) {
-            float dx = (RNG.nextFloat() - 0.5f) * 2.0f;  // -1.0 .. +1.0
-            float dy = (RNG.nextFloat() - 0.5f) * 2.0f;  // -1.0 .. +1.0
-            float x = Math.max(0f, Math.min(context.getColumnCount() - 1,
-                    plant.getPosition().getX() + dx));
-            float y = Math.max(0f, Math.min(context.getRowCount() - 1,
-                    plant.getPosition().getY() + dy));
-            int col = Math.round(x);
-            int row = Math.round(y);
-            Sun sun = new Sun(
-                    SunType.NORMAL,
-                    computeSunAmount(plant),
-                    col,
-                    row
-            );
-            context.spawnSun(sun);
+        if (def.hasTag(PlantTags.WARM_UP)) {
+            AbilityState state = plant.getAbilityState(PlantAbilityType.PRODUCE_SUN);
+            if (state != null) {
+                state.setGrowthStage(SUNSHROOM_MAX_STAGE);
+                state.setChargeProgress(sunshroomStage3Threshold(plant));
+            }
         }
+
+        dropScatteredSuns(plant, context, (int) def.getPlantFoodValue());
     }
 
     // --- Helpers ---
@@ -85,16 +117,10 @@ public class SunProducerAbility implements PlantAbility {
         Plant def = plant.getDefinition();
         int base = (int) def.getAbilityValue();
 
-        // Gold Bloom (INSTANT_SUN_BURST) reads the SUN_AMOUNT_BUFF
-        // upgrade to increase the burst amount.
-        if (def.getAbilityType() == PlantAbilityType.INSTANT_SUN_BURST) {
-            base += (int) cumulativeSpecialValue(plant, PlantSpecialTag.SUN_AMOUNT_BUFF);
-        }
-
         if (def.hasTag(PlantTags.WARM_UP)) {
             AbilityState state = plant.getAbilityState(PlantAbilityType.PRODUCE_SUN);
             if (state != null) {
-                int stage = Math.min(2, state.getGrowthStage());
+                int stage = Math.min(SUNSHROOM_MAX_STAGE, state.getGrowthStage());
                 return base * (1 + stage);
             }
         }
@@ -138,19 +164,94 @@ public class SunProducerAbility implements PlantAbility {
         return total;
     }
 
+    private float growTimeReduction(PlantInstance plant) {
+        float reduction = cumulativeSpecialValue(plant, PlantSpecialTag.GROW_TIME_REDUCTION);
+        return reduction < 0f ? -reduction : reduction;
+    }
+
+    private float sunshroomStage2Threshold(PlantInstance plant) {
+        return Math.max(0f, SUNSHROOM_STAGE2_SECONDS - growTimeReduction(plant));
+    }
+
+    private float sunshroomStage3Threshold(PlantInstance plant) {
+        return Math.max(0f, SUNSHROOM_STAGE3_SECONDS - growTimeReduction(plant));
+    }
+
+    private PlantAction beginGoldBloomBurst(PlantInstance plant, PlantAbilityContext context) {
+        float duration = TimedPlantAction.presentationDurationFor(
+                plant, context, PlantState.PRODUCING, TimedPlantAction.DEFAULT_PRODUCING_DURATION);
+        return new TimedPlantAction(
+                PlantState.PRODUCING,
+                duration,
+                null,
+                (p, ctx) -> dropGoldBloomBurst(p, ctx),
+                TimedPlantAction.DEFAULT_PRODUCING_FRACTION,
+                (p, ctx) -> ctx.destroyPlant(p));
+    }
+
+    private void dropGoldBloomBurst(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+        int burst = (int) def.getAbilityValue()
+                + (int) cumulativeSpecialValue(plant, PlantSpecialTag.SUN_AMOUNT_BUFF);
+        dropMultipleSuns(plant, context, burst);
+    }
+
+    private static int sunshroomStageFromElapsed(float elapsed, float stage2At, float stage3At) {
+        if (elapsed >= stage3At) {
+            return 2;
+        }
+        if (elapsed >= stage2At) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private SunType sunTypeFor(PlantInstance plant) {
+        Plant def = plant.getDefinition();
+        if (def != null && "Primal Sunflower".equals(def.getName())) {
+            return SunType.SPECIAL;
+        }
+        return SunType.NORMAL;
+    }
+
     private void dropSun(PlantInstance plant, PlantAbilityContext context, int amount) {
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
-        Sun sun = new Sun(SunType.NORMAL, amount, col, row);
+        Sun sun = new Sun(sunTypeFor(plant), amount, col, row);
         context.spawnSun(sun);
     }
 
     private void dropMultipleSuns(PlantInstance plant, PlantAbilityContext context, int amount) {
-        int numOfSuns = (int) Math.ceil(amount / 50f);
-        for (int i = 0; i < numOfSuns; i++) {
-            int currentSunAmount = Math.min(50, amount);
-            dropSun(plant, context, currentSunAmount);
-            amount -= 50;
+        int remaining = amount;
+        while (remaining > 0) {
+            int chunk = Math.min(50, remaining);
+            dropSun(plant, context, chunk);
+            remaining -= chunk;
+        }
+    }
+
+    /** Drops sun tokens totalling {@code total}, scattered near the plant. */
+    private void dropScatteredSuns(PlantInstance plant, PlantAbilityContext context, int total) {
+        if (total <= 0) return;
+
+        int remaining = total;
+        while (remaining > 0) {
+            int chunk = Math.min(50, remaining);
+            float dx = (RNG.nextFloat() - 0.5f) * 2.0f;
+            float dy = (RNG.nextFloat() - 0.5f) * 2.0f;
+            float x = Math.max(0f, Math.min(context.getColumnCount() - 1,
+                    plant.getPosition().getX() + dx));
+            float y = Math.max(0f, Math.min(context.getRowCount() - 1,
+                    plant.getPosition().getY() + dy));
+            Sun sun = new Sun(
+                    sunTypeFor(plant),
+                    chunk,
+                    Math.round(x),
+                    Math.round(y)
+            );
+            context.spawnSun(sun);
+            remaining -= chunk;
         }
     }
 }

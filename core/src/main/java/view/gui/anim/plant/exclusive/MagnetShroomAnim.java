@@ -34,6 +34,7 @@ public final class MagnetShroomAnim {
             case PLANT_FOOD_ON -> AnimPose.once(entry.path(), "plantfood_on", role, vis);
             case PLANT_FOOD -> AnimPose.looping(entry.path(), "plantfood", role, vis);
             case PLANT_FOOD_OFF -> AnimPose.once(entry.path(), "plantfood_off", role, vis);
+            default -> null;
         };
     }
 

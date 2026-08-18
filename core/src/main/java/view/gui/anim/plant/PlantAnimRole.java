@@ -11,13 +11,13 @@ public enum PlantAnimRole {
     PLANT_FOOD_ON(false),
     PLANT_FOOD(true),
     PLANT_FOOD_OFF(false),
-    ATTACK(false);
+    ATTACK(false),
+    SPECIAL(false)
     ;
 
     // TODO: GROWING — warm-up / stage idles
     // TODO: ARMED — Potato Mine / trap ready poses
     // TODO: DIE — death clips
-    // TODO: SPECIAL — exclusive one-offs
 
     private final boolean looping;
 

@@ -19,7 +19,7 @@ public final class GraveBusterAnim {
         }
         return switch (role) {
             case IDLE, ATTACK -> AnimPose.once(entry.path(), "attack", role);
-            case PLANT_FOOD_ON, PLANT_FOOD, PLANT_FOOD_OFF -> null;
+            default -> null;
         };
     }
 }

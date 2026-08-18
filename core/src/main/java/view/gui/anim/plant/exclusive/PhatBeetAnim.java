@@ -22,6 +22,7 @@ public final class PhatBeetAnim {
             case ATTACK -> AnimPose.once(entry.path(), "attack", role);
             case PLANT_FOOD_ON, PLANT_FOOD, PLANT_FOOD_OFF ->
                     AnimPose.looping(entry.path(), "plantfood", role);
+            default -> null;
         };
     }
 }

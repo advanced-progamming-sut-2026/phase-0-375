@@ -12,9 +12,11 @@ public final class TimedPlantAction implements PlantAction {
 
     /** Fallback only when {@link PlantAbilityContext#plantPresentationDuration} returns 0. */
     public static final float DEFAULT_ATTACK_DURATION = 0.6f;
+    public static final float DEFAULT_PRODUCING_DURATION = 0.5f;
 
-    /** Default share of the attack clip that must elapse before a delayed shot fires. */
+    /** Default fractions used for different states. */
     public static final float DEFAULT_ATTACK_FIRE_FRACTION = 0.4f;
+    public static final float DEFAULT_PRODUCING_FRACTION = 0.3f;
 
     @FunctionalInterface
     public interface Effect {
@@ -95,6 +97,26 @@ public final class TimedPlantAction implements PlantAction {
         return new TimedPlantAction(PlantState.ATTACKING, presentationDurationFor(
                 plant, context, PlantState.ATTACKING, DEFAULT_ATTACK_DURATION),
                 null, onFire, fireFraction, null);
+    }
+
+    /**
+     * Same as {@link TimedPlantAction#attackAt(PlantInstance, PlantAbilityContext, float, Effect)}
+     * but with {@link PlantState#PRODUCING} state.
+     */
+    public static TimedPlantAction produceAt(PlantInstance plant, PlantAbilityContext context,
+                                             float fireFraction, Effect onFire) {
+        return new TimedPlantAction(PlantState.PRODUCING, presentationDurationFor(
+            plant, context, PlantState.PRODUCING, DEFAULT_PRODUCING_DURATION),
+            null, onFire, fireFraction, null);
+    }
+
+
+    /**
+     * Same as {@link TimedPlantAction#attack(PlantInstance, PlantAbilityContext, Effect)}
+     * but with {@link PlantState#PRODUCING} state.
+     */
+    public static TimedPlantAction produceAt(PlantInstance plant, PlantAbilityContext context, Effect onFire) {
+        return produceAt(plant, context, DEFAULT_PRODUCING_FRACTION, onFire);
     }
 
     /**

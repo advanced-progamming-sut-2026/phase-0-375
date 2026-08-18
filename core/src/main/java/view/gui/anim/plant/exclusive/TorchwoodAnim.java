@@ -21,7 +21,7 @@ public final class TorchwoodAnim {
             case IDLE -> AnimPose.looping(entry.path(), "idle", role);
             case PLANT_FOOD_ON -> AnimPose.once(entry.path(), "plantfood_on", role);
             case PLANT_FOOD, PLANT_FOOD_OFF -> AnimPose.looping(entry.path(), "plantfood", role);
-            case ATTACK -> null;
+            default -> null;
         };
     }
 }

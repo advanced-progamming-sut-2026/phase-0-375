@@ -77,6 +77,10 @@ public class PlantInstance implements Placeable {
                 }
             }
             abilityStates.put(definition.getAbilityType(), abilityState);
+            if (definition.getAbilityType() == PlantAbilityType.PRODUCE_SUN
+                    && definition.getActionInterval() > 0f) {
+                abilityState.setCooldownRemaining(definition.getActionInterval());
+            }
         }
 
         // Temporary plants (Puff-shroom, Sea-shroom, etc.) get a finite lifespan.
