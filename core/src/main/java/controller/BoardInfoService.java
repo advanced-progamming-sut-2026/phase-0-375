@@ -249,8 +249,11 @@ final class BoardInfoService {
                             .append(def.getName())
                             .append(" @ (").append(c).append(", ").append(r).append(")")
                             .append(" cost=").append(def.getCost())
-                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP())
-                            .append(" level=").append(plant.getLevel())
+                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP());
+                    if (plant.hasArmor()) {
+                        sb.append(" armor=").append(plant.getArmorHP()).append("/").append(plant.getArmorMaxHP());
+                    }
+                    sb.append(" level=").append(plant.getLevel())
                             .append(" state=").append(plant.getState());
                     if (plant.getStackCount() > 1) {
                         sb.append(" stack=").append(plant.getStackCount())
@@ -318,8 +321,11 @@ final class BoardInfoService {
                     Plant def = plant.getDefinition();
                     sb.append("    [").append(plant.getLayer()).append("] ")
                             .append(def.getName())
-                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP())
-                            .append(" level=").append(plant.getLevel())
+                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP());
+                    if (plant.hasArmor()) {
+                        sb.append(" armor=").append(plant.getArmorHP()).append("/").append(plant.getArmorMaxHP());
+                    }
+                    sb.append(" level=").append(plant.getLevel())
                             .append(" state=").append(plant.getState());
                     if (plant.getStackCount() > 1) {
                         sb.append(" stack=").append(plant.getStackCount())

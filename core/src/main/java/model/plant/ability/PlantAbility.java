@@ -49,4 +49,12 @@ public interface PlantAbility extends Ability {
      */
     default void tick(PlantInstance plant, float deltaTime) {
     }
+
+    /**
+     * Called by the PlantSystem once when the giving {@code plant} dies.
+     * Default implementation is a no-op.
+     */
+    default void onPlantDeath(PlantInstance plant, PlantAbilityContext context) {
+
+    }
 }

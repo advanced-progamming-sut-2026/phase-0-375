@@ -31,6 +31,7 @@ import model.item.LootDrop;
 import model.item.Sun;
 import model.item.pushable.Pushable;
 import model.item.placeable.Placeable;
+import model.plant.ability.PlantAbility;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
@@ -702,10 +703,9 @@ public class GameModel implements BehaviorContext {
     public void damagePlant(PlantInstance plant, int damage) {
         if (plant == null || damage <= 0) return;
 
-        int newHP = Math.max(0, plant.getCurrentHP() - damage);
         boolean wasAlive = plant.getCurrentHP() > 0;
-        plant.setCurrentHP(newHP);
-        if (wasAlive && newHP == 0) {
+        plant.takeDamage(damage);
+        if (wasAlive && plant.getCurrentHP() == 0) {
             plantsLost++;
             hypnotiseHypnoShroomEaters(plant);
         }
@@ -739,13 +739,6 @@ public class GameModel implements BehaviorContext {
     public void destroyPlant(PlantInstance plant) {
         if (plant == null) return;
 
-        Point pos = plant.getPosition();
-        if (pos != null) {
-            Cell cell = getCellAt(pos.getY(), pos.getX());
-            if (cell != null) {
-                cell.removePlaceable(plant);
-            }
-        }
         if (plant.getCurrentHP() > 0) {
             plantsLost++;
         }

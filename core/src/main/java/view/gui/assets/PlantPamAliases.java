@@ -17,6 +17,13 @@ public final class PlantPamAliases {
         m.put("Sun-shroom", "SUNSHROOM");
         m.put("Primal Sunflower", "PRIMAL_SUNFLOWER");
         m.put("Wall-nut", "WALLNUT");
+        m.put("Tall-nut", "TALLNUT");
+        m.put("Endurian", "ENDURIAN");
+        m.put("Garlic", "GARLIC");
+        m.put("Sweet Potato", "SWEETPOTATO");
+        m.put("Explode-o-nut", "EXPLODEONUT");
+        m.put("Pumpkin", "PUMPKIN");
+        m.put("Sun Bean", "SUNBEAN");
         m.put("Fume-shroom", "FUMESHROOM");
         m.put("Ice-shroom", "ICESHROOM");
         m.put("Hypno-shroom", "HYPNOSHROOM");

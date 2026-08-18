@@ -2,11 +2,9 @@ package model.plant.ability;
 
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
-import model.enums.PlantFoodType;
 import model.enums.PlantSpecialTag;
 import model.enums.PlantTags;
 import model.enums.SunType;
-import model.game.map.FloatPoint;
 import model.item.Sun;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -21,9 +19,9 @@ import java.util.List;
  */
 public class WallAbility implements PlantAbility {
 
-    /** Default damage dealt by Explode-o-nut's death explosion. */
+    /** Default damage dealt by Explode-o-nut's death (and helmet-break) explosion. */
     private static final int DEFAULT_EXPLODE_O_NUT_DAMAGE = 1800;
-    /** Default radius (in tiles) of Explode-o-nut's death explosion. */
+    /** Default radius (in tiles) of Explode-o-nut's explosion. */
     private static final int DEFAULT_EXPLODE_O_NUT_RADIUS = 1;
     /** Default sun dropped per bite the zombie takes from a Sun Bean. */
     private static final int DEFAULT_SUN_BEAN_PER_BITE = 5;
@@ -32,26 +30,42 @@ public class WallAbility implements PlantAbility {
     public PlantCategory getCategory() { return PlantCategory.WALL_NUT; }
 
     @Override
+    public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return null;
+
+        if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
+            context.triggerFamilyPlantFood(PlantCategory.WALL_NUT);
+            return null;
+        }
+
+        if (isSweepPotato(def)) {
+            attractZombiesTo(plant, context);
+            return null;
+        }
+
+        if (isEndurian(def) && isBeingEaten(plant, context)) {
+            return TimedPlantAction.attackAt(plant, context, this::redirectOrReflect);
+        }
+
+        return null;
+    }
+
+    @Override
     public void execute(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
         if (def == null) return;
 
-        // Reinforce-mint: trigger plant-food on every WALL_NUT plant.
         if (def.getAbilityType() == PlantAbilityType.MINT_FAMILY_BOOST) {
             context.triggerFamilyPlantFood(PlantCategory.WALL_NUT);
             return;
         }
 
-        // Sun Bean: passive - drop sun when a zombie eats it. The actual
-        // sun-drop is triggered from ZombieSystem.handleEating via the
-        // plant's SUN tag, so execute() is a no-op for Sun Bean.
         if (def.hasTag(PlantTags.SUN)) {
             return;
         }
 
-        if (def.getDamage() > 0) {
-            redirectOrReflect(plant, context);
-        } else if (def.hasTag(PlantTags.MOVE_ZOMBIE)) {
+        if (def.getDamage() > 0 || def.hasTag(PlantTags.MOVE_ZOMBIE)) {
             redirectOrReflect(plant, context);
         }
     }
@@ -59,26 +73,59 @@ public class WallAbility implements PlantAbility {
     @Override
     public void onPlantFood(PlantInstance plant, PlantAbilityContext context) {
         Plant def = plant.getDefinition();
+        if (def == null) return;
+
         switch (def.getPlantFoodType()) {
             case GRANT_PERMANENT_ARMOR:
-                int bonus = (int) def.getPlantFoodValue();
-                plant.setCurrentHP(plant.getCurrentHP() + bonus);
+                grantMetalArmor(plant, def);
                 break;
             case KNOCKBACK_BLAST:
-                // Garlic plant-food: shove every zombie in the lane
-                // to an adjacent lane.
                 knockbackBlast(plant, context);
                 break;
+            case ATTRACT_AND_HEAL:
+                plant.restoreFullHP();
+                attractAllAdjacentLanes(plant, context);
+                break;
             default:
+                if (isSweepPotato(def)) {
+                    plant.restoreFullHP();
+                    attractAllAdjacentLanes(plant, context);
+                }
                 break;
         }
     }
 
     /**
-     * Called by the game systems when this wall-nut plant dies. If the
-     * plant has the {@link PlantTags#EXPLOSIVE} tag (Explode-o-nut), it
-     * detonates in a 3x3 area dealing damage.
+     * Bite hook used by the zombie system. Sun Bean drops sun; Garlic
+     * shoves the chewing zombie into an adjacent lane.
      */
+    public static void onBitten(PlantInstance plant, ZombieInstance zombie, PlantAbilityContext context) {
+        if (plant != null && plant.getCurrentHP() > 0) {
+            onSunBeanBitten(plant, context);
+        }
+        if (plant == null || zombie == null || context == null || plant.getPosition() == null) return;
+        Plant def = plant.getDefinition();
+        if (!isGarlic(def)) return;
+        int row = plant.getPosition().getY();
+        int targetLane = pickAdjacentLane(row, context);
+        if (targetLane != row) {
+            context.moveZombieToLane(zombie, targetLane);
+        }
+    }
+
+    private static void grantMetalArmor(PlantInstance plant, Plant def) {
+        int bonus = (int) def.getPlantFoodValue();
+        if (bonus <= 0) {
+            bonus = def.getBaseHP();
+        }
+        plant.grantArmor(bonus, def.hasTag(PlantTags.EXPLOSIVE));
+        if (isEndurian(def)) {
+            int extra = def.getDamage() > 0 ? def.getDamage() : (int) def.getAbilityValue();
+            plant.addReflectDamageBonus(Math.max(1, extra));
+        }
+    }
+
+    @Override
     public void onPlantDeath(PlantInstance plant, PlantAbilityContext context) {
         if (plant == null || context == null) return;
         Plant def = plant.getDefinition();
@@ -107,7 +154,7 @@ public class WallAbility implements PlantAbility {
 
         // Damage reflect (Endurian)
         if (def.getDamage() > 0 && !def.hasTag(PlantTags.EXPLOSIVE)) {
-            int reflectDamage = def.getDamage() + cumulativeReflectBuff(plant);
+            int reflectDamage = def.getDamage() + cumulativeReflectBuff(plant) + plant.getReflectDamageBonus();
             for (ZombieInstance zombie : context.getZombiesInArea(row, col, 0, 0)) {
                 if (zombie.isEating() && zombie.getEatingTarget() == plant) {
                     context.damageZombie(zombie, reflectDamage);
@@ -133,9 +180,6 @@ public class WallAbility implements PlantAbility {
         boolean toUpper = row > 0;
         boolean toLower = row < context.getRowCount() - 1;
 
-        // If both adjacent lanes are available, alternate between them
-        // to distribute the load. If only one is available, send all
-        // zombies there.
         boolean sendUpNext = true;
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
@@ -149,7 +193,6 @@ public class WallAbility implements PlantAbility {
             } else if (toLower) {
                 targetLane = row + 1;
             } else {
-                // nowhere to move.
                 continue;
             }
 
@@ -158,7 +201,7 @@ public class WallAbility implements PlantAbility {
     }
 
     /** Picks an adjacent lane for the regular redirect. */
-    private int pickAdjacentLane(int row, PlantAbilityContext context) {
+    private static int pickAdjacentLane(int row, PlantAbilityContext context) {
         boolean toUpper = row > 0;
         boolean toLower = row < context.getRowCount() - 1;
         if (toUpper && toLower) {
@@ -169,10 +212,6 @@ public class WallAbility implements PlantAbility {
         return row;
     }
 
-    /**
-     * Sums up every {@link PlantSpecialTag#EXPLODE_DAMAGE_BUFF} upgrade
-     * value the plant has accumulated.
-     */
     private int cumulativeExplodeDamageBuff(PlantInstance plant) {
         Plant def = plant.getDefinition();
         if (def == null || def.getLevels() == null) return 0;
@@ -190,10 +229,6 @@ public class WallAbility implements PlantAbility {
         return total;
     }
 
-    /**
-     * Sums up every {@link PlantSpecialTag#REFLECT_DAMAGE_BUFF} upgrade
-     * value the plant has accumulated.
-     */
     private int cumulativeReflectBuff(PlantInstance plant) {
         Plant def = plant.getDefinition();
         if (def == null || def.getLevels() == null) return 0;
@@ -231,10 +266,6 @@ public class WallAbility implements PlantAbility {
         context.spawnSun(sun);
     }
 
-    /**
-     * Sums up every {@link PlantSpecialTag#SUN_DROP_INCREMENT} upgrade
-     * value the plant has accumulated.
-     */
     private static int cumulativeSunDropIncrement(PlantInstance plant) {
         Plant def = plant.getDefinition();
         if (def == null || def.getLevels() == null) return 0;
@@ -253,18 +284,66 @@ public class WallAbility implements PlantAbility {
     }
 
     public boolean isSweepPotato(Plant def) {
-        if (def.getCategory() != PlantCategory.WALL_NUT) return false;
-        if (!def.hasTag(PlantTags.MOVE_ZOMBIE)) return false;
-        return def.getName().toLowerCase().contains("sweet potato");
+        return isSweepPotatoStatic(def);
     }
 
-    /** Attracts the given {@code zombie} to the given {@code plant}. */
+    private static boolean isSweepPotatoStatic(Plant def) {
+        if (def == null || def.getCategory() != PlantCategory.WALL_NUT) return false;
+        if (!def.hasTag(PlantTags.MOVE_ZOMBIE)) return false;
+        return def.getName() != null && def.getName().toLowerCase().contains("sweet potato");
+    }
+
+    private static boolean isGarlic(Plant def) {
+        if (def == null || def.getCategory() != PlantCategory.WALL_NUT) return false;
+        if (!def.hasTag(PlantTags.MOVE_ZOMBIE)) return false;
+        return !isSweepPotatoStatic(def);
+    }
+
+    private static boolean isEndurian(Plant def) {
+        if (def == null || def.getCategory() != PlantCategory.WALL_NUT) return false;
+        if (def.hasTag(PlantTags.EXPLOSIVE)) return false;
+        if (def.getName() != null && def.getName().toLowerCase().contains("endurian")) {
+            return true;
+        }
+        return def.getDamage() > 0;
+    }
+
+    private static boolean isBeingEaten(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return false;
+        int row = plant.getPosition().getY();
+        int col = plant.getPosition().getX();
+        for (ZombieInstance zombie : context.getZombiesInArea(row, col, 0, 0)) {
+            if (zombie != null && zombie.isEating() && zombie.getEatingTarget() == plant) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Attracts nearby zombies from adjacent lanes onto this plant's lane. */
     public void attractZombiesTo(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return;
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
         for (ZombieInstance zombie : context.getZombiesInArea(row, col, 1, 1)) {
             if (zombie.getGridPosition().getY() == row) continue;
             context.moveZombieToLane(zombie, row);
+        }
+    }
+
+    /** Plant-food: pull every zombie in the adjacent lanes onto this lane. */
+    private void attractAllAdjacentLanes(PlantInstance plant, PlantAbilityContext context) {
+        if (plant.getPosition() == null) return;
+        int row = plant.getPosition().getY();
+        pullLaneOnto(context, row - 1, row);
+        pullLaneOnto(context, row + 1, row);
+    }
+
+    private static void pullLaneOnto(PlantAbilityContext context, int fromRow, int toRow) {
+        if (fromRow < 0 || fromRow >= context.getRowCount()) return;
+        for (ZombieInstance zombie : context.getZombiesInLane(fromRow)) {
+            if (zombie == null || zombie.isDead()) continue;
+            context.moveZombieToLane(zombie, toRow);
         }
     }
 

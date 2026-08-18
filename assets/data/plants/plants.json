@@ -951,8 +951,8 @@
     "recharge": 20.0,
     "abilityType": "PASSIVE_SHIELD",
     "abilityValue": 0.0,
-    "plantFoodType": "GRANT_PERMANENT_ARMOR",
-    "plantFoodValue": 3000.0,
+    "plantFoodType": "ATTRACT_AND_HEAL",
+    "plantFoodValue": 0.0,
     "upgrades": [
       { "level": 2, "type": "BUFF_HP", "value": 1000.0, "specialTag": "" },
       { "level": 3, "type": "BUFF_RECHARGE", "value": -5.0, "specialTag": "" },

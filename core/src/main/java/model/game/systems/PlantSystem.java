@@ -5,10 +5,9 @@ import model.enums.PlantState;
 import model.enums.PlantTags;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
-import model.plant.ability.PlantAbilityContext;
-import model.plant.ability.PlantClipDurations;
-import model.plant.ability.PlantProjectileOrigins;
-import model.plant.ability.WallAbility;
+import model.game.map.Cell;
+import model.game.map.Point;
+import model.plant.ability.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
 import model.plant.instance.AbilityState;
@@ -16,6 +15,7 @@ import model.plant.instance.PlantInstance;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class PlantSystem implements Tickable {
@@ -38,6 +38,7 @@ public class PlantSystem implements Tickable {
 
     @Override
     public void tick(float deltaTime) {
+        handleDeadPlants();
         List<PlantInstance> snapshot = new ArrayList<>(gameModel.getAllPlants());
         for (PlantInstance plant : snapshot) {
             if (plant.getState() == PlantState.DYING) continue;
@@ -45,6 +46,9 @@ public class PlantSystem implements Tickable {
             plant.tick(deltaTime, context);
             if (plant.isImitating()) {
                 continue;
+            }
+            if (plant.consumePendingArmorExplosion()) {
+                triggerDeathExplosionIfNeeded(plant);
             }
             if (plant.getCurrentHP() <= 0 && plant.getState() != PlantState.DYING
                     && plant.getState() != PlantState.ATTACKING
@@ -57,6 +61,29 @@ public class PlantSystem implements Tickable {
             }
         }
         context.setCurrentPlant(null);
+    }
+
+    private void handleDeadPlants() {
+        Iterator<PlantInstance> iterator = gameModel.getAllPlants().iterator();
+
+        while (iterator.hasNext()) {
+            PlantInstance plant = iterator.next();
+            iterator.remove();
+            if (plant == null) continue;
+            if (plant.getState() == PlantState.DYING || plant.getCurrentHP() <= 0) {
+                PlantAbility ability = plant.getAbilityStrategy();
+                if (ability != null) {
+                    ability.onPlantDeath(plant, context);
+                }
+                Point pos = plant.getPosition();
+                if (pos != null) {
+                    Cell cell = gameModel.getCellAt(pos.getY(), pos.getX());
+                    if (cell != null) {
+                        cell.removePlaceable(plant);
+                    }
+                }
+            }
+        }
     }
 
     /**

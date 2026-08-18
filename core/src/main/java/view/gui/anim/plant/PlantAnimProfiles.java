@@ -40,6 +40,6 @@ public final class PlantAnimProfiles {
         ChomperAnim.register(overrides);
         SunshroomAnim.register(overrides);
         GoldBloomAnim.register(overrides);
-        // TODO: ChardGuardAnim.register(overrides);
+        WallNutFamilyAnim.register(overrides);
     }
 }

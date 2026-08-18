@@ -1,7 +1,5 @@
 package model.game.systems;
 
-import model.enums.PlantCategory;
-import model.enums.PlantTags;
 import model.enums.ZombieBehaviorType;
 import model.event.GameEvent;
 import model.event.EventBus;
@@ -13,7 +11,6 @@ import model.game.map.LawnMower;
 import model.enums.ZombieState;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.WallAbility;
-import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
@@ -328,20 +325,13 @@ public class ZombieSystem implements Tickable {
         int damage = biteDamage(zombie, deltaTime);
         if (damage > 0) {
             context.damagePlant(plant, damage);
-
-            // Sun Bean: every bite the zombie takes drops sun next to
-            // the plant. The drop only fires while the plant still has
-            // HP left (i.e. it's still being eaten, not just destroyed).
-            if (plant.getCurrentHP() > 0 && isSunBean(plant)) {
-                WallAbility.onSunBeanBitten(plant, sunBeanContext());
+            WallAbility.onBitten(plant, zombie, sunBeanContext());
+            if (plant.getCurrentHP() <= 0) {
+                if (plant.isHypnoShroom()) {
+                    hypnotise(zombie);
+                }
+                zombie.stopEating();
             }
-        }
-
-        if (plant.getCurrentHP() <= 0) {
-            if (plant.isHypnoShroom()) {
-                hypnotise(zombie);
-            }
-            zombie.stopEating();
         }
     }
 
@@ -371,15 +361,6 @@ public class ZombieSystem implements Tickable {
             }
         }
         return best;
-    }
-
-    /** @return true if the given plant is a Sun Bean (WALL_NUT with SUN tag). */
-    private boolean isSunBean(PlantInstance plant) {
-        if (plant == null) return false;
-        Plant def = plant.getDefinition();
-        if (def == null) return false;
-        if (def.getCategory() != PlantCategory.WALL_NUT) return false;
-        return def.hasTag(PlantTags.SUN);
     }
 
     /**

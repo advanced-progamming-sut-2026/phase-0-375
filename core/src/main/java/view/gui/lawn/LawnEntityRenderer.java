@@ -52,6 +52,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final Set<Object> seenThisFrame = new HashSet<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Integer> armorBreakFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Integer> meleeAttackFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OneShotFx> meleeIdlePulses = new IdentityHashMap<>();
@@ -125,6 +126,7 @@ public final class LawnEntityRenderer {
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        armorBreakFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleeAttackFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleePlantFoodFxSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleeIdlePulses.entrySet().removeIf(entry -> {
@@ -159,6 +161,7 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        maybeSpawnArmorBreakExplosion(plant, xy[0], xy[1]);
         if (ExplosivePlantFx.isDeathDetonator(plant)) {
             deathBlastNow.put(plant, new float[]{xy[0], xy[1]});
             return;
@@ -171,6 +174,22 @@ public final class LawnEntityRenderer {
             return;
         }
         spawnExplosionSpecs(ExplosivePlantFx.specsFor(plant), pos, xy[0], xy[1]);
+    }
+
+    private void maybeSpawnArmorBreakExplosion(PlantInstance plant, float x, float y) {
+        if (plant == null || plant.getArmorBreakEpoch() <= 0) {
+            return;
+        }
+        if (!ExplosivePlantFx.isDeathDetonator(plant) && !plant.armorExplodesOnBreak()) {
+            return;
+        }
+        int epoch = plant.getArmorBreakEpoch();
+        Integer last = armorBreakFxEpoch.get(plant);
+        if (last != null && last == epoch) {
+            return;
+        }
+        armorBreakFxEpoch.put(plant, epoch);
+        spawnExplosionSpecs(ExplosivePlantFx.specsFor(plant), plant.getPosition(), x, y);
     }
 
     private void maybeSpawnMeleeFx(PlantInstance plant) {

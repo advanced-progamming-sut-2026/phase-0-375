@@ -23,5 +23,7 @@ public enum PlantFoodType {
     /** Drags underwater / pulls in zombies in a radius (Tangle Kelp, Chomper, …). */
     PULL_UNDERWATER,
     /** Grants a permanent HP armor to the plant (Wall-nut, Tall-nut, Pumpkin, …). */
-    GRANT_PERMANENT_ARMOR
+    GRANT_PERMANENT_ARMOR,
+    /** Pulls nearby zombies onto this lane and fully restores HP (Sweet Potato). */
+    ATTRACT_AND_HEAL
 }

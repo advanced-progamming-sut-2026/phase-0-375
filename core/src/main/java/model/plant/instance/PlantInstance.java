@@ -27,6 +27,13 @@ public class PlantInstance implements Placeable {
     private Plant definition;
     private PlantState state;
     private int currentHP;
+    private int armorHP;
+    private int armorMaxHP;
+    private int reflectDamageBonus;
+    private boolean armorExplodesOnBreak;
+    private boolean pendingArmorExplosion;
+    private int armorBreakEpoch;
+    private boolean deathDetonated;
     private int level;                                 // 1-4
     private Point position;                            // grid (col, row); null if not yet placed
     private float currentRecharge;                     // seconds remaining before the seed is available again
@@ -52,6 +59,13 @@ public class PlantInstance implements Placeable {
         this.definition = definition;
         this.state = PlantState.IDLE;
         this.currentHP = definition.getBaseHP();
+        this.armorHP = 0;
+        this.armorMaxHP = 0;
+        this.reflectDamageBonus = 0;
+        this.armorExplodesOnBreak = false;
+        this.pendingArmorExplosion = false;
+        this.armorBreakEpoch = 0;
+        this.deathDetonated = false;
         this.level = 1;
         this.currentRecharge = definition.getRechargeTime();
         this.isPlantFoodActive = false;
@@ -330,15 +344,66 @@ public class PlantInstance implements Placeable {
 
     // --- Damage ---
 
-    /** Applies damage to this plant instance. */
+    /** Applies damage to this plant instance. Metal armor absorbs hits first. */
     public void takeDamage(int damage) {
         if (damage <= 0 || state == PlantState.DYING) return;
+        if (armorHP > 0) {
+            int absorbed = Math.min(armorHP, damage);
+            armorHP -= absorbed;
+            damage -= absorbed;
+            if (armorHP <= 0) {
+                armorHP = 0;
+                if (armorExplodesOnBreak) {
+                    pendingArmorExplosion = true;
+                    armorBreakEpoch++;
+                }
+            }
+        }
+        if (damage <= 0) return;
         currentHP -= damage;
         if (currentHP <= 0) {
             currentHP = 0;
             cancelActiveAction();
-            state = PlantState.DYING;
         }
+    }
+
+    public void grantArmor(int amount, boolean explodesOnBreak) {
+        if (amount <= 0) return;
+        armorHP += amount;
+        armorMaxHP += amount;
+        if (explodesOnBreak) {
+            armorExplodesOnBreak = true;
+        }
+    }
+
+    public void addReflectDamageBonus(int bonus) {
+        if (bonus > 0) {
+            reflectDamageBonus += bonus;
+        }
+    }
+
+    /** Fully restores body HP to the (upgrade-adjusted) maximum. */
+    public void restoreFullHP() {
+        int max = getMaxHP();
+        if (currentHP < max) {
+            currentHP = max;
+        }
+    }
+
+    public boolean consumePendingArmorExplosion() {
+        if (!pendingArmorExplosion) return false;
+        pendingArmorExplosion = false;
+        return true;
+    }
+
+    /**
+     * Marks the body-death explosion as spent. {@code false} if it already fired
+     * (so armor-break and death can each blast once, but death is not repeated).
+     */
+    public boolean markDeathDetonated() {
+        if (deathDetonated) return false;
+        deathDetonated = true;
+        return true;
     }
 
     // --- Level upgrades ---
@@ -556,6 +621,12 @@ public class PlantInstance implements Placeable {
 
         this.state = PlantState.IDLE;
         this.currentHP = newDefinition.getBaseHP();
+        this.armorHP = 0;
+        this.armorMaxHP = 0;
+        this.reflectDamageBonus = 0;
+        this.armorExplodesOnBreak = false;
+        this.pendingArmorExplosion = false;
+        this.deathDetonated = false;
         this.currentRecharge = newDefinition.getRechargeTime();
         this.isPlantFoodActive = false;
         this.plantFoodDurationRemaining = 0f;
@@ -582,6 +653,13 @@ public class PlantInstance implements Placeable {
     public Plant getDefinition() { return definition; }
     public PlantState getState() { return state; }
     public int getCurrentHP() { return currentHP; }
+    public int getMaxHP() { return definition == null ? 0 : Math.max(1, definition.getBaseHP()); }
+    public int getArmorHP() { return armorHP; }
+    public int getArmorMaxHP() { return armorMaxHP; }
+    public boolean hasArmor() { return armorHP > 0; }
+    public int getReflectDamageBonus() { return reflectDamageBonus; }
+    public boolean armorExplodesOnBreak() { return armorExplodesOnBreak; }
+    public int getArmorBreakEpoch() { return armorBreakEpoch; }
     public int getLevel() { return level; }
     public Point getPosition() { return position; }
     public Map<PlantAbilityType, AbilityState> getAbilityStates() { return abilityStates; }
