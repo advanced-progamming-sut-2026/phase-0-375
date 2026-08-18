@@ -38,28 +38,28 @@ public class LawnMowerSystem implements Tickable {
             gameModel.markLawnMowerUsed();
 
             boolean finished = mower.tick(deltaTime, colCount);
-            killZombiesInPath(mower, row, mower.getXPosition());
+            if (mower.isSweeping()) {
+                killZombiesInPath(mower, row, mower.getXPosition());
+            }
 
             if (finished) {
+                lane.clearLawnMower();
                 if (eventBus != null) {
                     eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
                 }
-                // Spec notification — printed once when the mower has
-                // finished crossing the lane, listing every zombie it
-                // killed during the sweep (triggering zombie + sweep).
-//                notifyMowerKills(row, mower);
             }
         }
     }
 
     private void killZombiesInPath(LawnMower mower, int row, float mowerX) {
-        if (mowerX >= gameModel.getColumnCount()) return;
         List<ZombieInstance> zombiesInLane = gameModel.getZombiesInLane(row);
         for (ZombieInstance zombie : zombiesInLane) {
             if (zombie == null || zombie.isDead()) continue;
             if (zombie.getContinuousPosition() == null) continue;
 
+            // Stationary spawns (Fisherman) sit at x = columnCount and never walk in.
             if (zombie.getContinuousX() <= mowerX && !isBoss(zombie)) {
+                zombie.recordNonPlantDamage();
                 zombie.markKilledByMower();
                 gameModel.damageZombie(zombie, MOWER_DAMAGE);
                 mower.recordSweepKill(zombie);

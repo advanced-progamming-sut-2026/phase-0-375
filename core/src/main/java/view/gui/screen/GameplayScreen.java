@@ -99,6 +99,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityOverlay = new DebugEntityOverlay(lawnLayout, resolveFont());
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
+        entityRenderer.resetMowers(chapter, lawnMowersEnabled());
         assets.textures.loadSync("UI_SeedPackets_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
 
@@ -138,6 +139,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private static Level currentLevel() {
         GameModel model = App.getInstance().getCurrentGameModel();
         return model == null ? null : model.getCurrentLevel();
+    }
+
+    private static boolean lawnMowersEnabled() {
+        Level level = currentLevel();
+        return level != null
+            && level.getConfig() != null
+            && level.getConfig().getRules() != null
+            && level.getConfig().getRules().isLawnMowersEnabled();
     }
 
     private void buildHud() {
@@ -327,6 +336,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void dropPlant(String plantName, float stageX, float stageY) {
+        if (entityRenderer.isMowerIntroPlaying()) {
+            return;
+        }
         stageToWorld(stageX, stageY);
         if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
             return;
@@ -498,11 +510,18 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     @Override
     protected void updateLogic(float delta) {
-        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
-        if (loop != null && loop.getGameState() == GameState.RUNNING) {
-            loop.update(delta);
-        }
         GameModel model = App.getInstance().getCurrentGameModel();
+        if (entityRenderer.isMowerIntroPlaying()) {
+            entityRenderer.tickMowerIntro(delta);
+        } else {
+            PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+            if (loop != null && loop.getGameState() == GameState.RUNNING) {
+                loop.update(delta);
+            }
+            if (model != null) {
+                entityRenderer.tickMowers(model, delta);
+            }
+        }
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());
         }

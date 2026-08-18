@@ -9,7 +9,6 @@ import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.Cell;
 import model.game.map.Lane;
-import model.game.map.LawnMower;
 import model.enums.ZombieState;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.WallAbility;
@@ -170,26 +169,20 @@ public class ZombieSystem implements Tickable {
 
     /**
      * Handles a zombie reaching the end of its lane.
-     * If lawn mowers are enabled for this level and the lane has a mower
-     * waiting, it triggers the mower and dies; otherwise the game is lost.
+     * If lawn mowers are enabled and the lane still has a mower, it triggers
+     * and the zombie waits for blade contact; otherwise the game is lost.
      */
     private void onZombieReachedHouse(ZombieInstance zombie, BehaviorContext context) {
         int row = zombie.getGridY();
         Lane lane = gameModel.getMap().getLane(row);
         if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
-            LawnMower mower = lane.getLawnMower();
             lane.triggerLawnMower();
-            if (mower != null) {
-                mower.recordSweepKill(zombie);
-            }
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
             }
-            // The mower kills the triggering zombie: mark non-plant damage
-            // and route through the normal death path so kill stats see it.
-            zombie.recordNonPlantDamage();
-            zombie.markKilledByMower();
-            zombie.setState(ZombieState.DYING);
+            // Hold here until the blade makes contact in LawnMowerSystem.
+        } else if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
+            // Already sweeping this lane — wait for contact, don't lose.
         } else {
             // No mower, the zombie got through.
             gameModel.markHouseBreached(row);

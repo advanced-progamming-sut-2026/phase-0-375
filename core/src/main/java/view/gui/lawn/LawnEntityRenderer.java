@@ -271,6 +271,8 @@ public final class LawnEntityRenderer {
     private boolean snorkelRippleLoaded;
     private ScreenShake screenShake;
 
+    private LawnMowerRenderer mowerRenderer;
+
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
             new PlantAnimAdapter(assets.pamCatalog),
@@ -289,6 +291,35 @@ public final class LawnEntityRenderer {
         this.catalog = assets.pamCatalog;
         this.textures = assets.textures;
         this.entityOverlay = entityOverlay;
+        this.mowerRenderer = new LawnMowerRenderer(assets, layout);
+    }
+
+    public void resetMowers(model.enums.Chapter chapter, boolean playIntro) {
+        if (mowerRenderer != null) {
+            mowerRenderer.reset(chapter, playIntro);
+        }
+    }
+
+    public boolean isMowerIntroPlaying() {
+        return mowerRenderer != null && mowerRenderer.isIntroPlaying();
+    }
+
+    public void tickMowerIntro(float delta) {
+        if (mowerRenderer != null) {
+            mowerRenderer.tickIntro(delta);
+        }
+    }
+
+    public void tickMowers(GameModel model, float delta) {
+        if (mowerRenderer != null) {
+            mowerRenderer.tick(model, delta);
+        }
+    }
+
+    public void drawMowers(Batch batch, GameModel model, float delta, int row) {
+        if (mowerRenderer != null) {
+            mowerRenderer.drawRow(batch, model, delta, row);
+        }
     }
 
     public void setScreenShake(ScreenShake screenShake) {
@@ -382,6 +413,7 @@ public final class LawnEntityRenderer {
             drawArmorPops(batch, delta, row);
             drawHunterSplats(batch, delta, row);
             drawProspectorBlasts(batch, delta, row);
+            drawMowers(batch, model, delta, row);
         }
         drawOctopi(batch, model, delta);
         drawSuns(batch, model, delta);
