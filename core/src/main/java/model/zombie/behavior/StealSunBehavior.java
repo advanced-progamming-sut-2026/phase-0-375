@@ -50,7 +50,7 @@ public class StealSunBehavior implements ZombieBehavior {
     public static final float RA_SCAN_INTERVAL = 2f;
 
     /** Seconds for a claimed sun to fly to Ra. */
-    public static final float RA_PULL_DURATION = 1f;
+    public static final float RA_PULL_DURATION = 1.55f;
 
     /** Short fall when stolen sun scatters on death. */
     public static final float RA_DEATH_FALL = 1.5f;

@@ -27,6 +27,7 @@ import model.game.systems.ChapterEffectsSystem;
 import model.item.Grave;
 import model.item.Grave.GraveType;
 import model.item.LootDrop;
+import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.pushable.Pushable;
@@ -72,6 +73,7 @@ public class GameModel implements BehaviorContext {
     private List<Projectile> activeProjectiles;
     private List<Sun> activeSuns;
     private List<PlantFoodPickup> activePlantFood;
+    private List<LootPickup> activeLootPickups;
     private List<LootDrop> pendingLootDrops;
     private List<Pushable> orphanedPushables;
 
@@ -117,6 +119,7 @@ public class GameModel implements BehaviorContext {
         this.activeProjectiles = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
         this.activePlantFood = new ArrayList<>();
+        this.activeLootPickups = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
         this.orphanedPushables = new ArrayList<>();
 
@@ -233,6 +236,10 @@ public class GameModel implements BehaviorContext {
 
     public List<PlantFoodPickup> getActivePlantFood() {
         return activePlantFood;
+    }
+
+    public List<LootPickup> getActiveLootPickups() {
+        return activeLootPickups;
     }
 
     public boolean isNightLevel() {
@@ -479,6 +486,30 @@ public class GameModel implements BehaviorContext {
         }
         activePlantFood.remove(pickup);
         resources.addPlantFood();
+    }
+
+    public void spawnLootPickup(LootPickup pickup) {
+        if (pickup != null) {
+            activeLootPickups.add(pickup);
+        }
+    }
+
+    public void removeLootPickup(LootPickup pickup) {
+        if (pickup != null) {
+            activeLootPickups.remove(pickup);
+        }
+    }
+
+    /** Credits loot counters after the fly-to-HUD animation finishes. */
+    public void applyLootPickup(LootPickup pickup) {
+        if (pickup == null) {
+            return;
+        }
+        switch (pickup.getKind()) {
+            case COIN_GOLD, COIN_SILVER -> addCoins(pickup.getAmount());
+            case DIAMOND -> addDiamonds(pickup.getAmount());
+            case FLOWER_POT -> addFlowerPots(pickup.getAmount());
+        }
     }
 
     public void tick(float deltaTime) {

@@ -2,6 +2,7 @@ package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
@@ -17,8 +18,10 @@ import model.game.map.Point;
 import model.plant.instance.PlantInstance;
 import model.item.Grave;
 import model.item.GridItem;
+import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
+import model.enums.LootPickupKind;
 import model.enums.GroundType;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.item.placeable.Placeable;
@@ -43,6 +46,7 @@ import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.behavior.TransformBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
+import pvz.libpvz.textures.TextureBank;
 import pvz.libpvz.pam.PamPlayer;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
@@ -186,6 +190,12 @@ public final class LawnEntityRenderer {
     private static final String SUN_PAM = "SUN";
     /** Glowing-zombie / ground plant-food PAM under EFFECTS. */
     private static final String PLANTFOOD_PICKUP_PAM = "PLANTFOOD_PICKUP";
+    private static final String COIN_GOLD_PAM = "COIN_GOLD";
+    private static final String COIN_SILVER_PAM = "COIN_SILVER";
+    private static final String COIN_DIAMOND_PAM = "COIN_DIAMOND";
+    private static final String FLOWER_POT_REGION =
+        "IMAGE_ZEN_GARDEN_GROWING_PLANT_SLOT_GROWING_PLANT_SLOT_122X161";
+    private static final float FLOWER_POT_DRAW_H = 78f;
     /** Soft green base + pulse amplitude for glowing zombies. */
     private static final float GLOW_BASE = 0.22f;
     private static final float GLOW_PULSE = 0.28f;
@@ -208,6 +218,9 @@ public final class LawnEntityRenderer {
     private final PamClipCache clips;
     private final PamPlayer player;
     private final PamCatalog catalog;
+    private final TextureBank textures;
+
+    private TextureRegion flowerPotRegion;
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
@@ -242,6 +255,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final List<SunFlight> sunFlights = new ArrayList<>();
     private final List<PlantFoodFlight> plantFoodFlights = new ArrayList<>();
+    private final List<LootFlight> lootFlights = new ArrayList<>();
     private final Set<Object> seenThisFrame =
         Collections.newSetFromMap(new IdentityHashMap<>());
     private final float[] xyTmp = new float[3];
@@ -273,6 +287,7 @@ public final class LawnEntityRenderer {
         this.player = assets.player;
         this.clips = new PamClipCache(assets.player);
         this.catalog = assets.pamCatalog;
+        this.textures = assets.textures;
         this.entityOverlay = entityOverlay;
     }
 
@@ -371,6 +386,7 @@ public final class LawnEntityRenderer {
         drawOctopi(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
+        drawLoot(batch, model, delta);
 
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
@@ -986,6 +1002,126 @@ public final class LawnEntityRenderer {
         float stateTime = advanceClock(clockKey, pose.cacheKey(), delta);
         player.draw(batch, ref, stateTime, x, y,
             AnimScale.SUN * sxN, AnimScale.SUN * syN, pose.loop());
+    }
+
+    private void drawLoot(Batch batch, GameModel model, float delta) {
+        List<LootPickup> tokens = model == null ? null : model.getActiveLootPickups();
+        if (tokens != null) {
+            for (LootPickup loot : tokens) {
+                writeLootDrawPos(loot, xyTmp);
+                drawLootToken(batch, loot, xyTmp[0], xyTmp[1], delta, 1f, 1f);
+            }
+        }
+        drawLootFlights(batch, delta);
+    }
+
+    public void writeLootDrawPos(LootPickup loot, float[] out) {
+        float[] xy = layout.centerOf(loot.getY(), loot.getX());
+        out[0] = xy[0] + loot.getOffsetX() * layout.cellWidth();
+        out[1] = xy[1] + loot.getOffsetY() * layout.cellHeight();
+    }
+
+    public void startLootCollect(LootPickup loot, float x0, float y0, float x1, float y1,
+                                 Runnable onComplete) {
+        if (loot == null) {
+            return;
+        }
+        lootFlights.add(new LootFlight(loot, x0, y0, x1, y1, onComplete));
+    }
+
+    private void drawLootFlights(Batch batch, float delta) {
+        for (int i = lootFlights.size() - 1; i >= 0; i--) {
+            LootFlight flight = lootFlights.get(i);
+            flight.elapsed += delta;
+            if (LootCollect.done(flight.elapsed)) {
+                if (!flight.done && flight.onComplete != null) {
+                    flight.onComplete.run();
+                    flight.done = true;
+                }
+                lootFlights.remove(i);
+                continue;
+            }
+            float x = flight.x1;
+            float y = flight.y1;
+            float sx = 1f;
+            float sy = 1f;
+            if (LootCollect.flying(flight.elapsed)) {
+                float u = LootCollect.flyU(flight.elapsed);
+                x = flight.x0 + (flight.x1 - flight.x0) * u;
+                y = flight.y0 + (flight.y1 - flight.y0) * u;
+            } else {
+                float u = LootCollect.vanishU(flight.elapsed);
+                sx = GraveAnim.scaleX(u);
+                sy = GraveAnim.scaleY(u);
+            }
+            drawLootToken(batch, flight.loot, x, y, delta, sx, sy);
+        }
+    }
+
+    private void drawLootToken(Batch batch, LootPickup loot, float x, float y, float delta) {
+        drawLootToken(batch, loot, x, y, delta, 1f, 1f);
+    }
+
+    private void drawLootToken(Batch batch, LootPickup loot, float x, float y, float delta,
+                               float sxN, float syN) {
+        if (loot == null) {
+            return;
+        }
+        if (loot.getKind() == LootPickupKind.FLOWER_POT) {
+            drawFlowerPotToken(batch, loot, x, y, sxN, syN);
+            return;
+        }
+        if (catalog == null) {
+            return;
+        }
+        String pamName = switch (loot.getKind()) {
+            case COIN_GOLD -> COIN_GOLD_PAM;
+            case COIN_SILVER -> COIN_SILVER_PAM;
+            case DIAMOND -> COIN_DIAMOND_PAM;
+            case FLOWER_POT -> null;
+        };
+        String clip = loot.getKind() == LootPickupKind.DIAMOND ? "idle" : "animation";
+        PamCatalog.PamEntry entry = pamName == null ? null : catalog.byName(pamName);
+        if (entry == null) {
+            return;
+        }
+        String resolved = catalog.resolveClip(entry, clip);
+        AnimPose pose = AnimPose.looping(entry.path(), resolved, ZombieAnimRole.IDLE);
+        float scale = loot.getKind() == LootPickupKind.DIAMOND
+            ? AnimScale.LOOT_GEM
+            : AnimScale.LOOT_COIN;
+        if (sxN == 1f && syN == 1f) {
+            drawPose(batch, loot, pose, x, y, scale, NO_PHASE, 0f, delta);
+            return;
+        }
+        seenThisFrame.add(loot);
+        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        if (ref == null) {
+            return;
+        }
+        float stateTime = advanceClock(loot, pose.cacheKey(), delta);
+        player.draw(batch, ref, stateTime, x, y,
+            scale * sxN, scale * syN, pose.loop());
+    }
+
+    private void drawFlowerPotToken(Batch batch, LootPickup loot, float x, float y,
+                                    float sxN, float syN) {
+        if (textures == null) {
+            return;
+        }
+        if (flowerPotRegion == null) {
+            flowerPotRegion = textures.region(FLOWER_POT_REGION);
+        }
+        if (flowerPotRegion == null) {
+            return;
+        }
+        seenThisFrame.add(loot);
+        float h = FLOWER_POT_DRAW_H * syN;
+        float w = flowerPotRegion.getRegionHeight() <= 0
+            ? h
+            : h * (flowerPotRegion.getRegionWidth() / (float) flowerPotRegion.getRegionHeight());
+        w *= sxN;
+        batch.draw(flowerPotRegion, x - w * 0.5f, y - h * 0.5f, w, h);
     }
 
     private void drawPushable(Batch batch, GameModel model, Pushable item, float delta) {
@@ -2792,6 +2928,26 @@ public final class LawnEntityRenderer {
             this.y0 = y0;
             this.x1 = x1;
             this.y1 = y1;
+        }
+    }
+
+    private static final class LootFlight {
+        final LootPickup loot;
+        final float x0;
+        final float y0;
+        final float x1;
+        final float y1;
+        final Runnable onComplete;
+        float elapsed;
+        boolean done;
+
+        LootFlight(LootPickup loot, float x0, float y0, float x1, float y1, Runnable onComplete) {
+            this.loot = loot;
+            this.x0 = x0;
+            this.y0 = y0;
+            this.x1 = x1;
+            this.y1 = y1;
+            this.onComplete = onComplete;
         }
     }
 

@@ -19,6 +19,8 @@ import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
 import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
+import model.enums.LootPickupKind;
+import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
@@ -43,6 +45,8 @@ public class ZombieSystem implements Tickable {
 
     private static final float LOOT_DROP_CHANCE = 0.10f;
     private final java.util.Random lootRandom = new java.util.Random();
+    /** Death tile for {@link #maybeDropLoot}; set only during the death pass. */
+    private model.game.map.Point lastDeadZombiePos;
 
     public ZombieSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
@@ -463,7 +467,9 @@ public class ZombieSystem implements Tickable {
 
                 gameModel.recordZombieKilled(zombie);
                 gameModel.notifyZombieKilledForScore(zombie);
+                lastDeadZombiePos = zombie.getGridPosition();
                 maybeDropLoot();
+                lastDeadZombiePos = null;
 
                 // Spec notification: "Zombie of type <type> is dead at (<x>, <y>)"
                 var pos = zombie.getGridPosition();
@@ -493,25 +499,26 @@ public class ZombieSystem implements Tickable {
     }
 
     private void maybeDropLoot() {
-        if (lootRandom.nextFloat() >= LOOT_DROP_CHANCE) return;
-
+        if (lootRandom.nextFloat() >= LOOT_DROP_CHANCE) {
+            return;
+        }
+        var pos = lastDeadZombiePos;
+        if (pos == null) {
+            return;
+        }
+        int col = pos.getX();
+        int row = pos.getY();
         int roll = lootRandom.nextInt(3);
         switch (roll) {
-            case 0:
-                gameModel.addDiamonds(1);
-                model.app.App.logToShell("A zombie dropped a diamond; you have "
-                        + gameModel.getDiamondCount() + " now.");
-                break;
-            case 1:
-                gameModel.addCoins(50);
-                model.app.App.logToShell("A zombie dropped 50 coins; you have "
-                        + gameModel.getCoinCount() + " now.");
-                break;
-            case 2:
-                gameModel.addFlowerPots(1);
-                model.app.App.logToShell("A zombie dropped a flower pot; you have "
-                        + gameModel.getFlowerPotCount() + " now.");
-                break;
+            case 0 -> gameModel.spawnLootPickup(new LootPickup(LootPickupKind.DIAMOND, 1, col, row));
+            case 1 -> {
+                LootPickupKind coinKind = lootRandom.nextBoolean()
+                    ? LootPickupKind.COIN_GOLD
+                    : LootPickupKind.COIN_SILVER;
+                gameModel.spawnLootPickup(new LootPickup(coinKind, 50, col, row));
+            }
+            case 2 -> gameModel.spawnLootPickup(new LootPickup(LootPickupKind.FLOWER_POT, 1, col, row));
+            default -> { }
         }
     }
 }

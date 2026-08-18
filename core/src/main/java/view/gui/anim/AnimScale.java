@@ -23,5 +23,11 @@ public final class AnimScale {
     public static final float ZOMBIE = LAWN;
 
     /** Lawn collectible. {@code SUN.PAM} canvas is 200, smaller than plant/zombie 390. */
-    public static final float SUN = 0.25f;
+    public static final float SUN = 0.375f;
+
+    /** Small coin PAM (45×45 canvas). */
+    public static final float LOOT_COIN = 0.525f;
+
+    /** Gem PAM (200×200 canvas). */
+    public static final float LOOT_GEM = 0.33f;
 }

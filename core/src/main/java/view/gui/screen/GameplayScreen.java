@@ -23,6 +23,7 @@ import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
+import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
@@ -34,6 +35,8 @@ import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
+import view.gui.ui.CoinHud;
+import view.gui.ui.LootRewardPopup;
 import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SunHud;
@@ -59,7 +62,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final int[] cellTmp = new int[2];
 
     private SunHud sunHud;
+    private CoinHud coinHud;
     private PlantFoodBankHud plantFoodBank;
+    private LootRewardPopup lootRewardPopup;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private String previewPlant;
@@ -100,6 +105,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_GROUP);
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_0);
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_1);
+        assets.textures.loadSync("ZENGARDENGROUP_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_ZENGARDENGROUP_768_00");
         setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         buildHud();
     }
@@ -154,6 +161,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         topRight.setFillParent(true);
         topRight.setTouchable(Touchable.childrenOnly);
         topRight.top().right().pad(12f);
+
+        coinHud = new CoinHud(skin, assets.textures);
+        coinHud.setAmount(model == null ? 0 : model.getCoinCount());
+        topRight.add(coinHud).right().padBottom(8f).row();
+
         TextButton back = new TextButton("Back to levels", skin, "brown");
         back.addListener(new ChangeListener() {
             @Override
@@ -163,6 +175,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         });
         topRight.add(back).width(220f).height(48f);
         uiStage.addActor(topRight);
+
+        lootRewardPopup = new LootRewardPopup(skin);
+        Table rewardAnchor = new Table();
+        rewardAnchor.setFillParent(true);
+        rewardAnchor.top().padTop(72f);
+        rewardAnchor.add(lootRewardPopup).top();
+        uiStage.addActor(rewardAnchor);
 
         plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
         plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
@@ -490,6 +509,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (plantFoodBank != null && model != null) {
             plantFoodBank.setCount(model.getPlantFoodCount());
         }
+        autoCollectLoot(model);
         if (previewPlant != null) {
             previewTime += delta;
         }
@@ -558,6 +578,32 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             cursorUnprojectTmp.y - h * 0.5f,
             w, h);
         game.batch.end();
+    }
+
+    private void autoCollectLoot(GameModel model) {
+        if (model == null || coinHud == null) {
+            return;
+        }
+        List<LootPickup> pending = model.getActiveLootPickups();
+        if (pending == null || pending.isEmpty()) {
+            return;
+        }
+        for (LootPickup loot : new ArrayList<>(pending)) {
+            model.removeLootPickup(loot);
+            entityRenderer.writeLootDrawPos(loot, sunPosTmp);
+            float x0 = sunPosTmp[0];
+            float y0 = sunPosTmp[1];
+            coinHud.logoCenter(logoTmp);
+            entityRenderer.startLootCollect(
+                loot, x0, y0, logoTmp.x, logoTmp.y,
+                () -> {
+                    model.applyLootPickup(loot);
+                    coinHud.setAmount(model.getCoinCount());
+                    if (lootRewardPopup != null) {
+                        lootRewardPopup.show(loot);
+                    }
+                });
+        }
     }
 
     private static boolean shovelEnabled(GameModel model) {
