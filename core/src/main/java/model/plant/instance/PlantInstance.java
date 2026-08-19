@@ -335,6 +335,29 @@ public class PlantInstance implements Placeable {
         firePlantFoodEffect(context);
     }
 
+    /** Ends the active plant-food window immediately. */
+    public void finishPlantFoodNow() {
+        if (!isPlantFoodActive && state != PlantState.PLANT_FOOD) {
+            return;
+        }
+        isPlantFoodActive = false;
+        plantFoodDurationRemaining = 0f;
+        pendingPlantFoodEffect = false;
+        if (state == PlantState.PLANT_FOOD) {
+            state = PlantState.IDLE;
+        }
+    }
+
+    /** Jumps an active plant-food effect into its outro window immediately. */
+    public void beginPlantFoodOffWindowNow(float offDurationSeconds) {
+        if (!isPlantFoodActive || state != PlantState.PLANT_FOOD || offDurationSeconds <= 0f) {
+            return;
+        }
+        if (plantFoodDurationRemaining > offDurationSeconds) {
+            plantFoodDurationRemaining = offDurationSeconds;
+        }
+    }
+
     /** Invokes the per-category plant-food effect. */
     private void firePlantFoodEffect(PlantAbilityContext context) {
         if (context == null) return;

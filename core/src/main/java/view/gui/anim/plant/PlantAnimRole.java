@@ -15,10 +15,6 @@ public enum PlantAnimRole {
     SPECIAL(false)
     ;
 
-    // TODO: GROWING — warm-up / stage idles
-    // TODO: ARMED — Potato Mine / trap ready poses
-    // TODO: DIE — death clips
-
     private final boolean looping;
 
     PlantAnimRole(boolean looping) {

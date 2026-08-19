@@ -43,7 +43,8 @@ public final class PamPlantProjectileOrigins implements PlantProjectileOrigins {
             "Snow Pea", new float[]{0.08f, 0f},
             "Fire Peashooter", new float[]{0.08f, 0f},
             "Goo Peashooter", new float[]{0.08f, 0f},
-            "Sea-shroom", new float[]{0.2f, 0.1f}
+            "Sea-shroom", new float[]{0.2f, 0.1f},
+            "Cabbage-pult", new float[]{-0.8f, -0.2f}
     );
 
     /** Omnidirectional shooters should leave from the plant body, not a side muzzle. */

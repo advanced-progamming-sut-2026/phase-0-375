@@ -5,6 +5,8 @@ import model.plant.instance.PlantInstance;
 import view.gui.anim.AnimPose;
 import view.gui.assets.PamCatalog;
 
+import java.util.Set;
+
 /**
  * Global plant defaults: model → {@link PlantAnimRole} → PAM clip.
  *
@@ -12,6 +14,19 @@ import view.gui.assets.PamCatalog;
  * Do not mutate the model here.
  */
 public final class PlantAnimAdapter {
+    private static final String[] PLANT_FOOD_MAIN_CLIPS = {"plantfood_loop", "plantfood", "plantfood_idle", "pf"};
+
+    /** Plants whose {@code PlantAnimRole.PLANT_FOOD} should loop for the full effect. */
+    private static final Set<String> PLANT_FOOD_LOOP_BY_NAME = Set.of(
+        "Peashooter",
+        "Mega Gatling Pea",
+        "Repeater",
+        "Snow Pea",
+        "Split Pea",
+        "Threepeater",
+        "Torchwood"
+    );
+
     private final PamCatalog catalog;
     private final PlantAnimOverrides overrides;
 
@@ -85,7 +100,7 @@ public final class PlantAnimAdapter {
                 ? AnimPose.looping(entry.path(), clip, role)
                 : AnimPose.once(entry.path(), clip, role);
         }
-        return pose;
+        return applyPlantFoodPlaybackMode(plant, role, pose);
     }
 
     /**
@@ -132,6 +147,15 @@ public final class PlantAnimAdapter {
         if (onDur > 0f && elapsed < onDur) {
             return PlantAnimRole.PLANT_FOOD_ON;
         }
+        float mainElapsed = Math.max(0f, elapsed - Math.max(0f, onDur));
+        if (!shouldLoopPlantFood(plant) && hasFinishedOncePlantFoodClip(entry, mainElapsed)) {
+            if (offDur > 0f) {
+                plant.beginPlantFoodOffWindowNow(offDur);
+                return PlantAnimRole.PLANT_FOOD_OFF;
+            }
+            plant.finishPlantFoodNow();
+            return PlantAnimRole.IDLE;
+        }
         return PlantAnimRole.PLANT_FOOD;
     }
 
@@ -139,13 +163,10 @@ public final class PlantAnimAdapter {
         return switch (role) {
             case IDLE -> new String[]{"idle", "idle2", "idle1", "loop"};
             case PLANT_FOOD_ON -> new String[]{"plantfood_on"};
-            case PLANT_FOOD -> new String[]{"plantfood_loop", "plantfood", "plantfood_idle", "idle"};
+            case PLANT_FOOD -> new String[]{"plantfood_loop", "plantfood", "plantfood_idle", "pf", "idle"};
             case PLANT_FOOD_OFF -> new String[]{"plantfood_off"};
             case ATTACK -> new String[]{"attack", "idle"};
             case SPECIAL ->  new String[]{"special"};
-            // TODO: case GROWING -> new String[]{"idle", "idle_stage1"};
-            // TODO: case ARMED -> new String[]{"ready_idle", "idle"};
-            // TODO: case DIE -> new String[]{"die", "death"};
         };
     }
 
@@ -155,5 +176,31 @@ public final class PlantAnimAdapter {
             case ATTACK -> new String[]{"attack"};
             default -> preferredClips(role);
         };
+    }
+
+    private static AnimPose applyPlantFoodPlaybackMode(PlantInstance plant, PlantAnimRole role, AnimPose pose) {
+        if (pose == null || role != PlantAnimRole.PLANT_FOOD || !pose.loop() || shouldLoopPlantFood(plant)) {
+            return pose;
+        }
+        AnimPose once = AnimPose.once(pose.pamPath(), pose.clipName(), pose.role(), pose.visibility())
+                .withScale(pose.scale())
+                .withFlipX(pose.flipX());
+        if (pose.reverse()) {
+            once = once.reversed();
+        }
+        return once;
+    }
+
+    private static boolean shouldLoopPlantFood(PlantInstance plant) {
+        if (plant == null || plant.getDefinition() == null) {
+            return false;
+        }
+        return PLANT_FOOD_LOOP_BY_NAME.contains(plant.getDefinition().getName());
+    }
+
+    private boolean hasFinishedOncePlantFoodClip(PamCatalog.PamEntry entry, float elapsedInMainPhase) {
+        String plantFoodClip = catalog.resolveClip(entry, PLANT_FOOD_MAIN_CLIPS);
+        float plantFoodDur = PamCatalog.clipDurationSeconds(entry, plantFoodClip);
+        return plantFoodDur > 0f && elapsedInMainPhase >= plantFoodDur;
     }
 }
