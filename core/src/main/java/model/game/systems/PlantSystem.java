@@ -177,19 +177,24 @@ public class PlantSystem implements Tickable {
 
         @Override
         public boolean hasZombieOrGraveAhead(int row, float plantX, int direction) {
-            // Check for zombies ahead in lane
+            return hasZombieOrGraveAheadInRange(row, plantX, direction, Float.MAX_VALUE);
+        }
+
+        @Override
+        public boolean hasZombieOrGraveAheadInRange(int row, float plantX, int direction, float maxRange) {
             for (ZombieInstance zombie : gameModel.getZombiesInLane(row)) {
                 if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
                 if (zombie.isHypnotized()) continue;
                 float dx = zombie.getContinuousX() - plantX;
-                if (direction > 0 && dx > 0f) return true;
-                if (direction < 0 && dx < 0f) return true;
+                if (direction > 0 && dx > 0f && dx <= maxRange) return true;
+                if (direction < 0 && dx < 0f && -dx <= maxRange) return true;
             }
-            // Check for graves ahead in lane
             int startCol = (int) plantX + direction;
             int endCol = direction > 0 ? gameModel.getColumnCount() : -1;
             int step = direction;
             for (int col = startCol; col != endCol; col += step) {
+                float dist = Math.abs(col - plantX);
+                if (dist > maxRange) break;
                 if (gameModel.getGraveAt(row, col) != null) return true;
             }
             return false;

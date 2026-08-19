@@ -193,6 +193,16 @@ public class ZombieInstance implements Tickable, Placeable {
         currentHP -= damage;
     }
 
+    /** Applies poison damage-over-time. */
+    public void applyPoison(int dps, float durationSeconds) {
+        if (dps <= 0 || durationSeconds <= 0f
+                || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
+        poisonDPS = Math.max(poisonDPS, dps);
+        poisonTimer = Math.max(poisonTimer, durationSeconds);
+    }
+
     /** Applies a chill stack to this zombie. Three stacks freezes it solid */
     public void applyChill() {
         if (isFrozen()) return;
@@ -207,6 +217,12 @@ public class ZombieInstance implements Tickable, Placeable {
 
     /** Default duration (in seconds) of a single chill stack. */
     public static final float CHILL_STACK_DURATION = 5.0f;
+
+    /** Default poison DoT duration applied by goo projectiles. */
+    public static final float POISON_DURATION = 5.0f;
+
+    /** Base poison DPS from Goo Peashooter pellets. */
+    public static final int POISON_BASE_DPS = 10;
 
     /**
      * Removes one chill stack from this zombie. Called by the combat

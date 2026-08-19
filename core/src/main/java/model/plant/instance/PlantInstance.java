@@ -90,6 +90,11 @@ public class PlantInstance implements Placeable {
                     abilityState.setCooldownRemaining(definition.getActionInterval());
                     this.state = PlantState.ARMING;
                 }
+            } else if (definition.hasTag(PlantTags.CHARGE)
+                    && definition.getCategory() == PlantCategory.SHOOTER
+                    && definition.getActionInterval() >= 5f) {
+                abilityState.setCooldownRemaining(definition.getActionInterval());
+                this.state = PlantState.ARMING;
             }
             abilityStates.put(definition.getAbilityType(), abilityState);
             if (definition.getAbilityType() == PlantAbilityType.PRODUCE_SUN
@@ -257,14 +262,13 @@ public class PlantInstance implements Placeable {
         if (strategy == null) return;
 
         PlantAction action = strategy.beginAction(this, context);
-        applyAbilityCooldown(strategy);
-        if (isMint(definition)) {
-            markMintBoostConsumed();
-        }
-
         if (action != null) {
+            applyAbilityCooldown(strategy);
             activeAction = action;
             activeAction.start(this, context);
+        }
+        if (isMint(definition)) {
+            markMintBoostConsumed();
         }
     }
 
@@ -680,6 +684,10 @@ public class PlantInstance implements Placeable {
             AbilityState fresh = new AbilityState(newDefinition.getAbilityType());
             if (newDefinition.hasTag(PlantTags.TRAP)) {
                 fresh.setArmed(false);
+            } else if (newDefinition.hasTag(PlantTags.CHARGE)
+                    && newDefinition.getCategory() == PlantCategory.SHOOTER
+                    && newDefinition.getActionInterval() >= 5f) {
+                fresh.setCooldownRemaining(newDefinition.getActionInterval());
             }
             this.abilityStates.put(newDefinition.getAbilityType(), fresh);
         }

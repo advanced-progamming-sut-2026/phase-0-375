@@ -64,6 +64,17 @@ public interface PlantAbilityContext {
     }
 
     /**
+     * @return true if there is a zombie or grave ahead within {@code maxRange}
+     *         grid units of {@code plantX}.
+     */
+    default boolean hasZombieOrGraveAheadInRange(int row, float plantX, int direction, float maxRange) {
+        if (maxRange <= 0f) {
+            return hasZombieOrGraveAhead(row, plantX, direction);
+        }
+        return false;
+    }
+
+    /**
      * @return true if there is a zombie anywhere along the diagonal path starting at
      *         {@code (row, plantX)} moving in {@code (dx, dy)} direction.
      *         Used by Rotobaga and Starfruit to check diagonal shots.

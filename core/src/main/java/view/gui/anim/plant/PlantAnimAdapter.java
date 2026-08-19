@@ -24,7 +24,8 @@ public final class PlantAnimAdapter {
         "Snow Pea",
         "Split Pea",
         "Threepeater",
-        "Torchwood"
+        "Torchwood",
+        "Bowling Bulb"
     );
 
     private final PamCatalog catalog;
