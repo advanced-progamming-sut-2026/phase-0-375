@@ -7,6 +7,7 @@ import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.Cell;
 import model.game.map.Point;
+import model.item.Grave;
 import model.plant.ability.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -172,6 +173,49 @@ public class PlantSystem implements Tickable {
         @Override
         public boolean hasZombieInLane(int lane) {
             return !gameModel.getZombiesInLane(lane).isEmpty();
+        }
+
+        @Override
+        public boolean hasZombieOrGraveAhead(int row, float plantX, int direction) {
+            // Check for zombies ahead in lane
+            for (ZombieInstance zombie : gameModel.getZombiesInLane(row)) {
+                if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
+                if (zombie.isHypnotized()) continue;
+                float dx = zombie.getContinuousX() - plantX;
+                if (direction > 0 && dx > 0f) return true;
+                if (direction < 0 && dx < 0f) return true;
+            }
+            // Check for graves ahead in lane
+            int startCol = (int) plantX + direction;
+            int endCol = direction > 0 ? gameModel.getColumnCount() : -1;
+            int step = direction;
+            for (int col = startCol; col != endCol; col += step) {
+                if (gameModel.getGraveAt(row, col) != null) return true;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean hasZombieAlongDiagonal(int startRow, float startX, int dx, float dy, int maxRows, int maxCols) {
+            float x = startX + dx;
+            float y = startRow + dy;
+            while (x >= 0 && x < maxCols && y >= 0 && y < maxRows) {
+                int row = Math.round(y);
+                if (row >= 0 && row < maxRows) {
+                    for (ZombieInstance zombie : gameModel.getZombiesInLane(row)) {
+                        if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
+                        if (zombie.isHypnotized()) continue;
+                        float zdx = zombie.getContinuousX() - startX;
+                        float zdy = zombie.getContinuousY() - startRow;
+                        if (dx > 0 && zdx > 0 || dx < 0 && zdx < 0) {
+                            if (Math.abs(zdy - (zdx / dx) * dy) < 1.0f) return true;
+                        }
+                    }
+                }
+                x += dx;
+                y += dy;
+            }
+            return false;
         }
 
         @Override

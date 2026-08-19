@@ -55,6 +55,23 @@ public interface PlantAbilityContext {
     /** @return true if at least one alive zombie is adjacent to the given cell. */
     boolean hasAdjacentZombie(int row, int col);
 
+    /**
+     * @return true if there is a zombie or grave strictly ahead of {@code (row, plantCol)}
+     *         in the given {@code direction} (+1 = right, -1 = left) within {@code row}.
+     */
+    default boolean hasZombieOrGraveAhead(int row, float plantX, int direction) {
+        return false;
+    }
+
+    /**
+     * @return true if there is a zombie anywhere along the diagonal path starting at
+     *         {@code (row, plantX)} moving in {@code (dx, dy)} direction.
+     *         Used by Rotobaga and Starfruit to check diagonal shots.
+     */
+    default boolean hasZombieAlongDiagonal(int startRow, float startX, int dx, float dy, int maxRows, int maxCols) {
+        return false;
+    }
+
     /** @return true if the level is a night / dark-ages level. */
     boolean isNightLevel();
 

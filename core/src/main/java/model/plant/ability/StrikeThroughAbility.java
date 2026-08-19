@@ -51,8 +51,10 @@ public class StrikeThroughAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
         if (def.isShroom()) {
             if (!hasZombieInFumeRange(plant, context)) return null;
-        } else if (!context.hasZombieInLane(plant.getPosition().getY())) {
-            return null;
+        } else {
+            int row = plant.getPosition().getY();
+            float plantX = plant.getPosition().getX();
+            if (!context.hasZombieOrGraveAhead(row, plantX, +1)) return null;
         }
 
         return TimedPlantAction.attackAt(plant, context, this::execute);
@@ -75,7 +77,7 @@ public class StrikeThroughAbility implements PlantAbility {
             shootFume(plant, context);
             return;
         }
-        if (!context.hasZombieInLane(plant.getPosition().getY())) return;
+        if (!context.hasZombieOrGraveAhead(plant.getPosition().getY(), plant.getPosition().getX(), +1)) return;
 
         int row = plant.getPosition().getY();
         FloatPoint origin = context.plantProjectileOriginOrCell(plant);

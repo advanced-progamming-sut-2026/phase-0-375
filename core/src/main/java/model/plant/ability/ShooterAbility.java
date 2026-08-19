@@ -47,8 +47,35 @@ public class ShooterAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
+        if (plant.getPosition() == null) return null;
+
+        if (!shouldFireGate(plant, context, def)) return null;
 
         return TimedPlantAction.attackAt(plant, context, this::execute);
+    }
+
+    private boolean shouldFireGate(PlantInstance plant, PlantAbilityContext context, Plant def) {
+        int row = plant.getPosition().getY();
+        float plantX = plant.getPosition().getX();
+        if (isRotobaga(def)) {
+            return context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, -1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, -1, -1f, context.getRowCount(), context.getColumnCount());
+        }
+        if (isStarfruit(def)) {
+            return context.hasZombieOrGraveAhead(row, plantX, -1)
+                || context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount());
+        }
+        if (isSplitPea(def)) {
+            return context.hasZombieOrGraveAhead(row, plantX, +1)
+                || context.hasZombieOrGraveAhead(row, plantX, -1);
+        }
+        if (isBowlingBulb(def)) {
+            return context.hasZombieInLane(row);
+        }
+        return context.hasZombieOrGraveAhead(row, plantX, +1);
     }
 
     @Override
