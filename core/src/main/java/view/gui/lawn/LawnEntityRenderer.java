@@ -1627,6 +1627,10 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
+        boolean backward = zombie.isMovingBackward();
+        if (backward) {
+            pose = pose.withFlipX(true);
+        }
         if (!zombieWorldCenter(zombie, xyTmp)) {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
@@ -1679,11 +1683,10 @@ public final class LawnEntityRenderer {
         } else if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
             // Walking is driven by travel, so a cycle always covers exactly one step and
             // ground_swatch can be held still. Every other pose stays on the wall clock.
-            // Hypnotized zombies walk the other way, so distance and the hold-back both flip.
-            boolean backward = zombie.isMovingBackward();
-            phase = gait.phaseAt(backward ? xyTmp[2] : -xyTmp[2]);
+            float travel = backward ? xyTmp[2] : -xyTmp[2];
+            phase = gait.phaseAt(travel);
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
-            x += backward ? -holdBack : holdBack;
+            x += holdBack;
         }
         float standY = y;
         Rectangle snorkelMask = null;

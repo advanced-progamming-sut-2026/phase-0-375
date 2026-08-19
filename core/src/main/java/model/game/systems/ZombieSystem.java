@@ -234,14 +234,15 @@ public class ZombieSystem implements Tickable {
         }
 
         if (hypnotized) {
-            // Hypnotized zombies never eat plants.
-            if (zombie.isEating() && zombie.getEatingTarget() != null) {
+            // Hypnotized zombies never eat plants. Leave EATING only while biting
+            // an opposing zombie (handled above); clear any stale plant chew.
+            if (zombie.isEating() && zombie.getCombatTargetZombie() == null) {
                 zombie.stopEating();
             }
             return;
         }
 
-        int eatCol = zombie.plantColumnAtFacingBorder();
+        int eatCol = resolveEatColumn(zombie, context, row);
         if (eatCol < 0 || eatCol >= context.getColumnCount()) {
             if (zombie.isEating()) {
                 zombie.stopEating();
@@ -296,6 +297,38 @@ public class ZombieSystem implements Tickable {
             zombie.stopEating();
         }
         return true;
+    }
+
+    /**
+     * Column whose plant this zombie should chew this tick.
+     *
+     * <p>Uses the facing-border rule for first contact, keeps chewing an existing
+     * target, and lets stacked walkers in {@code (col+0.5, col+1)} join the bite.
+     */
+    private int resolveEatColumn(ZombieInstance zombie, BehaviorContext context, int row) {
+        PlantInstance current = zombie.getEatingTarget();
+        if (current != null && current.getPosition() != null && current.getCurrentHP() > 0
+                && !current.isTransformed() && !current.isIgnoredByZombies()) {
+            return current.getPosition().getX();
+        }
+
+        int borderCol = zombie.plantColumnAtFacingBorder();
+        if (borderCol >= 0) {
+            return borderCol;
+        }
+
+        if (!zombie.isMovingBackward()) {
+            float x = zombie.getContinuousX();
+            int col = (int) Math.floor(x);
+            if (x > col + ZombieInstance.TILE_BORDER && x < col + 1.0f) {
+                PlantInstance plant = context.getPlantAt(row, col);
+                if (plant != null && plant.getCurrentHP() > 0 && !plant.isTransformed()
+                        && !plant.isIgnoredByZombies()) {
+                    return col;
+                }
+            }
+        }
+        return -1;
     }
 
     /** Damage of one tick's worth of biting, scaled by status effects. */

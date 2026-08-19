@@ -159,7 +159,7 @@ public class GameModel implements BehaviorContext {
     }
 
     public float difficultyBoost() {
-        return difficultyLevel / 3.0f;
+        return Math.max(1, difficultyLevel) / 3.0f;
     }
 
     public float difficultyPenalty() {
