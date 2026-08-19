@@ -15,7 +15,7 @@ dependencies {
   api "com.badlogicgames.gdx:gdx:$gdxVersion"
   api "com.badlogicgames.gdx:gdx-freetype:$gdxVersion"
   api "com.github.raeleus.TenPatch:tenpatch:$tenPatchVersion"
-  api "com.github.pizpizi:pvz-skin:$pvzSkinVersion"
+  api "com.github.ahgharaghani:pvz-skin:$pvzSkinVersion"
   api "com.github.pizpizi:libPVZ:$libPvzVersion"
 
   api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
