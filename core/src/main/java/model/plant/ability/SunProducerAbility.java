@@ -23,6 +23,11 @@ public class SunProducerAbility implements PlantAbility {
 
     private static final Random RNG = new Random();
 
+    /** Short fall from just above the plant. */
+    private static final float PLANT_SUN_FALL = 0.75f;
+    /** Tiles toward screen-top (row 0) for the fall start. */
+    private static final float PLANT_SUN_ABOVE_TILES = 0.35f;
+
     /** Sun-shroom elapsed time to reach stage 2. */
     private static final float SUNSHROOM_STAGE2_SECONDS = 24f;
     /** Sun-shroom elapsed time to reach stage 3. */
@@ -89,7 +94,13 @@ public class SunProducerAbility implements PlantAbility {
         if (plant.getPosition() == null) return;
 
         int amount = computeSunAmount(plant);
-        dropSun(plant, context, amount);
+        if (isDoubleSunDrop(plant, amount)) {
+            dropEqualScatteredSuns(plant, context, 2, amount / 2);
+        } else if (amount > 50) {
+            dropScatteredSuns(plant, context, amount);
+        } else {
+            dropSun(plant, context, amount);
+        }
     }
 
     @Override
@@ -131,6 +142,20 @@ public class SunProducerAbility implements PlantAbility {
             return base * 2;
         }
         return base;
+    }
+
+    /**
+     * True when {@link #computeSunAmount} returned a doubled single-stage payout
+     * that should be shown as two separate tokens.
+     */
+    private boolean isDoubleSunDrop(PlantInstance plant, int amount) {
+        Plant def = plant.getDefinition();
+        if (def == null || def.hasTag(PlantTags.WARM_UP)) {
+            return false;
+        }
+        int base = (int) def.getAbilityValue();
+        return base > 0 && amount == base * 2
+                && hasSpecialTag(plant, PlantSpecialTag.DOUBLE_SUN_CHANCE);
     }
 
     /** @return true if the plant has any upgrade with the given special tag. */
@@ -219,15 +244,20 @@ public class SunProducerAbility implements PlantAbility {
         int row = plant.getPosition().getY();
         int col = plant.getPosition().getX();
         Sun sun = new Sun(sunTypeFor(plant), amount, col, row);
+        applyPlantDropMotion(sun, plant);
         context.spawnSun(sun);
     }
 
     private void dropMultipleSuns(PlantInstance plant, PlantAbilityContext context, int amount) {
-        int remaining = amount;
-        while (remaining > 0) {
-            int chunk = Math.min(50, remaining);
-            dropSun(plant, context, chunk);
-            remaining -= chunk;
+        dropScatteredSuns(plant, context, amount);
+    }
+
+    /** Drops {@code count} equal sun tokens at scattered positions near the plant. */
+    private void dropEqualScatteredSuns(PlantInstance plant, PlantAbilityContext context,
+                                        int count, int amountEach) {
+        if (count <= 0 || amountEach <= 0) return;
+        for (int i = 0; i < count; i++) {
+            spawnScatteredSun(plant, context, amountEach);
         }
     }
 
@@ -238,20 +268,34 @@ public class SunProducerAbility implements PlantAbility {
         int remaining = total;
         while (remaining > 0) {
             int chunk = Math.min(50, remaining);
-            float dx = (RNG.nextFloat() - 0.5f) * 2.0f;
-            float dy = (RNG.nextFloat() - 0.5f) * 2.0f;
-            float x = Math.max(0f, Math.min(context.getColumnCount() - 1,
-                    plant.getPosition().getX() + dx));
-            float y = Math.max(0f, Math.min(context.getRowCount() - 1,
-                    plant.getPosition().getY() + dy));
-            Sun sun = new Sun(
-                    sunTypeFor(plant),
-                    chunk,
-                    Math.round(x),
-                    Math.round(y)
-            );
-            context.spawnSun(sun);
+            spawnScatteredSun(plant, context, chunk);
             remaining -= chunk;
         }
+    }
+
+    private void spawnScatteredSun(PlantInstance plant, PlantAbilityContext context, int amount) {
+        float dx = (RNG.nextFloat() - 0.5f) * 2.0f;
+        float dy = (RNG.nextFloat() - 0.5f) * 2.0f;
+        float x = Math.max(0f, Math.min(context.getColumnCount() - 1,
+                plant.getPosition().getX() + dx));
+        float y = Math.max(0f, Math.min(context.getRowCount() - 1,
+                plant.getPosition().getY() + dy));
+        Sun sun = new Sun(
+                sunTypeFor(plant),
+                amount,
+                Math.round(x),
+                Math.round(y)
+        );
+        sun.setOffset((RNG.nextFloat() - 0.5f) * 0.5f, (RNG.nextFloat() - 0.5f) * 0.5f);
+        applyPlantDropMotion(sun, plant);
+        context.spawnSun(sun);
+    }
+
+    /** Fall from a bit above the plant onto the sun's destination tile. */
+    private void applyPlantDropMotion(Sun sun, PlantInstance plant) {
+        float fromX = plant.getPosition().getX();
+        float fromY = plant.getPosition().getY() - PLANT_SUN_ABOVE_TILES;
+        sun.setOrigin(fromX, fromY);
+        sun.setFall(PLANT_SUN_FALL, PLANT_SUN_FALL);
     }
 }

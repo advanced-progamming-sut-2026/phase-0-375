@@ -69,6 +69,7 @@ import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
 import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
+import view.gui.assets.EffectPamPaths;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.ProjectilePamPaths;
 import view.gui.assets.PvzAssets;
@@ -247,6 +248,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, Integer> meleeAttackFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OneShotFx> meleeIdlePulses = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, PlantFoodFx> plantFoodFx = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
@@ -410,6 +412,7 @@ public final class LawnEntityRenderer {
             frontEffects.remove(entry.getValue());
             return true;
         });
+        plantFoodFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
                 && !plant.isTransformed());
@@ -444,9 +447,11 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
                 tickHitFlash(plant, plantVitality(plant), delta), delta, clockKey);
+        updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
 
@@ -587,6 +592,9 @@ public final class LawnEntityRenderer {
     private void spawnExplosionSpecs(List<ExplosivePlantFx.Spec> specs, Point pos, float x, float y) {
         if (specs == null || specs.isEmpty()) {
             return;
+        }
+        if (screenShake != null) {
+            screenShake.pulse();
         }
         for (ExplosivePlantFx.Spec spec : specs) {
             if (spec.placement() == ExplosivePlantFx.Placement.ALONG_LANE && pos != null) {
@@ -997,7 +1005,7 @@ public final class LawnEntityRenderer {
     }
 
     private float[] originWorld(Sun sun) {
-        return layout.centerOf(Math.round(sun.getOriginY()), sun.getOriginX());
+        return layout.centerOf(sun.getOriginY(), sun.getOriginX());
     }
 
     private void drawSunToken(Batch batch, Sun sun, float x, float y, float delta) {
@@ -1800,6 +1808,9 @@ public final class LawnEntityRenderer {
         float[] xy = layout.centerOf(zombie.getGridY(), jump.getLaunchX());
         prospectorBlasts.add(new BlastFx(blast.path(), xy[0], xy[1]));
         prospectorBlastSpawned.put(zombie, Boolean.TRUE);
+        if (screenShake != null) {
+            screenShake.pulse();
+        }
     }
 
     private void drawProspectorBlasts(Batch batch, float delta, int row) {
@@ -3481,5 +3492,70 @@ public final class LawnEntityRenderer {
             this.scale = scale > 0f ? scale : 1f;
             this.loop = loop;
         }
+    }
+
+    private enum PlantFoodFxPhase {
+        ON, LOOP, OFF
+    }
+
+    private static final class PlantFoodFx {
+        PlantFoodFxPhase phase = PlantFoodFxPhase.ON;
+        float time;
+    }
+
+    private void updateAndDrawPlantFoodFx(Batch batch, PlantInstance plant, float x, float y, float delta) {
+        boolean active = plant.isPlantFoodActive() || plant.getState() == PlantState.PLANT_FOOD;
+        PlantFoodFx fx = plantFoodFx.get(plant);
+        if (!active && fx == null) {
+            return;
+        }
+        if (fx == null) {
+            fx = new PlantFoodFx();
+            plantFoodFx.put(plant, fx);
+            preloadPlantFoodFx();
+        }
+        if (!active && fx.phase != PlantFoodFxPhase.OFF) {
+            fx.phase = PlantFoodFxPhase.OFF;
+            fx.time = 0f;
+        }
+
+        String clip = plantFoodFxClip(fx.phase);
+        ClipRef ref = clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, clip);
+        if (ref == null) {
+            if (!active) {
+                plantFoodFx.remove(plant);
+            }
+            return;
+        }
+        float duration = effectClipDurationSeconds(ref, EffectPamPaths.PLANTFOOD_FX, clip);
+        boolean loop = fx.phase == PlantFoodFxPhase.LOOP;
+        fx.time += delta;
+        player.draw(batch, ref, fx.time, x, y, AnimScale.PLANT, AnimScale.PLANT, loop);
+
+        if (fx.phase == PlantFoodFxPhase.ON && duration > 0f && fx.time >= duration) {
+            fx.phase = PlantFoodFxPhase.LOOP;
+            fx.time = 0f;
+        } else if (fx.phase == PlantFoodFxPhase.OFF && duration > 0f && fx.time >= duration) {
+            plantFoodFx.remove(plant);
+        } else if (fx.phase == PlantFoodFxPhase.OFF && duration <= 0f) {
+            plantFoodFx.remove(plant);
+        } else if (fx.phase == PlantFoodFxPhase.ON && duration <= 0f) {
+            fx.phase = active ? PlantFoodFxPhase.LOOP : PlantFoodFxPhase.OFF;
+            fx.time = 0f;
+        }
+    }
+
+    private void preloadPlantFoodFx() {
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_ON);
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_LOOP);
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_OFF);
+    }
+
+    private static String plantFoodFxClip(PlantFoodFxPhase phase) {
+        return switch (phase) {
+            case ON -> EffectPamPaths.PLANTFOOD_FX_ON;
+            case LOOP -> EffectPamPaths.PLANTFOOD_FX_LOOP;
+            case OFF -> EffectPamPaths.PLANTFOOD_FX_OFF;
+        };
     }
 }
