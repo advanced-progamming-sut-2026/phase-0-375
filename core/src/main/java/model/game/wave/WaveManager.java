@@ -183,5 +183,65 @@ public class WaveManager implements Tickable {
     public List<Wave> getWaves() { return Collections.unmodifiableList(waves); }
     public WaveManagerPhase getPhase() { return phase; }
 
+    /**
+     * Level progress in {@code [0, 1]}: the bar is split into {@code n} equal
+     * sections (one per wave). The current wave interpolates by HP depleted.
+     */
+    public float progress01() {
+        return progress01(waves.size(), currentWaveIndex, phase, currentWaveFraction());
+    }
+
+    /**
+     * Flag stops at the end of each section except the last: {@code 1/n},
+     * {@code 2/n}, … {@code (n-1)/n}.
+     */
+    public float[] flagStops01() {
+        return flagStops01(waves.size());
+    }
+
+    static float progress01(int waveCount, int index, WaveManagerPhase phase,
+                            float currentFrac) {
+        if (waveCount <= 0) {
+            return 0f;
+        }
+        if (phase == WaveManagerPhase.LEVEL_DONE) {
+            return 1f;
+        }
+        int idx = Math.max(0, Math.min(index, waveCount - 1));
+        float section = idx;
+        if (phase == WaveManagerPhase.ACTIVE_WAVE) {
+            section += clamp01(currentFrac);
+        }
+        return Math.min(1f, section / waveCount);
+    }
+
+    static float[] flagStops01(int waveCount) {
+        if (waveCount <= 1) {
+            return new float[0];
+        }
+        float[] flags = new float[waveCount - 1];
+        for (int i = 0; i < flags.length; i++) {
+            flags[i] = (i + 1) / (float) waveCount;
+        }
+        return flags;
+    }
+
+    private float currentWaveFraction() {
+        if (phase != WaveManagerPhase.ACTIVE_WAVE || currentWaveTotalHP <= 0) {
+            return 0f;
+        }
+        return clamp01(currentWaveDepletedHP / (float) currentWaveTotalHP);
+    }
+
+    private static float clamp01(float v) {
+        if (v < 0f) {
+            return 0f;
+        }
+        if (v > 1f) {
+            return 1f;
+        }
+        return v;
+    }
+
     void setPhase(WaveManagerPhase phase) { this.phase = phase; }
 }

@@ -42,7 +42,7 @@ import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SunHud;
 import view.gui.ui.WaveAnnounceBanner;
-import view.gui.ui.WaveAnnounceBanner;
+import view.gui.ui.WaveProgressHud;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -70,6 +70,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private LootRewardPopup lootRewardPopup;
     private ReadySetPlantBanner readySetPlant;
     private WaveAnnounceBanner waveAnnounce;
+    private WaveProgressHud waveProgress;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private String previewPlant;
@@ -194,6 +195,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         });
         topRight.add(back).width(220f).height(48f);
         uiStage.addActor(topRight);
+
+        if (WaveProgressHud.showFor(model)) {
+            waveProgress = new WaveProgressHud(skin, assets.textures);
+            Table topCenter = new Table();
+            topCenter.setFillParent(true);
+            topCenter.setTouchable(Touchable.childrenOnly);
+            topCenter.top().padTop(8f);
+            topCenter.add(waveProgress).top();
+            uiStage.addActor(topCenter);
+        }
 
         lootRewardPopup = new LootRewardPopup(skin);
         Table rewardAnchor = new Table();
@@ -544,6 +555,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (waveText != null && waveAnnounce != null) {
                 waveAnnounce.show(waveText);
             }
+        }
+        if (waveProgress != null) {
+            waveProgress.sync(model);
         }
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());

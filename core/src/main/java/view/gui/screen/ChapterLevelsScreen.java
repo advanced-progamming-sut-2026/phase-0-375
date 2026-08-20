@@ -109,7 +109,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         CommandResult<Void> r = controller.enterChapter(chapterArg, levelId);
         showToast(r.getMessage(), !r.isSuccess());
         if (r.isSuccess()) {
-            game.setScreen(new PlantSelectionScreen(game, chapter));
+            game.setScreen(new LevelObjectivesScreen(game, chapter));
         }
     }
 }
