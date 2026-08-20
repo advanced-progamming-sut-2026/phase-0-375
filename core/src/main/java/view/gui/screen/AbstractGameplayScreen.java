@@ -191,17 +191,26 @@ public abstract class AbstractGameplayScreen implements Screen {
 
     protected abstract void renderWorld(float delta);
 
+    /**
+     * When true, world sim/draw receive {@code 0} delta so PAM clocks and
+     * underlayers freeze; the UI stage still acts so overlays stay interactive.
+     */
+    protected boolean freezeWorld() {
+        return false;
+    }
+
     protected void renderGraphics(float delta) {
         Gdx.gl.glClearColor(0.05f, 0.07f, 0.05f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        screenShake.update(delta);
+        float worldDelta = freezeWorld() ? 0f : delta;
+        screenShake.update(worldDelta);
         worldViewport.apply(false);
         anchorCameraLeft(worldCamera);
         screenShake.apply(worldCamera);
         game.batch.setProjectionMatrix(worldCamera.combined);
         game.batch.begin();
-        renderWorld(delta);
+        renderWorld(worldDelta);
         game.batch.end();
 
         uiViewport.apply(false);

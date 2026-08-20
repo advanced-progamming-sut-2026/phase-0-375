@@ -46,7 +46,7 @@ public final class LevelObjectivesOverlay {
 
     /** Creates the overlay and returns it ready to add to uiStage. */
     public static Table create(Skin skin, LevelConfig config, Runnable onContinue) {
-        List<String> objectives = buildObjectives(config);
+        List<String> objectives = objectivesFor(config);
 
         Table overlay = new Table();
         overlay.setFillParent(true);
@@ -128,7 +128,8 @@ public final class LevelObjectivesOverlay {
         return stack;
     }
 
-    private static List<String> buildObjectives(LevelConfig config) {
+    /** Same objective lines shown on the start splash and the pause menu. */
+    public static List<String> objectivesFor(LevelConfig config) {
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");

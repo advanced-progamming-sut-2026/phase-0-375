@@ -14,7 +14,9 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import controller.GameMenuController;
 import controller.GameplayMenuController;
+import controller.PlantSelectionMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
@@ -23,6 +25,7 @@ import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
+import model.game.level.LevelConfig;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
@@ -37,6 +40,7 @@ import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
 import view.gui.ui.LootRewardPopup;
+import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
@@ -46,6 +50,7 @@ import view.gui.ui.WaveProgressHud;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -81,7 +86,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     private boolean plantfoodMode;
     private boolean shovelMode;
+    private boolean pauseMenuOpen;
     private ImageButton shovelButton;
+    private ImageButton pauseButton;
+    private Table pauseOverlay;
     private Cursor hiddenCursor;
     private TextureRegion plantfoodCursorRegion;
     private TextureRegion shovelCursorRegion;
@@ -90,6 +98,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private static final String SHOVEL_CURSOR_ID = "IMAGE_UI_HUD_INGAME_SHOVEL_ICON";
     /** Native 768 {@code IMAGE_UI_HUD_INGAME_SHOVEL_BUTTON} size. */
     private static final float SHOVEL_SIZE = 79f;
+    /** Native 768 {@code image_ui_hud_ingame_pause_button} size. */
+    private static final float PAUSE_BTN_SIZE = 70f;
 
     public GameplayScreen(PvzGdxGame game) {
         super(game);
@@ -114,6 +124,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_1);
         assets.textures.loadSync("ZENGARDENGROUP_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_ZENGARDENGROUP_768_00");
+        assets.textures.loadSync(PauseMenuOverlay.ATLAS_GROUP);
+        assets.textures.loadSync(PauseMenuOverlay.ATLAS_PAGE);
         setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         buildHud();
     }
@@ -184,16 +196,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
         coinHud = new CoinHud(skin, assets.textures);
         coinHud.setAmount(model == null ? 0 : model.getCoinCount());
-        topRight.add(coinHud).right().padBottom(8f).row();
 
-        TextButton back = new TextButton("Back to levels", skin, "brown");
-        back.addListener(new ChangeListener() {
+        pauseButton = new ImageButton(skin, "ingame_pause");
+        pauseButton.setProgrammaticChangeEvents(false);
+        pauseButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                exitToLevels();
+                openPauseMenu();
             }
         });
-        topRight.add(back).width(220f).height(48f);
+
+        Table coinRow = new Table();
+        coinRow.add(coinHud).padRight(8f);
+        coinRow.add(pauseButton).size(PAUSE_BTN_SIZE);
+        topRight.add(coinRow).right();
         uiStage.addActor(topRight);
 
         if (WaveProgressHud.showFor(model)) {
@@ -536,8 +552,84 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
     }
 
+    private void openPauseMenu() {
+        if (pauseMenuOpen) {
+            return;
+        }
+        pauseMenuOpen = true;
+        if (pauseButton != null) {
+            pauseButton.setChecked(true);
+        }
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop != null && loop.getGameState() == GameState.RUNNING) {
+            loop.pause();
+        }
+        LevelConfig config = currentLevel() == null ? null : currentLevel().getConfig();
+        pauseOverlay = PauseMenuOverlay.create(
+            skin, assets.textures, config,
+            this::closePauseMenu,
+            this::restartLevel,
+            this::exitToLevels);
+        uiStage.addActor(pauseOverlay);
+        toast.toFront();
+    }
+
+    private void closePauseMenu() {
+        if (!pauseMenuOpen) {
+            return;
+        }
+        pauseMenuOpen = false;
+        if (pauseOverlay != null) {
+            pauseOverlay.remove();
+            pauseOverlay = null;
+        }
+        if (pauseButton != null) {
+            pauseButton.setChecked(false);
+        }
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop != null && loop.getGameState() == GameState.PAUSED) {
+            loop.resume();
+        }
+    }
+
+    private void restartLevel() {
+        Chapter chapter = currentChapter();
+        Level level = currentLevel();
+        LevelConfig config = level == null ? null : level.getConfig();
+        if (chapter == null || config == null) {
+            showToast("Cannot restart: no level loaded.", true);
+            return;
+        }
+        List<String> plants = new ArrayList<>(selectedPlants());
+        int levelId = config.getLevelId();
+        String chapterArg = chapter.name().toLowerCase(Locale.ROOT);
+        CommandResult<Void> enter = GameMenuController.getInstance().enterChapter(chapterArg, levelId);
+        if (!enter.isSuccess()) {
+            showToast(enter.getMessage(), true);
+            return;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            model.setSelectedPlants(plants);
+        }
+        CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
+        if (!start.isSuccess()) {
+            showToast(start.getMessage(), true);
+            return;
+        }
+        game.setScreen(new GameplayScreen(game));
+    }
+
+    @Override
+    protected boolean freezeWorld() {
+        return pauseMenuOpen;
+    }
+
     @Override
     protected void updateLogic(float delta) {
+        if (pauseMenuOpen) {
+            return;
+        }
         GameModel model = App.getInstance().getCurrentGameModel();
         if (isPregame()) {
             entityRenderer.tickMowerIntro(delta);
