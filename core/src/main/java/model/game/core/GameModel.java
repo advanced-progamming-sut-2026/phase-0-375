@@ -80,9 +80,18 @@ public class GameModel implements BehaviorContext {
     private EventBus eventBus;
     private List<String> selectedPlants;       // plant types chosen for this level
 
+    /** Continuous X past the lawn left edge where a breacher stands and chews. */
+    public static final float HOUSE_CHEW_X = -0.9f;
+
     // End-game bookkeeping (read by EndGameCondition implementations)
     private boolean houseBreached;
     private final Set<Integer> breachedRows = new HashSet<>();
+    /** Zombie that walked into the house (lose spotlight); null for non-breach losses. */
+    private ZombieInstance breachingZombie;
+    /** Continuous X of the most recent zombie death. */
+    private float lastZombieDeathX = Float.NaN;
+    /** Row of the most recent zombie death. */
+    private float lastZombieDeathY = Float.NaN;
     private int zombiesKilled;
     private int plantsLost;
     private float elapsedSeconds;
@@ -357,6 +366,9 @@ public class GameModel implements BehaviorContext {
         if (myopointTracker != null) {
             myopointTracker.onZombieSpawned(instance, elapsedSeconds);
         }
+        if (waveManager != null) {
+            waveManager.onWaveZombieSpawned(instance);
+        }
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
     }
 
@@ -375,6 +387,9 @@ public class GameModel implements BehaviorContext {
         gameMap.addZombie(instance, col, lane);
         if (myopointTracker != null) {
             myopointTracker.onZombieSpawned(instance, elapsedSeconds);
+        }
+        if (waveManager != null) {
+            waveManager.onWaveZombieSpawned(instance);
         }
         App.logToShell("[Tornado] A " + zombie.getName()
                 + " is carried in by a tornado and lands " + columnsAhead
@@ -439,6 +454,9 @@ public class GameModel implements BehaviorContext {
     public void removeZombie(ZombieInstance zombie) {
         activeZombies.remove(zombie);
         gameMap.removeZombie(zombie);
+        if (waveManager != null) {
+            waveManager.onZombieRemoved(zombie);
+        }
     }
 
     @Override
@@ -562,9 +580,48 @@ public class GameModel implements BehaviorContext {
         this.breachedRows.add(row);
     }
 
+    /**
+     * House breach: mark the lane lost and pin the zombie in an eat loop.
+     * Leaves continuous X where it is (past the lawn edge into the house).
+     */
+    public void applyHouseBreach(ZombieInstance zombie, int row) {
+        markHouseBreached(row);
+        setBreachingZombie(zombie);
+        if (zombie != null) {
+            if (zombie.getContinuousPosition() == null) {
+                zombie.setContinuousPosition(new FloatPoint(HOUSE_CHEW_X, row));
+            }
+            zombie.setState(ZombieState.EATING);
+        }
+    }
+
     /** Rows whose lane end has been breached at least once. */
     public Set<Integer> getBreachedRows() {
         return breachedRows;
+    }
+
+    /** Zombie chewing at the house after a breach, or {@code null}. */
+    public ZombieInstance getBreachingZombie() {
+        return breachingZombie;
+    }
+
+    public void setBreachingZombie(ZombieInstance zombie) {
+        this.breachingZombie = zombie;
+    }
+
+    /** Continuous column of the last kill, or {@link Float#NaN} if none yet. */
+    public float getLastZombieDeathX() {
+        return lastZombieDeathX;
+    }
+
+    /** Lane row of the last kill, or {@link Float#NaN} if none yet. */
+    public float getLastZombieDeathY() {
+        return lastZombieDeathY;
+    }
+
+    public void recordLastZombieDeath(float continuousX, float row) {
+        this.lastZombieDeathX = continuousX;
+        this.lastZombieDeathY = row;
     }
 
     public int getZombiesKilled() {

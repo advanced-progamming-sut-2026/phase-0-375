@@ -40,6 +40,7 @@ import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
 import view.gui.ui.LootRewardPopup;
+import view.gui.ui.LoseResultsOverlay;
 import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.ReadySetPlantBanner;
@@ -47,6 +48,7 @@ import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SunHud;
 import view.gui.ui.WaveAnnounceBanner;
 import view.gui.ui.WaveProgressHud;
+import view.gui.ui.WinResultsOverlay;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,6 +89,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private boolean plantfoodMode;
     private boolean shovelMode;
     private boolean pauseMenuOpen;
+    private boolean endSequenceActive;
+    private LoseResultsOverlay loseOverlay;
+    private WinResultsOverlay winOverlay;
+    private final List<Actor> hudRoots = new ArrayList<>();
     private ImageButton shovelButton;
     private ImageButton pauseButton;
     private Table pauseOverlay;
@@ -188,6 +194,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         packetColumn = new Table();
         left.add(packetColumn).left().top();
         uiStage.addActor(left);
+        hudRoots.add(left);
 
         Table topRight = new Table();
         topRight.setFillParent(true);
@@ -211,6 +218,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         coinRow.add(pauseButton).size(PAUSE_BTN_SIZE);
         topRight.add(coinRow).right();
         uiStage.addActor(topRight);
+        hudRoots.add(topRight);
 
         if (WaveProgressHud.showFor(model)) {
             waveProgress = new WaveProgressHud(skin, assets.textures);
@@ -220,6 +228,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             topCenter.top().padTop(8f);
             topCenter.add(waveProgress).top();
             uiStage.addActor(topCenter);
+            hudRoots.add(topCenter);
         }
 
         lootRewardPopup = new LootRewardPopup(skin);
@@ -228,6 +237,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         rewardAnchor.top().padTop(72f);
         rewardAnchor.add(lootRewardPopup).top();
         uiStage.addActor(rewardAnchor);
+        hudRoots.add(rewardAnchor);
 
         plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
         plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
@@ -237,6 +247,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         bottomLeft.bottom().left().pad(8f);
         bottomLeft.add(plantFoodBank).left().bottom();
         uiStage.addActor(bottomLeft);
+        hudRoots.add(bottomLeft);
 
         buildBottomRight(model);
 
@@ -307,6 +318,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             bottomRight.add(shovelButton).size(SHOVEL_SIZE).right();
         }
         uiStage.addActor(bottomRight);
+        hudRoots.add(bottomRight);
     }
 
     private void refreshPackets() {
@@ -393,6 +405,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private boolean onWorldClick(float worldX, float worldY) {
+        if (endSequenceActive) {
+            return true;
+        }
         if (plantfoodMode) {
             tryFeedPlantFood(worldX, worldY);
             setPlantfoodMode(false);
@@ -552,8 +567,27 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
     }
 
+    /** After a win: load the next level in this chapter, or fall back to the map. */
+    private void continueToNextLevel() {
+        Chapter chapter = currentChapter();
+        Level level = currentLevel();
+        LevelConfig config = level == null ? null : level.getConfig();
+        if (chapter == null || config == null) {
+            exitToLevels();
+            return;
+        }
+        int nextId = config.getLevelId() + 1;
+        String chapterArg = chapter.name().toLowerCase(Locale.ROOT);
+        CommandResult<Void> enter = GameMenuController.getInstance().enterChapter(chapterArg, nextId);
+        if (!enter.isSuccess()) {
+            exitToLevels();
+            return;
+        }
+        game.setScreen(new LevelObjectivesScreen(game, chapter));
+    }
+
     private void openPauseMenu() {
-        if (pauseMenuOpen) {
+        if (pauseMenuOpen || endSequenceActive) {
             return;
         }
         pauseMenuOpen = true;
@@ -622,12 +656,23 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     @Override
     protected boolean freezeWorld() {
+        // Pause freezes PAM; win/lose keep lawn anims running under the dim.
         return pauseMenuOpen;
     }
 
     @Override
     protected void updateLogic(float delta) {
         if (pauseMenuOpen) {
+            return;
+        }
+        if (endSequenceActive) {
+            entityRenderer.tickEndLevel(delta);
+            if (loseOverlay != null && entityRenderer.isLoseFadeDone()) {
+                loseOverlay.play();
+            }
+            if (winOverlay != null && entityRenderer.isWinFadeDone()) {
+                winOverlay.play();
+            }
             return;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
@@ -641,6 +686,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (model != null) {
                 entityRenderer.tickMowers(model, delta);
             }
+        }
+        maybeStartEndSequence(model);
+        if (endSequenceActive) {
+            entityRenderer.tickEndLevel(delta);
+            if (winOverlay != null && entityRenderer.isWinFadeDone()) {
+                winOverlay.play();
+            }
+            return;
         }
         if (model != null) {
             String waveText = model.consumeWaveAnnouncement();
@@ -666,6 +719,71 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         } else {
             refreshPacketChrome();
         }
+    }
+
+    private void maybeStartEndSequence(GameModel model) {
+        if (endSequenceActive || model == null) {
+            return;
+        }
+        GameState state = model.getState();
+        if (state == GameState.LOST) {
+            startLoseSequence();
+        } else if (state == GameState.WON) {
+            startWinSequence();
+        }
+    }
+
+    private void startLoseSequence() {
+        endSequenceActive = true;
+        clearArmedModes();
+        hideHud();
+        if (pauseMenuOpen) {
+            closePauseMenu();
+        }
+        entityRenderer.beginLoseFade();
+        loseOverlay = new LoseResultsOverlay(
+            skin, assets.textures, this::restartLevel, this::exitToLevels);
+        uiStage.addActor(loseOverlay);
+        toast.toFront();
+    }
+
+    private void startWinSequence() {
+        endSequenceActive = true;
+        clearArmedModes();
+        hideHud();
+        if (pauseMenuOpen) {
+            closePauseMenu();
+        }
+        entityRenderer.beginWinFade();
+        winOverlay = new WinResultsOverlay(
+            skin, assets.textures, this::continueToNextLevel, this::exitToLevels);
+        uiStage.addActor(winOverlay);
+        toast.toFront();
+    }
+
+    private void hideHud() {
+        for (Actor root : hudRoots) {
+            root.setVisible(false);
+            root.setTouchable(Touchable.disabled);
+        }
+        if (readySetPlant != null) {
+            readySetPlant.setVisible(false);
+        }
+        if (waveAnnounce != null) {
+            waveAnnounce.setVisible(false);
+        }
+    }
+
+    private void clearArmedModes() {
+        if (plantfoodMode) {
+            setPlantfoodMode(false);
+        }
+        if (shovelMode) {
+            setShovelMode(false);
+        }
+        previewPlant = null;
+        hoverCol = -1;
+        hoverRow = -1;
     }
 
     @Override

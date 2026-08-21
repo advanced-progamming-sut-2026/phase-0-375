@@ -240,6 +240,7 @@ public final class SeedPacketActor extends WidgetGroup {
     private static Label packetLabel(
             String text, Label.LabelStyle style, float scale,
             float x, float y, float width, float height) {
+        SkinFonts.linear(style.font);
         Label label = new Label(text, style);
         label.setFontScale(scale);
         label.setAlignment(Align.right);

@@ -17,9 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Center-top wave meter: skin {@code ingame_progress} ProgressBar (keeps the
- * skin's knobBefore green fill), zombie head overlaid on the knob position,
- * flags at section boundaries.
+ * Center-top wave meter: skin {@code ingame_progress} ProgressBar.
+ * Head walks right→left; green fills behind it via {@code knobAfter}.
+ * Bar value is {@code 1 - progress} so at progress 0 the after-fill is empty.
  */
 public final class WaveProgressHud extends WidgetGroup {
     public static final String STYLE = "ingame_progress";
@@ -54,18 +54,18 @@ public final class WaveProgressHud extends WidgetGroup {
         setSize(BAR_W, HEAD_H);
         setTouchable(Touchable.disabled);
 
-        // knobBefore is the green fill drawn left-of-knob. We feed (1-progress)
-        // so the knob position mirrors our right-to-left head: at progress=0 the
-        // knob is at the right and knobBefore fills the whole bar; at progress=1
-        // the knob is at the left and knobBefore is empty. knobAfter and knob
-        // drawables are nulled so only the fill and background show.
+        // Head starts on the right (value=1). Green is knobAfter (right of the
+        // knob): empty at start, grows as value drops with progress. Skin fill
+        // often lives on style.knob — promote it to knobAfter, then hide knob.
         ProgressBarStyle style = new ProgressBarStyle(skin.get(STYLE, ProgressBarStyle.class));
+        ensureKnobAfterFill(style);
         style.knob = null;
-        style.knobAfter = null;
+        style.knobBefore = null;
 
         bar = new ProgressBar(0f, 1f, 0.001f, false, style);
-        bar.setAnimateDuration(0.18f);
+        bar.setAnimateDuration(0f);
         bar.setRound(false);
+        bar.setValue(1f);
         bar.setTouchable(Touchable.disabled);
         bar.setSize(BAR_W, BAR_H);
         bar.setPosition(0f, barY());
@@ -183,6 +183,21 @@ public final class WaveProgressHud extends WidgetGroup {
             }
         } else {
             image.setSize(w, h);
+        }
+    }
+
+    /**
+     * PvZ meter fills behind the head (right side) → {@link ProgressBarStyle#knobAfter}.
+     * If the skin only set {@code knob} / {@code knobBefore}, promote that drawable.
+     */
+    static void ensureKnobAfterFill(ProgressBarStyle style) {
+        if (style == null || style.knobAfter != null) {
+            return;
+        }
+        if (style.knob != null) {
+            style.knobAfter = style.knob;
+        } else if (style.knobBefore != null) {
+            style.knobAfter = style.knobBefore;
         }
     }
 

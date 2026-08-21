@@ -39,6 +39,12 @@ public class ZombieSystem implements Tickable {
      */
     private static final float ZOMBIE_COMBAT_RANGE = 0.7f;
 
+    /**
+     * Continuous X past the lawn's left edge ({@code -0.5}) where a breacher
+     * stops walking and starts the chew spotlight. Negative = into the house.
+     */
+    public static final float HOUSE_CHEW_X = GameModel.HOUSE_CHEW_X;
+
     private final GameModel gameModel;
     private final EventBus eventBus;
 
@@ -105,10 +111,11 @@ public class ZombieSystem implements Tickable {
 
         float newX = zombie.getContinuousX() - deltaX;
 
-        // End-of-lane handling
+        // End-of-lane / house entry
         if (!zombie.isMovingBackward() && newX < 0f) {
-            onZombieReachedHouse(zombie, context);
-            return;
+            if (enterHouseOrMower(zombie, context, newX)) {
+                return;
+            }
         }
         if (zombie.isMovingBackward() && newX >= context.getColumnCount()) {
             killSilently(zombie);
@@ -127,10 +134,35 @@ public class ZombieSystem implements Tickable {
         }
 
         zombie.setContinuousX(newX);
-        if (newGridX != zombie.getGridX()) {
+        if (newGridX != zombie.getGridX() && newGridX >= 0) {
             zombie.setGridX(newGridX);
             onZombieEnteredCell(zombie, context);
         }
+    }
+
+    /**
+     * @return true if movement for this tick is fully handled (caller should return).
+     */
+    private boolean enterHouseOrMower(ZombieInstance zombie, BehaviorContext context, float newX) {
+        int row = zombie.getGridY();
+        Lane lane = gameModel.getMap().getLane(row);
+        if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
+            lane.triggerLawnMower();
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
+            }
+            return true;
+        }
+        if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
+            return true;
+        }
+        // Walk into the house past the grid edge, then chew.
+        float x = Math.max(newX, HOUSE_CHEW_X);
+        zombie.setContinuousX(x);
+        if (x <= HOUSE_CHEW_X) {
+            onZombieReachedHouse(zombie, context);
+        }
+        return true;
     }
 
     /**
@@ -184,13 +216,12 @@ public class ZombieSystem implements Tickable {
         } else if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
             // Already sweeping this lane — wait for contact, don't lose.
         } else {
-            // No mower, the zombie got through.
-            gameModel.markHouseBreached(row);
+            // Past the lawn edge — start chewing for the lose spotlight.
+            gameModel.applyHouseBreach(zombie, row);
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_REACHED_END));
                 eventBus.dispatch(new GameEvent(GameEvent.Type.GAME_LOST));
             }
-            zombie.setState(ZombieState.DYING);
         }
     }
 
@@ -213,6 +244,15 @@ public class ZombieSystem implements Tickable {
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
+
+        if (zombie == gameModel.getBreachingZombie()) {
+            // House breach: stay on eat clip with no plant target.
+            if (!zombie.isEating()) {
+                zombie.setState(ZombieState.EATING);
+            }
+            return;
+        }
+
         if (row < 0 || col < 0
                 || row >= context.getRowCount()
                 || col >= context.getColumnCount()) {
@@ -460,6 +500,7 @@ public class ZombieSystem implements Tickable {
 
                 gameModel.recordZombieKilled(zombie);
                 gameModel.notifyZombieKilledForScore(zombie);
+                gameModel.recordLastZombieDeath(zombie.getContinuousX(), zombie.getGridY());
                 lastDeadZombiePos = zombie.getGridPosition();
                 maybeDropLoot();
                 lastDeadZombiePos = null;

@@ -1,6 +1,8 @@
 package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Matrix4;
@@ -8,6 +10,7 @@ import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.PlacableLayer;
+import model.enums.ZombieState;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
@@ -273,6 +276,16 @@ public final class LawnEntityRenderer {
 
     private LawnMowerRenderer mowerRenderer;
 
+    // --- End-level lose/win FX (clocks tick via {@link #tickEndLevel}, not world delta) ---
+    private static final float END_FADE_SEC = 0.75f;
+
+    private enum EndMode { NONE, LOSE, WIN }
+
+    private EndMode endMode = EndMode.NONE;
+    private float endFade;
+    private float endAnimDelta;
+    private Texture whitePixel;
+
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
             new PlantAnimAdapter(assets.pamCatalog),
@@ -374,12 +387,15 @@ public final class LawnEntityRenderer {
         lastCabinets.entrySet().removeIf(e -> !liveCabinets.contains(e.getKey()));
         Set<Cell> liveIce = syncTerrainIce(model);
 
+        // Win fade: hold plant idle (and plant ghosts) still under the dim.
+        float plantDelta = endMode == EndMode.WIN ? 0f : delta;
+
         List<PlantInstance> plants = model.getAllPlants();
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
         livePlants.addAll(plants);
         for (PlantInstance plant : plants) {
             if (plantRow(plant) < 0) {
-                drawPlant(batch, plant, delta);
+                drawPlant(batch, plant, plantDelta);
             }
         }
 
@@ -392,10 +408,10 @@ public final class LawnEntityRenderer {
             for (PlantInstance plant : plants) {
                 int lane = plantRow(plant);
                 if (lane >= 0 && clampRow(lane, rows) == row) {
-                    drawPlant(batch, plant, delta);
+                    drawPlant(batch, plant, plantDelta);
                 }
             }
-            drawPlantGhosts(batch, livePlants, delta, row);
+            drawPlantGhosts(batch, livePlants, plantDelta, row);
             for (Pushable cabinet : liveCabinets) {
                 int lane = cabinet.getRow();
                 if (lane >= 0 && clampRow(lane, rows) == row) {
@@ -434,6 +450,71 @@ public final class LawnEntityRenderer {
         Set<ZombieInstance> keepArt = new HashSet<>(model.getZombies());
         collectIcedOccupants(model, keepArt);
         artChapters.keySet().removeIf(zombie -> !keepArt.contains(zombie));
+
+        drawEndLevel(batch, model);
+    }
+
+    /** Advances lose/win black fade (world PAM keeps ticking separately). */
+    public void tickEndLevel(float delta) {
+        if (endMode == EndMode.NONE || delta <= 0f) {
+            return;
+        }
+        endAnimDelta = delta;
+        endFade = Math.min(1f, endFade + delta / END_FADE_SEC);
+    }
+
+    public void beginLoseFade() {
+        endMode = EndMode.LOSE;
+        endFade = 0f;
+    }
+
+    public void beginWinFade() {
+        endMode = EndMode.WIN;
+        endFade = 0f;
+    }
+
+    public float loseFadeAlpha() {
+        return endMode == EndMode.LOSE ? endFade : 0f;
+    }
+
+    public boolean isLoseFadeDone() {
+        return endMode == EndMode.LOSE && endFade >= 1f;
+    }
+
+    public boolean isWinFadeDone() {
+        return endMode == EndMode.WIN && endFade >= 1f;
+    }
+
+    private void drawEndLevel(Batch batch, GameModel model) {
+        if (endMode == EndMode.NONE) {
+            return;
+        }
+        endAnimDelta = 0f;
+        drawBlackFade(batch, endFade);
+    }
+
+    private void drawBlackFade(Batch batch, float alpha) {
+        if (alpha <= 0f) {
+            return;
+        }
+        Texture pixel = whitePixel();
+        Color prev = batch.getColor();
+        batch.setColor(0f, 0f, 0f, Math.min(1f, alpha));
+        // Cover left+center and spill into the right panel.
+        batch.draw(pixel, 0f, 0f, LawnLayout.WORLD_WIDTH + LawnLayout.TEXTURE_RIGHT_WIDTH,
+            LawnLayout.WORLD_HEIGHT);
+        batch.setColor(prev);
+    }
+
+    private Texture whitePixel() {
+        if (whitePixel == null) {
+            Pixmap pm = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+            pm.setColor(Color.WHITE);
+            pm.fill();
+            whitePixel = new Texture(pm);
+            pm.dispose();
+        }
+        return whitePixel;
     }
 
     private void drawPlant(Batch batch, PlantInstance plant, float delta) {
