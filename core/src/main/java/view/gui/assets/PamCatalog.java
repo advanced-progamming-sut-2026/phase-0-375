@@ -229,6 +229,18 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/SUN/")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/PLANTFOOD_PICKUP/")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/COIN_")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/MOWER_SPAWN/")) {
+            return true;
+        }
+        if (upper.contains("/MOWERS/")) {
+            return true;
+        }
         if (upper.contains("/GRAVESTONES/")) {
             return true;
         }

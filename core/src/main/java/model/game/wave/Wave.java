@@ -156,7 +156,10 @@ public class Wave implements Tickable {
     }
 
     public void markCleared() {
-        if (state == WaveState.COMPLETE) this.state = WaveState.CLEARED;
+        // ACTIVE → CLEARED: 75% kill early-advance clears before spawn-COMPLETE.
+        if (state == WaveState.COMPLETE || state == WaveState.ACTIVE) {
+            this.state = WaveState.CLEARED;
+        }
     }
 
     // --- Getters ---

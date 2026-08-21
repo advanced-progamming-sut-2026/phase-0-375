@@ -7,7 +7,6 @@ import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.Cell;
 import model.game.map.Lane;
-import model.game.map.LawnMower;
 import model.enums.ZombieState;
 import model.plant.ability.PlantAbilityContext;
 import model.plant.ability.WallAbility;
@@ -16,6 +15,9 @@ import model.zombie.behavior.BehaviorContext;
 import model.zombie.behavior.EnrageBehavior;
 import model.item.pushable.Barrel;
 import model.item.pushable.Piano;
+import model.enums.LootPickupKind;
+import model.item.LootPickup;
+import model.item.PlantFoodPickup;
 import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
 
@@ -34,11 +36,19 @@ public class ZombieSystem implements Tickable {
      */
     private static final float ZOMBIE_COMBAT_RANGE = 0.7f;
 
+    /**
+     * Continuous X past the lawn's left edge ({@code -0.5}) where a breacher
+     * stops walking and starts the chew spotlight. Negative = into the house.
+     */
+    public static final float HOUSE_CHEW_X = GameModel.HOUSE_CHEW_X;
+
     private final GameModel gameModel;
     private final EventBus eventBus;
 
     private static final float LOOT_DROP_CHANCE = 0.10f;
     private final java.util.Random lootRandom = new java.util.Random();
+    /** Death tile for {@link #maybeDropLoot}; set only during the death pass. */
+    private model.game.map.Point lastDeadZombiePos;
 
     public ZombieSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
@@ -98,10 +108,11 @@ public class ZombieSystem implements Tickable {
 
         float newX = zombie.getContinuousX() - deltaX;
 
-        // End-of-lane handling
+        // End-of-lane / house entry
         if (!zombie.isMovingBackward() && newX < 0f) {
-            onZombieReachedHouse(zombie, context);
-            return;
+            if (enterHouseOrMower(zombie, context, newX)) {
+                return;
+            }
         }
         if (zombie.isMovingBackward() && newX >= context.getColumnCount()) {
             killSilently(zombie);
@@ -120,10 +131,35 @@ public class ZombieSystem implements Tickable {
         }
 
         zombie.setContinuousX(newX);
-        if (newGridX != zombie.getGridX()) {
+        if (newGridX != zombie.getGridX() && newGridX >= 0) {
             zombie.setGridX(newGridX);
             onZombieEnteredCell(zombie, context);
         }
+    }
+
+    /**
+     * @return true if movement for this tick is fully handled (caller should return).
+     */
+    private boolean enterHouseOrMower(ZombieInstance zombie, BehaviorContext context, float newX) {
+        int row = zombie.getGridY();
+        Lane lane = gameModel.getMap().getLane(row);
+        if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
+            lane.triggerLawnMower();
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
+            }
+            return true;
+        }
+        if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
+            return true;
+        }
+        // Walk into the house past the grid edge, then chew.
+        float x = Math.max(newX, HOUSE_CHEW_X);
+        zombie.setContinuousX(x);
+        if (x <= HOUSE_CHEW_X) {
+            onZombieReachedHouse(zombie, context);
+        }
+        return true;
     }
 
     /**
@@ -162,34 +198,27 @@ public class ZombieSystem implements Tickable {
 
     /**
      * Handles a zombie reaching the end of its lane.
-     * If lawn mowers are enabled for this level and the lane has a mower
-     * waiting, it triggers the mower and dies; otherwise the game is lost.
+     * If lawn mowers are enabled and the lane still has a mower, it triggers
+     * and the zombie waits for blade contact; otherwise the game is lost.
      */
     private void onZombieReachedHouse(ZombieInstance zombie, BehaviorContext context) {
         int row = zombie.getGridY();
         Lane lane = gameModel.getMap().getLane(row);
         if (lawnMowersEnabled() && lane != null && lane.hasActiveLawnMower()) {
-            LawnMower mower = lane.getLawnMower();
             lane.triggerLawnMower();
-            if (mower != null) {
-                mower.recordSweepKill(zombie);
-            }
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.LAWN_MOWER_TRIGGERED));
             }
-            // The mower kills the triggering zombie: mark non-plant damage
-            // and route through the normal death path so kill stats see it.
-            zombie.recordNonPlantDamage();
-            zombie.markKilledByMower();
-            zombie.setState(ZombieState.DYING);
+            // Hold here until the blade makes contact in LawnMowerSystem.
+        } else if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
+            // Already sweeping this lane — wait for contact, don't lose.
         } else {
-            // No mower, the zombie got through.
-            gameModel.markHouseBreached(row);
+            // Past the lawn edge — start chewing for the lose spotlight.
+            gameModel.applyHouseBreach(zombie, row);
             if (eventBus != null) {
                 eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_REACHED_END));
                 eventBus.dispatch(new GameEvent(GameEvent.Type.GAME_LOST));
             }
-            zombie.setState(ZombieState.DYING);
         }
     }
 
@@ -212,6 +241,15 @@ public class ZombieSystem implements Tickable {
 
         int row = zombie.getGridY();
         int col = zombie.getGridX();
+
+        if (zombie == gameModel.getBreachingZombie()) {
+            // House breach: stay on eat clip with no plant target.
+            if (!zombie.isEating()) {
+                zombie.setState(ZombieState.EATING);
+            }
+            return;
+        }
+
         if (row < 0 || col < 0
                 || row >= context.getRowCount()
                 || col >= context.getColumnCount()) {
@@ -422,9 +460,12 @@ public class ZombieSystem implements Tickable {
             if (zombie.getState() == ZombieState.DYING) {
                 zombie.fireOnDeathBehaviors(context);
 
-                // Drop plant food if glowing.
+                // Drop plant food on the death tile if glowing (click to collect).
                 if (zombie.isGlowing()) {
-                    gameModel.addPlantFood();
+                    var pos = zombie.getGridPosition();
+                    if (pos != null) {
+                        gameModel.spawnPlantFood(new PlantFoodPickup(pos.getX(), pos.getY()));
+                    }
                 }
 
                 zombie.setState(ZombieState.DEAD);
@@ -433,7 +474,10 @@ public class ZombieSystem implements Tickable {
 
                 gameModel.recordZombieKilled(zombie);
                 gameModel.notifyZombieKilledForScore(zombie);
+                gameModel.recordLastZombieDeath(zombie.getContinuousX(), zombie.getGridY());
+                lastDeadZombiePos = zombie.getGridPosition();
                 maybeDropLoot();
+                lastDeadZombiePos = null;
 
                 // Spec notification: "Zombie of type <type> is dead at (<x>, <y>)"
                 var pos = zombie.getGridPosition();
@@ -463,25 +507,26 @@ public class ZombieSystem implements Tickable {
     }
 
     private void maybeDropLoot() {
-        if (lootRandom.nextFloat() >= LOOT_DROP_CHANCE) return;
-
+        if (lootRandom.nextFloat() >= LOOT_DROP_CHANCE) {
+            return;
+        }
+        var pos = lastDeadZombiePos;
+        if (pos == null) {
+            return;
+        }
+        int col = pos.getX();
+        int row = pos.getY();
         int roll = lootRandom.nextInt(3);
         switch (roll) {
-            case 0:
-                gameModel.addDiamonds(1);
-                model.app.App.logToShell("A zombie dropped a diamond; you have "
-                        + gameModel.getDiamondCount() + " now.");
-                break;
-            case 1:
-                gameModel.addCoins(50);
-                model.app.App.logToShell("A zombie dropped 50 coins; you have "
-                        + gameModel.getCoinCount() + " now.");
-                break;
-            case 2:
-                gameModel.addFlowerPots(1);
-                model.app.App.logToShell("A zombie dropped a flower pot; you have "
-                        + gameModel.getFlowerPotCount() + " now.");
-                break;
+            case 0 -> gameModel.spawnLootPickup(new LootPickup(LootPickupKind.DIAMOND, 1, col, row));
+            case 1 -> {
+                LootPickupKind coinKind = lootRandom.nextBoolean()
+                    ? LootPickupKind.COIN_GOLD
+                    : LootPickupKind.COIN_SILVER;
+                gameModel.spawnLootPickup(new LootPickup(coinKind, 50, col, row));
+            }
+            case 2 -> gameModel.spawnLootPickup(new LootPickup(LootPickupKind.FLOWER_POT, 1, col, row));
+            default -> { }
         }
     }
 }

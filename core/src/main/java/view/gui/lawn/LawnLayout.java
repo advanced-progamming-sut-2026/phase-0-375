@@ -1,17 +1,18 @@
 package view.gui.lawn;
 
 /**
- * Maps lawn grid cells to FrontLawn world coordinates (Y-up).
+ * Maps lawn grid cells to world coordinates (Y-up).
  *
  * <p>Camera / UI virtual size is LEFT + center TEXTURE only (always fully
  * visible, snapped top/bottom). {@code TEXTURE_RIGHT} is drawn past the right
  * edge and only peeks in when the window is wider than that base aspect.
- * ROW_05 and the interactive 5×9 grid sit on the center texture.
+ * FrontLawn ROW_05 and the interactive 5×9 grid sit on the center texture.
+ * Egypt, Ice Age, Beach, and Dark Ages use the same 768 panel slots (278 / 1024 / 673).
  */
 public final class LawnLayout {
     public static final float WORLD_HEIGHT = 768f;
 
-    /** Side panels flanking the main FrontLawn texture (768 atlas sizes). */
+    /** Side panels flanking the main lawn texture (768 atlas sizes). */
     public static final float TEXTURE_LEFT_WIDTH = 278f;
     public static final float TEXTURE_RIGHT_WIDTH = 673f;
 
