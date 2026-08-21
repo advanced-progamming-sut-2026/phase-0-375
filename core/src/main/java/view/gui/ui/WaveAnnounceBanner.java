@@ -24,6 +24,7 @@ public final class WaveAnnounceBanner extends Table {
 
     private final Label label;
     private final Container<Label> wrap;
+    private boolean playing;
 
     public WaveAnnounceBanner(Skin skin) {
         setFillParent(true);
@@ -43,6 +44,7 @@ public final class WaveAnnounceBanner extends Table {
         if (text == null || text.isBlank()) {
             return;
         }
+        playing = true;
         label.setText(text);
         wrap.pack();
         wrap.setOrigin(wrap.getWidth() * 0.5f, wrap.getHeight() * 0.5f);
@@ -52,6 +54,11 @@ public final class WaveAnnounceBanner extends Table {
         wrap.addAction(Actions.sequence(
             Actions.scaleTo(END_SCALE, END_SCALE, SHRINK_SEC, Interpolation.fade),
             Actions.delay(HOLD_SEC),
-            Actions.fadeOut(FADE_SEC)));
+            Actions.fadeOut(FADE_SEC),
+            Actions.run(() -> playing = false)));
+    }
+
+    public boolean isPlaying() {
+        return playing;
     }
 }

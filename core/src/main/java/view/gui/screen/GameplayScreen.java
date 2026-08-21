@@ -695,9 +695,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             return;
         }
-        if (model != null) {
+        if (model != null && waveAnnounce != null && !waveAnnounce.isPlaying()) {
             String waveText = model.consumeWaveAnnouncement();
-            if (waveText != null && waveAnnounce != null) {
+            if (waveText != null) {
                 waveAnnounce.show(waveText);
             }
         }

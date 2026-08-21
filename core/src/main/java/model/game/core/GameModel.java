@@ -42,6 +42,7 @@ import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -105,8 +106,8 @@ public class GameModel implements BehaviorContext {
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
-    /** Last CLI wave sting; GUI consumes it the same frame. */
-    private String pendingWaveAnnouncement;
+    /** Center-screen stings (wave / necromancy / low tide); GUI drains FIFO. */
+    private final ArrayDeque<String> pendingAnnouncements = new ArrayDeque<>();
 
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
@@ -413,15 +414,21 @@ public class GameModel implements BehaviorContext {
         String text = wave.isFinalWave()
             ? "The final wave has come."
             : "Wave " + wave.getWaveNumber() + " started.";
-        pendingWaveAnnouncement = text;
+        enqueueAnnouncement(text);
         App.logToShell(text);
     }
 
-    /** GUI sting: same string as the CLI print, or {@code null} if none pending. */
+    /** Queue a center-screen sting (wave / necromancy / low tide). */
+    public void enqueueAnnouncement(String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        pendingAnnouncements.addLast(text);
+    }
+
+    /** Next pending sting, or {@code null} if the queue is empty. */
     public String consumeWaveAnnouncement() {
-        String text = pendingWaveAnnouncement;
-        pendingWaveAnnouncement = null;
-        return text;
+        return pendingAnnouncements.pollFirst();
     }
 
     @Override
