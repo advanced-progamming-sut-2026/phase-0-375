@@ -12,6 +12,7 @@ import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
 import model.plant.ability.PlantAbility;
 import model.plant.ability.PlantAbilityContext;
+import model.plant.ability.TimedPlantAction;
 import model.plant.ability.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -313,6 +314,14 @@ public class PlantInstance implements Placeable {
     /** Called by {@link PlantAction} implementations when a presentation clip should restart. */
     public void bumpActionEpoch() {
         actionEpoch++;
+    }
+
+    /** Elapsed seconds of the active {@link TimedPlantAction}. */
+    public float getActiveActionElapsed() {
+        if (activeAction instanceof TimedPlantAction timed) {
+            return timed.getElapsed();
+        }
+        return 0f;
     }
 
     // --- Plant food ---

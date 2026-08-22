@@ -15,6 +15,7 @@ import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.map.Point;
+import model.plant.ability.ExplosiveAbility;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.projectile.Splash;
@@ -53,6 +54,7 @@ import view.gui.anim.PamClipCache;
 import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.anim.plant.MeleePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
+import view.gui.anim.plant.exclusive.SquashAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
@@ -447,12 +449,41 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        applySquashLeap(plant, xy);
         float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
                 tickHitFlash(plant, plantVitality(plant), delta), delta, clockKey);
         updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
+    }
+
+    /** Squash leaps from its tile onto the captured smash target during ATTACKING. */
+    private void applySquashLeap(PlantInstance plant, float[] xy) {
+        if (plant == null || xy == null || plant.getState() != PlantState.ATTACKING) {
+            return;
+        }
+        if (plant.getDefinition() == null || !"Squash".equals(plant.getDefinition().getName())) {
+            return;
+        }
+        if (!(plant.getAbilityStrategy() instanceof ExplosiveAbility explosive)
+                || !explosive.hasSmashTarget()) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog == null ? null
+                : catalog.forPlant(plant.getDefinition().getName());
+        float[] to = layout.centerOf(explosive.getSmashTargetGridY(), explosive.getSmashTargetGridX());
+        float dx = to[0] - xy[0];
+        float dy = to[1] - xy[1];
+        float travel = SquashAnim.leapTravelFraction(plant, entry);
+        if (travel > 0f) {
+            xy[0] += dx * travel;
+            xy[1] += dy * travel;
+        }
+        float travelTiles = layout.cellWidth() > 0f
+                ? (float) Math.sqrt(dx * dx + dy * dy) / layout.cellWidth()
+                : 1f;
+        xy[1] += SquashAnim.leapVisualHeightCells(plant, entry, travelTiles) * layout.cellHeight();
     }
 
     private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {

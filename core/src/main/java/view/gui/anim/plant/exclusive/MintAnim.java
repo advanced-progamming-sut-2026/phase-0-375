@@ -6,9 +6,6 @@ import view.gui.anim.plant.PlantAnimOverrides;
 import view.gui.anim.plant.PlantAnimRole;
 import view.gui.assets.PamCatalog;
 
-/**
- * Power mints use {@code intro} / {@code loop} / {@code outro} instead of idle.
- */
 public final class MintAnim {
     private static final String[] DEFINITION_NAMES = {
             "Enlighten-mint",

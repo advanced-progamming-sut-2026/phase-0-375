@@ -185,6 +185,14 @@ public final class TimedPlantAction implements PlantAction {
         finish(plant);
     }
 
+    public float getElapsed() {
+        return elapsed;
+    }
+
+    public float getDuration() {
+        return duration;
+    }
+
     private void applyFractionEffect(PlantInstance plant, PlantAbilityContext context) {
         if (fractionEffectApplied || onAtFraction == null) {
             return;

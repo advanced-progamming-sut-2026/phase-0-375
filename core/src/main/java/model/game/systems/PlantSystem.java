@@ -383,6 +383,11 @@ public class PlantSystem implements Tickable {
         }
 
         @Override
+        public float plantAttackImpactFraction(PlantInstance plant) {
+            return clipDurations.attackImpactFraction(plant);
+        }
+
+        @Override
         public model.game.map.FloatPoint plantProjectileOrigin(PlantInstance plant) {
             return projectileOrigins.origin(plant);
         }

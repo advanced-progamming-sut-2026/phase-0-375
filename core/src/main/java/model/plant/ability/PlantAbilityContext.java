@@ -190,6 +190,14 @@ public interface PlantAbilityContext {
     }
 
     /**
+     * Fraction of the attack clip at which the ability effect should fire.
+     * Defaults to {@link TimedPlantAction#DEFAULT_ATTACK_FIRE_FRACTION}.
+     */
+    default float plantAttackImpactFraction(PlantInstance plant) {
+        return TimedPlantAction.DEFAULT_ATTACK_FIRE_FRACTION;
+    }
+
+    /**
      * Grid-space muzzle for a projectile fired by {@code plant}, or {@code null}
      * to spawn on the plant's cell. Wired from PAM part bounds in the GUI.
      */

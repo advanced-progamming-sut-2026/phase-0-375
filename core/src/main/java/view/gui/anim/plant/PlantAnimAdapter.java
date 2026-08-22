@@ -71,6 +71,10 @@ public final class PlantAnimAdapter {
             return 0f;
         }
         PlantAnimRole role = roleForPresentation(plant, entry, presentation);
+        float exclusive = overrides.tryDuration(plant, entry, role);
+        if (exclusive > 0f) {
+            return exclusive;
+        }
         AnimPose custom = overrides.tryResolve(plant, entry, role);
         if (custom != null) {
             return PamCatalog.clipDurationSeconds(entry, custom.clipName());
@@ -82,6 +86,18 @@ public final class PlantAnimAdapter {
             }
         }
         return 0f;
+    }
+
+    /** Fraction of the attack presentation at which the ability effect should fire. */
+    public float attackImpactFraction(PlantInstance plant) {
+        if (plant == null || plant.getDefinition() == null || catalog == null) {
+            return 0f;
+        }
+        PamCatalog.PamEntry entry = catalog.forPlant(plant.getDefinition().getName());
+        if (entry == null) {
+            return 0f;
+        }
+        return overrides.tryImpactFraction(plant, entry, PlantAnimRole.ATTACK);
     }
 
     private AnimPose poseForPresentation(PlantInstance plant, PlantState presentation) {
