@@ -464,8 +464,9 @@ public final class LawnEntityRenderer {
         float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
         float flash = tickHitFlash(plant, plantVitality(plant), delta);
+        float animDelta = plant.isFrozen() ? 0f : delta;
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
-                flash, delta, clockKey);
+                flash, animDelta, clockKey);
         drawPlantFreezeIce(batch, plant, xy[0], xy[1], flash, delta);
         updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
