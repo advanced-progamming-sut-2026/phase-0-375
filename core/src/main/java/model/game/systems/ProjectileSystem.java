@@ -550,9 +550,7 @@ public class ProjectileSystem implements Tickable {
         }
 
         if (projectile.isButter()) {
-            zombie.applyChill();
-            zombie.applyChill();
-            zombie.applyChill();
+            zombie.applyButter();
         }
 
         if (projectile.isPoison()) {

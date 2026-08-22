@@ -29,6 +29,7 @@ public class ZombieInstance implements Tickable, Placeable {
     private float speedModifier;
     private boolean isGlowing;                             // a glowing zombie drops plant food after dying
     private int chillLevel;
+    private boolean buttered;
     private boolean movingBackward;                        // true while this zombie moves away from the house
     /** Persists across EATING / SPECIAL_ACTION so hypnosis is not lost when state changes. */
     private boolean hypnotized;
@@ -74,6 +75,7 @@ public class ZombieInstance implements Tickable, Placeable {
         this.speedModifier = 1.0f;
         this.isGlowing = shouldSpawnGlowing();
         this.chillLevel = 0;
+        this.buttered = false;
         this.movingBackward = false;
         this.armors = new ArrayList<>();
         this.pushableItem = null;
@@ -215,6 +217,17 @@ public class ZombieInstance implements Tickable, Placeable {
         }
     }
 
+    /**
+     * Kernel-pult butter: freeze solid and keep the PAM {@code butter} part
+     * visible until the freeze clears.
+     */
+    public void applyButter() {
+        buttered = true;
+        applyChill();
+        applyChill();
+        applyChill();
+    }
+
     /** Default duration (in seconds) of a single chill stack. */
     public static final float CHILL_STACK_DURATION = 5.0f;
 
@@ -230,6 +243,9 @@ public class ZombieInstance implements Tickable, Placeable {
      */
     public void removeChill() {
         chillLevel = Math.max(0, chillLevel - 1);
+        if (!isFrozen()) {
+            buttered = false;
+        }
         if (chillLevel == 0 && state == ZombieState.CHILLED) {
             state = ZombieState.WALKING;
         }
@@ -386,6 +402,7 @@ public class ZombieInstance implements Tickable, Placeable {
     public boolean isAlive() { return currentHP > 0 && !isDead(); }
     public boolean isFrozen() { return chillLevel >= 3; }
     public boolean isChilled() { return chillLevel > 0 && chillLevel < 3; }
+    public boolean isButtered() { return buttered && isFrozen(); }
 
     /** @return true if this zombie is currently flying. */
     public boolean isFlying() {

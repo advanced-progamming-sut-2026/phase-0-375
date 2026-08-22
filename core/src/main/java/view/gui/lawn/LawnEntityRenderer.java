@@ -64,6 +64,8 @@ import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.JugglerAnim;
 import view.gui.anim.zombie.OctopusAnim;
 import view.gui.anim.zombie.SnorkelerAnim;
+import view.gui.anim.plant.PlantFreezeAnim;
+import view.gui.anim.plant.PlantAnimRole;
 import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.WizardAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -99,7 +101,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * taller sprites from the rows above.
  *
  * <p>TODO: mowers and grid props.
- * TODO: freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
     private static final float NO_PHASE = -1f;
@@ -243,6 +244,9 @@ public final class LawnEntityRenderer {
     /** World origin of a flying octopus at release (PAM canvas centre). */
     private final IdentityHashMap<ShootBehavior.OctopusShot, float[]> octopusAlign = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, LiveSnap> lastPlantIce = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Float> plantIceIntro = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Object> plantIceClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
@@ -415,6 +419,13 @@ public final class LawnEntityRenderer {
             return true;
         });
         plantFoodFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        for (PlantInstance plant : new ArrayList<>(lastPlantIce.keySet())) {
+            if (!seenThisFrame.contains(plant)) {
+                plantIceIntro.remove(plant);
+                plantIceClocks.remove(plant);
+                spawnIceShatter(lastPlantIce.remove(plant));
+            }
+        }
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
                 && !plant.isTransformed());
@@ -452,8 +463,10 @@ public final class LawnEntityRenderer {
         applySquashLeap(plant, xy);
         float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
+        float flash = tickHitFlash(plant, plantVitality(plant), delta);
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
-                tickHitFlash(plant, plantVitality(plant), delta), delta, clockKey);
+                flash, delta, clockKey);
+        drawPlantFreezeIce(batch, plant, xy[0], xy[1], flash, delta);
         updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
     }
@@ -1532,6 +1545,54 @@ public final class LawnEntityRenderer {
         if (entry != null) {
             clips.getOrLoad(entry.path(), catalog.resolveClip(entry, "animation"));
         }
+    }
+
+    private void drawPlantFreezeIce(Batch batch, PlantInstance plant,
+                                    float x, float y, float flash, float delta) {
+        boolean show = plant.isFrozen() && !plant.hasOctopusCoating();
+        if (!show) {
+            plantIceIntro.remove(plant);
+            plantIceClocks.remove(plant);
+            LiveSnap prev = lastPlantIce.remove(plant);
+            if (prev != null) {
+                spawnIceShatter(prev);
+            }
+            return;
+        }
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(PlantFreezeAnim.ICE_PAM);
+        if (entry == null) {
+            return;
+        }
+        preloadIceBreak();
+        float startDur = plantIceStartDuration(entry.path());
+        Float intro = plantIceIntro.get(plant);
+        boolean playStart = intro == null || intro < startDur;
+        AnimPose pose;
+        String clockKey;
+        if (playStart) {
+            String clip = catalog.resolveClip(entry, PlantFreezeAnim.START_CLIP);
+            pose = AnimPose.once(entry.path(), clip, PlantAnimRole.SPECIAL, null);
+            clockKey = pose.cacheKey() + "#plant-ice-start";
+        } else {
+            String clip = catalog.resolveClip(entry, PlantFreezeAnim.IDLE_CLIP);
+            pose = AnimPose.looping(entry.path(), clip, PlantAnimRole.IDLE);
+            clockKey = pose.cacheKey() + "#plant-ice-idle";
+        }
+        Object iceClock = plantIceClocks.computeIfAbsent(plant, p -> new Object());
+        float time = drawPose(batch, iceClock, pose, x, y, AnimScale.PLANT, NO_PHASE,
+                flash, delta, clockKey);
+        if (playStart) {
+            plantIceIntro.put(plant, Math.min(time, startDur));
+        }
+        lastPlantIce.put(plant, new LiveSnap(pose, x, y, false, time));
+    }
+
+    private float plantIceStartDuration(String path) {
+        ClipRef start = clips.getOrLoad(path, PlantFreezeAnim.START_CLIP);
+        return start == null ? 0.9f : start.duration;
     }
 
     private void spawnIceShatter(LiveSnap snap) {

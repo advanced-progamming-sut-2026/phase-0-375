@@ -20,6 +20,8 @@ import java.util.Map;
  * Do not mutate the model here.
  */
 public final class ZombieAnimAdapter {
+    public static final String BUTTER_PART = "butter";
+
     private final PamCatalog catalog;
     private final ZombieAnimOverrides overrides;
 
@@ -51,17 +53,28 @@ public final class ZombieAnimAdapter {
         ZombieAnimRole role = roleFor(zombie);
         AnimPose custom = overrides.tryResolve(zombie, entry, role);
         if (custom != null) {
-            return custom;
+            return withButterVisibility(zombie, custom);
         }
         String clip = catalog.resolveClip(entry, preferredClips(role));
         if (clip == null) {
             return null;
         }
         Map<String, Boolean> vis = armorVisibility(zombie, entry);
+        AnimPose pose;
         if (role == ZombieAnimRole.DIE) {
-            return AnimPose.once(entry.path(), clip, role, vis);
+            pose = AnimPose.once(entry.path(), clip, role, vis);
+        } else {
+            pose = AnimPose.looping(entry.path(), clip, role, vis);
         }
-        return AnimPose.looping(entry.path(), clip, role, vis);
+        return withButterVisibility(zombie, pose);
+    }
+
+    /** Shows the PAM {@code butter} part while {@link ZombieInstance#isButtered()}. */
+    static AnimPose withButterVisibility(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || zombie == null || !zombie.isButtered()) {
+            return pose;
+        }
+        return pose.withVisibleParts(BUTTER_PART);
     }
 
     public static boolean isDistanceDriven(ZombieInstance zombie, AnimPose pose) {
