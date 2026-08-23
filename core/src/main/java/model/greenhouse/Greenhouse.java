@@ -18,13 +18,13 @@ import java.util.Random;
 import java.util.Set;
 
 /**
- * The greenhouse: a 4x5 grid of 20 pots. Row y=1 starts unlocked;
- * the rest are unlocked by buying the "Pot" item from the shop.
+ * The greenhouse: a 3×4 grid of 12 pots (matches zen-garden background slots).
+ * Row y=1 starts unlocked; the rest unlock via the shop "Pot" item.
  */
 public class Greenhouse {
 
-    public static final int ROWS = 4;
-    public static final int COLS = 5;
+    public static final int ROWS = 3;
+    public static final int COLS = 4;
     public static final int TOTAL_POTS = ROWS * COLS;
     public static final int DEFAULT_UNLOCKED_POTS = COLS; // row y=1
 
@@ -85,6 +85,11 @@ public class Greenhouse {
             unlocked = DEFAULT_UNLOCKED_POTS;
             owner.setUnlockedPots(unlocked);
         }
+        // Migrate old 20-pot saves down to the 12-slot greenhouse.
+        if (unlocked > TOTAL_POTS) {
+            unlocked = TOTAL_POTS;
+            owner.setUnlockedPots(unlocked);
+        }
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
                 if (row * COLS + col < unlocked) {
@@ -96,6 +101,11 @@ public class Greenhouse {
         Map<String, Long> timestamps = owner.getGreenhousePlantTimestamps();
         if (planted == null) {
             return;
+        }
+        // Drop plant entries that fall outside the new grid (legacy 5×4 coords).
+        planted.keySet().removeIf(key -> !isInBoundsKey(key));
+        if (timestamps != null) {
+            timestamps.keySet().removeIf(key -> !isInBoundsKey(key));
         }
         for (int row = 0; row < ROWS; row++) {
             for (int col = 0; col < COLS; col++) {
@@ -116,6 +126,23 @@ public class Greenhouse {
                 float growthHours = isMarigold ? MARIGOLD_GROWTH_HOURS : RANDOM_PLANT_GROWTH_HOURS;
                 pot.restore(plantName, isMarigold, growthHours, plantingTime);
             }
+        }
+    }
+
+    private static boolean isInBoundsKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String[] parts = key.split(",");
+        if (parts.length != 2) {
+            return false;
+        }
+        try {
+            int x = Integer.parseInt(parts[0].trim());
+            int y = Integer.parseInt(parts[1].trim());
+            return x >= 1 && x <= COLS && y >= 1 && y <= ROWS;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 
@@ -297,7 +324,7 @@ public class Greenhouse {
 
     /**
      * Unlocks the next locked pot in row-major order (shop "Pot" purchase).
-     * Returns the pot's (x, y), or null if all 20 pots are unlocked.
+     * Returns the pot's (x, y), or null if all pots are unlocked.
      */
     public int[] unlockNextPot() {
         int current = owner.getUnlockedPots();

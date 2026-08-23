@@ -42,6 +42,7 @@ public final class SettingsScreen extends AbstractMenuScreen {
     private Label musicValue;
     private Label sfxValue;
     private boolean syncing;
+    private ResourceBar resourceBar;
 
     public SettingsScreen(PvzGdxGame game) {
         super(game);
@@ -56,7 +57,8 @@ public final class SettingsScreen extends AbstractMenuScreen {
         Table top = new Table();
         top.setFillParent(true);
         top.top();
-        top.add(new ResourceBar(skin)).expandX().right().pad(12f);
+        resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
+        top.add(resourceBar).expandX().right().pad(12f);
         stage.addActor(top);
 
         BorderedTable card = new BorderedTable();
@@ -125,7 +127,7 @@ public final class SettingsScreen extends AbstractMenuScreen {
         });
         card.add(lawnGrid).left().padBottom(8f).row();
 
-        debugMode = new CheckBox(" Debug mode (coins / gems / sun / plant food cheats)", skin);
+        debugMode = new CheckBox(" Debug mode (all levels / coins / gems / sun / plant food cheats)", skin);
         debugMode.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -316,6 +318,9 @@ public final class SettingsScreen extends AbstractMenuScreen {
         showToast(r.getMessage(), !r.isSuccess());
         if (r.isSuccess()) {
             refreshSummary();
+            if (resourceBar != null) {
+                resourceBar.refresh();
+            }
         } else {
             refreshFromUser();
         }

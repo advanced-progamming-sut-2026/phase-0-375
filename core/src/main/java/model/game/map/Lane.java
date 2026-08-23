@@ -34,4 +34,8 @@ public class Lane {
     public boolean isLawnMowerTriggered() {
         return lawnMower != null && lawnMower.isTriggered();
     }
+
+    public void clearLawnMower() {
+        lawnMower = null;
+    }
 }

@@ -20,24 +20,22 @@ public final class AnimScale {
 
     public static final float PLANT = LAWN;
 
-    /**
-     * Custom PNG plant spritesheets. Frames are full-bleed (no empty PAM canvas),
-     * so {@link #PLANT} makes them look oversized next to PAM plants.
-     */
-    public static final float PLANT_SHEET = 0.35f;
-
     public static final float ZOMBIE = LAWN;
 
     public static final float PROJECTILE = LAWN;
 
-    /**
-     * Custom PNG projectile spritesheets (Cat-tail digits, …). Full-bleed like
-     * {@link #PLANT_SHEET}, so smaller than PAM projectile scale.
-     */
+    public static final float PLANT_SHEET = 0.35f;
+
     public static final float PROJECTILE_SHEET = 0.35f;
 
     /** Lawn collectible. {@code SUN.PAM} canvas is 200, smaller than plant/zombie 390. */
-    public static final float SUN = 0.25f;
+    public static final float SUN = 0.375f;
+
+    /** Small coin PAM (45×45 canvas). */
+    public static final float LOOT_COIN = 0.525f;
+
+    /** Gem PAM (200×200 canvas). */
+    public static final float LOOT_GEM = 0.33f;
 
     /** {@link #PLANT_SHEET} for spritesheet poses, otherwise {@link #PLANT}. */
     public static float forPlant(AnimPose pose) {

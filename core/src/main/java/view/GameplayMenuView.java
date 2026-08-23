@@ -130,7 +130,13 @@ public class GameplayMenuView extends AppMenuView {
     private static final long TICK_RENDER_MS = 30;
 
     public void advanceTime(int count) {
-        TuiShell shell = TuiShell.getActive();
+        TuiShell shell;
+        try {
+            shell = TuiShell.getActive();
+        } catch (Exception e) {
+            System.out.println(e);
+            shell = null;
+        }
         if (shell == null) {
             // Plain CLI mode: advance silently and print the final result.
             CommandResult<Void> result = controller.advanceTime(count);
@@ -146,7 +152,11 @@ public class GameplayMenuView extends AppMenuView {
                 displayCommandResult(result);
                 return;
             }
-            shell.renderFrame();
+            try {
+                shell.renderFrame();
+            } catch (Exception e) {
+                System.out.println(e);
+            }
 
             GameModel model = App.getInstance().getCurrentGameModel();
             if (model == null || model.getState() != GameState.RUNNING) {

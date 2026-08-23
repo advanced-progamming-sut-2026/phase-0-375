@@ -5,6 +5,7 @@ import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
@@ -26,6 +27,8 @@ import model.game.map.Cell;
 import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.core.PvZGameLoop;
+import model.item.PlantFoodPickup;
+import model.item.Sun;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.zombie.ZombieFactory;
@@ -39,6 +42,7 @@ import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.WaterUnderlayerRenderer;
+import view.gui.ui.SunHud;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,6 +71,10 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
 
     private Table pickerPanel;
     private Label statusLabel;
+    private SunHud sunHud;
+    private final Vector2 logoTmp = new Vector2();
+    private final float[] sunPosTmp = new float[2];
+    private final int[] cellTmp = new int[2];
     private Tool tool = Tool.PLANT;
     private String selectedPlant = "Sunflower";
     private String selectedZombie = "ZombieDefault";
@@ -85,7 +93,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         int rows = model != null ? model.getMap().getRows() : LawnLayout.DEFAULT_ROWS;
         int cols = model != null ? model.getMap().getCols() : LawnLayout.DEFAULT_COLS;
         lawnLayout = new LawnLayout(rows, cols);
-        lawnBackground = new LawnBackgroundRenderer(assets.textures);
+        lawnBackground = new LawnBackgroundRenderer(assets.textures, LawnBackgroundRenderer.Style.FRONT_LAWN);
         lawnBackground.ensureLoaded();
         waterUnderlayer = new WaterUnderlayerRenderer(assets, lawnLayout);
 
@@ -117,7 +125,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         whitePixel = new Texture(pixelPix);
         pixelPix.dispose();
 
-        setWorldInput(createCellPickInput(lawnLayout, this::onCellPicked, this::onCellHover));
+        setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         buildHud();
         refreshStatus();
 
@@ -145,6 +153,10 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         topLeft.setTouchable(Touchable.childrenOnly);
         topLeft.top().left().pad(12f);
 
+        if (SunHud.showFor(App.getInstance().getCurrentGameModel())) {
+            sunHud = new SunHud(skin);
+            topLeft.add(sunHud).left().padBottom(8f).row();
+        }
         statusLabel = new Label("", skin, "secondary");
         statusLabel.setWrap(true);
         topLeft.add(statusLabel).width(720f).left().padBottom(8f).row();
@@ -322,6 +334,9 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         GameModel model = App.getInstance().getCurrentGameModel();
         int sun = model != null ? model.getSunAmount() : 0;
         int pf = model != null ? model.getPlantFoodCount() : 0;
+        if (sunHud != null) {
+            sunHud.setAmount(sun);
+        }
         statusLabel.setText(
                 "TOOL: " + tool.name()
                         + " | Plant: " + selectedPlant
@@ -428,6 +443,65 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private void clearHover() {
         hoverCol = -1;
         hoverRow = -1;
+    }
+
+    private boolean onWorldClick(float worldX, float worldY) {
+        if (tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY)) {
+            return true;
+        }
+        if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
+            return false;
+        }
+        return onCellPicked(cellTmp[0], cellTmp[1]);
+    }
+
+    private boolean tryCollectPlantFood(float worldX, float worldY) {
+        if (pickerPanel.isVisible()) {
+            return false;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null) {
+            return false;
+        }
+        PlantFoodPickup food = entityRenderer.pickPlantFood(model, worldX, worldY);
+        if (food == null) {
+            return false;
+        }
+        CommandResult<Void> result = gameplay.collectPlantFood(food);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        refreshStatus();
+        return true;
+    }
+
+    private boolean tryCollectSun(float worldX, float worldY) {
+        if (pickerPanel.isVisible()) {
+            return false;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null) {
+            return false;
+        }
+        Sun sun = entityRenderer.pickSun(model, worldX, worldY);
+        if (sun == null) {
+            return false;
+        }
+        entityRenderer.writeSunDrawPos(sun, sunPosTmp);
+        CommandResult<Void> result = gameplay.collectSun(sun);
+        if (!result.isSuccess()) {
+            return false;
+        }
+        float destX = sunPosTmp[0];
+        float destY = sunPosTmp[1];
+        if (sunHud != null) {
+            sunHud.logoCenter(logoTmp);
+            destX = logoTmp.x;
+            destY = logoTmp.y;
+        }
+        entityRenderer.startSunCollect(sun, sunPosTmp[0], sunPosTmp[1], destX, destY);
+        refreshStatus();
+        return true;
     }
 
     private boolean onCellPicked(int col, int row) {
@@ -552,6 +626,10 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
         if (loop != null && loop.getGameState() == GameState.RUNNING) {
             loop.update(delta);
+        }
+        if (sunHud != null) {
+            GameModel model = App.getInstance().getCurrentGameModel();
+            sunHud.setAmount(model == null ? 0 : model.getSunAmount());
         }
     }
 

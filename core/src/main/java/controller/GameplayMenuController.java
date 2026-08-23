@@ -25,6 +25,7 @@ import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
 import model.item.Grave;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
@@ -211,9 +212,36 @@ public class GameplayMenuController extends AppMenuController {
         if (picked == null) {
             return CommandResult.error("No sun at (" + x + ", " + y + ").");
         }
-        model.collectSun(picked);
-        return CommandResult.success("Collected " + picked.getValue() + " sun."
+        return collectSun(picked);
+    }
+
+    /** Collects a specific token (GUI hit-tests the sprite, not the spawn tile). */
+    public CommandResult<Void> collectSun(Sun sun) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (sun == null || model.getActiveSuns() == null || !model.getActiveSuns().contains(sun)) {
+            return CommandResult.error("No sun there.");
+        }
+        model.collectSun(sun);
+        return CommandResult.success("Collected " + sun.getValue() + " sun."
                 + " Total: " + model.getSunAmount() + ".");
+    }
+
+    /** Collects a plant-food token from the lawn (GUI hit-tests the sprite). */
+    public CommandResult<Void> collectPlantFood(PlantFoodPickup food) {
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        if (food == null || model.getActivePlantFood() == null
+                || !model.getActivePlantFood().contains(food)) {
+            return CommandResult.error("No plant food there.");
+        }
+        model.collectPlantFood(food);
+        return CommandResult.success("Collected plant food. Total: "
+                + model.getPlantFoodCount() + ".");
     }
 
     /**

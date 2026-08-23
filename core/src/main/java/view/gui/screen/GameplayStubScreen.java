@@ -15,7 +15,8 @@ import view.gui.PvzGdxGame;
 import view.gui.ui.ResourceBar;
 
 /**
- * Temporary stand-in for {@link MenuType#IN_GAME} until the lawn GUI is implemented.
+ * Temporary stand-in for {@link MenuType#IN_GAME} on chapters that still lack a lawn GUI.
+ * Ancient Egypt, Frostbite Caves, Big Wave Beach, and Dark Ages use {@link GameplayScreen}.
  * Keeps menu routing / loadout state honest without drawing gameplay.
  */
 public final class GameplayStubScreen extends AbstractMenuScreen {
@@ -30,7 +31,8 @@ public final class GameplayStubScreen extends AbstractMenuScreen {
         Table top = new Table();
         top.setFillParent(true);
         top.top();
-        top.add(new ResourceBar(skin)).expandX().right().pad(12f);
+        top.add(new ResourceBar(skin, game.assets != null ? game.assets.textures : null))
+                .expandX().right().pad(12f);
         stage.addActor(top);
 
         GameModel model = App.getInstance().getCurrentGameModel();

@@ -75,8 +75,6 @@ public class App {
     }
 
     public static void logToShell(String message) {
-        TuiShell shell = TuiShell.getActive();
-        if (shell != null) shell.log(message);
-        else System.out.println(message);
+        TuiShell.tryLog(message);
     }
 }

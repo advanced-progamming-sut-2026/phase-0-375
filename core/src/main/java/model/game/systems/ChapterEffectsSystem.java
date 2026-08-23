@@ -76,6 +76,12 @@ public class ChapterEffectsSystem implements Tickable {
     /** Chance per submerged low-tide cell to release a zombie each wave. */
     public static final double LOW_TIDE_AMBUSH_CHANCE = 0.3;
 
+    /** Center-screen sting when a low-tide ambush actually spawns. */
+    public static final String LOW_TIDE_ANNOUNCE = "Low Tide!";
+
+    /** Center-screen sting when necromancy actually spawns. */
+    public static final String NECROMANCY_ANNOUNCE = "Necromancy!";
+
     // --- Dark Ages: per-wave grave spawning ---
 
     /** Chance that a Dark Ages wave spawns at least one new grave. */
@@ -259,6 +265,7 @@ public class ChapterEffectsSystem implements Tickable {
         List<Point> lowTides = config.getLowTideTiles();
         if (lowTides == null || lowTides.isEmpty()) return;
 
+        boolean ambushed = false;
         for (Point p : lowTides) {
             Cell cell = gameModel.getCellAt(p.getY(), p.getX());
             if (cell == null) continue;
@@ -273,10 +280,14 @@ public class ChapterEffectsSystem implements Tickable {
             ZombieInstance spawned =
                     gameModel.spawnZombieAt(zombie.getName(), p.getY(), p.getX());
             if (spawned != null) {
+                ambushed = true;
                 App.logToShell("[Ambush] A " + zombie.getName()
                         + " bursts out of the shallows at row " + (p.getY() + 1)
                         + ", column " + (p.getX() + 1) + "!");
             }
+        }
+        if (ambushed) {
+            gameModel.enqueueAnnouncement(LOW_TIDE_ANNOUNCE);
         }
     }
 
@@ -348,6 +359,7 @@ public class ChapterEffectsSystem implements Tickable {
         Zombie zombie = rollWaveZombie(wave);
         if (zombie == null) return;
 
+        boolean spawnedAny = false;
         for (Point p : necroTiles) {
             Grave grave = gameModel.getGraveAt(p.getY(), p.getX());
             if (grave == null) continue;
@@ -356,12 +368,16 @@ public class ChapterEffectsSystem implements Tickable {
             ZombieInstance spawned = gameModel.spawnZombieAt(
                     zombie.getName(), p.getY(), p.getX());
             if (spawned != null) {
+                spawnedAny = true;
                 App.logToShell("[Necromancy] A " + zombie.getName()
                         + " crawls out from under a grave at ("
                         + p.getX() + ", " + p.getY() + ")!");
                 gameModel.getEventBus().dispatch(
                         new model.event.GameEvent(model.event.GameEvent.Type.NECROMANCY_SPAWN));
             }
+        }
+        if (spawnedAny) {
+            gameModel.enqueueAnnouncement(NECROMANCY_ANNOUNCE);
         }
     }
 

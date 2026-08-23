@@ -84,7 +84,7 @@ public class SettingsMenuController extends AppMenuController {
         user.setDebugMode(enabled);
         persist();
         return CommandResult.success(enabled
-                ? "Debug mode enabled (cheat controls appear during gameplay)."
+                ? "Debug mode enabled (all levels unlocked; cheat controls appear during gameplay)."
                 : "Debug mode disabled.");
     }
 

@@ -16,9 +16,15 @@ public class Main {
         boolean tui = !plain && TuiShell.tryStart();
 
         if (tui) {
-            TuiShell shell = TuiShell.getActive();
-            shell.log("=== Plants vs. Zombies 2 ===");
-            shell.log("Welcome! Type 'register -u ...' to begin, or 'menu enter login' to sign in.");
+            try {
+                TuiShell shell = TuiShell.getActive();
+                shell.log("=== Plants vs. Zombies 2 ===");
+                shell.log("Welcome! Type 'register -u ...' to begin, or 'menu enter login' to sign in.");
+            } catch (Exception e) {
+                System.out.println("=== Plants vs. Zombies 2 ===");
+                System.out.println("Welcome! Type 'register -u ...' to begin, or 'menu enter login' to sign in.");
+                System.out.println(e);
+            }
         } else {
             System.out.println("=== Plants vs. Zombies 2 ===");
             System.out.println("Welcome! Type 'register -u ...' to begin, or 'menu enter login' to sign in.");
@@ -28,7 +34,11 @@ public class Main {
         try {
             AppMenuView.getInstance().run();
         } finally {
-            TuiShell.stop();
+            try {
+                TuiShell.stop();
+            } catch (Exception e) {
+                System.out.println(e);
+            }
         }
     }
 }

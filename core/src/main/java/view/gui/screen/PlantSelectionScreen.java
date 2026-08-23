@@ -1,11 +1,13 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
-import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import controller.CollectionMenuController;
 import controller.PlantSelectionMenuController;
 import controller.result.CommandResult;
 import model.app.App;
@@ -16,88 +18,122 @@ import model.game.level.Level;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.user.User;
-import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
-import view.gui.theme.AdventureTheme;
+import view.gui.lawn.LawnBackgroundRenderer;
+import view.gui.lawn.LawnLayout;
+import view.gui.lawn.WaterUnderlayerRenderer;
+import view.gui.ui.PlantChooserPanel;
 import view.gui.ui.ResourceBar;
-import view.gui.ui.SelectableMenuCard;
+import view.gui.ui.SeedPacketActor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Pre-game plant picker. Uses {@link PlantSelectionMenuController}; plant icons via
- * {@link AdventureTheme#plantIcon(String)} when assets are wired later.
+ * Pre-game plant picker over the chapter lawn. Seed packets via {@code UI_SeedPackets}.
  */
-public final class PlantSelectionScreen extends AbstractMenuScreen {
+public final class PlantSelectionScreen extends AbstractGameplayScreen {
     private static final int MAX_SLOTS = 8;
 
     private final PlantSelectionMenuController controller = PlantSelectionMenuController.getInstance();
+    private final CollectionMenuController collection = CollectionMenuController.getInstance();
     private final Chapter returnChapter;
+    private final LawnBackgroundRenderer lawnBackground;
+    private final WaterUnderlayerRenderer waterUnderlayer;
+    private final boolean allowsChoosing;
 
-    private Label selectedLabel;
-    private Table availableList;
-    private boolean allowsChoosing;
+    private Table slotColumn;
+    private PlantChooserPanel chooser;
+    private ResourceBar resourceBar;
+    private String inspected;
 
     public PlantSelectionScreen(PvzGdxGame game, Chapter returnChapter) {
         super(game);
         this.returnChapter = returnChapter;
+        App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
+        assets.textures.loadSync("UI_SeedPackets_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
+        assets.textures.loadSync("UI_AlwaysLoaded_Uncompressed_768");
+
+        Chapter chapter = currentChapter();
+        lawnBackground = new LawnBackgroundRenderer(
+                assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
+        lawnBackground.ensureLoaded();
+        waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
+                ? new WaterUnderlayerRenderer(assets, lawnLayout())
+                : null;
+        allowsChoosing = plantChoiceAllowed();
+        buildHud();
+        refreshPackets();
     }
 
-    @Override
-    protected void buildUi() {
-        App.getInstance().setCurrentMenu(MenuType.PLANT_SELECTION);
+    private void buildHud() {
+        Table topRight = new Table();
+        topRight.setFillParent(true);
+        topRight.setTouchable(Touchable.childrenOnly);
+        topRight.top().right().pad(12f);
+        resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
+        topRight.add(resourceBar);
+        uiStage.addActor(topRight);
 
-        Table top = new Table();
-        top.setFillParent(true);
-        top.top();
-        top.add(new ResourceBar(skin)).expandX().right().pad(12f);
-        stage.addActor(top);
+        Table left = new Table();
+        left.setFillParent(true);
+        left.setTouchable(Touchable.childrenOnly);
+        left.top().left().pad(16f);
+        slotColumn = new Table();
+        left.add(slotColumn);
+        uiStage.addActor(left);
 
-        allowsChoosing = plantChoiceAllowed();
-
-        BorderedTable card = new BorderedTable();
-        card.pad(24f);
-        card.add(new Label("Choose your plants", skin, "big")).padBottom(8f).row();
-
-        Level level = currentLevel();
-        String mission = level == null
-                ? "Prepare your loadout"
-                : level.getConfig().getChapter() + " · Level " + level.getConfig().getLevelId()
-                + " · " + level.getConfig().getLevelType();
-        card.add(new Label(mission, skin, "secondary")).padBottom(12f).row();
-
-        selectedLabel = new Label("", skin, "medium");
-        selectedLabel.setWrap(true);
-        card.add(selectedLabel).growX().padBottom(12f).row();
-
-        if (!allowsChoosing) {
-            card.add(new Label(
-                    "This level picks plants for you (conveyor / locked set). Press Let's Rock to continue.",
-                    skin,
-                    "secondary")).growX().padBottom(16f).row();
-        } else {
-            availableList = new Table();
-            rebuildAvailableList();
-            ScrollPane plantScroll = new ScrollPane(availableList, skin);
-            plantScroll.setFadeScrollBars(false);
-            plantScroll.setScrollingDisabled(true, false);
-            card.add(plantScroll).growX().height(420f).padBottom(12f).row();
-        }
-
-        TextButton start = new TextButton("Let's Rock", skin);
-        start.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.startGame();
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(new GameplayStubScreen(game));
+        Table mid = new Table();
+        mid.setFillParent(true);
+        mid.setTouchable(Touchable.childrenOnly);
+        mid.top().left().padLeft(16f + SeedPacketActor.PACKET_WIDTH + 16f).padTop(8f).padBottom(72f);
+        if (allowsChoosing) {
+            chooser = new PlantChooserPanel(skin, assets, new PlantChooserPanel.Listener() {
+                @Override
+                public void onToggle(String plantName, boolean locked) {
+                    inspected = plantName;
+                    if (!locked) {
+                        toggle(plantName, selectedPlants().contains(plantName));
+                    } else {
+                        refreshPackets();
+                    }
                 }
-            }
-        });
-        card.add(start).width(260f).height(56f).padBottom(8f).row();
 
+                @Override
+                public void onUpgrade(String plantName) {
+                    CommandResult<Void> r = collection.upgradePlant(plantName);
+                    showToast(r.getMessage(), !r.isSuccess());
+                    if (r.isSuccess()) {
+                        refreshPackets();
+                    }
+                }
+
+                @Override
+                public void onBoost(String plantName) {
+                    CommandResult<Void> r = controller.boostPlant(plantName);
+                    showToast(r.getMessage(), !r.isSuccess());
+                    if (r.isSuccess()) {
+                        refreshPackets();
+                    }
+                }
+            });
+            mid.add(chooser).width(680f).growY();
+        } else {
+            Label note = new Label(
+                    "This level picks plants for you. Press Let's Rock to continue.",
+                    skin,
+                    "secondary");
+            note.setWrap(true);
+            mid.add(note).width(420f);
+        }
+        uiStage.addActor(mid);
+
+        Table bottom = new Table();
+        bottom.setFillParent(true);
+        bottom.setTouchable(Touchable.childrenOnly);
+        bottom.bottom().pad(16f);
         TextButton back = new TextButton("Back", skin, "brown");
         back.addListener(new ChangeListener() {
             @Override
@@ -114,90 +150,151 @@ public final class PlantSelectionScreen extends AbstractMenuScreen {
                 }
             }
         });
-        card.add(back).width(220f).height(52f);
-
-        ScrollPane scroll = new ScrollPane(card, skin);
-        scroll.setFadeScrollBars(false);
-        scroll.setScrollingDisabled(true, false);
-
-        Table root = new Table();
-        root.setFillParent(true);
-        root.add(scroll).width(760f).maxHeight(UI_HEIGHT - 64f);
-        stage.addActor(root);
-
-        refreshSelectedLabel();
-    }
-
-    private void rebuildAvailableList() {
-        availableList.clearChildren();
-        CommandResult<List<String>> available = controller.showAvailablePlants();
-        List<String> names = available.getData() == null ? List.of() : available.getData();
-        GameModel model = App.getInstance().getCurrentGameModel();
-        List<String> selected = model == null || model.getSelectedPlants() == null
-                ? List.of()
-                : model.getSelectedPlants();
-
-        User user = App.getInstance().getCurrentUser();
-        for (String name : names) {
-            boolean isSelected = selected.contains(name);
-            int cost = plantCost(name);
-            boolean boosted = user != null && user.getPlantBoosts() != null
-                    && Boolean.TRUE.equals(user.getPlantBoosts().get(name));
-            String subtitle = "Cost " + cost + (boosted ? " · Boosted" : "");
-            String action = isSelected ? "Remove" : "Add";
-            SelectableMenuCard row = new SelectableMenuCard(skin, name, subtitle, action);
-            row.setArt(AdventureTheme.get().plantIcon(name));
-            final String plantName = name;
-            final boolean selectedNow = isSelected;
-            row.onAction(() -> {
-                CommandResult<Void> r = selectedNow
-                        ? controller.removePlant(plantName)
-                        : controller.addPlant(plantName);
+        TextButton start = new TextButton("Let's Rock", skin);
+        start.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> r = controller.startGame();
                 showToast(r.getMessage(), !r.isSuccess());
                 if (r.isSuccess()) {
-                    rebuildAvailableList();
-                    refreshSelectedLabel();
+                    game.setScreen(openGameplay(game));
                 }
-            });
-            availableList.add(row).growX().padBottom(8f).row();
+            }
+        });
+        bottom.add(back).width(180f).height(48f).left().expandX();
+        bottom.add(start).width(240f).height(52f).right();
+        uiStage.addActor(bottom);
+        toast.toFront();
+    }
 
-            if (!isSelected) {
-                TextButton boost = new TextButton("Boost (2 gems)", skin, "brown");
-                boost.addListener(new ChangeListener() {
-                    @Override
-                    public void changed(ChangeEvent event, Actor actor) {
-                        CommandResult<Void> r = controller.boostPlant(plantName);
-                        showToast(r.getMessage(), !r.isSuccess());
-                        if (r.isSuccess()) {
-                            rebuildAvailableList();
-                            refreshSelectedLabel();
-                        }
-                    }
-                });
-                availableList.add(boost).width(200f).height(40f).right().padBottom(12f).row();
+    private void refreshPackets() {
+        slotColumn.clearChildren();
+        List<String> selected = selectedPlants();
+        for (int i = 0; i < MAX_SLOTS; i++) {
+            if (i < selected.size()) {
+                String name = selected.get(i);
+                SeedPacketActor packet = packet(name, false, false);
+                packet.onClick(() -> toggle(name, true));
+                slotColumn.add(packet).size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+                        .padBottom(6f).row();
+            } else {
+                slotColumn.add(SeedPacketActor.empty(assets.textures, skin))
+                        .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+                        .padBottom(6f).row();
             }
         }
-        if (names.isEmpty()) {
-            availableList.add(new Label("No unlocked plants available.", skin, "medium")).row();
+
+        if (!allowsChoosing || chooser == null) {
+            if (resourceBar != null) {
+                resourceBar.refresh();
+            }
+            return;
+        }
+
+        List<String> names = allPlantNames();
+        if (inspected == null && !names.isEmpty()) {
+            inspected = firstUnlocked(names);
+        }
+        List<SeedPacketActor> cards = new ArrayList<>();
+        for (String name : names) {
+            boolean locked = !unlocked(name);
+            boolean picked = selected.contains(name);
+            SeedPacketActor packet = packet(name, picked && !locked, locked);
+            packet.setInspected(name.equals(inspected));
+            packet.onClick(() -> {
+                inspected = name;
+                if (locked) {
+                    refreshPackets();
+                } else {
+                    toggle(name, picked);
+                }
+            });
+            cards.add(packet);
+        }
+        chooser.setGrid(cards);
+        chooser.inspect(inspected, unlocked(inspected), boosted(inspected), plantLevel(inspected));
+        if (resourceBar != null) {
+            resourceBar.refresh();
         }
     }
 
-    private void refreshSelectedLabel() {
+    private SeedPacketActor packet(String name, boolean dimmed, boolean locked) {
+        SeedPacketActor packet = new SeedPacketActor(
+                assets.textures, skin, name, plantCost(name), plantLevel(name), boosted(name), locked);
+        packet.setDimmed(dimmed);
+        return packet;
+    }
+
+    private void toggle(String name, boolean currentlySelected) {
+        CommandResult<Void> r = currentlySelected
+                ? controller.removePlant(name)
+                : controller.addPlant(name);
+        showToast(r.getMessage(), !r.isSuccess());
+        refreshPackets();
+    }
+
+    @Override
+    protected void updateLogic(float delta) {}
+
+    @Override
+    protected void renderWorld(float delta) {
+        lawnBackground.draw(game.batch);
+        if (waterUnderlayer != null) {
+            waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
+        }
+    }
+
+    private static LawnLayout lawnLayout() {
         GameModel model = App.getInstance().getCurrentGameModel();
-        List<String> selected = model == null || model.getSelectedPlants() == null
-                ? new ArrayList<>()
-                : new ArrayList<>(model.getSelectedPlants());
-        int empty = Math.max(0, MAX_SLOTS - selected.size());
-        StringBuilder sb = new StringBuilder("Selected (" + selected.size() + "/" + MAX_SLOTS + "): ");
-        if (selected.isEmpty()) {
-            sb.append(allowsChoosing ? "none" : "level-controlled");
-        } else {
-            sb.append(String.join(", ", selected));
+        int rows = model != null ? model.getMap().getRows() : LawnLayout.DEFAULT_ROWS;
+        int cols = model != null ? model.getMap().getCols() : LawnLayout.DEFAULT_COLS;
+        return new LawnLayout(rows, cols);
+    }
+
+    private static List<String> selectedPlants() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model == null || model.getSelectedPlants() == null) {
+            return List.of();
         }
-        if (allowsChoosing && empty > 0) {
-            sb.append(" · ").append(empty).append(" empty slot(s)");
+        return model.getSelectedPlants();
+    }
+
+    private static List<String> allPlantNames() {
+        try {
+            List<String> names = new ArrayList<>();
+            for (Plant plant : PlantFactory.getAllDefinitions()) {
+                names.add(plant.getName());
+            }
+            return names;
+        } catch (IllegalStateException e) {
+            return List.of();
         }
-        selectedLabel.setText(sb.toString());
+    }
+
+    private static String firstUnlocked(List<String> names) {
+        for (String name : names) {
+            if (unlocked(name)) {
+                return name;
+            }
+        }
+        return names.isEmpty() ? null : names.get(0);
+    }
+
+    private static boolean unlocked(String name) {
+        if (name == null) {
+            return false;
+        }
+        User user = App.getInstance().getCurrentUser();
+        return user != null && user.getUnlockedPlants() != null && user.getUnlockedPlants().contains(name);
+    }
+
+    private static boolean boosted(String name) {
+        if (name == null) {
+            return false;
+        }
+        User user = App.getInstance().getCurrentUser();
+        Map<String, Boolean> boosts = user == null ? null : user.getPlantBoosts();
+        return boosts != null && Boolean.TRUE.equals(boosts.get(name));
     }
 
     private static int plantCost(String name) {
@@ -205,11 +302,23 @@ public final class PlantSelectionScreen extends AbstractMenuScreen {
             if (!PlantFactory.hasDefinition(name)) {
                 return 0;
             }
-            Plant plant = PlantFactory.getDefinition(name);
-            return plant.getCost();
+            return PlantFactory.getDefinition(name).getCost();
         } catch (IllegalStateException e) {
             return 0;
         }
+    }
+
+    private static int plantLevel(String name) {
+        if (name == null) {
+            return 1;
+        }
+        User user = App.getInstance().getCurrentUser();
+        Map<String, Integer> levels = user == null ? null : user.getPlantLevels();
+        if (levels == null) {
+            return 1;
+        }
+        Integer level = levels.get(name);
+        return level == null || level < 1 ? 1 : level;
     }
 
     private static boolean plantChoiceAllowed() {
@@ -221,14 +330,35 @@ public final class PlantSelectionScreen extends AbstractMenuScreen {
                 || model.getCurrentLevel().getConfig().getRules().isAllowsChoosingPlants();
     }
 
+    private static Chapter currentChapter() {
+        Level level = currentLevel();
+        return level == null || level.getConfig() == null ? null : level.getConfig().getChapter();
+    }
+
     private static Level currentLevel() {
         GameModel model = App.getInstance().getCurrentGameModel();
         return model == null ? null : model.getCurrentLevel();
+    }
+
+    private static Screen openGameplay(PvzGdxGame game) {
+        Chapter chapter = currentChapter();
+        if (LawnBackgroundRenderer.Style.forChapter(chapter) != LawnBackgroundRenderer.Style.FRONT_LAWN) {
+            return new GameplayScreen(game);
+        }
+        return new GameplayStubScreen(game);
     }
 
     private static void clearTransientGame() {
         App app = App.getInstance();
         app.setCurrentGameModel(null);
         app.setCurrentGameLoop(null);
+    }
+
+    @Override
+    public void dispose() {
+        if (chooser != null) {
+            chooser.dispose();
+        }
+        super.dispose();
     }
 }

@@ -28,6 +28,8 @@ import model.game.systems.ChapterEffectsSystem;
 import model.item.Grave;
 import model.item.Grave.GraveType;
 import model.item.LootDrop;
+import model.item.LootPickup;
+import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.pushable.Pushable;
 import model.item.placeable.Placeable;
@@ -41,8 +43,8 @@ import model.zombie.ZombieFactory;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.definition.Zombie;
 import model.zombie.instance.ZombieInstance;
-import view.tui.TuiShell;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,6 +76,8 @@ public class GameModel implements BehaviorContext {
     private List<Projectile> activeProjectiles;
     private final List<Projectile> projectileHitCues;
     private List<Sun> activeSuns;
+    private List<PlantFoodPickup> activePlantFood;
+    private List<LootPickup> activeLootPickups;
     private List<LootDrop> pendingLootDrops;
     private List<Pushable> orphanedPushables;
 
@@ -81,9 +85,18 @@ public class GameModel implements BehaviorContext {
     private List<String> selectedPlants;       // plant types chosen for this level
     private String imitaterCopyTarget; // Plant Imitater should morph into; last non-Imitater the player picked or planted
 
+    /** Continuous X past the lawn left edge where a breacher stands and chews. */
+    public static final float HOUSE_CHEW_X = -0.9f;
+
     // End-game bookkeeping (read by EndGameCondition implementations)
     private boolean houseBreached;
     private final Set<Integer> breachedRows = new HashSet<>();
+    /** Zombie that walked into the house (lose spotlight); null for non-breach losses. */
+    private ZombieInstance breachingZombie;
+    /** Continuous X of the most recent zombie death. */
+    private float lastZombieDeathX = Float.NaN;
+    /** Row of the most recent zombie death. */
+    private float lastZombieDeathY = Float.NaN;
     private int zombiesKilled;
     private int plantsLost;
     private float elapsedSeconds;
@@ -96,6 +109,9 @@ public class GameModel implements BehaviorContext {
 
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
+
+    /** Center-screen stings (wave / necromancy / low tide); GUI drains FIFO. */
+    private final ArrayDeque<String> pendingAnnouncements = new ArrayDeque<>();
 
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
@@ -120,6 +136,8 @@ public class GameModel implements BehaviorContext {
         this.activeProjectiles = new ArrayList<>();
         this.projectileHitCues = new ArrayList<>();
         this.activeSuns = new ArrayList<>();
+        this.activePlantFood = new ArrayList<>();
+        this.activeLootPickups = new ArrayList<>();
         this.pendingLootDrops = new ArrayList<>();
         this.orphanedPushables = new ArrayList<>();
 
@@ -259,6 +277,14 @@ public class GameModel implements BehaviorContext {
         return activeSuns;
     }
 
+    public List<PlantFoodPickup> getActivePlantFood() {
+        return activePlantFood;
+    }
+
+    public List<LootPickup> getActiveLootPickups() {
+        return activeLootPickups;
+    }
+
     public boolean isNightLevel() {
         return chapter == Chapter.DARK_AGES;
     }
@@ -372,6 +398,9 @@ public class GameModel implements BehaviorContext {
         if (myopointTracker != null) {
             myopointTracker.onZombieSpawned(instance, elapsedSeconds);
         }
+        if (waveManager != null) {
+            waveManager.onWaveZombieSpawned(instance);
+        }
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
     }
 
@@ -390,6 +419,9 @@ public class GameModel implements BehaviorContext {
         gameMap.addZombie(instance, col, lane);
         if (myopointTracker != null) {
             myopointTracker.onZombieSpawned(instance, elapsedSeconds);
+        }
+        if (waveManager != null) {
+            waveManager.onWaveZombieSpawned(instance);
         }
         App.logToShell("[Tornado] A " + zombie.getName()
                 + " is carried in by a tornado and lands " + columnsAhead
@@ -410,11 +442,24 @@ public class GameModel implements BehaviorContext {
         if (wave == null) {
             return;
         }
-        if (wave.isFinalWave()) {
-            TuiShell.getActive().log("The final wave has come.");
-        } else {
-            TuiShell.getActive().log("Wave " + wave.getWaveNumber() + " started.");
+        String text = wave.isFinalWave()
+            ? "The final wave has come."
+            : "Wave " + wave.getWaveNumber() + " started.";
+        enqueueAnnouncement(text);
+        App.logToShell(text);
+    }
+
+    /** Queue a center-screen sting (wave / necromancy / low tide). */
+    public void enqueueAnnouncement(String text) {
+        if (text == null || text.isBlank()) {
+            return;
         }
+        pendingAnnouncements.addLast(text);
+    }
+
+    /** Next pending sting, or {@code null} if the queue is empty. */
+    public String consumeWaveAnnouncement() {
+        return pendingAnnouncements.pollFirst();
     }
 
     @Override
@@ -447,6 +492,9 @@ public class GameModel implements BehaviorContext {
     public void removeZombie(ZombieInstance zombie) {
         activeZombies.remove(zombie);
         gameMap.removeZombie(zombie);
+        if (waveManager != null) {
+            waveManager.onZombieRemoved(zombie);
+        }
     }
 
     @Override
@@ -492,6 +540,44 @@ public class GameModel implements BehaviorContext {
         questStats.onSunCollected(sun.getValue());
     }
 
+    public void spawnPlantFood(PlantFoodPickup pickup) {
+        if (pickup != null) {
+            activePlantFood.add(pickup);
+        }
+    }
+
+    public void collectPlantFood(PlantFoodPickup pickup) {
+        if (pickup == null) {
+            return;
+        }
+        activePlantFood.remove(pickup);
+        resources.addPlantFood();
+    }
+
+    public void spawnLootPickup(LootPickup pickup) {
+        if (pickup != null) {
+            activeLootPickups.add(pickup);
+        }
+    }
+
+    public void removeLootPickup(LootPickup pickup) {
+        if (pickup != null) {
+            activeLootPickups.remove(pickup);
+        }
+    }
+
+    /** Credits loot counters after the fly-to-HUD animation finishes. */
+    public void applyLootPickup(LootPickup pickup) {
+        if (pickup == null) {
+            return;
+        }
+        switch (pickup.getKind()) {
+            case COIN_GOLD, COIN_SILVER -> addCoins(pickup.getAmount());
+            case DIAMOND -> addDiamonds(pickup.getAmount());
+            case FLOWER_POT -> addFlowerPots(pickup.getAmount());
+        }
+    }
+
     public void tick(float deltaTime) {
         currentTick += 1;
         elapsedSeconds += deltaTime;
@@ -532,9 +618,48 @@ public class GameModel implements BehaviorContext {
         this.breachedRows.add(row);
     }
 
+    /**
+     * House breach: mark the lane lost and pin the zombie in an eat loop.
+     * Leaves continuous X where it is (past the lawn edge into the house).
+     */
+    public void applyHouseBreach(ZombieInstance zombie, int row) {
+        markHouseBreached(row);
+        setBreachingZombie(zombie);
+        if (zombie != null) {
+            if (zombie.getContinuousPosition() == null) {
+                zombie.setContinuousPosition(new FloatPoint(HOUSE_CHEW_X, row));
+            }
+            zombie.setState(ZombieState.EATING);
+        }
+    }
+
     /** Rows whose lane end has been breached at least once. */
     public Set<Integer> getBreachedRows() {
         return breachedRows;
+    }
+
+    /** Zombie chewing at the house after a breach, or {@code null}. */
+    public ZombieInstance getBreachingZombie() {
+        return breachingZombie;
+    }
+
+    public void setBreachingZombie(ZombieInstance zombie) {
+        this.breachingZombie = zombie;
+    }
+
+    /** Continuous column of the last kill, or {@link Float#NaN} if none yet. */
+    public float getLastZombieDeathX() {
+        return lastZombieDeathX;
+    }
+
+    /** Lane row of the last kill, or {@link Float#NaN} if none yet. */
+    public float getLastZombieDeathY() {
+        return lastZombieDeathY;
+    }
+
+    public void recordLastZombieDeath(float continuousX, float row) {
+        this.lastZombieDeathX = continuousX;
+        this.lastZombieDeathY = row;
     }
 
     public int getZombiesKilled() {
