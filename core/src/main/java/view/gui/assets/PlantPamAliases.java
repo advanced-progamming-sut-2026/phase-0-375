@@ -50,6 +50,8 @@ public final class PlantPamAliases {
         m.put("Cat-tail", "CATTAIL");
         m.put("Lily Pad", "LILYPAD");
         m.put("Gold Bloom", "GOLDBLOOM");
+        m.put("marigold", "MARIGOLD");
+        m.put("Marigold", "MARIGOLD");
         m.put("Hot Potato", "HOTPOTATO");
         m.put("Pierce-mint", "PEPPERMINT");
         m.put("catTail-mint", "SPEARMINT");

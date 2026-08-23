@@ -3,6 +3,7 @@ package view.gui.screen;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import controller.GreenhouseMenuController;
@@ -62,6 +63,7 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
 
         Table top = new Table();
         top.setFillParent(true);
+        top.setTouchable(Touchable.childrenOnly);
         top.top().right();
         resourceBar = new ResourceBar(skin, textures);
         top.add(resourceBar).pad(55f);
@@ -71,8 +73,8 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         textures.loadSync(AdventureHudRegions.ATLAS_ALWAYS_LOADED);
 
         AtlasImageButton back = hudButton(textures,
-                AdventureHudRegions.BACK_NORMAL, AdventureHudRegions.BACK_DOWN,
-                HUD_ICON, CORNER_PAD, UI_HEIGHT - CORNER_PAD - HUD_ICON, this::goBack);
+            AdventureHudRegions.BACK_NORMAL, AdventureHudRegions.BACK_DOWN,
+            HUD_ICON, CORNER_PAD, UI_HEIGHT - CORNER_PAD - HUD_ICON, this::goBack);
         stage.addActor(back);
 
         summaryLabel = new Label("", skin, "medium");
@@ -94,8 +96,8 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         }
 
         AtlasImageButton shop = hudButton(textures,
-                AdventureHudRegions.STORE_NORMAL, AdventureHudRegions.STORE_DOWN,
-                SHOP_ICON, UI_WIDTH - CORNER_PAD - SHOP_ICON, CORNER_PAD, this::openShop);
+            AdventureHudRegions.STORE_NORMAL, AdventureHudRegions.STORE_DOWN,
+            SHOP_ICON, UI_WIDTH - CORNER_PAD - SHOP_ICON, CORNER_PAD, this::openShop);
         stage.addActor(shop);
 
         refreshAll();
@@ -114,8 +116,17 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         CommandResult<Void> result;
         switch (state) {
             case LOCKED -> {
-                openShop();
-                return;
+                Greenhouse gh = Greenhouse.getInstance(App.getInstance().getCurrentUser());
+                int[] next = gh.nextPotToUnlock();
+                if (next == null) {
+                    showToast("All pots are already unlocked.", false);
+                    return;
+                }
+                if (next[0] != x || next[1] != y) {
+                    showToast("Unlock pots in order. Next slot: (" + next[0] + "," + next[1] + ").", true);
+                    return;
+                }
+                result = controller.buyPot();
             }
             case EMPTY -> result = controller.plantPot(x, y);
             case GROWING -> result = controller.grow(x, y);
@@ -129,7 +140,9 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
     }
 
     private void openShop() {
-        showToast("Buy a 'Pot' from the shop to unlock the next slot.", false);
+        CommandResult<Void> result = controller.buyPot();
+        showToast(result.getMessage(), !result.isSuccess());
+        refreshAll();
     }
 
     private void goBack() {
@@ -142,22 +155,25 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
 
     private void refreshAll() {
         Greenhouse gh = Greenhouse.getInstance(App.getInstance().getCurrentUser());
+        int[] next = gh.nextPotToUnlock();
         for (int row = 0; row < Greenhouse.ROWS; row++) {
             for (int col = 0; col < Greenhouse.COLS; col++) {
-                Pot pot = gh.getPot(col + 1, row + 1);
+                int x = col + 1;
+                int y = row + 1;
+                Pot pot = gh.getPot(x, y);
                 PotSlotActor slot = slots[row][col];
-                slot.refresh(pot);
+                boolean purchasable = next != null && next[0] == x && next[1] == y;
+                slot.refresh(pot, purchasable);
                 slot.placeOnPlatform(cover, col, row);
             }
         }
-        int[] next = gh.nextPotToUnlock();
         String nextTxt = next == null
-                ? "All pots unlocked"
-                : "Next unlock: (" + next[0] + "," + next[1] + ")";
+            ? "All pots unlocked"
+            : "Next unlock: (" + next[0] + "," + next[1] + ")";
         summaryLabel.setText("Unlocked " + gh.getUnlockedPotCount() + "/" + Greenhouse.TOTAL_POTS
-                + "  ·  Growing " + gh.getProducingCount()
-                + "  ·  Ready " + gh.getReadyCount()
-                + "  ·  " + nextTxt);
+            + "  ·  Growing " + gh.getProducingCount()
+            + "  ·  Ready " + gh.getReadyCount()
+            + "  ·  " + nextTxt);
         if (resourceBar != null) {
             resourceBar.refresh();
         }
