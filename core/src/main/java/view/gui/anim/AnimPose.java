@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * Immutable draw request for one entity frame: which PAM clip to play and how.
+ * Immutable draw request for one entity frame: which PAM clip (or spritesheet) to play and how.
  *
  * <p>Produced by {@link view.gui.anim.plant.PlantAnimAdapter} /
  * {@link view.gui.anim.zombie.ZombieAnimAdapter} /
@@ -13,6 +13,10 @@ import java.util.Map;
  *
  * <p>Hidden PAM parts (armor, butter, …) stay off unless {@link #visibility()}
  * marks them {@code true} — use {@link PamVisibility} or {@link #withVisibleParts}.
+ *
+ * <p>When {@link #isSpritesheet()} is true, {@link #pamPath()} is a PNG path under the
+ * assets root and {@link #clipName()} is the spritesheet cache key from
+ * {@link view.gui.assets.PlantSpritesheetCatalog.ClipSpec#cacheKey()}.
  */
 public final class AnimPose {
     private final String pamPath;
@@ -23,25 +27,26 @@ public final class AnimPose {
     private final float scale;
     private final boolean flipX;
     private final boolean reverse;
+    private final boolean spritesheet;
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility) {
-        this(pamPath, clipName, role, loop, visibility, 1f, false, false);
+        this(pamPath, clipName, role, loop, visibility, 1f, false, false, false);
     }
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility, float scale) {
-        this(pamPath, clipName, role, loop, visibility, scale, false, false);
+        this(pamPath, clipName, role, loop, visibility, scale, false, false, false);
     }
 
     public AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                     Map<String, Boolean> visibility, float scale, boolean flipX) {
-        this(pamPath, clipName, role, loop, visibility, scale, flipX, false);
+        this(pamPath, clipName, role, loop, visibility, scale, flipX, false, false);
     }
 
     private AnimPose(String pamPath, String clipName, Enum<?> role, boolean loop,
                      Map<String, Boolean> visibility, float scale,
-                     boolean flipX, boolean reverse) {
+                     boolean flipX, boolean reverse, boolean spritesheet) {
         this.pamPath = pamPath;
         this.clipName = clipName;
         this.role = role;
@@ -52,6 +57,7 @@ public final class AnimPose {
         this.scale = scale > 0f ? scale : 1f;
         this.flipX = flipX;
         this.reverse = reverse;
+        this.spritesheet = spritesheet;
     }
 
     public static AnimPose looping(String pamPath, String clipName, Enum<?> role) {
@@ -79,13 +85,23 @@ public final class AnimPose {
         return new AnimPose(pamPath, clipName, role, false, null);
     }
 
+    /** Looping spritesheet pose ({@code pamPath} = PNG relative to assets root). */
+    public static AnimPose sheetLooping(String pngPath, String cacheKey, Enum<?> role) {
+        return new AnimPose(pngPath, cacheKey, role, true, null, 1f, false, false, true);
+    }
+
+    /** One-shot spritesheet pose. */
+    public static AnimPose sheetOnce(String pngPath, String cacheKey, Enum<?> role) {
+        return new AnimPose(pngPath, cacheKey, role, false, null, 1f, false, false, true);
+    }
+
     /**
      * Copy of this pose with additional PAM parts forced visible
      * (merged onto any existing visibility map).
      */
     public AnimPose withVisibleParts(String... partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse, spritesheet);
     }
 
     /**
@@ -94,7 +110,7 @@ public final class AnimPose {
      */
     public AnimPose withVisibleParts(Iterable<String> partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse);
+                PamVisibility.showAlso(visibility, partNames), scale, flipX, reverse, spritesheet);
     }
 
     /**
@@ -103,27 +119,27 @@ public final class AnimPose {
      */
     public AnimPose withHiddenParts(String... partNames) {
         return new AnimPose(pamPath, clipName, role, loop,
-                PamVisibility.hideAlso(visibility, partNames), scale, flipX, reverse);
+                PamVisibility.hideAlso(visibility, partNames), scale, flipX, reverse, spritesheet);
     }
 
     /** Copy of this pose with an entity-specific size multiplier (Gargantuar, Imp, …). */
     public AnimPose withScale(float scale) {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse, spritesheet);
     }
 
     /** Copy of this pose mirrored horizontally (leftward shots). */
     public AnimPose withFlipX(boolean flipX) {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, reverse, spritesheet);
     }
 
     /** Mirror horizontally around the PAM canvas centre. */
     public AnimPose flipped() {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, true, reverse);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, true, reverse, spritesheet);
     }
 
     /** Play the clip last-frame-first. */
     public AnimPose reversed() {
-        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, true);
+        return new AnimPose(pamPath, clipName, role, loop, visibility, scale, flipX, true, spritesheet);
     }
 
     public String pamPath() {
@@ -160,6 +176,11 @@ public final class AnimPose {
 
     public boolean reverse() {
         return reverse;
+    }
+
+    /** PNG spritesheet fallback instead of a PAM clip. */
+    public boolean isSpritesheet() {
+        return spritesheet;
     }
 
     public String cacheKey() {

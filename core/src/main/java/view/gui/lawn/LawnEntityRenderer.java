@@ -2,6 +2,7 @@ package view.gui.lawn;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Rectangle;
 import model.app.App;
@@ -51,7 +52,9 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.plant.ExplosivePlantFx;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.anim.plant.MeleePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
 import view.gui.anim.plant.exclusive.SquashAnim;
@@ -94,7 +97,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * Draws plants, zombies, and projectiles on the lawn via libPVZ PAM clips.
  *
  * <p>Pipeline: model entity → {@link PlantAnimAdapter} / {@link ZombieAnimAdapter} /
- * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
+ * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} /
+ * {@link SpritesheetClipCache} → {@code PamPlayer.draw} or sheet blit.
  *
  * <p>Draw order is back-to-front by lawn row (row 0 is the top of the screen),
  * then graves → plants → props → zombies within a lane so lower rows cover
@@ -212,6 +216,8 @@ public final class LawnEntityRenderer {
     private final ZombieAnimAdapter zombieAdapter;
     private final ProjectileAnimAdapter projectileAdapter;
     private final PamClipCache clips;
+    private final SpritesheetClipCache sheetClips;
+    private final PlantSpritesheetCatalog plantSheets;
     private final PamPlayer player;
     private final PamCatalog catalog;
 
@@ -274,7 +280,7 @@ public final class LawnEntityRenderer {
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
-                new PlantAnimAdapter(assets.pamCatalog),
+                new PlantAnimAdapter(assets.pamCatalog, assets.plantSheets),
                 new ZombieAnimAdapter(assets.pamCatalog),
                 entityOverlay);
     }
@@ -285,9 +291,11 @@ public final class LawnEntityRenderer {
         this.layout = layout;
         this.plantAdapter = plantAdapter;
         this.zombieAdapter = zombieAdapter;
-        this.projectileAdapter = new ProjectileAnimAdapter();
+        this.projectileAdapter = new ProjectileAnimAdapter(assets.plantSheets);
         this.player = assets.player;
         this.clips = new PamClipCache(assets.player);
+        this.sheetClips = new SpritesheetClipCache(assets.root);
+        this.plantSheets = assets.plantSheets;
         this.catalog = assets.pamCatalog;
         this.entityOverlay = entityOverlay;
     }
@@ -310,7 +318,10 @@ public final class LawnEntityRenderer {
 
     public LawnEntityRenderer(PamCatalog catalog, PvzAssets assets, LawnLayout layout,
                               DebugEntityOverlay entityOverlay) {
-        this(assets, layout, new PlantAnimAdapter(catalog), new ZombieAnimAdapter(catalog), entityOverlay);
+        this(assets, layout,
+                new PlantAnimAdapter(catalog, assets.plantSheets),
+                new ZombieAnimAdapter(catalog),
+                entityOverlay);
     }
 
     public void draw(Batch batch, GameModel model, float delta) {
@@ -465,7 +476,7 @@ public final class LawnEntityRenderer {
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
         float flash = tickHitFlash(plant, plantVitality(plant), delta);
         float animDelta = plant.isFrozen() ? 0f : delta;
-        float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
+        float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.forPlant(pose), NO_PHASE,
                 flash, animDelta, clockKey);
         drawPlantFreezeIce(batch, plant, xy[0], xy[1], flash, delta);
         updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
@@ -729,7 +740,7 @@ public final class LawnEntityRenderer {
             return;
         }
         projectileWorldCenter(projectile, xyTmp);
-        drawPose(batch, projectile, pose, xyTmp[0], xyTmp[1], AnimScale.PROJECTILE, NO_PHASE,
+        drawPose(batch, projectile, pose, xyTmp[0], xyTmp[1], AnimScale.forProjectile(pose), NO_PHASE,
                 0f, delta, pose.cacheKey());
     }
 
@@ -802,7 +813,7 @@ public final class LawnEntityRenderer {
                 lastPlants.remove(plant);
                 continue;
             }
-            drawPose(batch, plant, snap.pose, snap.x, snap.y, AnimScale.PLANT, NO_PHASE, flash, 0f);
+            drawPose(batch, plant, snap.pose, snap.x, snap.y, AnimScale.forPlant(snap.pose), NO_PHASE, flash, 0f);
         }
     }
 
@@ -921,7 +932,7 @@ public final class LawnEntityRenderer {
     private boolean drawPlantPop(Batch batch, PlantInstance plant,
                                  float x, float y, float u, float flash) {
         AnimPose pose = plantAdapter.poseFor(plant);
-        if (pose == null) {
+        if (pose == null || pose.isSpritesheet()) {
             return false;
         }
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
@@ -2582,6 +2593,9 @@ public final class LawnEntityRenderer {
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey) {
         seenThisFrame.add(entity);
+        if (pose.isSpritesheet()) {
+            return drawSheetPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey);
+        }
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
             return 0f;
@@ -2604,6 +2618,33 @@ public final class LawnEntityRenderer {
         return stateTime;
     }
 
+    private float drawSheetPose(Batch batch, Object entity, AnimPose pose,
+                                float x, float y, float baseScale, float phase, float flash,
+                                float delta, String clockKey) {
+        PlantSpritesheetCatalog.ClipSpec spec =
+                plantSheets == null ? null : plantSheets.byCacheKey(pose.clipName());
+        SpritesheetClipCache.SheetAnim sheet =
+                spec == null ? null : sheetClips.getOrLoad(spec);
+        if (sheet == null) {
+            return 0f;
+        }
+        float duration = sheet.duration();
+        float stateTime = phase >= 0f
+                ? phase * duration
+                : advanceClock(entity, clockKey, delta);
+        if (phase >= 0f) {
+            stampClockClip(entity, clockKey);
+        }
+        if (pose.reverse() && duration > 0f) {
+            stateTime = Math.max(0f, duration - Math.min(stateTime, duration));
+        }
+        float scale = baseScale * pose.scale();
+        float drawTime = stateTime;
+        drawSheet(batch, sheet, pose, drawTime, x, y, scale);
+        overlayHitFlash(batch, flash, () -> drawSheet(batch, sheet, pose, drawTime, x, y, scale));
+        return stateTime;
+    }
+
     private void drawClip(Batch batch, ClipRef ref, AnimPose pose,
                           float stateTime, float x, float y, float scale) {
         float sx = pose.flipX() ? -scale : scale;
@@ -2612,6 +2653,18 @@ public final class LawnEntityRenderer {
         } else {
             player.draw(batch, ref, stateTime, x, y, sx, scale, pose.loop(), pose.visibility());
         }
+    }
+
+    private void drawSheet(Batch batch, SpritesheetClipCache.SheetAnim sheet, AnimPose pose,
+                           float stateTime, float x, float y, float scale) {
+        TextureRegion frame = sheet.animation().getKeyFrame(stateTime, pose.loop());
+        if (frame == null) {
+            return;
+        }
+        float w = frame.getRegionWidth() * scale;
+        float h = frame.getRegionHeight() * scale;
+        float sx = pose.flipX() ? -1f : 1f;
+        batch.draw(frame, x - w * 0.5f, y - h * 0.5f, w * 0.5f, h * 0.5f, w, h, sx, 1f, 0f);
     }
 
     /** White additive flash while HP dropped since last frame. */

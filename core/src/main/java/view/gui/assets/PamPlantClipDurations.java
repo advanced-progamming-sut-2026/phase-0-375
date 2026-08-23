@@ -16,6 +16,10 @@ public final class PamPlantClipDurations implements PlantClipDurations {
         this(catalog == null ? null : new PlantAnimAdapter(catalog));
     }
 
+    public PamPlantClipDurations(PamCatalog catalog, PlantSpritesheetCatalog sheets) {
+        this(catalog == null && sheets == null ? null : new PlantAnimAdapter(catalog, sheets));
+    }
+
     public PamPlantClipDurations(PlantAnimAdapter adapter) {
         this.adapter = adapter;
     }

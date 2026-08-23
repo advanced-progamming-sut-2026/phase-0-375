@@ -79,6 +79,9 @@ public abstract class Projectile {
     /** True when Torchwood plant-food restyled this pea as a blue fire pea. */
     protected boolean blueFire;
 
+    /** Optional view art selector  */
+    protected int artVariant;
+
     public Plant getSourcePlant() { return sourcePlant; }
 
     public void setSourcePlant(Plant sourcePlant) { this.sourcePlant = sourcePlant; }
@@ -251,6 +254,15 @@ public abstract class Projectile {
 
     public void setBlueFire(boolean blueFire) {
         this.blueFire = blueFire;
+    }
+
+    /** View-only art selector; {@code 0} = default. */
+    public int getArtVariant() {
+        return artVariant;
+    }
+
+    public void setArtVariant(int artVariant) {
+        this.artVariant = artVariant;
     }
 
     /** @return true if a juggler (or similar) deflected this projectile back toward plants. */

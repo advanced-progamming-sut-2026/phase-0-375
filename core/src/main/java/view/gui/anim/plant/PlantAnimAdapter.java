@@ -4,11 +4,12 @@ import model.enums.PlantState;
 import model.plant.instance.PlantInstance;
 import view.gui.anim.AnimPose;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.PlantSpritesheetCatalog;
 
 import java.util.Set;
 
 /**
- * Global plant defaults: model → {@link PlantAnimRole} → PAM clip.
+ * Global plant defaults: model → {@link PlantAnimRole} → PAM clip (or spritesheet fallback).
  *
  * <p><b>Ownership:</b> plant team. Exclusive plants go through {@link PlantAnimOverrides}.
  * Do not mutate the model here.
@@ -29,14 +30,25 @@ public final class PlantAnimAdapter {
     );
 
     private final PamCatalog catalog;
+    private final PlantSpritesheetCatalog sheets;
     private final PlantAnimOverrides overrides;
 
     public PlantAnimAdapter(PamCatalog catalog) {
-        this(catalog, PlantAnimOverrides.createDefault());
+        this(catalog, null, PlantAnimOverrides.createDefault());
+    }
+
+    public PlantAnimAdapter(PamCatalog catalog, PlantSpritesheetCatalog sheets) {
+        this(catalog, sheets, PlantAnimOverrides.createDefault());
     }
 
     public PlantAnimAdapter(PamCatalog catalog, PlantAnimOverrides overrides) {
+        this(catalog, null, overrides);
+    }
+
+    public PlantAnimAdapter(PamCatalog catalog, PlantSpritesheetCatalog sheets,
+                            PlantAnimOverrides overrides) {
         this.catalog = catalog;
+        this.sheets = sheets;
         this.overrides = overrides != null ? overrides : PlantAnimOverrides.createDefault();
     }
 
@@ -63,12 +75,12 @@ public final class PlantAnimAdapter {
      * as {@link #poseFor}.
      */
     public float durationFor(PlantInstance plant, PlantState presentation) {
-        if (plant == null || plant.getDefinition() == null || presentation == null || catalog == null) {
+        if (plant == null || plant.getDefinition() == null || presentation == null) {
             return 0f;
         }
-        PamCatalog.PamEntry entry = catalog.forPlant(plant.getDefinition().getName());
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.forPlant(plant.getDefinition().getName());
         if (entry == null) {
-            return 0f;
+            return sheetDuration(plant, presentation);
         }
         PlantAnimRole role = roleForPresentation(plant, entry, presentation);
         float exclusive = overrides.tryDuration(plant, entry, role);
@@ -77,6 +89,9 @@ public final class PlantAnimAdapter {
         }
         AnimPose custom = overrides.tryResolve(plant, entry, role);
         if (custom != null) {
+            if (custom.isSpritesheet()) {
+                return sheetDurationForPose(plant, role);
+            }
             return PamCatalog.clipDurationSeconds(entry, custom.clipName());
         }
         for (String clip : durationClips(role)) {
@@ -101,9 +116,9 @@ public final class PlantAnimAdapter {
     }
 
     private AnimPose poseForPresentation(PlantInstance plant, PlantState presentation) {
-        PamCatalog.PamEntry entry = catalog.forPlant(plant.getDefinition().getName());
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.forPlant(plant.getDefinition().getName());
         if (entry == null) {
-            return null;
+            return sheetPose(plant, presentation);
         }
         PlantAnimRole role = roleForPresentation(plant, entry, presentation);
         AnimPose custom = overrides.tryResolve(plant, entry, role);
@@ -111,13 +126,66 @@ public final class PlantAnimAdapter {
         if (pose == null) {
             String clip = catalog.resolveClip(entry, preferredClips(role));
             if (clip == null) {
-                return null;
+                return sheetPose(plant, presentation);
             }
             pose = (role.isLooping())
                 ? AnimPose.looping(entry.path(), clip, role)
                 : AnimPose.once(entry.path(), clip, role);
         }
         return applyPlantFoodPlaybackMode(plant, role, pose);
+    }
+
+    private AnimPose sheetPose(PlantInstance plant, PlantState presentation) {
+        if (sheets == null || plant.getDefinition() == null) {
+            return null;
+        }
+        String name = plant.getDefinition().getName();
+        PlantAnimRole role = roleForSheet(presentation);
+        PlantSpritesheetCatalog.ClipSpec spec = resolveSheet(name, role);
+        if (spec == null) {
+            return null;
+        }
+        return role.isLooping()
+                ? AnimPose.sheetLooping(spec.relativePath(), spec.cacheKey(), role)
+                : AnimPose.sheetOnce(spec.relativePath(), spec.cacheKey(), role);
+    }
+
+    private float sheetDuration(PlantInstance plant, PlantState presentation) {
+        if (sheets == null || plant.getDefinition() == null) {
+            return 0f;
+        }
+        PlantAnimRole role = roleForSheet(presentation);
+        return sheetDurationForPose(plant, role);
+    }
+
+    private float sheetDurationForPose(PlantInstance plant, PlantAnimRole role) {
+        PlantSpritesheetCatalog.ClipSpec spec = resolveSheet(plant.getDefinition().getName(), role);
+        return spec == null ? 0f : spec.durationSeconds();
+    }
+
+    private PlantSpritesheetCatalog.ClipSpec resolveSheet(String definitionName, PlantAnimRole role) {
+        PlantSpritesheetCatalog.ClipSpec spec = sheets.resolveClip(definitionName, preferredClips(role));
+        if (spec != null) {
+            return spec;
+        }
+        if (role == PlantAnimRole.IDLE || role == PlantAnimRole.PLANT_FOOD
+                || role == PlantAnimRole.PLANT_FOOD_ON || role == PlantAnimRole.PLANT_FOOD_OFF) {
+            return sheets.idleFallback(definitionName);
+        }
+        return sheets.anyClip(definitionName);
+    }
+
+    private static PlantAnimRole roleForSheet(PlantState presentation) {
+        if (presentation == PlantState.ATTACKING) {
+            return PlantAnimRole.ATTACK;
+        }
+        if (presentation == PlantState.PRODUCING) {
+            return PlantAnimRole.SPECIAL;
+        }
+        if (presentation == PlantState.PLANT_FOOD) {
+            return PlantAnimRole.PLANT_FOOD;
+        }
+        return PlantAnimRole.IDLE;
     }
 
     /**
@@ -199,9 +267,10 @@ public final class PlantAnimAdapter {
         if (pose == null || role != PlantAnimRole.PLANT_FOOD || !pose.loop() || shouldLoopPlantFood(plant)) {
             return pose;
         }
-        AnimPose once = AnimPose.once(pose.pamPath(), pose.clipName(), pose.role(), pose.visibility())
-                .withScale(pose.scale())
-                .withFlipX(pose.flipX());
+        AnimPose once = pose.isSpritesheet()
+                ? AnimPose.sheetOnce(pose.pamPath(), pose.clipName(), pose.role())
+                : AnimPose.once(pose.pamPath(), pose.clipName(), pose.role(), pose.visibility());
+        once = once.withScale(pose.scale()).withFlipX(pose.flipX());
         if (pose.reverse()) {
             once = once.reversed();
         }

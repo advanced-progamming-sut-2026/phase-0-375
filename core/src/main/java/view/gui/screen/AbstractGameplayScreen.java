@@ -147,7 +147,7 @@ public abstract class AbstractGameplayScreen implements Screen {
         if (loop == null || assets == null || assets.pamCatalog == null) {
             return;
         }
-        loop.setPlantClipDurations(new PamPlantClipDurations(assets.pamCatalog));
+        loop.setPlantClipDurations(new PamPlantClipDurations(assets.pamCatalog, assets.plantSheets));
         GameModel model = App.getInstance().getCurrentGameModel();
         LawnLayout layout = (model == null)
                 ? LawnLayout.frontLawnDefault()
