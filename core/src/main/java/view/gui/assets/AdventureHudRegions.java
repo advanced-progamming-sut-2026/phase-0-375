@@ -23,5 +23,8 @@ public final class AdventureHudRegions {
     public static final String LEADERBOARD_NORMAL = "IMAGE_UI_GAMECENTER_ANDROID_LEADERBOARD";
     public static final String LEADERBOARD_DOWN = "IMAGE_UI_GAMECENTER_ANDROID_LEADERBOARD_SELECT";
 
+    public static final String STORE_NORMAL = "IMAGE_UI_HUD_WORLDMAP_BUTTONS_HUD_STORE_NORMAL";
+    public static final String STORE_DOWN = "IMAGE_UI_HUD_WORLDMAP_BUTTONS_HUD_STORE_SELECTED";
+
     private AdventureHudRegions() {}
 }

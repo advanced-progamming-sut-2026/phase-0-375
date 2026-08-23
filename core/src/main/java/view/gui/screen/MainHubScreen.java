@@ -78,7 +78,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
         float aspect = logoRegion.getRegionHeight() / (float) logoRegion.getRegionWidth();
         float logoHeight = LOGO_WIDTH * aspect;
         logo.setSize(LOGO_WIDTH, logoHeight);
-        logo.setPosition((UI_WIDTH - LOGO_WIDTH) * 0.5f, UI_HEIGHT - logoHeight - 36f);
+        logo.setPosition((UI_WIDTH - LOGO_WIDTH) * 0.5f, UI_HEIGHT - logoHeight - 80f);
         stage.addActor(logo);
     }
 

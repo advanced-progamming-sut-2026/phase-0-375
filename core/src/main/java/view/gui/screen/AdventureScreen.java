@@ -15,7 +15,6 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.CollectionMenuController;
 import controller.GameMenuController;
 import controller.GameMenuController.ChapterSummary;
-import controller.GreenhouseMenuController;
 import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
@@ -192,14 +191,8 @@ public final class AdventureScreen extends AbstractMenuScreen {
     }
 
     private void openGreenhouse() {
-        GreenhouseMenuController green = GreenhouseMenuController.getInstance();
         App.getInstance().setCurrentMenu(MenuType.GREENHOUSE);
-        CommandResult<String> shown = green.showGreenhouse();
-        String body = shown.isSuccess() ? shown.getData() : shown.getMessage();
-        if (body == null || body.isBlank()) {
-            body = "Greenhouse — full GUI coming soon.";
-        }
-        game.setScreen(PlaceholderMenuScreen.message(game, "Greenhouse", MenuType.GREENHOUSE, body));
+        game.setScreen(new GreenhouseScreen(game));
     }
 
     private void openLeaderboard() {

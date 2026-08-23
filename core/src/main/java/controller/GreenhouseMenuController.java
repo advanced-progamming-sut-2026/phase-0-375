@@ -62,7 +62,7 @@ public class GreenhouseMenuController extends AppMenuController {
         Pot pot = greenhouse.getPot(x, y);
         if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                    + "). " + boundsHint());
         }
         // distinct errors per spec
         if (pot.getState() == PotState.LOCKED) {
@@ -85,7 +85,7 @@ public class GreenhouseMenuController extends AppMenuController {
         Greenhouse greenhouse = currentGreenhouse();
         if (greenhouse.getPot(x, y) == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                    + "). " + boundsHint());
         }
         GreenhouseProduce produce = greenhouse.collect(x, y);
         if (produce == null) {
@@ -102,7 +102,7 @@ public class GreenhouseMenuController extends AppMenuController {
         Pot pot = greenhouse.getPot(x, y);
         if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                    + "). " + boundsHint());
         }
         pot.isReady(); // refresh lazy state
         // distinct errors: already ready vs nothing growing
@@ -164,5 +164,9 @@ public class GreenhouseMenuController extends AppMenuController {
                     + " — a one-shot boost has been stored for that plant.";
         }
         return "Harvested, but no extra boost was granted (a boost was already stored).";
+    }
+
+    private static String boundsHint() {
+        return "x must be 1.." + Greenhouse.COLS + ", y must be 1.." + Greenhouse.ROWS + ".";
     }
 }
