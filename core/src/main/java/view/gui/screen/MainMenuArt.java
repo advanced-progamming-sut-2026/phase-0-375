@@ -1,5 +1,6 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import pvz.libpvz.textures.TextureBank;
@@ -29,10 +30,18 @@ public final class MainMenuArt {
 
     /** Full-bleed cosmic main-menu background. */
     public void drawBackground(Batch batch, TextureBank textures, float width, float height) {
+        drawBackground(batch, textures, width, height, Color.WHITE);
+    }
+
+    /** Full-bleed background with a multiply tint (e.g. turquoise for Adventure). */
+    public void drawBackground(Batch batch, TextureBank textures, float width, float height, Color tint) {
         TextureRegion bg = region(textures, UiRegions.MAIN_MENU_BACKGROUND);
         if (bg == null) {
             return;
         }
+        Color old = batch.getColor();
+        batch.setColor(tint != null ? tint : Color.WHITE);
         batch.draw(bg, 0f, 0f, width, height);
+        batch.setColor(old);
     }
 }

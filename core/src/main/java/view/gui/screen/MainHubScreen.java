@@ -138,7 +138,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
             }
         });
         logout.setSize(160f, 52f);
-        logout.setPosition(CORNER_PAD, UI_HEIGHT - 72f);
+        logout.setPosition(CORNER_PAD, UI_HEIGHT - 95f);
         stage.addActor(logout);
     }
 

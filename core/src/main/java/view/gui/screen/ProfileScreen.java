@@ -47,7 +47,7 @@ public final class ProfileScreen extends AbstractMenuScreen {
         Table top = new Table();
         top.setFillParent(true);
         top.top();
-        resourceBar = new ResourceBar(skin);
+        resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
         top.add(resourceBar).expandX().right().pad(12f);
         stage.addActor(top);
 

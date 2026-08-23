@@ -31,7 +31,8 @@ public final class GameplayStubScreen extends AbstractMenuScreen {
         Table top = new Table();
         top.setFillParent(true);
         top.top();
-        top.add(new ResourceBar(skin)).expandX().right().pad(12f);
+        top.add(new ResourceBar(skin, game.assets != null ? game.assets.textures : null))
+                .expandX().right().pad(12f);
         stage.addActor(top);
 
         GameModel model = App.getInstance().getCurrentGameModel();

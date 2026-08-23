@@ -73,7 +73,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         topRight.setFillParent(true);
         topRight.setTouchable(Touchable.childrenOnly);
         topRight.top().right().pad(12f);
-        resourceBar = new ResourceBar(skin);
+        resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
         topRight.add(resourceBar);
         uiStage.addActor(topRight);
 

@@ -17,5 +17,16 @@ public final class UiRegions {
     public static final String COIN_ICON = "IMAGE_UI_HUD_INGAME_COIN";
     public static final String GEM_ICON = "IMAGE_UI_HUD_INGAME_GEM";
 
+    /** Debug free-currency buttons (world-map HUD). {@code _2} = pressed. */
+    public static final String ATLAS_WORLD_MAP = "UI_WorldMap_768";
+    public static final String FREE_COINS_UP =
+            "IMAGE_UI_HUD_WORLDMAP_FREE_COINS_BUTTON_FREE_COINS_BUTTON_300X130";
+    public static final String FREE_COINS_DOWN =
+            "IMAGE_UI_HUD_WORLDMAP_FREE_COINS_BUTTON_FREE_COINS_BUTTON_300X130_2";
+    public static final String FREE_COINS_GOLDEN_UP =
+            "IMAGE_UI_HUD_WORLDMAP_FREE_COINS_BUTTON_GOLDEN_FREE_COINS_BUTTON_GOLDEN_300X130";
+    public static final String FREE_COINS_GOLDEN_DOWN =
+            "IMAGE_UI_HUD_WORLDMAP_FREE_COINS_BUTTON_GOLDEN_FREE_COINS_BUTTON_GOLDEN_300X130_2";
+
     private UiRegions() {}
 }
