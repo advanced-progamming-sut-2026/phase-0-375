@@ -140,9 +140,7 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
     }
 
     private void openShop() {
-        CommandResult<Void> result = controller.buyPot();
-        showToast(result.getMessage(), !result.isSuccess());
-        refreshAll();
+        game.setScreen(new ShopScreen(game));
     }
 
     private void goBack() {
