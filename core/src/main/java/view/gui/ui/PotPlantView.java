@@ -10,6 +10,8 @@ import view.gui.anim.PamClipCache;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PvzAssets;
 
+import java.util.Objects;
+
 /**
  * Idle PAM plant drawn inside a greenhouse pot (Scene2D).
  */
@@ -36,22 +38,32 @@ public final class PotPlantView extends Actor {
         setTouchable(Touchable.disabled);
     }
 
+    /**
+     * Bind an idle PAM. Same plant + clip keeps {@code time} so the loop does not
+     * restart when the greenhouse refreshes the pot timer each second.
+     */
     public void setPlant(String plantType, boolean ready) {
-        pamPath = null;
-        clipName = null;
-        hasPlant = false;
-        time = 0f;
         drawScale = ready ? SCALE_READY : SCALE_GROWING;
         if (plantType == null || plantType.isBlank()) {
+            clearPlant();
             return;
         }
         PamCatalog.PamEntry entry = catalog.forPlant(plantType);
         if (entry == null) {
+            clearPlant();
             return;
         }
-        pamPath = entry.path();
-        clipName = catalog.resolveClip(entry, "idle", "idle2", "idle1", "loop", "animation");
+        String nextPath = entry.path();
+        String nextClip = catalog.resolveClip(entry, "idle", "idle2", "idle1", "loop", "animation");
+        boolean sameClip = hasPlant
+            && Objects.equals(pamPath, nextPath)
+            && Objects.equals(clipName, nextClip);
+        pamPath = nextPath;
+        clipName = nextClip;
         hasPlant = pamPath != null && clipName != null;
+        if (!sameClip) {
+            time = 0f;
+        }
     }
 
     public void clearPlant() {
@@ -95,7 +107,7 @@ public final class PotPlantView extends Actor {
         batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, oldA * parentAlpha);
         // Feet sit in the soil: center X, low in the pot cell.
         float cx = getX() + getWidth() * 0.5f;
-        float cy = getY() + getHeight() * 0.38f;
+        float cy = getY() + getHeight() * 0.7f;
         player.draw(batch, ref, time, cx, cy, drawScale, drawScale, true);
         batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, oldA);
     }
