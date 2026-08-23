@@ -122,25 +122,25 @@ public final class AdventureScreen extends AbstractMenuScreen {
 
         // Top-left: Back
         stage.addActor(hudButton(textures,
-                AdventureHudRegions.BACK_NORMAL, AdventureHudRegions.BACK_DOWN,
-                CORNER_PAD, yTop, this::goBack));
+            AdventureHudRegions.BACK_NORMAL, AdventureHudRegions.BACK_DOWN,
+            CORNER_PAD, yTop, this::goBack));
 
         // Bottom-left stack: Quests, Collection
         stage.addActor(hudButton(textures,
-                AdventureHudRegions.QUESTS_NORMAL, AdventureHudRegions.QUESTS_DOWN,
-                CORNER_PAD, yBottom + HUD_ICON + HUD_GAP, this::openQuests));
+            AdventureHudRegions.QUESTS_NORMAL, AdventureHudRegions.QUESTS_DOWN,
+            CORNER_PAD, yBottom + HUD_ICON + HUD_GAP, this::openQuests));
         stage.addActor(hudButton(textures,
-                AdventureHudRegions.COLLECTION_NORMAL, AdventureHudRegions.COLLECTION_DOWN,
-                CORNER_PAD, yBottom, this::openCollection));
+            AdventureHudRegions.COLLECTION_NORMAL, AdventureHudRegions.COLLECTION_DOWN,
+            CORNER_PAD, yBottom, this::openCollection));
 
         // Bottom-right stack: Greenhouse, Leaderboard
         float xRight = UI_WIDTH - CORNER_PAD - HUD_ICON;
         stage.addActor(hudButton(textures,
-                AdventureHudRegions.GREENHOUSE_NORMAL, AdventureHudRegions.GREENHOUSE_DOWN,
-                xRight, yBottom + HUD_ICON + HUD_GAP, this::openGreenhouse));
+            AdventureHudRegions.GREENHOUSE_NORMAL, AdventureHudRegions.GREENHOUSE_DOWN,
+            xRight, yBottom + HUD_ICON + HUD_GAP, this::openGreenhouse));
         stage.addActor(hudButton(textures,
-                AdventureHudRegions.LEADERBOARD_NORMAL, AdventureHudRegions.LEADERBOARD_DOWN,
-                xRight, yBottom, this::openLeaderboard));
+            AdventureHudRegions.LEADERBOARD_NORMAL, AdventureHudRegions.LEADERBOARD_DOWN,
+            xRight, yBottom, this::openLeaderboard));
     }
 
     private AtlasImageButton hudButton(TextureBank textures, String upId, String downId,
@@ -173,6 +173,14 @@ public final class AdventureScreen extends AbstractMenuScreen {
                 list.add(new Label(q.getName(), skin, "medium")).left().padBottom(6f).row();
             }
         }
+        TextButton miniGames = new TextButton("MINI-GAMES", skin, "purple");
+        miniGames.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                game.setScreen(new MiniGameScreen(game));
+            }
+        });
+        list.add(miniGames).width(300f).height(58f).padTop(18f).row();
         game.setScreen(new PlaceholderMenuScreen(game, "Quests", MenuType.TRAVEL_LOG, list));
     }
 
@@ -204,7 +212,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
             int rank = 1;
             for (User user : board.getData()) {
                 String line = rank + ". " + user.getUsername()
-                        + "  —  " + user.getHighestMyopoint() + " myopoint";
+                    + "  —  " + user.getHighestMyopoint() + " myopoint";
                 list.add(new Label(line, skin, "medium")).left().padBottom(4f).row();
                 rank++;
             }
@@ -271,7 +279,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
             progressLabel.setText("Progress " + summary.completedLevels() + " / " + summary.totalLevels());
         } else {
             progressLabel.setText("Locked  ·  Progress "
-                    + summary.completedLevels() + " / " + summary.totalLevels());
+                + summary.completedLevels() + " / " + summary.totalLevels());
         }
         if (enterButton != null) {
             enterButton.setText(summary.unlocked() ? "Enter" : "Locked");
