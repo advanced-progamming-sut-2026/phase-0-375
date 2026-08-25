@@ -34,6 +34,7 @@ import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.enums.LootPickupKind;
 import model.enums.GroundType;
+import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.item.placeable.Placeable;
 import model.item.pushable.ArcadeMachine;
@@ -307,7 +308,7 @@ public final class LawnEntityRenderer {
     private final Map<String, Float> vaseAge = new HashMap<>();
     private final IdentityHashMap<PlantInstance, BeghouledMotion> beghouledMotion = new IdentityHashMap<>();
     private static final float BEGHOULED_MOVE_SEC = 0.22f;
-    private TextureRegion beghouledCraterRegion;
+    private TextureRegion craterRegion;
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
@@ -465,7 +466,7 @@ public final class LawnEntityRenderer {
         int rows = map != null ? map.getRows() : layout.rows();
         // Row 0 is the top of the screen; later rows paint over it.
         for (int row = 0; row < rows; row++) {
-            drawBeghouledCraters(batch, model, row);
+            drawCraters(batch, model, row);
             drawGraves(batch, model, delta, row);
             drawGraveGhosts(batch, delta, row);
             drawVases(batch, model, delta, row, rows);
@@ -939,12 +940,12 @@ public final class LawnEntityRenderer {
                 "idle", "walk", "eat", "smash_left", "fire", "cannon_fire", "die");
     }
 
-    public void preloadBeghouled() {
+    public void preloadCraters() {
         textures.loadSync(BeghouledArt.ATLAS_GROUP);
         textures.loadSync(BeghouledArt.ATLAS_PAGE);
-        beghouledCraterRegion = textures.region(BeghouledArt.CRATER_TILE);
-        if (beghouledCraterRegion == null) {
-            beghouledCraterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+        craterRegion = textures.region(BeghouledArt.CRATER_TILE);
+        if (craterRegion == null) {
+            craterRegion = textures.region(BeghouledArt.CRATER_LARGE);
         }
     }
 
@@ -963,29 +964,42 @@ public final class LawnEntityRenderer {
         }
     }
 
-    private void drawBeghouledCraters(Batch batch, GameModel model, int row) {
-        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+    private void drawCraters(Batch batch, GameModel model, int row) {
+        GameMap map = model.getMap();
+        if (map == null) {
             return;
         }
-        if (beghouledCraterRegion == null) {
-            beghouledCraterRegion = textures.region(BeghouledArt.CRATER_TILE);
-            if (beghouledCraterRegion == null) {
-                beghouledCraterRegion = textures.region(BeghouledArt.CRATER_LARGE);
-            }
-        }
-        if (beghouledCraterRegion == null) {
+        TextureRegion crater = ensureCraterRegion();
+        if (crater == null) {
             return;
         }
-        float w = beghouledCraterRegion.getRegionWidth();
-        float h = beghouledCraterRegion.getRegionHeight();
-        int cols = layout.cols();
+        float w = crater.getRegionWidth();
+        float h = crater.getRegionHeight();
+        int cols = Math.min(layout.cols(), map.getCols());
         for (int c = 0; c < cols; c++) {
-            if (!beghouled.isCrater(row, c)) {
+            Cell cell = map.getCell(c, row);
+            if (cell == null || !isCraterCell(cell)) {
                 continue;
             }
             float[] xy = layout.centerOf(row, c);
-            batch.draw(beghouledCraterRegion, xy[0] - w * 0.5f, xy[1] - h * 0.4f, w, h);
+            batch.draw(crater, xy[0] - w * 0.5f, xy[1] - h * 0.4f, w, h);
         }
+    }
+
+    private static boolean isCraterCell(Cell cell) {
+        return cell.getGroundType() == GroundType.CRATER
+                || cell.getTerrainStrategy() instanceof CraterTerrainStrategy;
+    }
+
+    private TextureRegion ensureCraterRegion() {
+        if (craterRegion != null) {
+            return craterRegion;
+        }
+        craterRegion = textures.region(BeghouledArt.CRATER_TILE);
+        if (craterRegion == null) {
+            craterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+        }
+        return craterRegion;
     }
 
     private void applyBeghouledMotion(PlantInstance plant, float[] xy, float delta) {

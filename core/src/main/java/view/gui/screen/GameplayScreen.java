@@ -45,7 +45,6 @@ import view.gui.PvzGdxGame;
 import view.gui.anim.AnimScale;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
-import view.gui.assets.BeghouledArt;
 import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
@@ -152,9 +151,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (vaseBreakerMode) {
             entityRenderer.preloadVases();
         }
-        if (beghouledMode) {
-            entityRenderer.preloadBeghouled();
-        }
+        entityRenderer.preloadCraters();
         if (bowlingMode || deadLineColumn() >= 0) {
             deadLineRenderer = new DeadLineRenderer();
         }
@@ -169,8 +166,6 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         assets.textures.loadSync(PauseMenuOverlay.ATLAS_GROUP);
         assets.textures.loadSync(PauseMenuOverlay.ATLAS_PAGE);
         if (beghouledMode) {
-            assets.textures.loadSync(BeghouledArt.ATLAS_GROUP);
-            assets.textures.loadSync(BeghouledArt.ATLAS_PAGE);
             setWorldInput(createBeghouledWorldInput());
         } else {
             setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
