@@ -1,0 +1,17 @@
+{
+  "name": "cattail",
+  "version": "1.0",
+  "description": "Cattail plant spritesheet and projectile effects (sprites.json + PNGs).",
+  "entries": [
+    {
+      "path": "IMAGES/768/FULL/PLANT/CATTAIL",
+      "exclude": ["plantfood.png"]
+    },
+    {
+      "path": "IMAGES/768/INITIAL/EFFECTS/CATTAIL_PROJECTILE1"
+    },
+    {
+      "path": "IMAGES/768/INITIAL/EFFECTS/CATTAIL_PROJECTILE2"
+    }
+  ]
+}

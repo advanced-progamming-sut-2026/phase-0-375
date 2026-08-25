@@ -1,0 +1,4 @@
+# Packed payloads (share as zip instead of committing binaries)
+*/IMAGES/
+*/ATLASES/
+*.zip
