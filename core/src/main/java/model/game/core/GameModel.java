@@ -619,6 +619,14 @@ public class GameModel implements BehaviorContext {
     }
 
     /**
+     * I, Zombie: destroys the brain in {@code row} after a chew finishes.
+     * Does not pin a breaching zombie (those walk off the left afterward).
+     */
+    public void markBrainEaten(int row) {
+        this.breachedRows.add(row);
+    }
+
+    /**
      * House breach: mark the lane lost and pin the zombie in an eat loop.
      * Leaves continuous X where it is (past the lawn edge into the house).
      */

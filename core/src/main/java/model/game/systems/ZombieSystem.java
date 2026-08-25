@@ -5,6 +5,7 @@ import model.event.GameEvent;
 import model.event.EventBus;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
+import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.map.Cell;
 import model.game.map.Lane;
 import model.enums.ZombieState;
@@ -22,8 +23,10 @@ import model.zombie.behavior.FlyBehavior;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 public class ZombieSystem implements Tickable {
 
@@ -42,6 +45,15 @@ public class ZombieSystem implements Tickable {
      */
     public static final float HOUSE_CHEW_X = GameModel.HOUSE_CHEW_X;
 
+    /** How long an I, Zombie must chew before the lane's brain is destroyed. */
+    public static final float BRAIN_CHEW_SECONDS = 3f;
+
+    /**
+     * Continuous X past the chew spot where an I, Zombie walker is removed
+     * after leaving the lawn to the left.
+     */
+    public static final float OFF_LAWN_DESPAWN_X = -2.0f;
+
     private final GameModel gameModel;
     private final EventBus eventBus;
 
@@ -49,6 +61,8 @@ public class ZombieSystem implements Tickable {
     private final java.util.Random lootRandom = new java.util.Random();
     /** Death tile for {@link #maybeDropLoot}; set only during the death pass. */
     private model.game.map.Point lastDeadZombiePos;
+    /** Elapsed chew time for zombies eating an I, Zombie brain. */
+    private final Map<ZombieInstance, Float> brainChewElapsed = new IdentityHashMap<>();
 
     public ZombieSystem(GameModel gameModel, EventBus eventBus) {
         this.gameModel = gameModel;
@@ -153,6 +167,10 @@ public class ZombieSystem implements Tickable {
         if (lawnMowersEnabled() && lane != null && lane.isLawnMowerTriggered()) {
             return true;
         }
+        if (isIZombieMode()) {
+            enterIZombieBrainSide(zombie, newX);
+            return true;
+        }
         // Walk into the house past the grid edge, then chew.
         float x = Math.max(newX, HOUSE_CHEW_X);
         zombie.setContinuousX(x);
@@ -160,6 +178,65 @@ public class ZombieSystem implements Tickable {
             onZombieReachedHouse(zombie, context);
         }
         return true;
+    }
+
+    /**
+     * I, Zombie left edge: chew the brain for a few seconds, then walk off
+     * the lawn and despawn. Already-eaten lanes skip straight to the walk-off.
+     */
+    private void enterIZombieBrainSide(ZombieInstance zombie, float newX) {
+        int row = zombie.getGridY();
+        if (gameModel.getBreachedRows().contains(row)) {
+            zombie.setContinuousX(newX);
+            if (newX <= OFF_LAWN_DESPAWN_X) {
+                killSilently(zombie);
+            }
+            return;
+        }
+        float x = Math.max(newX, HOUSE_CHEW_X);
+        zombie.setContinuousX(x);
+        if (x <= HOUSE_CHEW_X) {
+            beginBrainChew(zombie);
+        }
+    }
+
+    private void beginBrainChew(ZombieInstance zombie) {
+        if (!zombie.isEating()) {
+            zombie.setState(ZombieState.EATING);
+        }
+        brainChewElapsed.putIfAbsent(zombie, 0f);
+    }
+
+    private void tickBrainChew(ZombieInstance zombie, float deltaTime) {
+        int row = zombie.getGridY();
+        if (gameModel.getBreachedRows().contains(row)) {
+            finishBrainChew(zombie);
+            return;
+        }
+        float elapsed = brainChewElapsed.getOrDefault(zombie, 0f) + deltaTime;
+        if (elapsed >= BRAIN_CHEW_SECONDS) {
+            gameModel.markBrainEaten(row);
+            if (eventBus != null) {
+                eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_REACHED_END));
+            }
+            finishBrainChew(zombie);
+            return;
+        }
+        brainChewElapsed.put(zombie, elapsed);
+        if (!zombie.isEating()) {
+            zombie.setState(ZombieState.EATING);
+        }
+    }
+
+    private void finishBrainChew(ZombieInstance zombie) {
+        brainChewElapsed.remove(zombie);
+        if (zombie.isEating()) {
+            zombie.stopEating();
+        }
+    }
+
+    private boolean isIZombieMode() {
+        return gameModel.getCurrentLevel() instanceof IZombieLevel;
     }
 
     /**
@@ -247,6 +324,13 @@ public class ZombieSystem implements Tickable {
             if (!zombie.isEating()) {
                 zombie.setState(ZombieState.EATING);
             }
+            return;
+        }
+
+        if (brainChewElapsed.containsKey(zombie) || (isIZombieMode()
+                && zombie.getContinuousX() <= HOUSE_CHEW_X
+                && !gameModel.getBreachedRows().contains(row))) {
+            tickBrainChew(zombie, deltaTime);
             return;
         }
 
@@ -527,6 +611,7 @@ public class ZombieSystem implements Tickable {
             }
 
             if (zombie.getState() == ZombieState.DEAD) {
+                brainChewElapsed.remove(zombie);
                 iterator.remove();
                 gameModel.removeZombie(zombie);
             }
