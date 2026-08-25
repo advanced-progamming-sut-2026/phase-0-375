@@ -16,8 +16,14 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
+import model.app.App;
 import model.enums.LevelType;
+import model.enums.MiniGameType;
+import model.game.core.GameModel;
+import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.rule.GameRules;
 
 import java.util.ArrayList;
@@ -46,7 +52,7 @@ public final class LevelObjectivesOverlay {
 
     /** Creates the overlay and returns it ready to add to uiStage. */
     public static Table create(Skin skin, LevelConfig config, Runnable onContinue) {
-        List<String> objectives = objectivesFor(config);
+        List<String> objectives = objectivesFor(App.getInstance().getCurrentGameModel(), config);
 
         Table overlay = new Table();
         overlay.setFillParent(true);
@@ -130,6 +136,14 @@ public final class LevelObjectivesOverlay {
 
     /** Same objective lines shown on the start splash and the pause menu. */
     public static List<String> objectivesFor(LevelConfig config) {
+        return objectivesFor(null, config);
+    }
+
+    public static List<String> objectivesFor(GameModel model, LevelConfig config) {
+        List<String> bowling = bowlingObjectives(model);
+        if (bowling != null) {
+            return bowling;
+        }
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -167,6 +181,23 @@ public final class LevelObjectivesOverlay {
             out.add("Survive the zombie attack!");
         }
         return out;
+    }
+
+    private static List<String> bowlingObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean bowling = level instanceof WallnutBowlingLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.WALLNUT_BOWLING);
+        if (!bowling) {
+            return null;
+        }
+        return List.of(
+                "Roll Wall-nuts into zombies from the conveyor belt",
+                "Only launch left of the red line",
+                "Survive every zombie wave");
     }
 
     private static String formatTime(float seconds) {

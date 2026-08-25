@@ -341,11 +341,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     }
 
     private static Screen openGameplay(PvzGdxGame game) {
-        Chapter chapter = currentChapter();
-        if (LawnBackgroundRenderer.Style.forChapter(chapter) != LawnBackgroundRenderer.Style.FRONT_LAWN) {
-            return new GameplayScreen(game);
-        }
-        return new GameplayStubScreen(game);
+        return LevelObjectivesScreen.openGameplay(game);
     }
 
     private static void clearTransientGame() {

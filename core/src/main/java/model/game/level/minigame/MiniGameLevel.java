@@ -13,6 +13,7 @@ import model.user.User;
 public abstract class MiniGameLevel extends Level {
     private final MiniGameType miniGameType;
     private int difficultyTier;
+    private int stage = 1;
     private boolean completed;
     private int coinReward;
 
@@ -38,6 +39,10 @@ public abstract class MiniGameLevel extends Level {
         return difficultyTier;
     }
 
+    public int getStage() {
+        return stage;
+    }
+
     public boolean isCompleted() {
         return completed;
     }
@@ -46,6 +51,10 @@ public abstract class MiniGameLevel extends Level {
 
     public void setDifficultyTier(int difficultyTier) {
         this.difficultyTier = difficultyTier;
+    }
+
+    public void setStage(int stage) {
+        this.stage = Math.max(1, stage);
     }
 
     public void setCompleted(boolean completed) {

@@ -19,5 +19,7 @@ class SeedPacketIdsTest {
         assertEquals("IMAGE_UI_PACKETS_CHERRY_BOMB", SeedPacketIds.portraitId("Cherry Bomb"));
         assertEquals("IMAGE_UI_PACKETS_PEPPERMINT", SeedPacketIds.portraitId("Pierce-mint"));
         assertEquals("IMAGE_UI_PACKETS_MEGAGATLING", SeedPacketIds.portraitId("Mega Gatling Pea"));
+        assertEquals("IMAGE_UI_PACKETS_WALLNUT", SeedPacketIds.portraitId("Giant Wall-nut"));
+        assertEquals("IMAGE_UI_PACKETS_EXPLODEONUT", SeedPacketIds.portraitId("Explode-o-nut"));
     }
 }

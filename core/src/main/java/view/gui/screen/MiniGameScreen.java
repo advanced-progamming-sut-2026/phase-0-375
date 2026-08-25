@@ -89,7 +89,7 @@ public final class MiniGameScreen extends AbstractMenuScreen {
         CommandResult<Void> result = controller.enterMiniGame(entry.getMiniGameType(), entry.getStage());
         showToast(result.getMessage(), !result.isSuccess());
         if (result.isSuccess()) {
-            game.setScreen(new PlantSelectionScreen(game, null));
+            game.setScreen(new LevelObjectivesScreen(game, null));
         }
     }
 

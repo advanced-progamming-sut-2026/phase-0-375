@@ -494,7 +494,7 @@ public class ZombieSystem implements Tickable {
                 zombie.fireOnDeathBehaviors(context);
 
                 // Drop plant food on the death tile if glowing (click to collect).
-                if (zombie.isGlowing()) {
+                if (zombie.isGlowing() && plantFoodDropsEnabled()) {
                     var pos = zombie.getGridPosition();
                     if (pos != null) {
                         gameModel.spawnPlantFood(new PlantFoodPickup(pos.getX(), pos.getY()));
@@ -537,6 +537,13 @@ public class ZombieSystem implements Tickable {
     private void killSilently(ZombieInstance zombie) {
         zombie.setCurrentHP(0);
         zombie.setState(ZombieState.DEAD);
+    }
+
+    private boolean plantFoodDropsEnabled() {
+        return gameModel.getCurrentLevel() != null
+                && gameModel.getCurrentLevel().getConfig() != null
+                && gameModel.getCurrentLevel().getConfig().getRules() != null
+                && gameModel.getCurrentLevel().getConfig().getRules().isPlantFoodDrops();
     }
 
     private void maybeDropLoot() {

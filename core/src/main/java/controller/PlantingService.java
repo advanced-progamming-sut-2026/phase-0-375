@@ -299,7 +299,7 @@ final class PlantingService {
 
     /**
      * Wall-nut Bowling: consumes a walnut from the conveyor belt and rolls
-     * it from the leftmost column down the given lane.
+     * it from the chosen column (must be left of the red line) down the lane.
      */
     private CommandResult<Void> rollWalnut(GameModel model, WallnutBowlingLevel bowling,
                                            String type, int x, int y) {
@@ -317,11 +317,12 @@ final class PlantingService {
             return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds. "
                     + "Map is " + map.getRows() + "x" + map.getCols() + ".");
         }
-        if (x != 0) {
-            return CommandResult.error("Bowling walnuts must be launched from the leftmost column:"
-                    + " use -l (0," + y + ").");
+        if (!bowling.canLaunchAtColumn(x)) {
+            int max = bowling.maxLaunchColumnExclusive();
+            return CommandResult.error("Bowling walnuts must be launched left of the red line"
+                    + " (columns 0–" + Math.max(0, max - 1) + ").");
         }
-        bowling.launchWalnut(walnutType, y);
+        bowling.launchWalnut(walnutType, x, y);
         belt.remove(beltEntry);
         return CommandResult.success("Rolled " + beltEntry + " down lane " + y + ".");
     }

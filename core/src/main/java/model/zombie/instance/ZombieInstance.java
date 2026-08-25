@@ -1,8 +1,10 @@
 package model.zombie.instance;
 
+import model.app.App;
 import model.enums.PlacableLayer;
 import model.item.placeable.Placeable;
 import model.enums.*;
+import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
@@ -102,9 +104,26 @@ public class ZombieInstance implements Tickable, Placeable {
     // --- Glowing ---
 
     public boolean shouldSpawnGlowing() {
+        if (!plantFoodDropsAllowed()) {
+            return false;
+        }
         float glowingChance = 0.1f;
         Random rng = new Random();
         return rng.nextFloat() <= glowingChance;
+    }
+
+    private static boolean plantFoodDropsAllowed() {
+        try {
+            GameModel model = App.getInstance().getCurrentGameModel();
+            if (model == null || model.getCurrentLevel() == null
+                    || model.getCurrentLevel().getConfig() == null
+                    || model.getCurrentLevel().getConfig().getRules() == null) {
+                return true;
+            }
+            return model.getCurrentLevel().getConfig().getRules().isPlantFoodDrops();
+        } catch (RuntimeException ignored) {
+            return true;
+        }
     }
 
     // --- Hypnosis helpers ---

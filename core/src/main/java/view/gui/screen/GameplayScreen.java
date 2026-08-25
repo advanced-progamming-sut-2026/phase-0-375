@@ -17,6 +17,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.GameMenuController;
 import controller.GameplayMenuController;
 import controller.PlantSelectionMenuController;
+import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
@@ -26,12 +27,17 @@ import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.anim.AnimScale;
+import view.gui.anim.bowling.BowlingWalnutAnim;
+import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
@@ -80,11 +86,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private WaveProgressHud waveProgress;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
+    private DeadLineRenderer deadLineRenderer;
     private String previewPlant;
     private float previewTime;
     private int hoverCol = -1;
     private int hoverRow = -1;
     private List<String> shownPackets = List.of();
+    private final boolean bowlingMode;
 
     private boolean plantfoodMode;
     private boolean shovelMode;
@@ -111,9 +119,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         super(game);
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         lawnLayout = lawnLayout();
+        bowlingMode = currentLevel() instanceof WallnutBowlingLevel;
         Chapter chapter = currentChapter();
-        lawnBackground = new LawnBackgroundRenderer(
-            assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
+        LawnBackgroundRenderer.Style lawnStyle = LawnBackgroundRenderer.Style.forChapter(chapter);
+        lawnBackground = new LawnBackgroundRenderer(assets.textures, lawnStyle);
         lawnBackground.ensureLoaded();
         waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
             ? new WaterUnderlayerRenderer(assets, lawnLayout)
@@ -122,6 +131,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
         entityRenderer.resetMowers(chapter, lawnMowersEnabled());
+        if (bowlingMode) {
+            deadLineRenderer = new DeadLineRenderer();
+        }
         assets.textures.loadSync("UI_SeedPackets_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
 
@@ -239,15 +251,17 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(rewardAnchor);
         hudRoots.add(rewardAnchor);
 
-        plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
-        plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
-        Table bottomLeft = new Table();
-        bottomLeft.setFillParent(true);
-        bottomLeft.setTouchable(Touchable.childrenOnly);
-        bottomLeft.bottom().left().pad(8f);
-        bottomLeft.add(plantFoodBank).left().bottom();
-        uiStage.addActor(bottomLeft);
-        hudRoots.add(bottomLeft);
+        if (plantFoodHudEnabled(model)) {
+            plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
+            plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
+            Table bottomLeft = new Table();
+            bottomLeft.setFillParent(true);
+            bottomLeft.setTouchable(Touchable.childrenOnly);
+            bottomLeft.bottom().left().pad(8f);
+            bottomLeft.add(plantFoodBank).left().bottom();
+            uiStage.addActor(bottomLeft);
+            hudRoots.add(bottomLeft);
+        }
 
         buildBottomRight(model);
 
@@ -326,9 +340,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         shownPackets = new ArrayList<>(selected);
         packetColumn.clearChildren();
         for (String name : selected) {
-            SeedPacketActor packet = new SeedPacketActor(
-                assets.textures, skin, name, plantCost(name), plantLevel(name),
-                boosted(name), false);
+            SeedPacketActor packet = bowlingMode
+                ? new SeedPacketActor(assets.textures, skin, name, 0, 1, false, false, false)
+                : new SeedPacketActor(
+                    assets.textures, skin, name, plantCost(name), plantLevel(name),
+                    boosted(name), false);
             packet.onDragPlant(new SeedPacketActor.DragPlant() {
                 @Override
                 public void dragStart(SeedPacketActor packet) {
@@ -368,6 +384,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 continue;
             }
             String name = packet.plantName();
+            if (bowlingMode) {
+                packet.setDimmed(false);
+                continue;
+            }
             boolean ready = model == null || model.isSeedReady(name);
             boolean afford = plantCost(name) <= sun;
             packet.setDimmed(!ready || !afford);
@@ -401,7 +421,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
-        refreshPacketChrome();
+        if (bowlingMode) {
+            refreshPackets();
+        } else {
+            refreshPacketChrome();
+        }
     }
 
     private boolean onWorldClick(float worldX, float worldY) {
@@ -556,9 +580,15 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void exitToLevels() {
-        Chapter chapter = currentChapter();
+        Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
         App.getInstance().setCurrentGameLoop(null);
+        if (bowlingMode || level instanceof MiniGameLevel) {
+            App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+            game.setScreen(new MiniGameScreen(game));
+            return;
+        }
+        Chapter chapter = currentChapter();
         App.getInstance().setCurrentMenu(MenuType.GAME);
         if (chapter != null) {
             game.setScreen(new ChapterLevelsScreen(game, chapter));
@@ -569,8 +599,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     /** After a win: load the next level in this chapter, or fall back to the map. */
     private void continueToNextLevel() {
-        Chapter chapter = currentChapter();
         Level level = currentLevel();
+        if (level instanceof MiniGameLevel mini) {
+            String type = mini.getMiniGameType().name();
+            int nextStage = mini.getStage() + 1;
+            CommandResult<Void> enter = TravelLogMenuController.getInstance()
+                .enterMiniGame(type, nextStage);
+            if (!enter.isSuccess()) {
+                exitToLevels();
+                return;
+            }
+            game.setScreen(new LevelObjectivesScreen(game, null));
+            return;
+        }
+        Chapter chapter = currentChapter();
         LevelConfig config = level == null ? null : level.getConfig();
         if (chapter == null || config == null) {
             exitToLevels();
@@ -627,8 +669,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartLevel() {
-        Chapter chapter = currentChapter();
         Level level = currentLevel();
+        if (level instanceof MiniGameLevel mini) {
+            restartMiniGame(mini);
+            return;
+        }
+        Chapter chapter = currentChapter();
         LevelConfig config = level == null ? null : level.getConfig();
         if (chapter == null || config == null) {
             showToast("Cannot restart: no level loaded.", true);
@@ -645,6 +691,22 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model != null) {
             model.setSelectedPlants(plants);
+        }
+        CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
+        if (!start.isSuccess()) {
+            showToast(start.getMessage(), true);
+            return;
+        }
+        game.setScreen(new GameplayScreen(game));
+    }
+
+    private void restartMiniGame(MiniGameLevel mini) {
+        String type = mini.getMiniGameType().name();
+        int stage = mini.getStage();
+        CommandResult<Void> enter = TravelLogMenuController.getInstance().enterMiniGame(type, stage);
+        if (!enter.isSuccess()) {
+            showToast(enter.getMessage(), true);
+            return;
         }
         CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
         if (!start.isSuccess()) {
@@ -792,7 +854,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
+        if (deadLineRenderer != null) {
+            deadLineRenderer.draw(game.batch, lawnLayout, deadLineColumn());
+        }
         boolean highlight = (previewPlant != null || plantfoodMode || shovelMode) && hoverCol >= 0;
+        if (highlight && bowlingMode && previewPlant != null && !canBowlAt(hoverCol)) {
+            highlight = false;
+        }
         if (highlight) {
             if (rowColHighlight == null) {
                 rowColHighlight = new LawnRowColHighlight();
@@ -801,7 +869,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         if (previewPlant != null) {
-            entityRenderer.drawPlantIdle(game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime);
+            float scale = bowlingMode
+                ? BowlingWalnutAnim.scale(WallnutBowlingLevel.parseWalnutType(previewPlant))
+                : AnimScale.PLANT;
+            entityRenderer.drawPlantIdle(
+                game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, scale);
         }
     }
 
@@ -883,6 +955,40 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return level.getConfig().getRules().isShovelEnabled();
     }
 
+    private static boolean plantFoodHudEnabled(GameModel model) {
+        if (model == null) {
+            return true;
+        }
+        if (model.getCurrentLevel() instanceof WallnutBowlingLevel) {
+            return false;
+        }
+        Level level = model.getCurrentLevel();
+        if (level == null || level.getConfig() == null || level.getConfig().getRules() == null) {
+            return true;
+        }
+        return level.getConfig().getRules().isPlantFoodDrops();
+    }
+
+    private static int deadLineColumn() {
+        Level level = currentLevel();
+        if (level == null || level.getConfig() == null) {
+            return -1;
+        }
+        int line = level.getConfig().getDeadLineColumn();
+        if (line <= 0 && level.getConfig().getRules() != null) {
+            line = level.getConfig().getRules().getDeadLineColumn();
+        }
+        return line;
+    }
+
+    private boolean canBowlAt(int col) {
+        Level level = currentLevel();
+        if (level instanceof WallnutBowlingLevel bowling) {
+            return bowling.canLaunchAtColumn(col);
+        }
+        return true;
+    }
+
     private static List<String> selectedPlants() {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model == null || model.getSelectedPlants() == null) {
@@ -936,6 +1042,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityOverlay.dispose();
         if (rowColHighlight != null) {
             rowColHighlight.dispose();
+        }
+        if (deadLineRenderer != null) {
+            deadLineRenderer.dispose();
         }
         restoreOsCursor();
         if (hiddenCursor != null) {

@@ -14,6 +14,8 @@ import model.enums.PlantState;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
+import model.game.level.minigame.bowling.BowlingWalnut;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
@@ -59,6 +61,7 @@ import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
+import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.anim.plant.MeleePlantFx;
@@ -295,6 +298,8 @@ public final class LawnEntityRenderer {
     private final Matrix4 popTransform = new Matrix4();
     private final Map<String, Boolean> popVis = new HashMap<>();
 
+    private List<BowlingWalnut> bowlingWalnuts = List.of();
+
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
     private HitFlashShader hitFlashShader;
@@ -436,6 +441,7 @@ public final class LawnEntityRenderer {
         deathBlastSeen.clear();
         deathBlastSeen.putAll(deathBlastNow);
         drawEffects(batch, backEffects, delta);
+        prepareBowlingWalnuts(model);
 
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
         livePlants.addAll(plants);
@@ -471,6 +477,7 @@ public final class LawnEntityRenderer {
                     drawZombie(batch, zombie, skin, delta);
                 }
             }
+            drawBowlingWalnuts(batch, delta, row, rows);
             drawDeathFx(batch, delta, row);
             drawArmorPops(batch, delta, row);
             drawHunterSplats(batch, delta, row);
@@ -891,16 +898,93 @@ public final class LawnEntityRenderer {
         }
     }
 
+    private void prepareBowlingWalnuts(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof WallnutBowlingLevel bowling)) {
+            bowlingWalnuts = List.of();
+            return;
+        }
+        harvestBowlingExplosions(bowling);
+        List<BowlingWalnut> active = bowling.getActiveWalnuts();
+        bowlingWalnuts = active;
+        for (BowlingWalnut walnut : active) {
+            if (walnut != null) {
+                seenThisFrame.add(walnut);
+            }
+        }
+    }
+
+    private void drawBowlingWalnuts(Batch batch, float delta, int row, int rows) {
+        if (bowlingWalnuts.isEmpty()) {
+            return;
+        }
+        for (BowlingWalnut walnut : bowlingWalnuts) {
+            if (walnut == null) {
+                continue;
+            }
+            if (clampRow(Math.round(walnut.getY()), rows) != row) {
+                continue;
+            }
+            drawBowlingWalnut(batch, walnut, delta);
+        }
+    }
+
+    private void harvestBowlingExplosions(WallnutBowlingLevel bowling) {
+        for (FloatPoint point : bowling.drainExplosions()) {
+            if (point == null) {
+                continue;
+            }
+            float[] xy = layout.centerOf(point.getY(), point.getX());
+            spawnExplosionSpecs(ExplosivePlantFx.specsForName("Explode-o-nut"), null, xy[0], xy[1]);
+        }
+    }
+
+    private void drawBowlingWalnut(Batch batch, BowlingWalnut walnut, float delta) {
+        String plantName = BowlingWalnutAnim.artPlantName(walnut);
+        ClipRef ref = plantIdleClip(plantName);
+        if (ref == null) {
+            if (entityOverlay != null) {
+                entityOverlay.drawProjectile(batch, walnut);
+            }
+            return;
+        }
+        AnimClock clock = clocks.computeIfAbsent(walnut, k -> new AnimClock());
+        clock.time += Math.max(0f, delta);
+        float[] xy = layout.centerOf(walnut.getY(), walnut.getX());
+        float scale = BowlingWalnutAnim.scale(walnut);
+        float degrees = BowlingWalnutAnim.rollDegrees(walnut, clock.time);
+        batch.flush();
+        batchTransform.set(batch.getTransformMatrix());
+        popTransform.set(batchTransform)
+            .translate(xy[0], xy[1], 0f)
+            .rotate(0f, 0f, 1f, degrees)
+            .translate(-xy[0], -xy[1], 0f);
+        batch.setTransformMatrix(popTransform);
+        player.draw(batch, ref, 0f, xy[0], xy[1], scale, scale, true);
+        batch.flush();
+        batch.setTransformMatrix(batchTransform);
+    }
+
     /** Idle PAM at a world point — drag-to-plant cursor ghost. */
     public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time) {
-        ClipRef ref = plantIdleClip(plantName);
+        drawPlantIdle(batch, plantName, x, y, time, AnimScale.PLANT);
+    }
+
+    public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time, float scale) {
+        ClipRef ref = plantIdleClip(resolveIdlePlantName(plantName));
         if (ref != null) {
-            player.draw(batch, ref, time, x, y, AnimScale.PLANT, AnimScale.PLANT, true);
+            player.draw(batch, ref, time, x, y, scale, scale, true);
         }
     }
 
     public void preloadPlantIdle(String plantName) {
-        plantIdleClip(plantName);
+        plantIdleClip(resolveIdlePlantName(plantName));
+    }
+
+    private static String resolveIdlePlantName(String plantName) {
+        if ("Giant Wall-nut".equalsIgnoreCase(plantName)) {
+            return "Wall-nut";
+        }
+        return plantName;
     }
 
     private ClipRef plantIdleClip(String plantName) {

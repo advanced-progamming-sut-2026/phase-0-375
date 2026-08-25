@@ -5,8 +5,10 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -46,6 +48,7 @@ public abstract class AbstractGameplayScreen implements Screen {
     protected final Stage uiStage;
     protected final ToastBanner toast;
     protected final ScreenShake screenShake = new ScreenShake();
+    private final Matrix4 identityTransform = new Matrix4();
 
     private final Vector3 unprojectTmp = new Vector3();
     private InputProcessor worldInput;
@@ -230,6 +233,8 @@ public abstract class AbstractGameplayScreen implements Screen {
         screenShake.apply(worldCamera);
         game.batch.setProjectionMatrix(worldCamera.combined);
         game.batch.begin();
+        game.batch.setColor(Color.WHITE);
+        game.batch.setTransformMatrix(identityTransform);
         renderWorld(worldDelta);
         game.batch.end();
 
