@@ -10,7 +10,10 @@ import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import view.gui.PvzGdxGame;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnLayout;
@@ -86,7 +89,10 @@ public final class LevelObjectivesScreen extends AbstractGameplayScreen {
 
     static Screen openGameplay(PvzGdxGame game) {
         Level level = currentLevel();
-        if (level instanceof WallnutBowlingLevel) {
+        if (level instanceof WallnutBowlingLevel
+            || level instanceof BeghouledLevel
+            || level instanceof VaseBreakerLevel
+            || level instanceof MiniGameLevel) {
             return new GameplayScreen(game);
         }
         Chapter ch = currentChapter();

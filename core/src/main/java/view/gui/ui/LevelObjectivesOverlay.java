@@ -23,6 +23,7 @@ import model.game.core.GameModel;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.rule.GameRules;
@@ -149,6 +150,10 @@ public final class LevelObjectivesOverlay {
         if (vaseBreaker != null) {
             return vaseBreaker;
         }
+        List<String> beghouled = beghouledObjectives(model);
+        if (beghouled != null) {
+            return beghouled;
+        }
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -220,6 +225,31 @@ public final class LevelObjectivesOverlay {
                 "Break every vase on the lawn",
                 "Plant free seed packets before they expire",
                 "Don't let zombies eat your brains");
+    }
+
+    private static List<String> beghouledObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean beghouled = level instanceof BeghouledLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.BEGHOULED);
+        if (!beghouled) {
+            return null;
+        }
+        int target = 0;
+        if (level instanceof BeghouledLevel bg) {
+            target = bg.getSettings().getMatchTarget();
+        }
+        String matches = target > 0
+                ? "Make " + target + " matches of 3+ plants"
+                : "Make matches of 3+ plants";
+        return List.of(
+                matches,
+                "Drag plants to swap with neighbors",
+                "Spend sun to upgrade plants on the board",
+                "Don't let zombies reach your house");
     }
 
     private static String formatTime(float seconds) {

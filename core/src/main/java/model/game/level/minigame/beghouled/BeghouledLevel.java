@@ -45,6 +45,8 @@ public class BeghouledLevel extends MiniGameLevel {
     private float spawnTimer;
     private float currentSpawnInterval;
 
+    private List<int[]> lastClearedCells = List.of();
+
     public BeghouledLevel(LevelConfig config, MiniGameType miniGameType, int difficultyTier) {
         super(config, miniGameType, difficultyTier);
     }
@@ -61,6 +63,25 @@ public class BeghouledLevel extends MiniGameLevel {
 
     public int getMatchesMade() {
         return matchesMade;
+    }
+
+    public boolean isCrater(int row, int col) {
+        return craters != null && inBounds(row, col) && craters[row][col];
+    }
+
+    /** Board plant at (row, col), or null if empty / crater. */
+    public PlantInstance plantAt(int row, int col) {
+        if (board == null || !inBounds(row, col)) {
+            return null;
+        }
+        return board[row][col];
+    }
+
+    /** Returns and clears cells removed by the last match cascade */
+    public List<int[]> consumeLastClearedCells() {
+        List<int[]> cells = lastClearedCells;
+        lastClearedCells = List.of();
+        return cells;
     }
 
     @Override
@@ -298,6 +319,7 @@ public class BeghouledLevel extends MiniGameLevel {
      */
     private void resolveBoard(GameModel model) {
         int cascadeDepth = 0;
+        List<int[]> clearedThisResolve = new ArrayList<>();
         while (true) {
             List<List<int[]>> matches = findMatches();
             if (matches.isEmpty()) {
@@ -318,14 +340,15 @@ public class BeghouledLevel extends MiniGameLevel {
                 if (board[r][c] != null) {
                     model.getMap().getCell(c, r).removePlaceable(board[r][c]);
                     board[r][c] = null;
+                    clearedThisResolve.add(new int[] { r, c });
                 }
             }
             applyGravity(model);
             refill(model);
             cascadeDepth++;
         }
+        lastClearedCells = List.copyOf(clearedThisResolve);
         if (matchesMade >= settings.getMatchTarget()) {
-            // Spec: reaching the target destroys every zombie in the garden.
             killAllZombies(model);
         } else if (!possibleMoveExists()) {
             resetBoard(model);
@@ -556,6 +579,7 @@ public class BeghouledLevel extends MiniGameLevel {
                         .getPlaceable(PlacableLayer.MAIN) != board[r][c]) {
                     board[r][c] = null;
                     craters[r][c] = true;
+                    model.createCraterAt(r, c);
                     changed = true;
                 }
             }

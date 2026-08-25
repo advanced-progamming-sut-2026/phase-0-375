@@ -16,6 +16,7 @@ import model.enums.ZombieSize;
 import model.game.core.GameModel;
 import model.game.level.minigame.bowling.BowlingWalnut;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
 import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
@@ -88,6 +89,7 @@ import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
 import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
+import view.gui.assets.BeghouledArt;
 import view.gui.assets.EffectPamPaths;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.ProjectilePamPaths;
@@ -303,6 +305,9 @@ public final class LawnEntityRenderer {
 
     private List<BowlingWalnut> bowlingWalnuts = List.of();
     private final Map<String, Float> vaseAge = new HashMap<>();
+    private final IdentityHashMap<PlantInstance, BeghouledMotion> beghouledMotion = new IdentityHashMap<>();
+    private static final float BEGHOULED_MOVE_SEC = 0.22f;
+    private TextureRegion beghouledCraterRegion;
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
@@ -444,6 +449,7 @@ public final class LawnEntityRenderer {
         spawnMissingDeathBlasts(deathBlastNow);
         deathBlastSeen.clear();
         deathBlastSeen.putAll(deathBlastNow);
+        harvestBeghouledClears(model);
         drawEffects(batch, backEffects, delta);
         prepareBowlingWalnuts(model);
 
@@ -459,6 +465,7 @@ public final class LawnEntityRenderer {
         int rows = map != null ? map.getRows() : layout.rows();
         // Row 0 is the top of the screen; later rows paint over it.
         for (int row = 0; row < rows; row++) {
+            drawBeghouledCraters(batch, model, row);
             drawGraves(batch, model, delta, row);
             drawGraveGhosts(batch, delta, row);
             drawVases(batch, model, delta, row, rows);
@@ -503,6 +510,7 @@ public final class LawnEntityRenderer {
 
         pruneVaseAge(model);
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        beghouledMotion.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         armorBreakFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleeAttackFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
@@ -622,6 +630,7 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        applyBeghouledMotion(plant, xy, delta);
         applySquashLeap(plant, xy);
         float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
@@ -928,6 +937,104 @@ public final class LawnEntityRenderer {
         }
         clips.preloadSync(VaseBreakerAnim.GARGANTUAR_ZOMBIE,
                 "idle", "walk", "eat", "smash_left", "fire", "cannon_fire", "die");
+    }
+
+    public void preloadBeghouled() {
+        textures.loadSync(BeghouledArt.ATLAS_GROUP);
+        textures.loadSync(BeghouledArt.ATLAS_PAGE);
+        beghouledCraterRegion = textures.region(BeghouledArt.CRATER_TILE);
+        if (beghouledCraterRegion == null) {
+            beghouledCraterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+        }
+    }
+
+    private void harvestBeghouledClears(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return;
+        }
+        for (int[] cell : beghouled.consumeLastClearedCells()) {
+            if (cell == null || cell.length < 2) {
+                continue;
+            }
+            float[] xy = layout.centerOf(cell[0], cell[1]);
+            frontEffects.add(new OneShotFx(
+                    EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_ON,
+                    xy[0], xy[1], AnimScale.PLANT * 0.85f, false));
+        }
+    }
+
+    private void drawBeghouledCraters(Batch batch, GameModel model, int row) {
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return;
+        }
+        if (beghouledCraterRegion == null) {
+            beghouledCraterRegion = textures.region(BeghouledArt.CRATER_TILE);
+            if (beghouledCraterRegion == null) {
+                beghouledCraterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+            }
+        }
+        if (beghouledCraterRegion == null) {
+            return;
+        }
+        float w = beghouledCraterRegion.getRegionWidth();
+        float h = beghouledCraterRegion.getRegionHeight();
+        int cols = layout.cols();
+        for (int c = 0; c < cols; c++) {
+            if (!beghouled.isCrater(row, c)) {
+                continue;
+            }
+            float[] xy = layout.centerOf(row, c);
+            batch.draw(beghouledCraterRegion, xy[0] - w * 0.5f, xy[1] - h * 0.4f, w, h);
+        }
+    }
+
+    private void applyBeghouledMotion(PlantInstance plant, float[] xy, float delta) {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (!(model != null && model.getCurrentLevel() instanceof BeghouledLevel)) {
+            beghouledMotion.remove(plant);
+            return;
+        }
+        BeghouledMotion motion = beghouledMotion.get(plant);
+        if (motion == null) {
+            motion = new BeghouledMotion();
+            motion.toX = xy[0];
+            motion.toY = xy[1];
+            motion.fromX = xy[0];
+            motion.fromY = xy[1] + layout.cellHeight() * 1.15f;
+            motion.t = 0f;
+            beghouledMotion.put(plant, motion);
+        } else {
+            float dx = xy[0] - motion.toX;
+            float dy = xy[1] - motion.toY;
+            if (dx * dx + dy * dy > 0.25f) {
+                float u = beghouledEase(motion.t);
+                motion.fromX = motion.fromX + (motion.toX - motion.fromX) * u;
+                motion.fromY = motion.fromY + (motion.toY - motion.fromY) * u;
+                motion.toX = xy[0];
+                motion.toY = xy[1];
+                motion.t = 0f;
+            } else {
+                motion.toX = xy[0];
+                motion.toY = xy[1];
+            }
+        }
+        motion.t = Math.min(1f, motion.t + Math.max(0f, delta) / BEGHOULED_MOVE_SEC);
+        float u = beghouledEase(motion.t);
+        xy[0] = motion.fromX + (motion.toX - motion.fromX) * u;
+        xy[1] = motion.fromY + (motion.toY - motion.fromY) * u;
+    }
+
+    private static float beghouledEase(float t) {
+        float u = Math.max(0f, Math.min(1f, t));
+        return 1f - (1f - u) * (1f - u);
+    }
+
+    private static final class BeghouledMotion {
+        float fromX;
+        float fromY;
+        float toX;
+        float toY;
+        float t;
     }
 
     public void playVaseBreak(String pamPath, int col, int row) {
