@@ -131,7 +131,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
         entityRenderer.resetMowers(chapter, lawnMowersEnabled());
-        if (bowlingMode) {
+        if (bowlingMode || deadLineColumn() >= 0) {
             deadLineRenderer = new DeadLineRenderer();
         }
         assets.textures.loadSync("UI_SeedPackets_768");
@@ -975,7 +975,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return -1;
         }
         int line = level.getConfig().getDeadLineColumn();
-        if (line <= 0 && level.getConfig().getRules() != null) {
+        if (line < 0 && level.getConfig().getRules() != null) {
             line = level.getConfig().getRules().getDeadLineColumn();
         }
         return line;
