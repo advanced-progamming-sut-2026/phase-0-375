@@ -17,6 +17,7 @@ import com.ray3k.tenpatch.TenPatchDrawable;
 import model.game.core.GameModel;
 import model.game.level.Level;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.level.special.ConveyorBeltLevel;
 
 /**
@@ -79,14 +80,15 @@ public final class SunHud extends WidgetGroup {
         return out;
     }
 
-    /** Conveyor / bowling do not spend sun; hide the bank. */
+    /** Conveyor / bowling / vase breaker do not spend sun; hide the bank. */
     public static boolean showFor(GameModel model) {
         if (model == null) {
             return false;
         }
         Level level = model.getCurrentLevel();
         return !(level instanceof ConveyorBeltLevel)
-                && !(level instanceof WallnutBowlingLevel);
+                && !(level instanceof WallnutBowlingLevel)
+                && !(level instanceof VaseBreakerLevel);
     }
 
     /**

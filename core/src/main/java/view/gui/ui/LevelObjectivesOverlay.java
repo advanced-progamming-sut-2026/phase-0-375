@@ -24,6 +24,7 @@ import model.game.level.Level;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.rule.GameRules;
 
 import java.util.ArrayList;
@@ -144,6 +145,10 @@ public final class LevelObjectivesOverlay {
         if (bowling != null) {
             return bowling;
         }
+        List<String> vaseBreaker = vaseBreakerObjectives(model);
+        if (vaseBreaker != null) {
+            return vaseBreaker;
+        }
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -198,6 +203,23 @@ public final class LevelObjectivesOverlay {
                 "Roll Wall-nuts into zombies from the conveyor belt",
                 "Only launch left of the red line",
                 "Survive every zombie wave");
+    }
+
+    private static List<String> vaseBreakerObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean vase = level instanceof VaseBreakerLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.VASE_BREAKER);
+        if (!vase) {
+            return null;
+        }
+        return List.of(
+                "Break every vase on the lawn",
+                "Plant free seed packets before they expire",
+                "Don't let zombies eat your brains");
     }
 
     private static String formatTime(float seconds) {

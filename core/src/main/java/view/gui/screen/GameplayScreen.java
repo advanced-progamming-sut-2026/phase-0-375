@@ -29,6 +29,9 @@ import model.game.level.Level;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.PendingSeedPacket;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
@@ -37,6 +40,7 @@ import model.user.User;
 import view.gui.PvzGdxGame;
 import view.gui.anim.AnimScale;
 import view.gui.anim.bowling.BowlingWalnutAnim;
+import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
@@ -93,6 +97,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private int hoverRow = -1;
     private List<String> shownPackets = List.of();
     private final boolean bowlingMode;
+    private final boolean vaseBreakerMode;
 
     private boolean plantfoodMode;
     private boolean shovelMode;
@@ -120,6 +125,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         lawnLayout = lawnLayout();
         bowlingMode = currentLevel() instanceof WallnutBowlingLevel;
+        vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
         Chapter chapter = currentChapter();
         LawnBackgroundRenderer.Style lawnStyle = LawnBackgroundRenderer.Style.forChapter(chapter);
         lawnBackground = new LawnBackgroundRenderer(assets.textures, lawnStyle);
@@ -131,6 +137,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
         entityRenderer.resetMowers(chapter, lawnMowersEnabled());
+        if (vaseBreakerMode) {
+            entityRenderer.preloadVases();
+        }
         if (bowlingMode || deadLineColumn() >= 0) {
             deadLineRenderer = new DeadLineRenderer();
         }
@@ -336,15 +345,24 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void refreshPackets() {
-        List<String> selected = selectedPlants();
+        List<String> selected = hudPlantNames();
         shownPackets = new ArrayList<>(selected);
         packetColumn.clearChildren();
+        List<PendingSeedPacket> pending = vaseBreakerMode ? pendingPackets() : List.of();
+        int pendingIndex = 0;
         for (String name : selected) {
-            SeedPacketActor packet = bowlingMode
+            SeedPacketActor packet = (bowlingMode || vaseBreakerMode)
                 ? new SeedPacketActor(assets.textures, skin, name, 0, 1, false, false, false)
                 : new SeedPacketActor(
                     assets.textures, skin, name, plantCost(name), plantLevel(name),
                     boosted(name), false);
+            if (vaseBreakerMode) {
+                packet.enableExpiryTimer(skin);
+                if (pendingIndex < pending.size()) {
+                    packet.setExpirySeconds(pending.get(pendingIndex).getTimeToExpiry());
+                }
+                pendingIndex++;
+            }
             packet.onDragPlant(new SeedPacketActor.DragPlant() {
                 @Override
                 public void dragStart(SeedPacketActor packet) {
@@ -379,13 +397,19 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private void refreshPacketChrome() {
         GameModel model = App.getInstance().getCurrentGameModel();
         int sun = model == null ? 0 : model.getSunAmount();
+        List<PendingSeedPacket> pending = vaseBreakerMode ? pendingPackets() : List.of();
+        int pendingIndex = 0;
         for (Actor actor : packetColumn.getChildren()) {
             if (!(actor instanceof SeedPacketActor packet) || packet.plantName() == null) {
                 continue;
             }
             String name = packet.plantName();
-            if (bowlingMode) {
+            if (bowlingMode || vaseBreakerMode) {
                 packet.setDimmed(false);
+                if (vaseBreakerMode && pendingIndex < pending.size()) {
+                    packet.setExpirySeconds(pending.get(pendingIndex).getTimeToExpiry());
+                }
+                pendingIndex++;
                 continue;
             }
             boolean ready = model == null || model.isSeedReady(name);
@@ -421,7 +445,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
-        if (bowlingMode) {
+        if (bowlingMode || vaseBreakerMode) {
             refreshPackets();
         } else {
             refreshPacketChrome();
@@ -442,7 +466,37 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setShovelMode(false);
             return true;
         }
+        if (vaseBreakerMode && tryBreakVase(worldX, worldY)) {
+            return true;
+        }
         return tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY);
+    }
+
+    private boolean tryBreakVase(float worldX, float worldY) {
+        if (isPregame()) {
+            return false;
+        }
+        if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
+            return false;
+        }
+        Level level = currentLevel();
+        if (!(level instanceof VaseBreakerLevel vaseLevel)) {
+            return false;
+        }
+        int col = cellTmp[0];
+        int row = cellTmp[1];
+        Vase vase = vaseLevel.vaseAt(col, row);
+        if (vase == null) {
+            return false;
+        }
+        String pam = VaseBreakerAnim.pamPath(vase);
+        CommandResult<Void> result = gameplay.breakVase(col, row);
+        showToast(result.getMessage(), !result.isSuccess());
+        if (result.isSuccess()) {
+            entityRenderer.playVaseBreak(pam, col, row);
+            refreshPackets();
+        }
+        return true;
     }
 
     private void onCellHover(int col, int row) {
@@ -776,7 +830,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (previewPlant != null) {
             previewTime += delta;
         }
-        if (!selectedPlants().equals(shownPackets)) {
+        if (!hudPlantNames().equals(shownPackets)) {
             refreshPackets();
         } else {
             refreshPacketChrome();
@@ -959,7 +1013,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (model == null) {
             return true;
         }
-        if (model.getCurrentLevel() instanceof WallnutBowlingLevel) {
+        if (model.getCurrentLevel() instanceof WallnutBowlingLevel
+                || model.getCurrentLevel() instanceof VaseBreakerLevel) {
             return false;
         }
         Level level = model.getCurrentLevel();
@@ -987,6 +1042,27 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return bowling.canLaunchAtColumn(col);
         }
         return true;
+    }
+
+    private List<String> hudPlantNames() {
+        if (vaseBreakerMode) {
+            List<String> names = new ArrayList<>();
+            for (PendingSeedPacket packet : pendingPackets()) {
+                if (packet.getPlant() != null && packet.getPlant().getName() != null) {
+                    names.add(packet.getPlant().getName());
+                }
+            }
+            return names;
+        }
+        return selectedPlants();
+    }
+
+    private static List<PendingSeedPacket> pendingPackets() {
+        Level level = currentLevel();
+        if (level instanceof VaseBreakerLevel vaseBreaker) {
+            return vaseBreaker.getPendingSeedPackets();
+        }
+        return List.of();
     }
 
     private static List<String> selectedPlants() {

@@ -40,6 +40,7 @@ public final class SeedPacketActor extends WidgetGroup {
     private boolean dimmed;
     private Runnable onClick;
     private DragPlant dragPlant;
+    private Label expiryLabel;
 
     public SeedPacketActor(TextureBank textures, Skin skin, String plantName, int sunCost, int level) {
         this(textures, skin, plantName, sunCost, level, false, false, true);
@@ -197,6 +198,30 @@ public final class SeedPacketActor extends WidgetGroup {
 
     public void onDragPlant(DragPlant dragPlant) {
         this.dragPlant = dragPlant;
+    }
+
+    public void enableExpiryTimer(Skin skin) {
+        if (expiryLabel != null || plantName == null) {
+            return;
+        }
+        BitmapFont font = SkinFonts.outlined(skin, "secondary");
+        Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
+        expiryLabel = packetLabel("0s", style, 1.6f,
+                PACKET_WIDTH * 0.44f, 4f, PACKET_WIDTH * 0.52f, 18f);
+        addActor(expiryLabel);
+    }
+
+    public void setExpirySeconds(float seconds) {
+        if (expiryLabel == null) {
+            return;
+        }
+        int rounded = Math.max(0, Math.round(seconds));
+        expiryLabel.setText(rounded + "s");
+        if (seconds <= 5f) {
+            expiryLabel.setColor(Color.SCARLET);
+        } else {
+            expiryLabel.setColor(Color.WHITE);
+        }
     }
 
     public String plantName() {

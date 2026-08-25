@@ -16,6 +16,8 @@ import model.enums.ZombieSize;
 import model.game.core.GameModel;
 import model.game.level.minigame.bowling.BowlingWalnut;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
@@ -62,6 +64,7 @@ import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
+import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.anim.plant.MeleePlantFx;
@@ -299,6 +302,7 @@ public final class LawnEntityRenderer {
     private final Map<String, Boolean> popVis = new HashMap<>();
 
     private List<BowlingWalnut> bowlingWalnuts = List.of();
+    private final Map<String, Float> vaseAge = new HashMap<>();
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
@@ -457,6 +461,7 @@ public final class LawnEntityRenderer {
         for (int row = 0; row < rows; row++) {
             drawGraves(batch, model, delta, row);
             drawGraveGhosts(batch, delta, row);
+            drawVases(batch, model, delta, row, rows);
             for (PlantInstance plant : plants) {
                 int lane = plantRow(plant);
                 if (lane >= 0 && clampRow(lane, rows) == row) {
@@ -496,6 +501,7 @@ public final class LawnEntityRenderer {
         harvestProjectileHits(model);
         drawEffects(batch, frontEffects, delta);
 
+        pruneVaseAge(model);
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         armorBreakFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
@@ -911,6 +917,75 @@ public final class LawnEntityRenderer {
                 seenThisFrame.add(walnut);
             }
         }
+    }
+
+    public void preloadVases() {
+        for (String pam : VaseBreakerAnim.allVasePams()) {
+            clips.preloadSync(pam,
+                    VaseBreakerAnim.CLIP_DROP,
+                    VaseBreakerAnim.CLIP_IDLE,
+                    VaseBreakerAnim.CLIP_BREAK);
+        }
+        clips.preloadSync(VaseBreakerAnim.GARGANTUAR_ZOMBIE,
+                "idle", "walk", "eat", "smash_left", "fire", "cannon_fire", "die");
+    }
+
+    public void playVaseBreak(String pamPath, int col, int row) {
+        if (pamPath == null) {
+            return;
+        }
+        float[] xy = layout.centerOf(row, col);
+        frontEffects.add(new OneShotFx(
+                pamPath, VaseBreakerAnim.CLIP_BREAK, xy[0], xy[1], AnimScale.PLANT, false));
+        vaseAge.remove(vaseKey(col, row));
+    }
+
+    private void drawVases(Batch batch, GameModel model, float delta, int row, int rows) {
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            return;
+        }
+        for (Vase vase : level.getVases()) {
+            if (vase.isBroken() || vase.getPosition() == null) {
+                continue;
+            }
+            int col = vase.getPosition().getX();
+            int vaseRow = vase.getPosition().getY();
+            if (clampRow(vaseRow, rows) != row) {
+                continue;
+            }
+            String key = vaseKey(col, vaseRow);
+            float age = vaseAge.getOrDefault(key, 0f) + Math.max(0f, delta);
+            vaseAge.put(key, age);
+            String pam = VaseBreakerAnim.pamPath(vase);
+            boolean dropping = age < VaseBreakerAnim.DROP_SECONDS;
+            String clip = dropping ? VaseBreakerAnim.CLIP_DROP : VaseBreakerAnim.CLIP_IDLE;
+            float time = dropping ? age : age - VaseBreakerAnim.DROP_SECONDS;
+            ClipRef ref = clips.getOrLoad(pam, clip);
+            if (ref == null) {
+                continue;
+            }
+            float[] xy = layout.centerOf(vaseRow, col);
+            player.draw(batch, ref, time, xy[0], xy[1],
+                    AnimScale.PLANT, AnimScale.PLANT, !dropping);
+        }
+    }
+
+    private void pruneVaseAge(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            vaseAge.clear();
+            return;
+        }
+        HashSet<String> live = new HashSet<>();
+        for (Vase vase : level.getVases()) {
+            if (!vase.isBroken() && vase.getPosition() != null) {
+                live.add(vaseKey(vase.getPosition().getX(), vase.getPosition().getY()));
+            }
+        }
+        vaseAge.keySet().removeIf(key -> !live.contains(key));
+    }
+
+    private static String vaseKey(int col, int row) {
+        return col + "," + row;
     }
 
     private void drawBowlingWalnuts(Batch batch, float delta, int row, int rows) {
