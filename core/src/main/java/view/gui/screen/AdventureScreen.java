@@ -15,12 +15,13 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.CollectionMenuController;
 import controller.GameMenuController;
 import controller.GameMenuController.ChapterSummary;
+import controller.MainMenuController;
 import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
+import model.enums.Chapter;
 import model.enums.MenuType;
 import model.quest.Quest;
-import model.user.User;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
@@ -141,6 +142,17 @@ public final class AdventureScreen extends AbstractMenuScreen {
         stage.addActor(hudButton(textures,
             AdventureHudRegions.LEADERBOARD_NORMAL, AdventureHudRegions.LEADERBOARD_DOWN,
             xRight, yBottom, this::openLeaderboard));
+
+        TextButton scoreGame = new TextButton("Score Game", skin, "purple");
+        scoreGame.setSize(200f, 56f);
+        scoreGame.setPosition(xRight - 200f - 16f, yBottom);
+        scoreGame.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                openScoreGame();
+            }
+        });
+        stage.addActor(scoreGame);
     }
 
     private AtlasImageButton hudButton(TextureBank textures, String upId, String downId,
@@ -204,20 +216,15 @@ public final class AdventureScreen extends AbstractMenuScreen {
     }
 
     private void openLeaderboard() {
-        CommandResult<List<User>> board = controller.leaderboard("score", "desc");
-        Table list = new Table();
-        if (!board.isSuccess() || board.getData() == null) {
-            list.add(new Label(board.getMessage(), skin, "medium"));
-        } else {
-            int rank = 1;
-            for (User user : board.getData()) {
-                String line = rank + ". " + user.getUsername()
-                    + "  —  " + user.getHighestMyopoint() + " myopoint";
-                list.add(new Label(line, skin, "medium")).left().padBottom(4f).row();
-                rank++;
-            }
+        game.setScreen(new LeaderboardScreen(game, () -> game.setScreen(new AdventureScreen(game))));
+    }
+
+    private void openScoreGame() {
+        CommandResult<Void> r = MainMenuController.getInstance().enterScoreGame();
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(new LevelObjectivesScreen(game, Chapter.ANCIENT_EGYPT));
         }
-        game.setScreen(new PlaceholderMenuScreen(game, "Leaderboard", MenuType.GAME, list));
     }
 
     private void addNavButtons() {

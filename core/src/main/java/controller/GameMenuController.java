@@ -271,13 +271,14 @@ public class GameMenuController extends AppMenuController {
     }
 
     /**
-     * Leaderboard sorted by any column. Sort keys: "score"/"myopoint"
+     * Leaderboard sorted by any column. Sort keys: "username", "score"/"myopoint"
      * (default), "progress", "minigames", "daily-quests" and "quests"
      * (non-daily). Order: "desc" (default) or "asc".
      */
     public CommandResult<List<User>> leaderboard(String sortKey, String order) {
         String key = sortKey == null ? "score" : sortKey.toLowerCase();
         Comparator<User> comparator = switch (key) {
+            case "username", "name", "user" -> Comparator.comparing(User::getUsername, String.CASE_INSENSITIVE_ORDER);
             case "progress" -> Comparator.comparingInt(GameMenuController::totalProgress);
             case "minigames" -> Comparator.comparingInt(User::getCompletedMiniGames);
             case "daily-quests", "dailyquests", "daily" -> Comparator.comparingInt(User::getCompletedDailyQuests);
@@ -287,7 +288,7 @@ public class GameMenuController extends AppMenuController {
         };
         if (comparator == null) {
             return errorTyped("Unknown sort column '" + sortKey
-                    + "'. Use: score, progress, minigames, daily-quests or quests.");
+                    + "'. Use: username, score, progress, minigames, daily-quests or quests.");
         }
         if (order != null && !order.equalsIgnoreCase("asc") && !order.equalsIgnoreCase("desc")) {
             return errorTyped("Unknown sort order '" + order + "'. Use: asc or desc.");
