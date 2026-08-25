@@ -1176,6 +1176,39 @@ public final class LawnEntityRenderer {
         plantIdleClip(resolveIdlePlantName(plantName));
     }
 
+    public void drawZombieIdle(Batch batch, String zombieName, float x, float y, float time,
+                               Chapter chapter) {
+        if (zombieName == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.forZombie(zombieName, chapter);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "walk", "idle2", "idle1");
+        if (clip == null) {
+            return;
+        }
+        ClipRef ref = clips.getOrLoad(entry.path(), clip);
+        if (ref != null) {
+            player.draw(batch, ref, time, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, true);
+        }
+    }
+
+    public void preloadZombieIdle(String zombieName, Chapter chapter) {
+        if (zombieName == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.forZombie(zombieName, chapter);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "walk", "idle2", "idle1");
+        if (clip != null) {
+            clips.getOrLoad(entry.path(), clip);
+        }
+    }
+
     private static String resolveIdlePlantName(String plantName) {
         if ("Giant Wall-nut".equalsIgnoreCase(plantName)) {
             return "Wall-nut";

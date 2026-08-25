@@ -25,6 +25,7 @@ import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
 import model.game.level.minigame.beghouled.BeghouledLevel;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.rule.GameRules;
 
@@ -154,6 +155,10 @@ public final class LevelObjectivesOverlay {
         if (beghouled != null) {
             return beghouled;
         }
+        List<String> iZombie = iZombieObjectives(model);
+        if (iZombie != null) {
+            return iZombie;
+        }
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -250,6 +255,23 @@ public final class LevelObjectivesOverlay {
                 "Drag plants to swap with neighbors",
                 "Spend sun to upgrade plants on the board",
                 "Don't let zombies reach your house");
+    }
+
+    private static List<String> iZombieObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean iZombie = level instanceof IZombieLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.I_ZOMBIE);
+        if (!iZombie) {
+            return null;
+        }
+        return List.of(
+                "Spend sun to place zombies right of the red line",
+                "Eat every brain on the left side of the lawn",
+                "Collect sun from the glowing zombies on the right");
     }
 
     private static String formatTime(float seconds) {
