@@ -125,12 +125,12 @@ public class Shop {
             return;
         }
 
-        // Reuse today's saved offer if it exists and is still valid.
+        // Reuse today's saved offer if it exists and is still unlocked.
         String plant = null;
         if (today.toString().equals(customer.getDailyOfferDate())) {
-            plant = customer.getDailyOfferPlant();
+            plant = resolveUnlockedPlantName(customer.getDailyOfferPlant());
         }
-        if (plant == null || !isPlantUnlocked(plant)) {
+        if (plant == null) {
             plant = pickRandomUnlockedPlant();
         }
         if (plant == null) {
@@ -353,11 +353,6 @@ public class Shop {
             }
         }
         return null;
-    }
-
-    private boolean isPlantUnlocked(String plantName) {
-        Set<String> unlocked = customer.getUnlockedPlants();
-        return plantName != null && unlocked != null && unlocked.contains(plantName);
     }
 
     /** Finds the canonical unlocked plant name, ignoring case. */

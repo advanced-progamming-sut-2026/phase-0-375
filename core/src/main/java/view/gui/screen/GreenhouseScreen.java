@@ -1,11 +1,17 @@
 package view.gui.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
+import com.badlogic.gdx.utils.Align;
+import com.badlogic.gdx.utils.Scaling;
 import controller.GreenhouseMenuController;
 import controller.result.CommandResult;
 import model.app.App;
@@ -17,6 +23,7 @@ import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.PvzAssets;
+import view.gui.assets.ShopArt;
 import view.gui.assets.ZenGardenArt;
 import view.gui.assets.ZenGardenLayout;
 import view.gui.anim.PamClipCache;
@@ -32,6 +39,15 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
     private static final float CORNER_PAD = 40f;
     private static final float HUD_ICON = 100f;
     private static final float SHOP_ICON = 140f;
+    /** Red sale ribbon under the shop button (same art as shop daily banner). */
+    private static final float SALE_BANNER_W = 125f;
+    private static final float SALE_BANNER_H = 44f;
+    /** Offset from shop icon centre; +Y moves the banner up. */
+    private static final float SALE_BANNER_SHIFT_X = -5f;
+    private static final float SALE_BANNER_SHIFT_Y = 35f;
+    private static final float SALE_BANNER_TEXT_SCALE = 1f;
+    private static final float SALE_BANNER_TEXT_SHIFT_X = 0f;
+    private static final float SALE_BANNER_TEXT_SHIFT_Y = 0f;
 
     private final GreenhouseMenuController controller = GreenhouseMenuController.getInstance();
     private final ZenGardenArt art = ZenGardenArt.create();
@@ -95,12 +111,43 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
             }
         }
 
+        float shopX = UI_WIDTH - CORNER_PAD - SHOP_ICON;
+        float shopY = CORNER_PAD;
         AtlasImageButton shop = hudButton(textures,
             AdventureHudRegions.STORE_NORMAL, AdventureHudRegions.STORE_DOWN,
-            SHOP_ICON, UI_WIDTH - CORNER_PAD - SHOP_ICON, CORNER_PAD, this::openShop);
+            SHOP_ICON, shopX, shopY, this::openShop);
         stage.addActor(shop);
+        stage.addActor(shopSaleBanner(textures, shopX, shopY));
 
         refreshAll();
+    }
+
+    /** Red "sale" ribbon parked under the greenhouse shop icon. */
+    private Group shopSaleBanner(TextureBank t, float shopX, float shopY) {
+        Group banner = new Group();
+        banner.setSize(SALE_BANNER_W, SALE_BANNER_H);
+        banner.setTouchable(Touchable.disabled);
+        banner.setPosition(
+            shopX + (SHOP_ICON - SALE_BANNER_W) * 0.5f + SALE_BANNER_SHIFT_X,
+            shopY - SALE_BANNER_H * 0.55f + SALE_BANNER_SHIFT_Y);
+
+        TextureRegion region = t.region(ShopArt.SALE_BANNER);
+        if (region != null) {
+            Image art = new Image(new TextureRegionDrawable(region));
+            art.setScaling(Scaling.stretch);
+            art.setBounds(0f, 0f, SALE_BANNER_W, SALE_BANNER_H);
+            banner.addActor(art);
+        }
+        Label text = new Label("sale", skin, "medium");
+        text.setColor(Color.WHITE);
+        text.setAlignment(Align.center);
+        text.setFontScale(SALE_BANNER_TEXT_SCALE);
+        text.pack();
+        text.setPosition(
+            (SALE_BANNER_W - text.getWidth()) * 0.5f + SALE_BANNER_TEXT_SHIFT_X,
+            (SALE_BANNER_H - text.getHeight()) * 0.5f + SALE_BANNER_TEXT_SHIFT_Y);
+        banner.addActor(text);
+        return banner;
     }
 
     private AtlasImageButton hudButton(TextureBank textures, String upId, String downId,

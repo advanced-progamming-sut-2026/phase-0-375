@@ -46,9 +46,7 @@ public class ShopMenuController extends AppMenuController {
 
     public CommandResult<String> shopDaily() {
         Shop shop = buildShop();
-        shop.refreshDailyOffer();
-        // Persist the refreshed offer identity (plant + date).
-        App.getInstance().getUserRepository().flush();
+        ensureDailyOffer(shop);
         if (shop.getDailyOffer() == null) {
             String msg = "No daily offer today.";
             return CommandResult.successWithData(msg, msg);
@@ -58,6 +56,21 @@ public class ShopMenuController extends AppMenuController {
             + "  Price: " + shop.getDailyOffer().getDiscountedPrice() + " coins\n"
             + (shop.getDailyOffer().isPurchased() ? "  [Already purchased today]" : "  Use 'shop buy -i 6 -n 1'");
         return CommandResult.successWithData(msg, msg);
+    }
+
+    /**
+     * Rebuilds today's daily offer from the user save (or rolls a new one once),
+     * then flushes so the plant identity survives restarts.
+     */
+    public Shop ensureDailyOffer() {
+        Shop shop = buildShop();
+        ensureDailyOffer(shop);
+        return shop;
+    }
+
+    private void ensureDailyOffer(Shop shop) {
+        shop.refreshDailyOffer();
+        App.getInstance().getUserRepository().flush();
     }
 
     public CommandResult<Void> shopBuy(int itemId, int count, String plantType) {
