@@ -113,6 +113,12 @@ public class GameModel implements BehaviorContext {
     /** Center-screen stings (wave / necromancy / low tide); GUI drains FIFO. */
     private final ArrayDeque<String> pendingAnnouncements = new ArrayDeque<>();
 
+    /** Egypt sandstorms in flight; each lands its zombie at touchdown. */
+    private final List<SandstormSpawn> pendingSandstorms = new ArrayList<>();
+    /** Read-only view of {@link #pendingSandstorms} for the renderer. */
+    private final List<SandstormSpawn> sandstormsView =
+            Collections.unmodifiableList(pendingSandstorms);
+
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
     private int coinCount;
@@ -406,13 +412,16 @@ public class GameModel implements BehaviorContext {
 
     /**
      * Ancient Egypt tornado entry (final wave): the zombie is carried in by a
-     * tornado and touches down 1-4 columns ahead of the normal entry edge.
+     * sandstorm and touches down 1-4 columns ahead of the normal entry edge.
+     *
+     * @return the landed instance, so sandstorm records can hide it behind
+     *         the outro fade
      */
-    public void spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
+    public ZombieInstance spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
         instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         recordZombieSeen(zombie.getName());
-        int col = Math.max(0, gameMap.getCols() - Math.max(1, columnsAhead));
+        int col = tornadoColumn(gameMap.getCols(), columnsAhead);
         instance.setContinuousPosition(new FloatPoint(col, lane));
         instance.setGridPosition(new Point(col, lane));
         activeZombies.add(instance);
@@ -423,10 +432,31 @@ public class GameModel implements BehaviorContext {
         if (waveManager != null) {
             waveManager.onWaveZombieSpawned(instance);
         }
-        App.logToShell("[Tornado] A " + zombie.getName()
-                + " is carried in by a tornado and lands " + columnsAhead
+        App.logToShell("[Sandstorm] A " + zombie.getName()
+                + " is carried in by a sandstorm and lands " + columnsAhead
                 + " column(s) ahead in lane " + (lane + 1) + "!");
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+        return instance;
+    }
+
+    /** Touchdown column for a storm entry landing inside the right edge. */
+    public static int tornadoColumn(int columnCount, int columnsAhead) {
+        return Math.max(0, columnCount - Math.max(1, columnsAhead));
+    }
+
+    /**
+     * Ancient Egypt sandstorm entry: queues a storm that carries
+     * {@code zombie} in from off-screen right and spawns it
+     * {@code columnsAhead} columns inside the normal entry edge when the
+     * storm touches down.
+     */
+    public void queueSandstormSpawn(Zombie zombie, int lane, int columnsAhead) {
+        pendingSandstorms.add(new SandstormSpawn(this, zombie, lane, columnsAhead));
+    }
+
+    /** In-flight sandstorms (read-only) for the view layer. */
+    public List<SandstormSpawn> getSandstorms() {
+        return sandstormsView;
     }
 
     /** Hook invoked by the wave manager when a new wave begins. */
@@ -584,6 +614,7 @@ public class GameModel implements BehaviorContext {
         if (chapterEffects != null) {
             chapterEffects.tick(deltaTime);
         }
+        tickSandstorms(deltaTime);
         if (!seedCooldowns.isEmpty()) {
             Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
             while (it.hasNext()) {
@@ -591,6 +622,19 @@ public class GameModel implements BehaviorContext {
                 float remaining = e.getValue() - deltaTime;
                 if (remaining <= 0f) it.remove();
                 else e.setValue(remaining);
+            }
+        }
+    }
+
+    /** Advances in-flight sandstorms, spawning each zombie at touchdown. */
+    private void tickSandstorms(float deltaTime) {
+        if (pendingSandstorms.isEmpty()) {
+            return;
+        }
+        Iterator<SandstormSpawn> iterator = pendingSandstorms.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
             }
         }
     }

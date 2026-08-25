@@ -23,10 +23,12 @@ import model.enums.GameState;
 import model.enums.MenuType;
 import model.enums.SunType;
 import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
+import model.game.core.SandstormSpawn;
 import model.game.map.Cell;
 import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
-import model.game.core.PvZGameLoop;
+import model.game.wave.Wave;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
@@ -46,7 +48,10 @@ import view.gui.ui.SunHud;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Debug FrontLawn playground: tool panel + free plant/zombie placement, no win/lose.
@@ -81,6 +86,8 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
     private Chapter selectedZombieChapter = Chapter.ANCIENT_EGYPT;
     private boolean icedPick;
     private boolean paused;
+    /** Sandstorms queued by the button → biome skin to apply once their zombie lands. */
+    private final Map<SandstormSpawn, Chapter> sandstormSkins = new IdentityHashMap<>();
     private Texture placeholderAvatar;
     private Texture whitePixel;
 
@@ -191,6 +198,10 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         // Row 5 — sim control
         panel.add(actionButton("Pause/Resume", this::togglePause, "purple")).width(160f).height(44f);
         panel.add(actionButton("Exit", this::exitToAdventure, "brown")).width(100f).height(44f);
+        panel.row();
+
+        // Row 6 — Egypt sandstorm entry (carries the selected zombie in)
+        panel.add(actionButton("Sandstorm", this::spawnSandstorm, "purple")).width(140f).height(44f);
 
         topLeft.add(panel).left();
         uiStage.addActor(topLeft);
@@ -594,6 +605,47 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         refreshStatus();
     }
 
+    /** Queues a sandstorm that carries the currently selected zombie in. */
+    private void spawnSandstorm() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        Zombie zombie = ZombieFactory.getDefinition(selectedZombie);
+        if (model == null || zombie == null) {
+            showToast("No game / zombie definition for " + selectedZombie, true);
+            return;
+        }
+        int lanes = Math.max(1, model.getMap().getRows());
+        int lane = ThreadLocalRandom.current().nextInt(lanes);
+        int columnsAhead = 1 + ThreadLocalRandom.current()
+                .nextInt(Wave.TORNADO_MAX_COLUMNS_AHEAD);
+        Chapter skin = selectedZombieChapter;
+        model.queueSandstormSpawn(zombie, lane, columnsAhead);
+        List<SandstormSpawn> storms = model.getSandstorms();
+        SandstormSpawn storm = storms.isEmpty() ? null : storms.get(storms.size() - 1);
+        if (skin != null && storm != null) {
+            sandstormSkins.put(storm, skin);
+        }
+        showToast("Sandstorm incoming: " + zombie.getName() + " in lane "
+                + (lane + 1) + ", " + columnsAhead + " column(s) ahead.", false);
+        refreshStatus();
+    }
+
+    /** Biome-skin override for zombies once their debug sandstorm touches down. */
+    private void applyStormSkins() {
+        if (sandstormSkins.isEmpty()) {
+            return;
+        }
+        sandstormSkins.entrySet().removeIf(entry -> {
+            if (!entry.getKey().hasLanded()) {
+                return false;
+            }
+            ZombieInstance spawned = entry.getKey().getSpawned();
+            if (spawned != null) {
+                entityRenderer.setArtChapter(spawned, entry.getValue());
+            }
+            return true;
+        });
+    }
+
     private void togglePause() {
         PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
         if (loop == null) {
@@ -627,6 +679,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         if (loop != null && loop.getGameState() == GameState.RUNNING) {
             loop.update(delta);
         }
+        applyStormSkins();
         if (sunHud != null) {
             GameModel model = App.getInstance().getCurrentGameModel();
             sunHud.setAmount(model == null ? 0 : model.getSunAmount());

@@ -258,12 +258,12 @@ public class Wave implements Tickable {
         if (gameModel == null) return;   // not wired up yet — silently skip
         Zombie z = rng.rollZombiePool(entry.getPool());
         if (z == null) return;
-        // Ancient Egypt: final-wave zombies may ride in on a tornado and
+        // Ancient Egypt: final-wave zombies may ride in on a sandstorm and
         // touch down 1-4 columns ahead of the normal entry point.
         if (isFinalWave
                 && gameModel.getChapter() == Chapter.ANCIENT_EGYPT
                 && rng.nextBoolean(TORNADO_CHANCE)) {
-            gameModel.spawnZombieWithTornado(z, lane,
+            gameModel.queueSandstormSpawn(z, lane,
                     rng.nextInt(1, TORNADO_MAX_COLUMNS_AHEAD));
             return;
         }

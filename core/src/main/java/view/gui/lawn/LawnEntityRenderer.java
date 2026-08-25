@@ -14,6 +14,7 @@ import model.enums.PlantState;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
+import model.game.core.SandstormSpawn;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
@@ -57,6 +58,7 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SandstormAnim;
 import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.anim.plant.MeleePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
@@ -272,6 +274,13 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
+    /** Egypt sandstorms in flight, keyed by their model record. */
+    private final IdentityHashMap<SandstormSpawn, SandstormFx> sandstorms = new IdentityHashMap<>();
+    /** Zombies spawned under a still-fading sandstorm; hidden until the outro ends. */
+    private final Set<ZombieInstance> sandstormConcealed =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    /** The sandstorm PAM was force-loaded once so intro/loop/outro timings are known. */
+    private boolean sandstormPamReady;
     private final List<SunFlight> sunFlights = new ArrayList<>();
     private final List<PlantFoodFlight> plantFoodFlights = new ArrayList<>();
     private final List<LootFlight> lootFlights = new ArrayList<>();
@@ -418,6 +427,7 @@ public final class LawnEntityRenderer {
         deathBlastSeen.clear();
         deathBlastSeen.putAll(deathBlastNow);
         drawEffects(batch, backEffects, delta);
+        updateSandstorms(model, delta);
 
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
         livePlants.addAll(plants);
@@ -448,7 +458,8 @@ public final class LawnEntityRenderer {
             }
             drawTerrainIce(batch, model, liveIce, delta, row);
             for (ZombieInstance zombie : model.getZombies()) {
-                if (clampRow(zombieRow(zombie), rows) == row) {
+                if (clampRow(zombieRow(zombie), rows) == row
+                        && !sandstormConcealed.contains(zombie)) {
                     Chapter skin = artChapterFor(zombie, model.getChapter());
                     drawZombie(batch, zombie, skin, delta);
                 }
@@ -459,6 +470,7 @@ public final class LawnEntityRenderer {
             drawProspectorBlasts(batch, delta, row);
             drawMowers(batch, model, delta, row);
         }
+        drawSandstorms(batch);
         drawOctopi(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
@@ -803,6 +815,109 @@ public final class LawnEntityRenderer {
             return ref.duration;
         }
         return 1.5f;
+    }
+
+    /**
+     * Phase machine for every active Egypt sandstorm: intro plays as the storm
+     * starts moving, loop repeats until touchdown, then outro fades it away
+     * once over the landed zombie. Also collects the freshly landed zombies
+     * that must stay hidden behind their storm's outro.
+     */
+    private void updateSandstorms(GameModel model, float delta) {
+        sandstormConcealed.clear();
+        if (model.getSandstorms().isEmpty()) {
+            sandstorms.clear();
+            return;
+        }
+        for (SandstormSpawn storm : model.getSandstorms()) {
+            SandstormFx fx = sandstorms.get(storm);
+            if (fx == null) {
+                fx = beginSandstorm(storm);
+            }
+            fx.clock += delta;
+            float progress = storm.travelProgress();
+            fx.x = fx.startX + (fx.targetX - fx.startX) * progress;
+            if (!storm.hasLanded()) {
+                fx.visible = true;
+                if (fx.introDuration > 0f && fx.clock < fx.introDuration) {
+                    fx.clip = SandstormAnim.INTRO_CLIP;
+                    fx.clipTime = fx.clock;
+                    fx.loop = false;
+                } else {
+                    fx.clip = SandstormAnim.LOOP_CLIP;
+                    fx.clipTime = fx.clock - fx.introDuration;
+                    fx.loop = true;
+                }
+            } else {
+                if (!fx.landedSeen) {
+                    fx.landedSeen = true;
+                    fx.outroClock = 0f;
+                }
+                fx.outroClock += delta;
+                fx.clip = SandstormAnim.OUTRO_CLIP;
+                fx.clipTime = Math.min(fx.outroClock, fx.outroDuration);
+                fx.loop = false;
+                fx.visible = fx.outroClock < fx.outroDuration;
+                if (fx.visible && storm.getSpawned() != null) {
+                    sandstormConcealed.add(storm.getSpawned());
+                }
+            }
+            cacheStormScale(fx);
+        }
+        Set<SandstormSpawn> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        live.addAll(model.getSandstorms());
+        sandstorms.keySet().removeIf(storm -> !live.contains(storm));
+    }
+
+    /** First sighting of a model sandstorm: resolve placement + clip timings. */
+    private SandstormFx beginSandstorm(SandstormSpawn storm) {
+        if (!sandstormPamReady) {
+            sandstormPamReady = true;
+            clips.preloadSync(SandstormAnim.PAM_PATH, SandstormAnim.LOOP_CLIP);
+        }
+        SandstormFx fx = new SandstormFx();
+        // Materialises past the zombie entry edge, off-screen right.
+        fx.startX = layout.centerOf(storm.getLane(), layout.cols())[0]
+                + SandstormAnim.START_MARGIN_PX;
+        float[] target = layout.centerOf(storm.getLane(), storm.getColumn());
+        fx.targetX = target[0];
+        // Raised half a tile so the dust cloud doesn't sink into the lane below.
+        fx.y = target[1] + layout.cellHeight() * 0.5f;
+        fx.introDuration = player.clipDurationSeconds(
+                SandstormAnim.PAM_PATH, SandstormAnim.INTRO_CLIP);
+        fx.outroDuration = player.clipDurationSeconds(
+                SandstormAnim.PAM_PATH, SandstormAnim.OUTRO_CLIP);
+        if (fx.outroDuration <= 0f) {
+            fx.outroDuration = 0.8f;
+        }
+        fx.outroDuration = Math.min(fx.outroDuration, SandstormSpawn.OUTRO_SECONDS);
+        sandstorms.put(storm, fx);
+        return fx;
+    }
+
+    /** Storm art is scaled to cover a fixed number of lawn cells in height. */
+    private void cacheStormScale(SandstormFx fx) {
+        if (fx.scale > 0f || fx.clip == null) {
+            return;
+        }
+        Rectangle bounds = player.bounds(SandstormAnim.PAM_PATH, fx.clip);
+        fx.scale = bounds != null && bounds.height > 0f
+                ? layout.cellHeight() * SandstormAnim.HEIGHT_CELLS / bounds.height
+                : AnimScale.LAWN;
+    }
+
+    /** Draws the storms above lawn content; their zombie hides underneath. */
+    private void drawSandstorms(Batch batch) {
+        for (SandstormFx fx : sandstorms.values()) {
+            if (!fx.visible || fx.clip == null || fx.scale <= 0f) {
+                continue;
+            }
+            ClipRef ref = clips.getOrLoad(SandstormAnim.PAM_PATH, fx.clip);
+            if (ref == null) {
+                continue;
+            }
+            player.draw(batch, ref, fx.clipTime, fx.x, fx.y, fx.scale, fx.scale, fx.loop);
+        }
     }
 
     private void drawProjectile(Batch batch, Projectile projectile, float delta) {
@@ -4074,5 +4189,23 @@ public final class LawnEntityRenderer {
             this.scale = scale > 0f ? scale : 1f;
             this.loop = loop;
         }
+    }
+
+    /** Per-sandstorm visual state: placement, clip choice and clocks. */
+    private static final class SandstormFx {
+        float startX;
+        float targetX;
+        float y;
+        float x;
+        float scale = -1f;
+        float introDuration;
+        float outroDuration;
+        float clock;
+        float outroClock;
+        boolean landedSeen;
+        boolean visible;
+        boolean loop;
+        float clipTime;
+        String clip;
     }
 }
