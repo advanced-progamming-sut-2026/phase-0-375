@@ -73,7 +73,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         topRight.setFillParent(true);
         topRight.setTouchable(Touchable.childrenOnly);
         topRight.top().right().pad(12f);
-        resourceBar = new ResourceBar(skin);
+        resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
         topRight.add(resourceBar);
         uiStage.addActor(topRight);
 
@@ -341,11 +341,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     }
 
     private static Screen openGameplay(PvzGdxGame game) {
-        Chapter chapter = currentChapter();
-        if (LawnBackgroundRenderer.Style.forChapter(chapter) != LawnBackgroundRenderer.Style.FRONT_LAWN) {
-            return new GameplayScreen(game);
-        }
-        return new GameplayStubScreen(game);
+        return LevelObjectivesScreen.openGameplay(game);
     }
 
     private static void clearTransientGame() {

@@ -7,6 +7,7 @@ import model.enums.PotState;
 import model.greenhouse.Greenhouse;
 import model.greenhouse.GreenhouseProduce;
 import model.greenhouse.Pot;
+import model.shop.Shop;
 import model.user.User;
 import model.user.persistance.UserRepository;
 
@@ -48,12 +49,12 @@ public class GreenhouseMenuController extends AppMenuController {
         int unlocked = greenhouse.getUnlockedPotCount();
         int[] next = greenhouse.nextPotToUnlock();
         String nextHint = next == null
-                ? "All pots are unlocked."
-                : "Next pot to unlock: (" + next[0] + "," + next[1]
-                        + ") — buy a 'Pot' from the shop.";
+            ? "All pots are unlocked."
+            : "Next pot to unlock: (" + next[0] + "," + next[1]
+            + ") — buy a 'Pot' from the shop.";
         String summary = "\nUnlocked: " + unlocked + "/" + Greenhouse.TOTAL_POTS
-                + "  |  Growing: " + growing + "  |  Ready: " + ready
-                + "  |  " + nextHint;
+            + "  |  Growing: " + growing + "  |  Ready: " + ready
+            + "  |  " + nextHint;
         return CommandResult.successWithData(grid + summary, grid + summary);
     }
 
@@ -62,12 +63,12 @@ public class GreenhouseMenuController extends AppMenuController {
         Pot pot = greenhouse.getPot(x, y);
         if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                + "). " + boundsHint());
         }
         // distinct errors per spec
         if (pot.getState() == PotState.LOCKED) {
             return CommandResult.error("Pot (" + x + "," + y
-                    + ") is locked. Buy a 'Pot' from the shop to unlock it.");
+                + ") is locked. Buy a 'Pot' from the shop to unlock it.");
         }
         pot.isReady(); // refresh lazy GROWING -> READY
         if (pot.getState() != PotState.EMPTY) {
@@ -85,7 +86,7 @@ public class GreenhouseMenuController extends AppMenuController {
         Greenhouse greenhouse = currentGreenhouse();
         if (greenhouse.getPot(x, y) == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                + "). " + boundsHint());
         }
         GreenhouseProduce produce = greenhouse.collect(x, y);
         if (produce == null) {
@@ -102,13 +103,13 @@ public class GreenhouseMenuController extends AppMenuController {
         Pot pot = greenhouse.getPot(x, y);
         if (pot == null) {
             return CommandResult.error("Invalid position: (" + x + "," + y
-                    + "). x must be 1..5, y must be 1..4.");
+                + "). " + boundsHint());
         }
         pot.isReady(); // refresh lazy state
         // distinct errors: already ready vs nothing growing
         if (pot.getState() == PotState.READY) {
             return CommandResult.error("Plant at (" + x + "," + y
-                    + ") is already fully grown. Use collect instead.");
+                + ") is already fully grown. Use collect instead.");
         }
         if (pot.getState() != PotState.GROWING) {
             return CommandResult.error("No growing plant at (" + x + "," + y + ").");
@@ -116,7 +117,7 @@ public class GreenhouseMenuController extends AppMenuController {
         int cost = greenhouse.growCost(x, y);
         if (cost <= 0) {
             return CommandResult.error("Plant at (" + x + "," + y
-                    + ") is already fully grown. Use collect instead.");
+                + ") is already fully grown. Use collect instead.");
         }
         User user = App.getInstance().getCurrentUser();
         if (user.getGems() < cost) {
@@ -128,6 +129,14 @@ public class GreenhouseMenuController extends AppMenuController {
         user.setGems(user.getGems() - cost);
         saveGreenhouse();
         return CommandResult.success("Accelerated growth for " + cost + " gem(s).");
+    }
+
+    /**
+     * Buys one greenhouse pot slot using the same shop item as the TUI shop
+     * ({@link Shop#ITEM_ID_POT}, 2000 coins). Unlocks the next locked pot.
+     */
+    public CommandResult<Void> buyPot() {
+        return ShopMenuController.getInstance().shopBuy(Shop.ITEM_ID_POT, 1, null);
     }
 
     // ──────────────────────────────────────────────
@@ -161,8 +170,12 @@ public class GreenhouseMenuController extends AppMenuController {
             }
             boosts.put(produce.getBoostPlantType(), true);
             return "Harvested " + produce.getBoostPlantType()
-                    + " — a one-shot boost has been stored for that plant.";
+                + " — a one-shot boost has been stored for that plant.";
         }
         return "Harvested, but no extra boost was granted (a boost was already stored).";
+    }
+
+    private static String boundsHint() {
+        return "x must be 1.." + Greenhouse.COLS + ", y must be 1.." + Greenhouse.ROWS + ".";
     }
 }

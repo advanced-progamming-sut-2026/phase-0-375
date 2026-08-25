@@ -4,14 +4,19 @@ import model.enums.BowlingBulbType;
 import model.enums.PlantAbilityType;
 import model.enums.PlantCategory;
 import model.enums.PlantFoodType;
+import model.enums.PlantSpecialTag;
+import model.enums.PlantState;
 import model.enums.PlantTags;
 import model.game.map.FloatPoint;
+import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
+import model.plant.definition.PlantLevels;
 import model.plant.instance.AbilityState;
 import model.plant.instance.PlantInstance;
 import model.projectile.BowlingBulb;
 import model.projectile.Pellet;
 import model.projectile.Projectile;
+import model.zombie.instance.ZombieInstance;
 
 import java.util.Random;
 
@@ -25,6 +30,8 @@ public class ShooterAbility implements PlantAbility {
     private static final float PELLET_VELOCITY = 1f;
 
     private static final int GIANT_PEA_DAMAGE_MULTIPLIER = 20;
+
+    private static final float SHROOM_RANGE_TILES = 3f;
 
     // --- Bowling Bulb constants ---
 
@@ -47,8 +54,56 @@ public class ShooterAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
+        if (plant.getPosition() == null) return null;
 
+        if (!shouldFireGate(plant, context, def)) return null;
+
+        if (isBowlingBulb(def)) {
+            return beginBowlingBulbAction(plant, context);
+        }
         return TimedPlantAction.attackAt(plant, context, this::execute);
+    }
+
+    private PlantAction beginBowlingBulbAction(PlantInstance plant, PlantAbilityContext context) {
+        float duration = TimedPlantAction.presentationDurationFor(
+                plant, context, PlantState.ATTACKING, TimedPlantAction.DEFAULT_ATTACK_DURATION);
+        return new TimedPlantAction(
+                PlantState.ATTACKING,
+                duration,
+                null,
+                (p, ctx) -> shootBowlingBulb(ctx, p, ctx.plantProjectileOriginOrCell(p)),
+                TimedPlantAction.DEFAULT_ATTACK_FIRE_FRACTION,
+                this::advanceBowlingBulbCycle);
+    }
+
+    private boolean shouldFireGate(PlantInstance plant, PlantAbilityContext context, Plant def) {
+        int row = plant.getPosition().getY();
+        float plantX = plant.getPosition().getX();
+        if (isRotobaga(def)) {
+            return context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, -1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, -1, -1f, context.getRowCount(), context.getColumnCount());
+        }
+        if (isStarfruit(def)) {
+            return context.hasZombieOrGraveAhead(row, plantX, -1)
+                || context.hasZombieOrGraveAhead(row, plantX, +1)
+                || hasZombieInAdjacentLane(context, row, plantX, +1)
+                || hasZombieInAdjacentLane(context, row, plantX, -1)
+                || context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
+                || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount());
+        }
+        if (isSplitPea(def)) {
+            return context.hasZombieOrGraveAhead(row, plantX, +1)
+                || context.hasZombieOrGraveAhead(row, plantX, -1);
+        }
+        if (isBowlingBulb(def)) {
+            return context.hasZombieInLane(row);
+        }
+        if (isShroomShooter(def)) {
+            return context.hasZombieOrGraveAheadInRange(row, plantX, +1, shroomRangeTiles(plant));
+        }
+        return context.hasZombieOrGraveAhead(row, plantX, +1);
     }
 
     @Override
@@ -81,13 +136,13 @@ public class ShooterAbility implements PlantAbility {
         if (pelletCount <= 0) pelletCount = 1;
 
         if (isThreepeater(def)) {
-            shootThreepeater(context, plant, pelletCount, origin, element);
+            shootThreepeater(context, plant, origin, element);
         } else if (isSplitPea(def)) {
-            shootSplitPea(context, plant, pelletCount, origin, element);
+            shootSplitPea(context, plant, origin, element);
         } else if (isRotobaga(def)) {
-            shootRotobaga(context, plant, pelletCount, origin, element);
+            shootRotobaga(context, plant, origin, element);
         } else if (isStarfruit(def)) {
-            shootStarfruit(context, plant, pelletCount, origin, element);
+            shootStarfruit(context, plant, origin, element);
         } else {
             shootDefault(context, plant, pelletCount, origin, element);
         }
@@ -100,8 +155,8 @@ public class ShooterAbility implements PlantAbility {
 
         AbilityState state = plant.getAbilityState(def.getAbilityType());
         int cycleIndex = (state != null) ? state.getGrowthStage() : 0;
-        BowlingBulbType firedType = bulbTypeForCycleIndex((cycleIndex - 1 + 3) % 3);
-        return bulbCooldown(plant, firedType);
+        BowlingBulbType firingType = bulbTypeForCycleIndex(cycleIndex);
+        return bulbCooldown(plant, firingType);
     }
 
     @Override
@@ -110,49 +165,248 @@ public class ShooterAbility implements PlantAbility {
         if (def.getPlantFoodType() != PlantFoodType.PROJECTILE_BURST) {
             return;
         }
+        if (plant.getPosition() == null) return;
 
         if (isBowlingBulb(def)) {
             bowlingBulbPlantFood(plant, context);
             return;
         }
+        if (isCitron(def)) {
+            citronPlantFood(plant, context);
+            return;
+        }
+        if (isSnowPea(def)) {
+            snowPeaPlantFood(plant, context);
+            return;
+        }
+        if (isShroomShooter(def)) {
+            resetShroomFamilyLifespan(plant, context);
+            return;
+        }
+        if (isThreepeater(def)) {
+            threepeaterPlantFood(plant, context);
+            return;
+        }
+        if (isSplitPea(def)) {
+            splitPeaPlantFood(plant, context);
+            return;
+        }
+        if (isRotobaga(def)) {
+            rotobagaPlantFood(plant, context);
+            return;
+        }
+        if (isStarfruit(def)) {
+            starfruitPlantFood(plant, context);
+            return;
+        }
 
+        projectileBurstPlantFood(plant, context, +1, 0f, false);
+
+        if (shootsGiantPea(def)) {
+            spawnGiantPeas(plant, context, inferElement(def), +1, 0f);
+        }
+    }
+
+    // --- Plant-food variants ---
+
+    private void projectileBurstPlantFood(PlantInstance plant, PlantAbilityContext context,
+                                          int direction, float yVelocity, boolean allLanes) {
+        Plant def = plant.getDefinition();
         int volley = (int) def.getPlantFoodValue();
         if (def.hasTag(PlantTags.STACK)) {
             volley = volley * plant.getStackCount();
         }
         if (volley <= 0) return;
+
         Projectile.Element element = inferElement(def);
-        int lane = plant.getPosition().getY();
         FloatPoint origin = context.plantProjectileOriginOrCell(plant);
-        for (int i = 0; i < volley; i++) {
-            if (i % 5 == 0) {
-                origin.setX(origin.getX() + i * 0.1f);
+        int plantRow = plant.getPosition().getY();
+
+        if (allLanes) {
+            int perLane = Math.max(1, volley / Math.max(1, context.getRowCount()));
+            for (int lane = 0; lane < context.getRowCount(); lane++) {
+                burstVolley(context, def, plant, origin, lane, perLane, element, direction, yVelocity);
             }
-
-            float dx = (RNG.nextFloat() - 0.5f) * 0.4f;
-            float dy = (RNG.nextFloat() - 0.5f) * 0.4f;
-
-            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + dx, origin.getY() + dy);
-
-            shootOne(context, def.getDamage(), pelletOrigin, lane,
-                    PELLET_VELOCITY * 1.25f,  element, +1, 0f);
+            return;
         }
 
-        if (shootsGiantPea(def)) {
-            for (int i = 0; i < plant.getStackCount(); i++) {
-                float offset = ((i & 1) == 0 ? 1 : -1) * 0.1f * ((i + 1) / 2);
-                FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
-                shootOne(context, plant.getDefinition().getDamage() * GIANT_PEA_DAMAGE_MULTIPLIER,
-                        pelletOrigin, plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
+        burstVolley(context, def, plant, origin, plantRow, volley, element, direction, yVelocity);
+    }
+
+    private void burstVolley(PlantAbilityContext context, Plant def, PlantInstance plant,
+                             FloatPoint origin, int lane, int volley,
+                             Projectile.Element element, int direction, float yVelocity) {
+        for (int i = 0; i < volley; i++) {
+            float dx = (RNG.nextFloat() - 0.5f) * 0.4f;
+            float dy = (RNG.nextFloat() - 0.5f) * 0.4f;
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX() + dx + i * 0.05f, origin.getY() + dy);
+            shootOne(context, def.getDamage(), pelletOrigin, lane,
+                    PELLET_VELOCITY * 1.25f, element, direction, yVelocity);
+        }
+    }
+
+    private void citronPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        int row = plant.getPosition().getY();
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        int damage = (int) def.getPlantFoodValue();
+        if (damage <= 0) damage = def.getDamage() * 2;
+
+        Pellet plasma = new Pellet(
+                damage,
+                new FloatPoint(origin.getX(), origin.getY()),
+                row,
+                PELLET_VELOCITY * 2f,
+                Projectile.Element.NONE,
+                +1
+        );
+        plasma.setPierce(true);
+        context.spawnProjectile(plasma, plasma.getX(), plasma.getY());
+    }
+
+    private void snowPeaPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        int row = plant.getPosition().getY();
+        for (ZombieInstance zombie : context.getZombiesInLane(row)) {
+            if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+            zombie.applyChill();
+            zombie.applyChill();
+            zombie.applyChill();
+        }
+        projectileBurstPlantFood(plant, context, +1, 0f, false);
+    }
+
+    private void threepeaterPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+        int perLane = Math.max(1, volley / 3);
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        Projectile.Element element = inferElement(def);
+        int centerRow = plant.getPosition().getY();
+        for (int rowOffset = -1; rowOffset <= 1; rowOffset++) {
+            int lane = centerRow + rowOffset;
+            if (lane < 0 || lane >= context.getRowCount()) continue;
+            burstVolley(context, def, plant, origin, lane, perLane, element, +1, 0f);
+        }
+    }
+
+    private void splitPeaPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+        int half = Math.max(1, volley / 2);
+        Projectile.Element element = inferElement(def);
+        FloatPoint toRightOrigin = context.plantProjectileOriginOrCell(plant);
+        FloatPoint toLeftOrigin = new FloatPoint(toRightOrigin.getX() - 3.5f, toRightOrigin.getY());
+        int row = plant.getPosition().getY();
+        burstVolley(context, def, plant, toRightOrigin, row, half, element, +1, 0f);
+        burstVolley(context, def, plant, toLeftOrigin, row, half, element, -1, 0f);
+    }
+
+    private void rotobagaPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+        int perDirection = Math.max(1, volley / 4);
+        Projectile.Element element = inferElement(def);
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        int row = plant.getPosition().getY();
+        for (int i = 0; i < perDirection; i++) {
+            float jitter = i * 0.05f;
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX(), origin.getY() + 0.3f + jitter),
+                    row, PELLET_VELOCITY * 1.25f, element, +1, PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX(), origin.getY() - 0.1f + jitter),
+                    row, PELLET_VELOCITY * 1.25f, element, +1, -PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + 0.1f + jitter, origin.getY() + 0.3f),
+                    row, PELLET_VELOCITY * 1.25f, element, -1, PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY() - 0.1f),
+                    row, PELLET_VELOCITY * 1.25f, element, -1, -PELLET_VELOCITY);
+        }
+    }
+
+    private void starfruitPlantFood(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        int volley = (int) def.getPlantFoodValue();
+        if (volley <= 0) return;
+        int perDirection = Math.max(1, volley / 5);
+        Projectile.Element element = inferElement(def);
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        int row = plant.getPosition().getY();
+        for (int i = 0; i < perDirection; i++) {
+            float jitter = i * 0.05f;
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY()),
+                    row, PELLET_VELOCITY * 1.25f, element, -1, 0f);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY()),
+                    row, 0f, element, +1, PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY()),
+                    row, 0f, element, +1, -PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY()),
+                    row, PELLET_VELOCITY * 1.25f, element, +1, PELLET_VELOCITY);
+            shootOne(context, def.getDamage(), new FloatPoint(origin.getX() + jitter, origin.getY()),
+                    row, PELLET_VELOCITY * 1.25f, element, +1, -PELLET_VELOCITY);
+        }
+    }
+
+    private void resetShroomFamilyLifespan(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        String name = def.getName();
+        for (PlantInstance other : context.getAllPlants()) {
+            if (other.getDefinition().getName().equals(name)) {
+                other.setLifespanRemaining(PlantInstance.SHROOM_BASE_LIFESPAN);
             }
+        }
+        projectileBurstPlantFood(plant, context, +1, 0f, false);
+    }
+
+    private void spawnGiantPeas(PlantInstance plant, PlantAbilityContext context,
+                                Projectile.Element element, int direction, float yVelocity) {
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        int count = plant.getStackCount();
+        if (isMegaGatling(plant.getDefinition())) {
+            count = 4;
+        } else if (!plant.getDefinition().hasTag(PlantTags.STACK)) {
+            count = 1;
+        }
+        for (int i = 0; i < count; i++) {
+            float offset = ((i & 1) == 0 ? 1 : -1) * 0.1f * ((i + 1) / 2);
+            FloatPoint pelletOrigin = new FloatPoint(origin.getX(), origin.getY() + offset);
+            shootOne(context, plant.getDefinition().getDamage() * GIANT_PEA_DAMAGE_MULTIPLIER,
+                    pelletOrigin, plant.getPosition().getY(), PELLET_VELOCITY, element, direction, yVelocity);
         }
     }
 
     // --- Helpers ---
 
-    private boolean shouldFire(PlantInstance plant, PlantAbilityContext context) {
-        if (plant.getPosition() == null) return false;
-        return context.hasZombieInLane(plant.getPosition().getY());
+    private boolean hasZombieInAdjacentLane(PlantAbilityContext context, int row, float plantX, int rowOffset) {
+        int targetRow = row + rowOffset;
+        if (targetRow < 0 || targetRow >= context.getRowCount()) return false;
+        for (ZombieInstance zombie : context.getZombiesInLane(targetRow)) {
+            if (zombie == null || zombie.isDead() || zombie.isHypnotized()) continue;
+            if (zombie.getContinuousPosition() == null) continue;
+            float dx = zombie.getContinuousX() - plantX;
+            if (Math.abs(dx) <= 1.5f) return true;
+        }
+        return false;
+    }
+
+    private float shroomRangeTiles(PlantInstance plant) {
+        return SHROOM_RANGE_TILES + cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
+    }
+
+    private float cumulativeSpecialValue(PlantInstance plant, PlantSpecialTag tag) {
+        Plant def = plant.getDefinition();
+        if (def == null || def.getLevels() == null) return 0f;
+        PlantLevels levels = def.getLevels();
+        float total = 0f;
+        for (int lvl = 2; lvl <= 4; lvl++) {
+            if (lvl > plant.getLevel()) break;
+            LevelUpgrade upgrade = levels.getUpgrade(lvl);
+            if (upgrade == null) continue;
+            if (upgrade.isSpecialMechanic() && upgrade.getSpecialTag() == tag) {
+                total += upgrade.getValue();
+            }
+        }
+        return total;
     }
 
     private Projectile.Element inferElement(Plant def) {
@@ -163,8 +417,8 @@ public class ShooterAbility implements PlantAbility {
     }
 
     private boolean shootsGiantPea(Plant def) {
-        return def.getName().toLowerCase().contains("repeater") ||
-                def.getName().toLowerCase().contains("pea pod");
+        String name = def.getName().toLowerCase();
+        return name.contains("repeater") || name.contains("pea pod") || name.contains("mega gatling");
     }
 
     private boolean isThreepeater(Plant def) {
@@ -186,6 +440,24 @@ public class ShooterAbility implements PlantAbility {
     private boolean isBowlingBulb(Plant def) {
         return def.getName() != null
                 && def.getName().toLowerCase().contains("bowling bulb");
+    }
+
+    private boolean isCitron(Plant def) {
+        return def.getName() != null && def.getName().equalsIgnoreCase("Citron");
+    }
+
+    private boolean isSnowPea(Plant def) {
+        return def.getName() != null && def.getName().equalsIgnoreCase("Snow Pea");
+    }
+
+    private boolean isMegaGatling(Plant def) {
+        return def.getName() != null && def.getName().toLowerCase().contains("mega gatling");
+    }
+
+    private boolean isShroomShooter(Plant def) {
+        return def.isShroom()
+                && def.getCategory() == PlantCategory.SHOOTER
+                && def.getAbilityType() == PlantAbilityType.SHOOT_PROJECTILE;
     }
 
     // --- Bowling Bulb ---
@@ -214,7 +486,14 @@ public class ShooterAbility implements PlantAbility {
                 type,
                 type.getMaxBounces());
         context.spawnProjectile(bulb, bulb.getX(), bulb.getY());
-        state.setGrowthStage((cycleIndex + 1) % 3);
+    }
+
+    private void advanceBowlingBulbCycle(PlantInstance plant, PlantAbilityContext context) {
+        Plant def = plant.getDefinition();
+        if (def == null) return;
+        AbilityState state = plant.getAbilityState(def.getAbilityType());
+        if (state == null) return;
+        state.setGrowthStage((state.getGrowthStage() + 1) % 3);
     }
 
     private void bowlingBulbPlantFood(PlantInstance plant, PlantAbilityContext context) {
@@ -230,10 +509,10 @@ public class ShooterAbility implements PlantAbility {
 
             BowlingBulb bulb = new BowlingBulb(
                     damage,
-                    new FloatPoint(originX + i * 0.2f, row),
+                    new FloatPoint(originX + i * 0.7f, row),
                     row,
                     BULB_VELOCITY,
-                    BowlingBulbType.ORANGE,
+                    bulbTypeForCycleIndex(2 - i),
                     BULB_PLANT_FOOD_BOUNCES);
             bulb.setExplosive(true);
             context.spawnProjectile(bulb, bulb.getX(), bulb.getY());
@@ -241,7 +520,7 @@ public class ShooterAbility implements PlantAbility {
     }
 
     /** Maps a cycle index (0..2) to its bulb type. */
-    public BowlingBulbType bulbTypeForCycleIndex(int cycleIndex) {
+    public static BowlingBulbType bulbTypeForCycleIndex(int cycleIndex) {
         switch (cycleIndex) {
             case 1: return BowlingBulbType.BLUE;
             case 2: return BowlingBulbType.ORANGE;
@@ -286,7 +565,7 @@ public class ShooterAbility implements PlantAbility {
         }
     }
 
-    private void shootThreepeater(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+    private void shootThreepeater(PlantAbilityContext context, PlantInstance plant,
                                   FloatPoint origin, Projectile.Element element) {
         shootOne(context, plant.getDefinition().getDamage(), origin,
             plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
@@ -304,7 +583,7 @@ public class ShooterAbility implements PlantAbility {
             plant.getPosition().getY(), PELLET_VELOCITY, element, +1, 0);
     }
 
-    private void shootSplitPea(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+    private void shootSplitPea(PlantAbilityContext context, PlantInstance plant,
                                FloatPoint origin, Projectile.Element element) {
         shootOne(context, plant.getDefinition().getDamage(), origin,
             plant.getPosition().getY(), PELLET_VELOCITY, element,
@@ -325,57 +604,37 @@ public class ShooterAbility implements PlantAbility {
             -1, 0);
     }
 
-    private void shootRotobaga(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+    private void shootRotobaga(PlantAbilityContext context, PlantInstance plant,
                                FloatPoint origin, Projectile.Element element) {
-        FloatPoint firstOrigin = new FloatPoint(
-            origin.getX(), origin.getY() + 0.3f
-        );
-        shootOne(context, plant.getDefinition().getDamage(), firstOrigin,
-            plant.getPosition().getY(), PELLET_VELOCITY, element,
-            +1, PELLET_VELOCITY);
+        int damage = plant.getDefinition().getDamage();
+        int row = plant.getPosition().getY();
 
-        FloatPoint secondOrigin = new FloatPoint(
-            origin.getX(), origin.getY() - 0.1f
-        );
-        shootOne(context, plant.getDefinition().getDamage(), secondOrigin,
-            plant.getPosition().getY(), PELLET_VELOCITY, element,
-            +1, -PELLET_VELOCITY);
+        FloatPoint firstOrigin = new FloatPoint(origin.getX(), origin.getY() + 0.3f);
+        shootOne(context, damage, firstOrigin, row, PELLET_VELOCITY, element, +1, PELLET_VELOCITY);
 
-        FloatPoint thirdOrigin = new FloatPoint(
-            origin.getX() + 0.1f, origin.getY() + 0.3f
-        );
-        shootOne(context, plant.getDefinition().getDamage(), thirdOrigin,
-            plant.getPosition().getY(), PELLET_VELOCITY, element,
-            -1, PELLET_VELOCITY);
+        FloatPoint secondOrigin = new FloatPoint(origin.getX(), origin.getY() - 0.1f);
+        shootOne(context, damage, secondOrigin, row, PELLET_VELOCITY, element, +1, -PELLET_VELOCITY);
 
-        FloatPoint fourthOrigin = new FloatPoint(
-            origin.getX(), origin.getY() - 0.1f
-        );
-        shootOne(context, plant.getDefinition().getDamage(), fourthOrigin,
-            plant.getPosition().getY(), PELLET_VELOCITY, element,
-            -1, -PELLET_VELOCITY);
+        FloatPoint thirdOrigin = new FloatPoint(origin.getX() + 0.1f, origin.getY() + 0.3f);
+        shootOne(context, damage, thirdOrigin, row, PELLET_VELOCITY, element, -1, PELLET_VELOCITY);
+
+        FloatPoint fourthOrigin = new FloatPoint(origin.getX(), origin.getY() - 0.1f);
+        shootOne(context, damage, fourthOrigin, row, PELLET_VELOCITY, element, -1, -PELLET_VELOCITY);
     }
 
-    private void shootStarfruit(PlantAbilityContext context, PlantInstance plant, int pelletCount,
+    private void shootStarfruit(PlantAbilityContext context, PlantInstance plant,
                                 FloatPoint origin, Projectile.Element element) {
-        shootOne(context, plant.getDefinition().getDamage(), origin,
-                plant.getPosition().getY(), PELLET_VELOCITY, element,
-                -1, 0);
+        int damage = plant.getDefinition().getDamage();
+        int row = plant.getPosition().getY();
 
-        shootOne(context, plant.getDefinition().getDamage(), origin,
-                plant.getPosition().getY(), 0, element,
-                1, PELLET_VELOCITY);
+        shootOne(context, damage, origin, row, PELLET_VELOCITY, element, -1, 0);
 
-        shootOne(context, plant.getDefinition().getDamage(), origin,
-                plant.getPosition().getY(), 0, element,
-                1, -PELLET_VELOCITY);
+        shootOne(context, damage, origin, row, 0, element, +1, PELLET_VELOCITY);
 
-        shootOne(context, plant.getDefinition().getDamage(), origin,
-                plant.getPosition().getY(), PELLET_VELOCITY, element,
-                1, PELLET_VELOCITY);
+        shootOne(context, damage, origin, row, 0, element, +1, -PELLET_VELOCITY);
 
-        shootOne(context, plant.getDefinition().getDamage(), origin,
-                plant.getPosition().getY(), PELLET_VELOCITY, element,
-                1, -PELLET_VELOCITY);
+        shootOne(context, damage, origin, row, PELLET_VELOCITY, element, +1, PELLET_VELOCITY);
+
+        shootOne(context, damage, origin, row, PELLET_VELOCITY, element, +1, -PELLET_VELOCITY);
     }
 }

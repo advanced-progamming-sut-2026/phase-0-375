@@ -67,8 +67,8 @@ public final class ZombieGait {
 
     /**
      * Walk-cycle phase in {@code [0, 1)} after covering {@code travelledTiles}, measured from
-     * column 0 so cycles start on tile borders and centres. The caller measures travel along
-     * the direction the zombie faces, so hypnotized zombies still walk forwards.
+     * column 0 so cycles start on tile borders and centres. {@code travelledTiles}
+     * is signed board travel (negative toward the house, positive away).
      */
     public float phaseAt(float travelledTiles) {
         float steps = travelledTiles / stepTiles;

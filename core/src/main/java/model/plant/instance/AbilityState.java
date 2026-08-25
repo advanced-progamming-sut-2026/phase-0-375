@@ -17,6 +17,7 @@ public class AbilityState {
     private boolean isDigesting;      // true for Chomper after swallowing a zombie
     private float digestRemaining;    // seconds left in digestion
     private ArmorType heldMetal;      // Metal last pulled by Magnet-shroom; null if none
+    private int shotOrdinal;
 
     public AbilityState(PlantAbilityType abilityType) {
         this.abilityType = abilityType;
@@ -113,5 +114,9 @@ public class AbilityState {
 
     public void setHeldMetal(ArmorType heldMetal) {
         this.heldMetal = heldMetal;
+    }
+
+    public int nextShotOrdinal() {
+        return shotOrdinal++;
     }
 }

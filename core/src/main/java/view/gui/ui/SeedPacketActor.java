@@ -40,14 +40,24 @@ public final class SeedPacketActor extends WidgetGroup {
     private boolean dimmed;
     private Runnable onClick;
     private DragPlant dragPlant;
+    private Label expiryLabel;
 
     public SeedPacketActor(TextureBank textures, Skin skin, String plantName, int sunCost, int level) {
-        this(textures, skin, plantName, sunCost, level, false, false);
+        this(textures, skin, plantName, sunCost, level, false, false, true);
     }
 
     public SeedPacketActor(
             TextureBank textures, Skin skin, String plantName, int sunCost, int level,
             boolean boosted, boolean locked) {
+        this(textures, skin, plantName, sunCost, level, boosted, locked, true);
+    }
+
+    /**
+     * @param showCostAndLevel false for conveyor / bowling packets (no sun cost or LVL).
+     */
+    public SeedPacketActor(
+            TextureBank textures, Skin skin, String plantName, int sunCost, int level,
+            boolean boosted, boolean locked, boolean showCostAndLevel) {
         this.textures = textures;
         this.plantName = plantName;
         this.chromeId = plantName == null
@@ -77,15 +87,17 @@ public final class SeedPacketActor extends WidgetGroup {
             }
             addActor(portrait);
 
-            BitmapFont font = SkinFonts.outlined(skin, "secondary");
-            Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
-            float textW = PACKET_WIDTH * 0.52f;
-            float textX = PACKET_WIDTH * 0.44f;
-            addActor(packetLabel("LVL " + Math.max(1, level), style, 1.2f,
-                    textX, PACKET_HEIGHT - 18f, textW, 16f));
-            if (!locked) {
-                addActor(packetLabel(String.valueOf(sunCost), style, 2f,
-                        textX, 4f, textW, 18f));
+            if (showCostAndLevel) {
+                BitmapFont font = SkinFonts.outlined(skin, "secondary");
+                Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
+                float textW = PACKET_WIDTH * 0.52f;
+                float textX = PACKET_WIDTH * 0.44f;
+                addActor(packetLabel("LVL " + Math.max(1, level), style, 1.2f,
+                        textX, PACKET_HEIGHT - 18f, textW, 16f));
+                if (!locked) {
+                    addActor(packetLabel(String.valueOf(sunCost), style, 2f,
+                            textX, 4f, textW, 18f));
+                }
             }
         } else {
             portrait = null;
@@ -186,6 +198,30 @@ public final class SeedPacketActor extends WidgetGroup {
 
     public void onDragPlant(DragPlant dragPlant) {
         this.dragPlant = dragPlant;
+    }
+
+    public void enableExpiryTimer(Skin skin) {
+        if (expiryLabel != null || plantName == null) {
+            return;
+        }
+        BitmapFont font = SkinFonts.outlined(skin, "secondary");
+        Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
+        expiryLabel = packetLabel("0s", style, 1.6f,
+                PACKET_WIDTH * 0.44f, 4f, PACKET_WIDTH * 0.52f, 18f);
+        addActor(expiryLabel);
+    }
+
+    public void setExpirySeconds(float seconds) {
+        if (expiryLabel == null) {
+            return;
+        }
+        int rounded = Math.max(0, Math.round(seconds));
+        expiryLabel.setText(rounded + "s");
+        if (seconds <= 5f) {
+            expiryLabel.setColor(Color.SCARLET);
+        } else {
+            expiryLabel.setColor(Color.WHITE);
+        }
     }
 
     public String plantName() {

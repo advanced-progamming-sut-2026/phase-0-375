@@ -39,25 +39,38 @@ public class ShopMenuController extends AppMenuController {
         for (ShopItem item : items) {
             String cost = item.getPrice() + " " + item.getCurrency() + "(s)";
             sb.append("  ID ").append(item.getId()).append(": ")
-                    .append(item.getDescription()).append(" — ").append(cost).append("\n");
+                .append(item.getDescription()).append(" — ").append(cost).append("\n");
         }
         return CommandResult.successWithData(sb.toString(), sb.toString());
     }
 
     public CommandResult<String> shopDaily() {
         Shop shop = buildShop();
-        shop.refreshDailyOffer();
-        // Persist the refreshed offer identity (plant + date).
-        App.getInstance().getUserRepository().flush();
+        ensureDailyOffer(shop);
         if (shop.getDailyOffer() == null) {
             String msg = "No daily offer today.";
             return CommandResult.successWithData(msg, msg);
         }
         String msg = "── Daily Offer ──\n"
-                + "  " + shop.getDailyOffer().getItem().getDescription() + "\n"
-                + "  Price: " + shop.getDailyOffer().getDiscountedPrice() + " coins\n"
-                + (shop.getDailyOffer().isPurchased() ? "  [Already purchased today]" : "  Use 'shop buy -i 6 -n 1'");
+            + "  " + shop.getDailyOffer().getItem().getDescription() + "\n"
+            + "  Price: " + shop.getDailyOffer().getDiscountedPrice() + " coins\n"
+            + (shop.getDailyOffer().isPurchased() ? "  [Already purchased today]" : "  Use 'shop buy -i 6 -n 1'");
         return CommandResult.successWithData(msg, msg);
+    }
+
+    /**
+     * Rebuilds today's daily offer from the user save (or rolls a new one once),
+     * then flushes so the plant identity survives restarts.
+     */
+    public Shop ensureDailyOffer() {
+        Shop shop = buildShop();
+        ensureDailyOffer(shop);
+        return shop;
+    }
+
+    private void ensureDailyOffer(Shop shop) {
+        shop.refreshDailyOffer();
+        App.getInstance().getUserRepository().flush();
     }
 
     public CommandResult<Void> shopBuy(int itemId, int count, String plantType) {
@@ -72,20 +85,22 @@ public class ShopMenuController extends AppMenuController {
         ShopItem item = shop.findItemById(itemId);
         String message = "Purchase successful!";
         if (item != null && item.getItemType() == ShopItemType.SEED_PACKET_RANDOM
-                && shop.getLastRandomSeedPlant() != null) {
+            && shop.getLastRandomSeedPlant() != null) {
             message = "Purchased " + (Shop.RANDOM_SEED_PACKET_AMOUNT * count)
-                    + " seed packet(s) for '" + shop.getLastRandomSeedPlant() + "'.";
+                + " seed packet(s) for '" + shop.getLastRandomSeedPlant() + "'.";
         }
         if (item != null && item.getItemType() == ShopItemType.POT) {
             Greenhouse greenhouse = Greenhouse.getInstance(App.getInstance().getCurrentUser());
             int[] next = greenhouse.nextPotToUnlock();
             int unlocked = greenhouse.getUnlockedPotCount();
+            int spent = item.getPrice() * count;
             if (next == null) {
-                message = "All " + Greenhouse.TOTAL_POTS + " pots are now unlocked.";
+                message = "Bought pot for " + spent + " coins. All "
+                    + Greenhouse.TOTAL_POTS + " pots are now unlocked.";
             } else {
-                message = "Unlocked " + count + " pot(s). You now have " + unlocked
-                        + "/" + Greenhouse.TOTAL_POTS + " pots. Next to unlock: ("
-                        + next[0] + "," + next[1] + ").";
+                message = "Bought pot for " + spent + " coins. You now have " + unlocked
+                    + "/" + Greenhouse.TOTAL_POTS + " pots. Next to unlock: ("
+                    + next[0] + "," + next[1] + ").";
             }
         }
         return CommandResult.success(message);

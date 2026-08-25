@@ -2,10 +2,14 @@ package view.gui.anim.zombie;
 
 import model.enums.Chapter;
 import model.enums.ZombieState;
+import model.app.App;
+import model.game.core.GameModel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 import view.gui.anim.AnimPose;
 import view.gui.anim.PamVisibility;
+import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.ZombiePamAliases;
 
@@ -20,6 +24,8 @@ import java.util.Map;
  * Do not mutate the model here.
  */
 public final class ZombieAnimAdapter {
+    public static final String BUTTER_PART = "butter";
+
     private final PamCatalog catalog;
     private final ZombieAnimOverrides overrides;
 
@@ -44,24 +50,54 @@ public final class ZombieAnimAdapter {
         if (zombie.getState() == ZombieState.DEAD) {
             return null;
         }
-        PamCatalog.PamEntry entry = catalog.forZombie(zombie.getDefinition().getName(), chapter);
+        PamCatalog.PamEntry entry = entryFor(zombie, chapter);
         if (entry == null) {
             return null;
         }
         ZombieAnimRole role = roleFor(zombie);
         AnimPose custom = overrides.tryResolve(zombie, entry, role);
         if (custom != null) {
-            return custom;
+            return withButterVisibility(zombie, custom);
         }
         String clip = catalog.resolveClip(entry, preferredClips(role));
         if (clip == null) {
             return null;
         }
         Map<String, Boolean> vis = armorVisibility(zombie, entry);
+        AnimPose pose;
         if (role == ZombieAnimRole.DIE) {
-            return AnimPose.once(entry.path(), clip, role, vis);
+            pose = AnimPose.once(entry.path(), clip, role, vis);
+        } else {
+            pose = AnimPose.looping(entry.path(), clip, role, vis);
         }
-        return AnimPose.looping(entry.path(), clip, role, vis);
+        return withButterVisibility(zombie, pose);
+    }
+
+    private PamCatalog.PamEntry entryFor(ZombieInstance zombie, Chapter chapter) {
+        String name = zombie.getDefinition().getName();
+        if ("ZombieGargantuar".equals(name) && isVaseBreakerLevel()) {
+            PamCatalog.PamEntry vaseGarg = catalog.byName("VASE_GARGANTUAR");
+            if (vaseGarg != null && vaseGarg.path() != null
+                    && vaseGarg.path().toUpperCase(java.util.Locale.ROOT).contains("/ZOMBIE/")) {
+                return vaseGarg;
+            }
+            return new PamCatalog.PamEntry(
+                    "VASE_GARGANTUAR", VaseBreakerAnim.GARGANTUAR_ZOMBIE, Map.of());
+        }
+        return catalog.forZombie(name, chapter);
+    }
+
+    private static boolean isVaseBreakerLevel() {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        return model != null && model.getCurrentLevel() instanceof VaseBreakerLevel;
+    }
+
+    /** Shows the PAM {@code butter} part while {@link ZombieInstance#isButtered()}. */
+    static AnimPose withButterVisibility(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || zombie == null || !zombie.isButtered()) {
+            return pose;
+        }
+        return pose.withVisibleParts(BUTTER_PART);
     }
 
     public static boolean isDistanceDriven(ZombieInstance zombie, AnimPose pose) {

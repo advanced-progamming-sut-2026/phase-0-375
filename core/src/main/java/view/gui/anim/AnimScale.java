@@ -1,7 +1,7 @@
 package view.gui.anim;
 
 /**
- * Draw scale for PAM art on the lawn.
+ * Draw scale for PAM / spritesheet art on the lawn.
  *
  * <p>PAM clips are authored against a larger board than {@link view.gui.lawn.LawnLayout}
  * cells, so drawing them 1:1 makes plants and zombies overflow their cell.
@@ -24,6 +24,10 @@ public final class AnimScale {
 
     public static final float PROJECTILE = LAWN;
 
+    public static final float PLANT_SHEET = 0.35f;
+
+    public static final float PROJECTILE_SHEET = 0.35f;
+
     /** Lawn collectible. {@code SUN.PAM} canvas is 200, smaller than plant/zombie 390. */
     public static final float SUN = 0.375f;
 
@@ -32,4 +36,14 @@ public final class AnimScale {
 
     /** Gem PAM (200×200 canvas). */
     public static final float LOOT_GEM = 0.33f;
+
+    /** {@link #PLANT_SHEET} for spritesheet poses, otherwise {@link #PLANT}. */
+    public static float forPlant(AnimPose pose) {
+        return pose != null && pose.isSpritesheet() ? PLANT_SHEET : PLANT;
+    }
+
+    /** {@link #PROJECTILE_SHEET} for spritesheet poses, otherwise {@link #PROJECTILE}. */
+    public static float forProjectile(AnimPose pose) {
+        return pose != null && pose.isSpritesheet() ? PROJECTILE_SHEET : PROJECTILE;
+    }
 }

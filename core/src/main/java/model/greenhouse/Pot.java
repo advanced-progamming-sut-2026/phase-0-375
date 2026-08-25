@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  * Represents a single pot/slot in the greenhouse.
  *
  * <p>A pot can be locked, empty, growing a plant, or ready for harvest.
- * Each pot has a fixed 1-indexed position {@code (x, y)} in the 4x5
+ * Each pot has a fixed 1-indexed position {@code (x, y)} in the 3×4
  * greenhouse grid. The pot itself is a transient object rebuilt each
  * session; its persistent state lives on the owning {@link model.user.User}
  * (see {@link model.greenhouse.Greenhouse}). Restoration helpers
@@ -33,8 +33,8 @@ public class Pot {
      * overrides this via {@link #forceUnlock()} during loading if the
      * user has already unlocked more pots.
      *
-     * @param x column (1..5)
-     * @param y row (1..4)
+     * @param x column (1..{@link Greenhouse#COLS})
+     * @param y row (1..{@link Greenhouse#ROWS})
      */
     public Pot(int x, int y) {
         this.x = x;

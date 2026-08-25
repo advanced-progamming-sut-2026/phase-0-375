@@ -30,7 +30,7 @@ public class Shop {
     private User customer;
     private final Random random = new Random();
 
-    public static final int MAX_POTS = 20;
+    public static final int MAX_POTS = Greenhouse.TOTAL_POTS;
     public static final int MAX_PLANT_FOOD = 3;
     public static final int DAILY_OFFER_PACKET_AMOUNT = 10;
     public static final int DAILY_OFFER_BASE_PRICE = 2000;
@@ -72,7 +72,7 @@ public class Shop {
                 2000,
                 CurrencyType.COIN,
                 MAX_POTS,
-                null, "Opens a greenhouse pot slot (max 20 pots)"
+                null, "Opens a greenhouse pot slot (max " + Greenhouse.TOTAL_POTS + " pots)"
         ));
         permanentItems.add(new ShopItem(
                 ITEM_ID_PLANT_FOOD,
@@ -125,12 +125,12 @@ public class Shop {
             return;
         }
 
-        // Reuse today's saved offer if it exists and is still valid.
+        // Reuse today's saved offer if it exists and is still unlocked.
         String plant = null;
         if (today.toString().equals(customer.getDailyOfferDate())) {
-            plant = customer.getDailyOfferPlant();
+            plant = resolveUnlockedPlantName(customer.getDailyOfferPlant());
         }
-        if (plant == null || !isPlantUnlocked(plant)) {
+        if (plant == null) {
             plant = pickRandomUnlockedPlant();
         }
         if (plant == null) {
@@ -353,11 +353,6 @@ public class Shop {
             }
         }
         return null;
-    }
-
-    private boolean isPlantUnlocked(String plantName) {
-        Set<String> unlocked = customer.getUnlockedPlants();
-        return plantName != null && unlocked != null && unlocked.contains(plantName);
     }
 
     /** Finds the canonical unlocked plant name, ignoring case. */

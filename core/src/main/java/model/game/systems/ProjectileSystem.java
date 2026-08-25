@@ -550,9 +550,12 @@ public class ProjectileSystem implements Tickable {
         }
 
         if (projectile.isButter()) {
-            zombie.applyChill();
-            zombie.applyChill();
-            zombie.applyChill();
+            zombie.applyButter();
+        }
+
+        if (projectile.isPoison()) {
+            int dps = poisonDpsFor(projectile);
+            zombie.applyPoison(dps, ZombieInstance.POISON_DURATION);
         }
 
         Plant source = projectile.getSourcePlant();
@@ -561,6 +564,10 @@ public class ProjectileSystem implements Tickable {
                 && source.hasTag(PlantTags.MAGIC)) {
             zombie.hypnotise();
         }
+    }
+
+    private int poisonDpsFor(Projectile projectile) {
+        return ZombieInstance.POISON_BASE_DPS;
     }
 
     // --- Bowling Bulb physics ---

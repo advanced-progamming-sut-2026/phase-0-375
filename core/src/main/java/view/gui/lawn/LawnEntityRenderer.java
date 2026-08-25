@@ -15,10 +15,16 @@ import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
 import model.game.core.SandstormSpawn;
+import model.game.level.minigame.bowling.BowlingWalnut;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.map.Point;
+import model.plant.ability.ExplosiveAbility;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
 import model.projectile.Splash;
@@ -29,6 +35,7 @@ import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.enums.LootPickupKind;
 import model.enums.GroundType;
+import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.item.placeable.Placeable;
 import model.item.pushable.ArcadeMachine;
@@ -58,10 +65,15 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SpritesheetClipCache;
+import view.gui.anim.bowling.BowlingWalnutAnim;
+import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.anim.SandstormAnim;
 import view.gui.anim.plant.ExplosivePlantFx;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.anim.plant.MeleePlantFx;
 import view.gui.anim.plant.PlantAnimAdapter;
+import view.gui.anim.plant.exclusive.SquashAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
@@ -71,6 +83,8 @@ import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.JugglerAnim;
 import view.gui.anim.zombie.OctopusAnim;
 import view.gui.anim.zombie.SnorkelerAnim;
+import view.gui.anim.plant.PlantFreezeAnim;
+import view.gui.anim.plant.PlantAnimRole;
 import view.gui.anim.zombie.TroglobiteAnim;
 import view.gui.anim.zombie.WizardAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
@@ -78,6 +92,8 @@ import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
 import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
+import view.gui.assets.BeghouledArt;
+import view.gui.assets.EffectPamPaths;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.ProjectilePamPaths;
 import view.gui.assets.PvzAssets;
@@ -98,14 +114,14 @@ import java.util.concurrent.ThreadLocalRandom;
  * Draws plants, zombies, and projectiles on the lawn via libPVZ PAM clips.
  *
  * <p>Pipeline: model entity → {@link PlantAnimAdapter} / {@link ZombieAnimAdapter} /
- * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} → {@code PamPlayer.draw}.
+ * {@link ProjectileAnimAdapter} → {@link AnimPose} → {@link PamClipCache} /
+ * {@link SpritesheetClipCache} → {@code PamPlayer.draw} or sheet blit.
  *
  * <p>Draw order is back-to-front by lawn row (row 0 is the top of the screen),
  * then graves → plants → props → zombies within a lane so lower rows cover
  * taller sprites from the rows above.
  *
  * <p>TODO: mowers and grid props.
- * TODO: freeze overlays from model status flags.
  */
 public final class LawnEntityRenderer {
     private static final float NO_PHASE = -1f;
@@ -229,6 +245,8 @@ public final class LawnEntityRenderer {
     private final ZombieAnimAdapter zombieAdapter;
     private final ProjectileAnimAdapter projectileAdapter;
     private final PamClipCache clips;
+    private final SpritesheetClipCache sheetClips;
+    private final PlantSpritesheetCatalog plantSheets;
     private final PamPlayer player;
     private final PamCatalog catalog;
     private final TextureBank textures;
@@ -264,6 +282,9 @@ public final class LawnEntityRenderer {
     /** World origin of a flying octopus at release (PAM canvas centre). */
     private final IdentityHashMap<ShootBehavior.OctopusShot, float[]> octopusAlign = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OctopusCoatFx> octopusCoats = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, LiveSnap> lastPlantIce = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Float> plantIceIntro = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Object> plantIceClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
@@ -271,6 +292,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, Integer> meleeAttackFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OneShotFx> meleeIdlePulses = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, PlantFoodFx> plantFoodFx = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
@@ -290,6 +312,12 @@ public final class LawnEntityRenderer {
     private final Matrix4 batchTransform = new Matrix4();
     private final Matrix4 popTransform = new Matrix4();
     private final Map<String, Boolean> popVis = new HashMap<>();
+
+    private List<BowlingWalnut> bowlingWalnuts = List.of();
+    private final Map<String, Float> vaseAge = new HashMap<>();
+    private final IdentityHashMap<PlantInstance, BeghouledMotion> beghouledMotion = new IdentityHashMap<>();
+    private static final float BEGHOULED_MOVE_SEC = 0.22f;
+    private TextureRegion craterRegion;
 
     private final DebugEntityOverlay entityOverlay;
     private FishermanDrownShader drownShader;
@@ -313,9 +341,9 @@ public final class LawnEntityRenderer {
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
-            new PlantAnimAdapter(assets.pamCatalog),
-            new ZombieAnimAdapter(assets.pamCatalog),
-            entityOverlay);
+                new PlantAnimAdapter(assets.pamCatalog, assets.plantSheets),
+                new ZombieAnimAdapter(assets.pamCatalog),
+                entityOverlay);
     }
 
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout,
@@ -324,9 +352,11 @@ public final class LawnEntityRenderer {
         this.layout = layout;
         this.plantAdapter = plantAdapter;
         this.zombieAdapter = zombieAdapter;
-        this.projectileAdapter = new ProjectileAnimAdapter();
+        this.projectileAdapter = new ProjectileAnimAdapter(assets.plantSheets);
         this.player = assets.player;
         this.clips = new PamClipCache(assets.player);
+        this.sheetClips = new SpritesheetClipCache(assets.root);
+        this.plantSheets = assets.plantSheets;
         this.catalog = assets.pamCatalog;
         this.textures = assets.textures;
         this.entityOverlay = entityOverlay;
@@ -379,7 +409,10 @@ public final class LawnEntityRenderer {
 
     public LawnEntityRenderer(PamCatalog catalog, PvzAssets assets, LawnLayout layout,
                               DebugEntityOverlay entityOverlay) {
-        this(assets, layout, new PlantAnimAdapter(catalog), new ZombieAnimAdapter(catalog), entityOverlay);
+        this(assets, layout,
+                new PlantAnimAdapter(catalog, assets.plantSheets),
+                new ZombieAnimAdapter(catalog),
+                entityOverlay);
     }
 
     public void draw(Batch batch, GameModel model, float delta) {
@@ -426,7 +459,9 @@ public final class LawnEntityRenderer {
         spawnMissingDeathBlasts(deathBlastNow);
         deathBlastSeen.clear();
         deathBlastSeen.putAll(deathBlastNow);
+        harvestBeghouledClears(model);
         drawEffects(batch, backEffects, delta);
+        prepareBowlingWalnuts(model);
         updateSandstorms(model, delta);
 
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -441,8 +476,10 @@ public final class LawnEntityRenderer {
         int rows = map != null ? map.getRows() : layout.rows();
         // Row 0 is the top of the screen; later rows paint over it.
         for (int row = 0; row < rows; row++) {
+            drawCraters(batch, model, row);
             drawGraves(batch, model, delta, row);
             drawGraveGhosts(batch, delta, row);
+            drawVases(batch, model, delta, row, rows);
             for (PlantInstance plant : plants) {
                 int lane = plantRow(plant);
                 if (lane >= 0 && clampRow(lane, rows) == row) {
@@ -464,6 +501,7 @@ public final class LawnEntityRenderer {
                     drawZombie(batch, zombie, skin, delta);
                 }
             }
+            drawBowlingWalnuts(batch, delta, row, rows);
             drawDeathFx(batch, delta, row);
             drawArmorPops(batch, delta, row);
             drawHunterSplats(batch, delta, row);
@@ -483,7 +521,9 @@ public final class LawnEntityRenderer {
         harvestProjectileHits(model);
         drawEffects(batch, frontEffects, delta);
 
+        pruneVaseAge(model);
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        beghouledMotion.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         armorBreakFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleeAttackFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
@@ -496,6 +536,14 @@ public final class LawnEntityRenderer {
             frontEffects.remove(entry.getValue());
             return true;
         });
+        plantFoodFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        for (PlantInstance plant : new ArrayList<>(lastPlantIce.keySet())) {
+            if (!seenThisFrame.contains(plant)) {
+                plantIceIntro.remove(plant);
+                plantIceClocks.remove(plant);
+                spawnIceShatter(lastPlantIce.remove(plant));
+            }
+        }
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
             && !plant.isTransformed());
@@ -595,10 +643,45 @@ public final class LawnEntityRenderer {
             return;
         }
         float[] xy = layout.centerOf(pos.getY(), pos.getX());
+        applyBeghouledMotion(plant, xy, delta);
+        applySquashLeap(plant, xy);
+        float[] pfXy = layout.centerOf(pos.getY() - 0.5f, pos.getX() + 0.1f);
         String clockKey = pose.cacheKey() + "#" + plant.getActionEpoch();
-        float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.PLANT, NO_PHASE,
-                tickHitFlash(plant, plantVitality(plant), delta), delta, clockKey);
+        float flash = tickHitFlash(plant, plantVitality(plant), delta);
+        float animDelta = plant.isFrozen() ? 0f : delta;
+        float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.forPlant(pose), NO_PHASE,
+                flash, animDelta, clockKey);
+        drawPlantFreezeIce(batch, plant, xy[0], xy[1], flash, delta);
+        updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
+    }
+
+    /** Squash leaps from its tile onto the captured smash target during ATTACKING. */
+    private void applySquashLeap(PlantInstance plant, float[] xy) {
+        if (plant == null || xy == null || plant.getState() != PlantState.ATTACKING) {
+            return;
+        }
+        if (plant.getDefinition() == null || !"Squash".equals(plant.getDefinition().getName())) {
+            return;
+        }
+        if (!(plant.getAbilityStrategy() instanceof ExplosiveAbility explosive)
+                || !explosive.hasSmashTarget()) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog == null ? null
+                : catalog.forPlant(plant.getDefinition().getName());
+        float[] to = layout.centerOf(explosive.getSmashTargetGridY(), explosive.getSmashTargetGridX());
+        float dx = to[0] - xy[0];
+        float dy = to[1] - xy[1];
+        float travel = SquashAnim.leapTravelFraction(plant, entry);
+        if (travel > 0f) {
+            xy[0] += dx * travel;
+            xy[1] += dy * travel;
+        }
+        float travelTiles = layout.cellWidth() > 0f
+                ? (float) Math.sqrt(dx * dx + dy * dy) / layout.cellWidth()
+                : 1f;
+        xy[1] += SquashAnim.leapVisualHeightCells(plant, entry, travelTiles) * layout.cellHeight();
     }
 
     private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
@@ -738,6 +821,9 @@ public final class LawnEntityRenderer {
     private void spawnExplosionSpecs(List<ExplosivePlantFx.Spec> specs, Point pos, float x, float y) {
         if (specs == null || specs.isEmpty()) {
             return;
+        }
+        if (screenShake != null) {
+            screenShake.pulse();
         }
         for (ExplosivePlantFx.Spec spec : specs) {
             if (spec.placement() == ExplosivePlantFx.Placement.ALONG_LANE && pos != null) {
@@ -930,7 +1016,7 @@ public final class LawnEntityRenderer {
             return;
         }
         projectileWorldCenter(projectile, xyTmp);
-        drawPose(batch, projectile, pose, xyTmp[0], xyTmp[1], AnimScale.PROJECTILE, NO_PHASE,
+        drawPose(batch, projectile, pose, xyTmp[0], xyTmp[1], AnimScale.forProjectile(pose), NO_PHASE,
                 0f, delta, pose.cacheKey());
     }
 
@@ -943,16 +1029,306 @@ public final class LawnEntityRenderer {
         }
     }
 
+    private void prepareBowlingWalnuts(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof WallnutBowlingLevel bowling)) {
+            bowlingWalnuts = List.of();
+            return;
+        }
+        harvestBowlingExplosions(bowling);
+        List<BowlingWalnut> active = bowling.getActiveWalnuts();
+        bowlingWalnuts = active;
+        for (BowlingWalnut walnut : active) {
+            if (walnut != null) {
+                seenThisFrame.add(walnut);
+            }
+        }
+    }
+
+    public void preloadVases() {
+        for (String pam : VaseBreakerAnim.allVasePams()) {
+            clips.preloadSync(pam,
+                    VaseBreakerAnim.CLIP_DROP,
+                    VaseBreakerAnim.CLIP_IDLE,
+                    VaseBreakerAnim.CLIP_BREAK);
+        }
+        clips.preloadSync(VaseBreakerAnim.GARGANTUAR_ZOMBIE,
+                "idle", "walk", "eat", "smash_left", "fire", "cannon_fire", "die");
+    }
+
+    public void preloadCraters() {
+        textures.loadSync(BeghouledArt.ATLAS_GROUP);
+        textures.loadSync(BeghouledArt.ATLAS_PAGE);
+        craterRegion = textures.region(BeghouledArt.CRATER_TILE);
+        if (craterRegion == null) {
+            craterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+        }
+    }
+
+    private void harvestBeghouledClears(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof BeghouledLevel beghouled)) {
+            return;
+        }
+        for (int[] cell : beghouled.consumeLastClearedCells()) {
+            if (cell == null || cell.length < 2) {
+                continue;
+            }
+            float[] xy = layout.centerOf(cell[0], cell[1]);
+            frontEffects.add(new OneShotFx(
+                    EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_ON,
+                    xy[0], xy[1], AnimScale.PLANT * 0.85f, false));
+        }
+    }
+
+    private void drawCraters(Batch batch, GameModel model, int row) {
+        GameMap map = model.getMap();
+        if (map == null) {
+            return;
+        }
+        TextureRegion crater = ensureCraterRegion();
+        if (crater == null) {
+            return;
+        }
+        float w = crater.getRegionWidth();
+        float h = crater.getRegionHeight();
+        int cols = Math.min(layout.cols(), map.getCols());
+        for (int c = 0; c < cols; c++) {
+            Cell cell = map.getCell(c, row);
+            if (cell == null || !isCraterCell(cell)) {
+                continue;
+            }
+            float[] xy = layout.centerOf(row, c);
+            batch.draw(crater, xy[0] - w * 0.5f, xy[1] - h * 0.4f, w, h);
+        }
+    }
+
+    private static boolean isCraterCell(Cell cell) {
+        return cell.getGroundType() == GroundType.CRATER
+                || cell.getTerrainStrategy() instanceof CraterTerrainStrategy;
+    }
+
+    private TextureRegion ensureCraterRegion() {
+        if (craterRegion != null) {
+            return craterRegion;
+        }
+        craterRegion = textures.region(BeghouledArt.CRATER_TILE);
+        if (craterRegion == null) {
+            craterRegion = textures.region(BeghouledArt.CRATER_LARGE);
+        }
+        return craterRegion;
+    }
+
+    private void applyBeghouledMotion(PlantInstance plant, float[] xy, float delta) {
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (!(model != null && model.getCurrentLevel() instanceof BeghouledLevel)) {
+            beghouledMotion.remove(plant);
+            return;
+        }
+        BeghouledMotion motion = beghouledMotion.get(plant);
+        if (motion == null) {
+            motion = new BeghouledMotion();
+            motion.toX = xy[0];
+            motion.toY = xy[1];
+            motion.fromX = xy[0];
+            motion.fromY = xy[1] + layout.cellHeight() * 1.15f;
+            motion.t = 0f;
+            beghouledMotion.put(plant, motion);
+        } else {
+            float dx = xy[0] - motion.toX;
+            float dy = xy[1] - motion.toY;
+            if (dx * dx + dy * dy > 0.25f) {
+                float u = beghouledEase(motion.t);
+                motion.fromX = motion.fromX + (motion.toX - motion.fromX) * u;
+                motion.fromY = motion.fromY + (motion.toY - motion.fromY) * u;
+                motion.toX = xy[0];
+                motion.toY = xy[1];
+                motion.t = 0f;
+            } else {
+                motion.toX = xy[0];
+                motion.toY = xy[1];
+            }
+        }
+        motion.t = Math.min(1f, motion.t + Math.max(0f, delta) / BEGHOULED_MOVE_SEC);
+        float u = beghouledEase(motion.t);
+        xy[0] = motion.fromX + (motion.toX - motion.fromX) * u;
+        xy[1] = motion.fromY + (motion.toY - motion.fromY) * u;
+    }
+
+    private static float beghouledEase(float t) {
+        float u = Math.max(0f, Math.min(1f, t));
+        return 1f - (1f - u) * (1f - u);
+    }
+
+    private static final class BeghouledMotion {
+        float fromX;
+        float fromY;
+        float toX;
+        float toY;
+        float t;
+    }
+
+    public void playVaseBreak(String pamPath, int col, int row) {
+        if (pamPath == null) {
+            return;
+        }
+        float[] xy = layout.centerOf(row, col);
+        frontEffects.add(new OneShotFx(
+                pamPath, VaseBreakerAnim.CLIP_BREAK, xy[0], xy[1], AnimScale.PLANT, false));
+        vaseAge.remove(vaseKey(col, row));
+    }
+
+    private void drawVases(Batch batch, GameModel model, float delta, int row, int rows) {
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            return;
+        }
+        for (Vase vase : level.getVases()) {
+            if (vase.isBroken() || vase.getPosition() == null) {
+                continue;
+            }
+            int col = vase.getPosition().getX();
+            int vaseRow = vase.getPosition().getY();
+            if (clampRow(vaseRow, rows) != row) {
+                continue;
+            }
+            String key = vaseKey(col, vaseRow);
+            float age = vaseAge.getOrDefault(key, 0f) + Math.max(0f, delta);
+            vaseAge.put(key, age);
+            String pam = VaseBreakerAnim.pamPath(vase);
+            boolean dropping = age < VaseBreakerAnim.DROP_SECONDS;
+            String clip = dropping ? VaseBreakerAnim.CLIP_DROP : VaseBreakerAnim.CLIP_IDLE;
+            float time = dropping ? age : age - VaseBreakerAnim.DROP_SECONDS;
+            ClipRef ref = clips.getOrLoad(pam, clip);
+            if (ref == null) {
+                continue;
+            }
+            float[] xy = layout.centerOf(vaseRow, col);
+            player.draw(batch, ref, time, xy[0], xy[1],
+                    AnimScale.PLANT, AnimScale.PLANT, !dropping);
+        }
+    }
+
+    private void pruneVaseAge(GameModel model) {
+        if (!(model.getCurrentLevel() instanceof VaseBreakerLevel level)) {
+            vaseAge.clear();
+            return;
+        }
+        HashSet<String> live = new HashSet<>();
+        for (Vase vase : level.getVases()) {
+            if (!vase.isBroken() && vase.getPosition() != null) {
+                live.add(vaseKey(vase.getPosition().getX(), vase.getPosition().getY()));
+            }
+        }
+        vaseAge.keySet().removeIf(key -> !live.contains(key));
+    }
+
+    private static String vaseKey(int col, int row) {
+        return col + "," + row;
+    }
+
+    private void drawBowlingWalnuts(Batch batch, float delta, int row, int rows) {
+        if (bowlingWalnuts.isEmpty()) {
+            return;
+        }
+        for (BowlingWalnut walnut : bowlingWalnuts) {
+            if (walnut == null) {
+                continue;
+            }
+            if (clampRow(Math.round(walnut.getY()), rows) != row) {
+                continue;
+            }
+            drawBowlingWalnut(batch, walnut, delta);
+        }
+    }
+
+    private void harvestBowlingExplosions(WallnutBowlingLevel bowling) {
+        for (FloatPoint point : bowling.drainExplosions()) {
+            if (point == null) {
+                continue;
+            }
+            float[] xy = layout.centerOf(point.getY(), point.getX());
+            spawnExplosionSpecs(ExplosivePlantFx.specsForName("Explode-o-nut"), null, xy[0], xy[1]);
+        }
+    }
+
+    private void drawBowlingWalnut(Batch batch, BowlingWalnut walnut, float delta) {
+        String plantName = BowlingWalnutAnim.artPlantName(walnut);
+        ClipRef ref = plantIdleClip(plantName);
+        if (ref == null) {
+            if (entityOverlay != null) {
+                entityOverlay.drawProjectile(batch, walnut);
+            }
+            return;
+        }
+        AnimClock clock = clocks.computeIfAbsent(walnut, k -> new AnimClock());
+        clock.time += Math.max(0f, delta);
+        float[] xy = layout.centerOf(walnut.getY(), walnut.getX());
+        float scale = BowlingWalnutAnim.scale(walnut);
+        float degrees = BowlingWalnutAnim.rollDegrees(walnut, clock.time);
+        batch.flush();
+        batchTransform.set(batch.getTransformMatrix());
+        popTransform.set(batchTransform)
+            .translate(xy[0], xy[1], 0f)
+            .rotate(0f, 0f, 1f, degrees)
+            .translate(-xy[0], -xy[1], 0f);
+        batch.setTransformMatrix(popTransform);
+        player.draw(batch, ref, 0f, xy[0], xy[1], scale, scale, true);
+        batch.flush();
+        batch.setTransformMatrix(batchTransform);
+    }
+
     /** Idle PAM at a world point — drag-to-plant cursor ghost. */
     public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time) {
-        ClipRef ref = plantIdleClip(plantName);
+        drawPlantIdle(batch, plantName, x, y, time, AnimScale.PLANT);
+    }
+
+    public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time, float scale) {
+        ClipRef ref = plantIdleClip(resolveIdlePlantName(plantName));
         if (ref != null) {
-            player.draw(batch, ref, time, x, y, AnimScale.PLANT, AnimScale.PLANT, true);
+            player.draw(batch, ref, time, x, y, scale, scale, true);
         }
     }
 
     public void preloadPlantIdle(String plantName) {
-        plantIdleClip(plantName);
+        plantIdleClip(resolveIdlePlantName(plantName));
+    }
+
+    public void drawZombieIdle(Batch batch, String zombieName, float x, float y, float time,
+                               Chapter chapter) {
+        if (zombieName == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.forZombie(zombieName, chapter);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "walk", "idle2", "idle1");
+        if (clip == null) {
+            return;
+        }
+        ClipRef ref = clips.getOrLoad(entry.path(), clip);
+        if (ref != null) {
+            player.draw(batch, ref, time, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, true);
+        }
+    }
+
+    public void preloadZombieIdle(String zombieName, Chapter chapter) {
+        if (zombieName == null || catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.forZombie(zombieName, chapter);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "idle", "walk", "idle2", "idle1");
+        if (clip != null) {
+            clips.getOrLoad(entry.path(), clip);
+        }
+    }
+
+    private static String resolveIdlePlantName(String plantName) {
+        if ("Giant Wall-nut".equalsIgnoreCase(plantName)) {
+            return "Wall-nut";
+        }
+        return plantName;
     }
 
     private ClipRef plantIdleClip(String plantName) {
@@ -1027,7 +1403,7 @@ public final class LawnEntityRenderer {
                 lastPlants.remove(plant);
                 continue;
             }
-            drawPose(batch, plant, snap.pose, snap.x, snap.y, AnimScale.PLANT, NO_PHASE, flash, 0f);
+            drawPose(batch, plant, snap.pose, snap.x, snap.y, AnimScale.forPlant(snap.pose), NO_PHASE, flash, 0f);
         }
     }
 
@@ -1146,7 +1522,7 @@ public final class LawnEntityRenderer {
     private boolean drawPlantPop(Batch batch, PlantInstance plant,
                                  float x, float y, float u, float flash) {
         AnimPose pose = plantAdapter.poseFor(plant);
-        if (pose == null) {
+        if (pose == null || pose.isSpritesheet()) {
             return false;
         }
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
@@ -1359,7 +1735,7 @@ public final class LawnEntityRenderer {
     }
 
     private float[] originWorld(Sun sun) {
-        return layout.centerOf(Math.round(sun.getOriginY()), sun.getOriginX());
+        return layout.centerOf(sun.getOriginY(), sun.getOriginX());
     }
 
     private void drawSunToken(Batch batch, Sun sun, float x, float y, float delta) {
@@ -2110,6 +2486,54 @@ public final class LawnEntityRenderer {
         }
     }
 
+    private void drawPlantFreezeIce(Batch batch, PlantInstance plant,
+                                    float x, float y, float flash, float delta) {
+        boolean show = plant.isFrozen() && !plant.hasOctopusCoating();
+        if (!show) {
+            plantIceIntro.remove(plant);
+            plantIceClocks.remove(plant);
+            LiveSnap prev = lastPlantIce.remove(plant);
+            if (prev != null) {
+                spawnIceShatter(prev);
+            }
+            return;
+        }
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(PlantFreezeAnim.ICE_PAM);
+        if (entry == null) {
+            return;
+        }
+        preloadIceBreak();
+        float startDur = plantIceStartDuration(entry.path());
+        Float intro = plantIceIntro.get(plant);
+        boolean playStart = intro == null || intro < startDur;
+        AnimPose pose;
+        String clockKey;
+        if (playStart) {
+            String clip = catalog.resolveClip(entry, PlantFreezeAnim.START_CLIP);
+            pose = AnimPose.once(entry.path(), clip, PlantAnimRole.SPECIAL, null);
+            clockKey = pose.cacheKey() + "#plant-ice-start";
+        } else {
+            String clip = catalog.resolveClip(entry, PlantFreezeAnim.IDLE_CLIP);
+            pose = AnimPose.looping(entry.path(), clip, PlantAnimRole.IDLE);
+            clockKey = pose.cacheKey() + "#plant-ice-idle";
+        }
+        Object iceClock = plantIceClocks.computeIfAbsent(plant, p -> new Object());
+        float time = drawPose(batch, iceClock, pose, x, y, AnimScale.PLANT, NO_PHASE,
+                flash, delta, clockKey);
+        if (playStart) {
+            plantIceIntro.put(plant, Math.min(time, startDur));
+        }
+        lastPlantIce.put(plant, new LiveSnap(pose, x, y, false, time));
+    }
+
+    private float plantIceStartDuration(String path) {
+        ClipRef start = clips.getOrLoad(path, PlantFreezeAnim.START_CLIP);
+        return start == null ? 0.9f : start.duration;
+    }
+
     private void spawnIceShatter(LiveSnap snap) {
         if (snap == null) {
             return;
@@ -2242,6 +2666,10 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
+        boolean backward = zombie.isMovingBackward();
+        if (backward) {
+            pose = pose.withFlipX(true);
+        }
         if (!zombieWorldCenter(zombie, xyTmp)) {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
@@ -2294,11 +2722,10 @@ public final class LawnEntityRenderer {
         } else if (ref != null && gait.enabled() && ZombieAnimAdapter.isDistanceDriven(zombie, pose)) {
             // Walking is driven by travel, so a cycle always covers exactly one step and
             // ground_swatch can be held still. Every other pose stays on the wall clock.
-            // Hypnotized zombies walk the other way, so distance and the hold-back both flip.
-            boolean backward = zombie.isMovingBackward();
-            phase = gait.phaseAt(backward ? xyTmp[2] : -xyTmp[2]);
+            float travel = backward ? xyTmp[2] : -xyTmp[2];
+            phase = gait.phaseAt(travel);
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
-            x += backward ? -holdBack : holdBack;
+            x += holdBack;
         }
         float standY = y;
         Rectangle snorkelMask = null;
@@ -2417,6 +2844,9 @@ public final class LawnEntityRenderer {
         float[] xy = layout.centerOf(zombie.getGridY(), jump.getLaunchX());
         prospectorBlasts.add(new BlastFx(blast.path(), xy[0], xy[1]));
         prospectorBlastSpawned.put(zombie, Boolean.TRUE);
+        if (screenShake != null) {
+            screenShake.pulse();
+        }
     }
 
     private void drawProspectorBlasts(Batch batch, float delta, int row) {
@@ -3107,6 +3537,9 @@ public final class LawnEntityRenderer {
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey, float glow) {
         seenThisFrame.add(entity);
+        if (pose.isSpritesheet()) {
+            return drawSheetPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey);
+        }
         ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref == null) {
             return 0f;
@@ -3136,6 +3569,33 @@ public final class LawnEntityRenderer {
         return stateTime;
     }
 
+    private float drawSheetPose(Batch batch, Object entity, AnimPose pose,
+                                float x, float y, float baseScale, float phase, float flash,
+                                float delta, String clockKey) {
+        PlantSpritesheetCatalog.ClipSpec spec =
+                plantSheets == null ? null : plantSheets.byCacheKey(pose.clipName());
+        SpritesheetClipCache.SheetAnim sheet =
+                spec == null ? null : sheetClips.getOrLoad(spec);
+        if (sheet == null) {
+            return 0f;
+        }
+        float duration = sheet.duration();
+        float stateTime = phase >= 0f
+                ? phase * duration
+                : advanceClock(entity, clockKey, delta);
+        if (phase >= 0f) {
+            stampClockClip(entity, clockKey);
+        }
+        if (pose.reverse() && duration > 0f) {
+            stateTime = Math.max(0f, duration - Math.min(stateTime, duration));
+        }
+        float scale = baseScale * pose.scale();
+        float drawTime = stateTime;
+        drawSheet(batch, sheet, pose, drawTime, x, y, scale);
+        overlayHitFlash(batch, flash, () -> drawSheet(batch, sheet, pose, drawTime, x, y, scale));
+        return stateTime;
+    }
+
     private void drawClip(Batch batch, ClipRef ref, AnimPose pose,
                           float stateTime, float x, float y, float scale) {
         float sx = pose.flipX() ? -scale : scale;
@@ -3144,6 +3604,18 @@ public final class LawnEntityRenderer {
         } else {
             player.draw(batch, ref, stateTime, x, y, sx, scale, pose.loop(), pose.visibility());
         }
+    }
+
+    private void drawSheet(Batch batch, SpritesheetClipCache.SheetAnim sheet, AnimPose pose,
+                           float stateTime, float x, float y, float scale) {
+        TextureRegion frame = sheet.animation().getKeyFrame(stateTime, pose.loop());
+        if (frame == null) {
+            return;
+        }
+        float w = frame.getRegionWidth() * scale;
+        float h = frame.getRegionHeight() * scale;
+        float sx = pose.flipX() ? -1f : 1f;
+        batch.draw(frame, x - w * 0.5f, y - h * 0.5f, w * 0.5f, h * 0.5f, w, h, sx, 1f, 0f);
     }
 
     /** White additive flash while HP dropped since last frame. */
@@ -4189,6 +4661,71 @@ public final class LawnEntityRenderer {
             this.scale = scale > 0f ? scale : 1f;
             this.loop = loop;
         }
+    }
+
+    private enum PlantFoodFxPhase {
+        ON, LOOP, OFF
+    }
+
+    private static final class PlantFoodFx {
+        PlantFoodFxPhase phase = PlantFoodFxPhase.ON;
+        float time;
+    }
+
+    private void updateAndDrawPlantFoodFx(Batch batch, PlantInstance plant, float x, float y, float delta) {
+        boolean active = plant.isPlantFoodActive() || plant.getState() == PlantState.PLANT_FOOD;
+        PlantFoodFx fx = plantFoodFx.get(plant);
+        if (!active && fx == null) {
+            return;
+        }
+        if (fx == null) {
+            fx = new PlantFoodFx();
+            plantFoodFx.put(plant, fx);
+            preloadPlantFoodFx();
+        }
+        if (!active && fx.phase != PlantFoodFxPhase.OFF) {
+            fx.phase = PlantFoodFxPhase.OFF;
+            fx.time = 0f;
+        }
+
+        String clip = plantFoodFxClip(fx.phase);
+        ClipRef ref = clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, clip);
+        if (ref == null) {
+            if (!active) {
+                plantFoodFx.remove(plant);
+            }
+            return;
+        }
+        float duration = effectClipDurationSeconds(ref, EffectPamPaths.PLANTFOOD_FX, clip);
+        boolean loop = fx.phase == PlantFoodFxPhase.LOOP;
+        fx.time += delta;
+        player.draw(batch, ref, fx.time, x, y, AnimScale.PLANT, AnimScale.PLANT, loop);
+
+        if (fx.phase == PlantFoodFxPhase.ON && duration > 0f && fx.time >= duration) {
+            fx.phase = PlantFoodFxPhase.LOOP;
+            fx.time = 0f;
+        } else if (fx.phase == PlantFoodFxPhase.OFF && duration > 0f && fx.time >= duration) {
+            plantFoodFx.remove(plant);
+        } else if (fx.phase == PlantFoodFxPhase.OFF && duration <= 0f) {
+            plantFoodFx.remove(plant);
+        } else if (fx.phase == PlantFoodFxPhase.ON && duration <= 0f) {
+            fx.phase = active ? PlantFoodFxPhase.LOOP : PlantFoodFxPhase.OFF;
+            fx.time = 0f;
+        }
+    }
+
+    private void preloadPlantFoodFx() {
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_ON);
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_LOOP);
+        clips.getOrLoad(EffectPamPaths.PLANTFOOD_FX, EffectPamPaths.PLANTFOOD_FX_OFF);
+    }
+
+    private static String plantFoodFxClip(PlantFoodFxPhase phase) {
+        return switch (phase) {
+            case ON -> EffectPamPaths.PLANTFOOD_FX_ON;
+            case LOOP -> EffectPamPaths.PLANTFOOD_FX_LOOP;
+            case OFF -> EffectPamPaths.PLANTFOOD_FX_OFF;
+        };
     }
 
     /** Per-sandstorm visual state: placement, clip choice and clocks. */

@@ -18,7 +18,9 @@ public final class SeedPacketIds {
             "Iceberg Lettuce", "ICEBURG",
             "Cherry Bomb", "CHERRY_BOMB",
             "Pierce-mint", "PEPPERMINT",
-            "Mega Gatling Pea", "MEGAGATLING");
+            "Mega Gatling Pea", "MEGAGATLING",
+            "Giant Wall-nut", "WALLNUT",
+            "Explode-o-nut", "EXPLODEONUT");
 
     private SeedPacketIds() {}
 

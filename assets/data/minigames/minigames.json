@@ -263,6 +263,7 @@
       "skyDropEnabled": false,
       "sunFallsFromSky": false,
       "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
       "plantFoodDrops": false
     },
     "waves": [],
@@ -301,6 +302,7 @@
       "skyDropEnabled": false,
       "sunFallsFromSky": false,
       "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
       "plantFoodDrops": false
     },
     "waves": [],
@@ -340,6 +342,7 @@
       "skyDropEnabled": false,
       "sunFallsFromSky": false,
       "allowsChoosingPlants": false,
+      "lawnMowersEnabled": false,
       "plantFoodDrops": false
     },
     "waves": [],

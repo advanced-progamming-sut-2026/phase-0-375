@@ -1,8 +1,10 @@
 package model.zombie.instance;
 
+import model.app.App;
 import model.enums.PlacableLayer;
 import model.item.placeable.Placeable;
 import model.enums.*;
+import model.game.core.GameModel;
 import model.game.core.Tickable;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
@@ -29,6 +31,7 @@ public class ZombieInstance implements Tickable, Placeable {
     private float speedModifier;
     private boolean isGlowing;                             // a glowing zombie drops plant food after dying
     private int chillLevel;
+    private boolean buttered;
     private boolean movingBackward;                        // true while this zombie moves away from the house
     /** Persists across EATING / SPECIAL_ACTION so hypnosis is not lost when state changes. */
     private boolean hypnotized;
@@ -74,6 +77,7 @@ public class ZombieInstance implements Tickable, Placeable {
         this.speedModifier = 1.0f;
         this.isGlowing = shouldSpawnGlowing();
         this.chillLevel = 0;
+        this.buttered = false;
         this.movingBackward = false;
         this.armors = new ArrayList<>();
         this.pushableItem = null;
@@ -100,9 +104,26 @@ public class ZombieInstance implements Tickable, Placeable {
     // --- Glowing ---
 
     public boolean shouldSpawnGlowing() {
+        if (!plantFoodDropsAllowed()) {
+            return false;
+        }
         float glowingChance = 0.1f;
         Random rng = new Random();
         return rng.nextFloat() <= glowingChance;
+    }
+
+    private static boolean plantFoodDropsAllowed() {
+        try {
+            GameModel model = App.getInstance().getCurrentGameModel();
+            if (model == null || model.getCurrentLevel() == null
+                    || model.getCurrentLevel().getConfig() == null
+                    || model.getCurrentLevel().getConfig().getRules() == null) {
+                return true;
+            }
+            return model.getCurrentLevel().getConfig().getRules().isPlantFoodDrops();
+        } catch (RuntimeException ignored) {
+            return true;
+        }
     }
 
     // --- Hypnosis helpers ---
@@ -193,6 +214,16 @@ public class ZombieInstance implements Tickable, Placeable {
         currentHP -= damage;
     }
 
+    /** Applies poison damage-over-time. */
+    public void applyPoison(int dps, float durationSeconds) {
+        if (dps <= 0 || durationSeconds <= 0f
+                || state == ZombieState.DEAD || state == ZombieState.DYING) {
+            return;
+        }
+        poisonDPS = Math.max(poisonDPS, dps);
+        poisonTimer = Math.max(poisonTimer, durationSeconds);
+    }
+
     /** Applies a chill stack to this zombie. Three stacks freezes it solid */
     public void applyChill() {
         if (isFrozen()) return;
@@ -205,8 +236,25 @@ public class ZombieInstance implements Tickable, Placeable {
         }
     }
 
+    /**
+     * Kernel-pult butter: freeze solid and keep the PAM {@code butter} part
+     * visible until the freeze clears.
+     */
+    public void applyButter() {
+        buttered = true;
+        applyChill();
+        applyChill();
+        applyChill();
+    }
+
     /** Default duration (in seconds) of a single chill stack. */
     public static final float CHILL_STACK_DURATION = 5.0f;
+
+    /** Default poison DoT duration applied by goo projectiles. */
+    public static final float POISON_DURATION = 5.0f;
+
+    /** Base poison DPS from Goo Peashooter pellets. */
+    public static final int POISON_BASE_DPS = 10;
 
     /**
      * Removes one chill stack from this zombie. Called by the combat
@@ -214,6 +262,9 @@ public class ZombieInstance implements Tickable, Placeable {
      */
     public void removeChill() {
         chillLevel = Math.max(0, chillLevel - 1);
+        if (!isFrozen()) {
+            buttered = false;
+        }
         if (chillLevel == 0 && state == ZombieState.CHILLED) {
             state = ZombieState.WALKING;
         }
@@ -370,6 +421,7 @@ public class ZombieInstance implements Tickable, Placeable {
     public boolean isAlive() { return currentHP > 0 && !isDead(); }
     public boolean isFrozen() { return chillLevel >= 3; }
     public boolean isChilled() { return chillLevel > 0 && chillLevel < 3; }
+    public boolean isButtered() { return buttered && isFrozen(); }
 
     /** @return true if this zombie is currently flying. */
     public boolean isFlying() {

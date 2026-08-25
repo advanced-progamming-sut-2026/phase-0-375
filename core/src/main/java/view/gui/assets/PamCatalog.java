@@ -223,6 +223,10 @@ public final class PamCatalog {
                 && !upper.contains("BEHIND")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PLANT/")
+                && !upper.contains("BEHIND")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/")) {
             return true;
         }
@@ -256,7 +260,9 @@ public final class PamCatalog {
         if (upper.contains("/NPC/")) {
             return false;
         }
-        return upper.contains("/PLANT/") || upper.contains("/ZOMBIE/");
+        return upper.contains("/PLANT/")
+                || upper.contains("/ZOMBIE/")
+                || upper.contains("/VASEBREAKER/");
     }
 
     /** Catalog entry by animations.json {@code name}, or {@code null}. */

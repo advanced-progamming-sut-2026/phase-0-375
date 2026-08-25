@@ -12,6 +12,7 @@ import model.item.placeable.Placeable;
 import model.plant.PlantFactory;
 import model.plant.ability.PlantAbility;
 import model.plant.ability.PlantAbilityContext;
+import model.plant.ability.TimedPlantAction;
 import model.plant.ability.*;
 import model.plant.definition.LevelUpgrade;
 import model.plant.definition.Plant;
@@ -90,6 +91,11 @@ public class PlantInstance implements Placeable {
                     abilityState.setCooldownRemaining(definition.getActionInterval());
                     this.state = PlantState.ARMING;
                 }
+            } else if (definition.hasTag(PlantTags.CHARGE)
+                    && definition.getCategory() == PlantCategory.SHOOTER
+                    && definition.getActionInterval() >= 5f) {
+                abilityState.setCooldownRemaining(definition.getActionInterval());
+                this.state = PlantState.ARMING;
             }
             abilityStates.put(definition.getAbilityType(), abilityState);
             if (definition.getAbilityType() == PlantAbilityType.PRODUCE_SUN
@@ -257,14 +263,13 @@ public class PlantInstance implements Placeable {
         if (strategy == null) return;
 
         PlantAction action = strategy.beginAction(this, context);
-        applyAbilityCooldown(strategy);
-        if (isMint(definition)) {
-            markMintBoostConsumed();
-        }
-
         if (action != null) {
+            applyAbilityCooldown(strategy);
             activeAction = action;
             activeAction.start(this, context);
+        }
+        if (isMint(definition)) {
+            markMintBoostConsumed();
         }
     }
 
@@ -311,6 +316,14 @@ public class PlantInstance implements Placeable {
         actionEpoch++;
     }
 
+    /** Elapsed seconds of the active {@link TimedPlantAction}. */
+    public float getActiveActionElapsed() {
+        if (activeAction instanceof TimedPlantAction timed) {
+            return timed.getElapsed();
+        }
+        return 0f;
+    }
+
     // --- Plant food ---
     /** No-arg overload for callers that don't have a {@link PlantAbilityContext} handy. */
     public void activatePlantFood() {
@@ -333,6 +346,29 @@ public class PlantInstance implements Placeable {
         plantFoodDurationRemaining = PLANT_FOOD_DURATION;
         pendingPlantFoodEffect = false;
         firePlantFoodEffect(context);
+    }
+
+    /** Ends the active plant-food window immediately. */
+    public void finishPlantFoodNow() {
+        if (!isPlantFoodActive && state != PlantState.PLANT_FOOD) {
+            return;
+        }
+        isPlantFoodActive = false;
+        plantFoodDurationRemaining = 0f;
+        pendingPlantFoodEffect = false;
+        if (state == PlantState.PLANT_FOOD) {
+            state = PlantState.IDLE;
+        }
+    }
+
+    /** Jumps an active plant-food effect into its outro window immediately. */
+    public void beginPlantFoodOffWindowNow(float offDurationSeconds) {
+        if (!isPlantFoodActive || state != PlantState.PLANT_FOOD || offDurationSeconds <= 0f) {
+            return;
+        }
+        if (plantFoodDurationRemaining > offDurationSeconds) {
+            plantFoodDurationRemaining = offDurationSeconds;
+        }
     }
 
     /** Invokes the per-category plant-food effect. */
@@ -657,6 +693,10 @@ public class PlantInstance implements Placeable {
             AbilityState fresh = new AbilityState(newDefinition.getAbilityType());
             if (newDefinition.hasTag(PlantTags.TRAP)) {
                 fresh.setArmed(false);
+            } else if (newDefinition.hasTag(PlantTags.CHARGE)
+                    && newDefinition.getCategory() == PlantCategory.SHOOTER
+                    && newDefinition.getActionInterval() >= 5f) {
+                fresh.setCooldownRemaining(newDefinition.getActionInterval());
             }
             this.abilityStates.put(newDefinition.getAbilityType(), fresh);
         }

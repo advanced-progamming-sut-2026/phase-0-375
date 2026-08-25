@@ -43,7 +43,10 @@ public final class PamPlantProjectileOrigins implements PlantProjectileOrigins {
             "Snow Pea", new float[]{0.08f, 0f},
             "Fire Peashooter", new float[]{0.08f, 0f},
             "Goo Peashooter", new float[]{0.08f, 0f},
-            "Sea-shroom", new float[]{0.2f, 0.1f}
+            "Sea-shroom", new float[]{0.2f, 0.1f},
+            "Cabbage-pult", new float[]{-0.8f, -0.2f},
+            "Kernel-pult", new float[]{0.8f, -0.5f},
+            "Cat-tail", new float[]{1f, 0f}
     );
 
     /** Omnidirectional shooters should leave from the plant body, not a side muzzle. */
@@ -53,7 +56,7 @@ public final class PamPlantProjectileOrigins implements PlantProjectileOrigins {
 
     public PamPlantProjectileOrigins(PvzAssets assets, LawnLayout layout) {
         this(assets == null ? null : assets.player,
-                assets == null ? null : new PlantAnimAdapter(assets.pamCatalog),
+                assets == null ? null : new PlantAnimAdapter(assets.pamCatalog, assets.plantSheets),
                 layout,
                 TimedPlantAction.DEFAULT_ATTACK_FIRE_FRACTION);
     }
@@ -79,13 +82,26 @@ public final class PamPlantProjectileOrigins implements PlantProjectileOrigins {
         if (pose == null || pose.pamPath() == null || pose.clipName() == null) {
             return null;
         }
+        if (pose.isSpritesheet()) {
+            Point cell = plant.getPosition();
+            float[] plantWorld = layout.centerOf(cell.getY(), cell.getX());
+            float worldX = plantWorld[0];
+            float worldY = plantWorld[1];
+            float[] grid = layout.gridOf(worldX, worldY);
+            float[] nudge = GRID_NUDGE.get(plant.getDefinition() != null ? plant.getDefinition().getName() : null);
+            if (nudge != null) {
+                grid[0] += nudge[0];
+                grid[1] += nudge[1];
+            }
+            return new FloatPoint(grid[0], grid[1]);
+        }
         float[] offset = offsetFor(plant, pose);
         if (offset == null) {
             return null;
         }
         Point cell = plant.getPosition();
         float[] plantWorld = layout.centerOf(cell.getY(), cell.getX());
-        float scale = AnimScale.PLANT * pose.scale();
+        float scale = AnimScale.forPlant(pose) * pose.scale();
         float signX = pose.flipX() ? -1f : 1f;
         float worldX = plantWorld[0] + offset[0] * scale * signX;
         float worldY = plantWorld[1] - offset[1] * scale;

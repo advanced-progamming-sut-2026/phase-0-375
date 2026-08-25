@@ -51,7 +51,7 @@ public class LobberAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
-        if (!context.hasZombieInLane(plant.getPosition().getY())) return null;
+        if (nearestZombieAhead(plant, context, +1) == null) return null;
 
         prepareKernelShot(plant);
         return TimedPlantAction.attackAt(plant, context, this::execute);
@@ -78,7 +78,7 @@ public class LobberAbility implements PlantAbility {
         }
 
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return;
-        if (!context.hasZombieInLane(plant.getPosition().getY())) return;
+        if (nearestZombieAhead(plant, context, +1) == null) return;
 
         if (!shotPrepared) {
             prepareKernelShot(plant);

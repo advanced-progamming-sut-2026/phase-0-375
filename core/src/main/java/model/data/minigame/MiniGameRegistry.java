@@ -84,6 +84,7 @@ public final class MiniGameRegistry {
         MiniGameLevel level = MiniGameFactory.create(type, config, entry.getDifficultyTier());
         if (level != null) {
             level.setCoinReward(entry.getCoinReward());
+            level.setStage(entry.getStage());
         }
         if (level instanceof VaseBreakerLevel vaseBreaker) {
             vaseBreaker.setSettings(buildVaseSettings(entry));

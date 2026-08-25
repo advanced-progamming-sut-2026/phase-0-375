@@ -17,6 +17,7 @@ public final class PlantPamAliases {
         m.put("Sun-shroom", "SUNSHROOM");
         m.put("Primal Sunflower", "PRIMAL_SUNFLOWER");
         m.put("Wall-nut", "WALLNUT");
+        m.put("Giant Wall-nut", "WALLNUT");
         m.put("Tall-nut", "TALLNUT");
         m.put("Endurian", "ENDURIAN");
         m.put("Garlic", "GARLIC");
@@ -47,9 +48,11 @@ public final class PlantPamAliases {
         m.put("Snapdragon", "SNAPDRAGON");
         m.put("Cold Snapdragon", "COLD_SNAPDRAGON");
         m.put("Iceberg Lettuce", "ICEBURG");
-        m.put("Cat-tail", "CATTAIL"); // TODO: find something for cat-tail animation
+        m.put("Cat-tail", "CATTAIL");
         m.put("Lily Pad", "LILYPAD");
         m.put("Gold Bloom", "GOLDBLOOM");
+        m.put("marigold", "MARIGOLD");
+        m.put("Marigold", "MARIGOLD");
         m.put("Hot Potato", "HOTPOTATO");
         m.put("Pierce-mint", "PEPPERMINT");
         m.put("catTail-mint", "SPEARMINT");

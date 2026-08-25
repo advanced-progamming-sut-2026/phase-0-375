@@ -6,9 +6,6 @@ import view.gui.anim.plant.PlantAnimOverrides;
 import view.gui.anim.plant.PlantAnimRole;
 import view.gui.assets.PamCatalog;
 
-/**
- * Fume-shroom has no {@code attack} clip; the spray lives on {@code special}.
- */
 public final class FumeShroomAnim {
     private FumeShroomAnim() {}
 

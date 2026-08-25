@@ -183,7 +183,7 @@ public class GameModel implements BehaviorContext {
     }
 
     public float difficultyBoost() {
-        return difficultyLevel / 3.0f;
+        return Math.max(1, difficultyLevel) / 3.0f;
     }
 
     public float difficultyPenalty() {
@@ -659,6 +659,14 @@ public class GameModel implements BehaviorContext {
     /** Marks a breach in a specific lane. In I, Zombie this is an eaten brain. */
     public void markHouseBreached(int row) {
         this.houseBreached = true;
+        this.breachedRows.add(row);
+    }
+
+    /**
+     * I, Zombie: destroys the brain in {@code row} after a chew finishes.
+     * Does not pin a breaching zombie (those walk off the left afterward).
+     */
+    public void markBrainEaten(int row) {
         this.breachedRows.add(row);
     }
 

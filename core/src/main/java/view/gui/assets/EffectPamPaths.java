@@ -19,6 +19,11 @@ public final class EffectPamPaths {
             "768/INITIAL/EFFECTS/JALAPENO_FIRE/JALAPENO_FIRE.PAM";
     public static final String GENERIC_EXPLOSION_FRONT =
             "768/INITIAL/EFFECTS/GENERIC_EXPLOSION_FRONT/GENERIC_EXPLOSION_FRONT.PAM";
+    public static final String PLANTFOOD_FX =
+            "768/INITIAL/EFFECTS/PLANTFOOD_FX/PLANTFOOD_FX.PAM";
+    public static final String PLANTFOOD_FX_ON = "plantfood_on";
+    public static final String PLANTFOOD_FX_LOOP = "plantfood";
+    public static final String PLANTFOOD_FX_OFF = "plantfood_off";
     public static final String BOWLING_BULB_EXPLOSION =
             "768/FULL/EFFECTS/BOWLINGBULB_PLANTFOOD_PROJECTILE/BOWLINGBULB_PLANTFOOD_PROJECTILE.PAM";
 

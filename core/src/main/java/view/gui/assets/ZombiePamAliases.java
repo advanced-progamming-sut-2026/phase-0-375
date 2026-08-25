@@ -22,7 +22,8 @@ public final class ZombiePamAliases {
     public static final String DARK_BASIC = "ZOMBIE_DARK_BASIC";
 
     private static final Set<String> BIOME_BASIC_BODIES = Set.of(
-            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4");
+            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4",
+            "ZombieIZombieSun");
 
     private static final Map<String, String> BY_NAME = createByName();
 

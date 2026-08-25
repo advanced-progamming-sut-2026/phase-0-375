@@ -64,6 +64,10 @@ public final class ProjectilePamPaths {
             "768/INITIAL/EFFECTS/ELECTRICBLUEBERRY_CLOUD_PROJECTILE/ELECTRICBLUEBERRY_CLOUD_PROJECTILE.PAM";
     public static final String GRAPESHOT =
             "768/INITIAL/EFFECTS/GRAPESHOT_PROJECTILE/GRAPESHOT_PROJECTILE.PAM";
+    public static final String CATTAIL_6 =
+            "768/INITIAL/EFFECTS/CATTAIL_PROJECTILE1/6.png";
+    public static final String CATTAIL_8 =
+            "768/INITIAL/EFFECTS/CATTAIL_PROJECTILE2/8.png";
 
     /** Storm-cloud hover on {@link #ELECTRIC_BLUEBERRY} (no {@code animation} clip). */
     public static final String ELECTRIC_BLUEBERRY_CLIP = "idle";
@@ -164,12 +168,29 @@ public final class ProjectilePamPaths {
             return FIRE_PEA;
         }
         if (name != null) {
+            if ("Cat-tail".equalsIgnoreCase(name)) {
+                return pathForCatTail(projectile.getArtVariant());
+            }
             String mapped = BY_PLANT.get(name);
             if (mapped != null) {
                 return mapped;
             }
         }
         return null;
+    }
+
+    /** Cat-tail digit spritesheet. */
+    public static String pathForCatTail(int artVariant) {
+        return artVariant == 8 ? CATTAIL_8 : CATTAIL_6;
+    }
+
+    /** True when {@code path} is a PNG spritesheet fallback (not a PAM). */
+    public static boolean isSpritesheetPath(String path) {
+        if (path == null) {
+            return false;
+        }
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        return lower.endsWith(".png");
     }
 
     /**

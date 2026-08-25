@@ -92,8 +92,8 @@ public class IZombieLevel extends MiniGameLevel {
     public void tick(float deltaTime) {
         // All I, Zombie logic runs through the regular systems: placed
         // zombies walk and eat on their own, the sun zombies produce sun via
-        // their behavior, and eaten brains are tracked per breached lane by
-        // GameModel.
+        // their behavior, and brains are chewed then marked eaten per lane by
+        // ZombieSystem / GameModel.markBrainEaten.
     }
 
     @Override

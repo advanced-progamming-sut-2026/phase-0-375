@@ -1,6 +1,8 @@
 package view.gui.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -17,6 +19,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.GameMenuController;
 import controller.GameplayMenuController;
 import controller.PlantSelectionMenuController;
+import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
@@ -26,12 +29,26 @@ import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
+import model.game.level.minigame.beghouled.BeghouledSettings;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.vasebreaker.PendingSeedPacket;
+import model.game.level.minigame.vasebreaker.Vase;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.anim.AnimScale;
+import view.gui.anim.bowling.BowlingWalnutAnim;
+import view.gui.anim.vase.VaseBreakerAnim;
+import view.gui.assets.ZombiePacketIds;
+import view.gui.lawn.BrainLaneRenderer;
+import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
@@ -39,6 +56,7 @@ import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
+import view.gui.ui.BeghouledMatchHud;
 import view.gui.ui.LootRewardPopup;
 import view.gui.ui.LoseResultsOverlay;
 import view.gui.ui.PauseMenuOverlay;
@@ -49,6 +67,7 @@ import view.gui.ui.SunHud;
 import view.gui.ui.WaveAnnounceBanner;
 import view.gui.ui.WaveProgressHud;
 import view.gui.ui.WinResultsOverlay;
+import view.gui.ui.ZombiePacketActor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,6 +92,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     private SunHud sunHud;
     private CoinHud coinHud;
+    private BeghouledMatchHud beghouledMatchHud;
     private PlantFoodBankHud plantFoodBank;
     private LootRewardPopup lootRewardPopup;
     private ReadySetPlantBanner readySetPlant;
@@ -80,11 +100,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private WaveProgressHud waveProgress;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
+    private DeadLineRenderer deadLineRenderer;
+    private BrainLaneRenderer brainLaneRenderer;
     private String previewPlant;
     private float previewTime;
     private int hoverCol = -1;
     private int hoverRow = -1;
     private List<String> shownPackets = List.of();
+    private final boolean bowlingMode;
+    private final boolean vaseBreakerMode;
+    private final boolean beghouledMode;
+    private final boolean iZombieMode;
+    private int swapFromCol = -1;
+    private int swapFromRow = -1;
+    private boolean swapDragging;
 
     private boolean plantfoodMode;
     private boolean shovelMode;
@@ -111,9 +140,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         super(game);
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         lawnLayout = lawnLayout();
+        bowlingMode = currentLevel() instanceof WallnutBowlingLevel;
+        vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
+        beghouledMode = currentLevel() instanceof BeghouledLevel;
+        iZombieMode = currentLevel() instanceof IZombieLevel;
         Chapter chapter = currentChapter();
-        lawnBackground = new LawnBackgroundRenderer(
-            assets.textures, LawnBackgroundRenderer.Style.forChapter(chapter));
+        LawnBackgroundRenderer.Style lawnStyle = LawnBackgroundRenderer.Style.forChapter(chapter);
+        lawnBackground = new LawnBackgroundRenderer(assets.textures, lawnStyle);
         lawnBackground.ensureLoaded();
         waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
             ? new WaterUnderlayerRenderer(assets, lawnLayout)
@@ -122,6 +155,19 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
         entityRenderer.resetMowers(chapter, lawnMowersEnabled());
+        if (vaseBreakerMode) {
+            entityRenderer.preloadVases();
+        }
+        entityRenderer.preloadCraters();
+        if (bowlingMode || iZombieMode || deadLineColumn() >= 0) {
+            deadLineRenderer = new DeadLineRenderer();
+        }
+        if (iZombieMode) {
+            brainLaneRenderer = new BrainLaneRenderer(assets.textures);
+            brainLaneRenderer.ensureLoaded();
+            assets.textures.loadSync(ZombiePacketIds.ATLAS_GROUP);
+            assets.textures.loadSync(ZombiePacketIds.ATLAS_PAGE);
+        }
         assets.textures.loadSync("UI_SeedPackets_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
 
@@ -132,7 +178,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         assets.textures.loadSync("ATLASIMAGE_ATLAS_ZENGARDENGROUP_768_00");
         assets.textures.loadSync(PauseMenuOverlay.ATLAS_GROUP);
         assets.textures.loadSync(PauseMenuOverlay.ATLAS_PAGE);
-        setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
+        if (beghouledMode) {
+            setWorldInput(createBeghouledWorldInput());
+        } else {
+            setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
+        }
         buildHud();
     }
 
@@ -186,13 +236,24 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         left.setFillParent(true);
         left.setTouchable(Touchable.childrenOnly);
         left.top().left().pad(8f);
-        if (sunBank) {
-            sunHud = new SunHud(skin);
-            sunHud.setAmount(model == null ? 0 : model.getSunAmount());
-            left.add(sunHud).left().padBottom(8f).row();
-        }
         packetColumn = new Table();
-        left.add(packetColumn).left().top();
+        if (iZombieMode) {
+            Table topRow = new Table();
+            if (sunBank) {
+                sunHud = new SunHud(skin);
+                sunHud.setAmount(model == null ? 0 : model.getSunAmount());
+                topRow.add(sunHud).left().padRight(10f);
+            }
+            topRow.add(packetColumn).left().top();
+            left.add(topRow).left().top();
+        } else {
+            if (sunBank) {
+                sunHud = new SunHud(skin);
+                sunHud.setAmount(model == null ? 0 : model.getSunAmount());
+                left.add(sunHud).left().padBottom(8f).row();
+            }
+            left.add(packetColumn).left().top();
+        }
         uiStage.addActor(left);
         hudRoots.add(left);
 
@@ -229,6 +290,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             topCenter.add(waveProgress).top();
             uiStage.addActor(topCenter);
             hudRoots.add(topCenter);
+        } else if (BeghouledMatchHud.showFor(model)) {
+            beghouledMatchHud = new BeghouledMatchHud(skin);
+            beghouledMatchHud.sync(model);
+            Table topCenter = new Table();
+            topCenter.setFillParent(true);
+            topCenter.setTouchable(Touchable.disabled);
+            topCenter.top().padTop(8f);
+            topCenter.add(beghouledMatchHud).top();
+            uiStage.addActor(topCenter);
+            hudRoots.add(topCenter);
         }
 
         lootRewardPopup = new LootRewardPopup(skin);
@@ -239,15 +310,17 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(rewardAnchor);
         hudRoots.add(rewardAnchor);
 
-        plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
-        plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
-        Table bottomLeft = new Table();
-        bottomLeft.setFillParent(true);
-        bottomLeft.setTouchable(Touchable.childrenOnly);
-        bottomLeft.bottom().left().pad(8f);
-        bottomLeft.add(plantFoodBank).left().bottom();
-        uiStage.addActor(bottomLeft);
-        hudRoots.add(bottomLeft);
+        if (plantFoodHudEnabled(model)) {
+            plantFoodBank = new PlantFoodBankHud(skin, assets.textures);
+            plantFoodBank.onPlantFoodButton(() -> setPlantfoodMode(!plantfoodMode));
+            Table bottomLeft = new Table();
+            bottomLeft.setFillParent(true);
+            bottomLeft.setTouchable(Touchable.childrenOnly);
+            bottomLeft.bottom().left().pad(8f);
+            bottomLeft.add(plantFoodBank).left().bottom();
+            uiStage.addActor(bottomLeft);
+            hudRoots.add(bottomLeft);
+        }
 
         buildBottomRight(model);
 
@@ -322,13 +395,32 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void refreshPackets() {
-        List<String> selected = selectedPlants();
+        if (beghouledMode) {
+            refreshBeghouledUpgrades();
+            return;
+        }
+        if (iZombieMode) {
+            refreshIZombiePackets();
+            return;
+        }
+        List<String> selected = hudPlantNames();
         shownPackets = new ArrayList<>(selected);
         packetColumn.clearChildren();
+        List<PendingSeedPacket> pending = vaseBreakerMode ? pendingPackets() : List.of();
+        int pendingIndex = 0;
         for (String name : selected) {
-            SeedPacketActor packet = new SeedPacketActor(
-                assets.textures, skin, name, plantCost(name), plantLevel(name),
-                boosted(name), false);
+            SeedPacketActor packet = (bowlingMode || vaseBreakerMode)
+                ? new SeedPacketActor(assets.textures, skin, name, 0, 1, false, false, false)
+                : new SeedPacketActor(
+                    assets.textures, skin, name, plantCost(name), plantLevel(name),
+                    boosted(name), false);
+            if (vaseBreakerMode) {
+                packet.enableExpiryTimer(skin);
+                if (pendingIndex < pending.size()) {
+                    packet.setExpirySeconds(pending.get(pendingIndex).getTimeToExpiry());
+                }
+                pendingIndex++;
+            }
             packet.onDragPlant(new SeedPacketActor.DragPlant() {
                 @Override
                 public void dragStart(SeedPacketActor packet) {
@@ -360,14 +452,122 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         refreshPacketChrome();
     }
 
+    private void refreshIZombiePackets() {
+        List<String> roster = iZombieRosterNames();
+        shownPackets = new ArrayList<>(roster);
+        packetColumn.clearChildren();
+        Map<String, Integer> costs = iZombieRosterCosts();
+        for (String name : roster) {
+            int cost = costs.getOrDefault(name, 0);
+            ZombiePacketActor packet = new ZombiePacketActor(assets.textures, skin, name, cost);
+            packet.onDragZombie(new ZombiePacketActor.DragZombie() {
+                @Override
+                public void dragStart(ZombiePacketActor packet) {
+                    previewPlant = name;
+                    previewTime = 0f;
+                    entityRenderer.preloadZombieIdle(name, currentChapter());
+                    stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
+                    packet.localToStageCoordinates(stageToScreen);
+                    followPlantDrag(stageToScreen.x, stageToScreen.y);
+                }
+
+                @Override
+                public void drag(ZombiePacketActor packet, float stageX, float stageY) {
+                    followPlantDrag(stageX, stageY);
+                }
+
+                @Override
+                public void dragEnd(ZombiePacketActor packet, float stageX, float stageY) {
+                    dropZombie(name, stageX, stageY);
+                    previewPlant = null;
+                    hoverCol = -1;
+                    hoverRow = -1;
+                }
+            });
+            packetColumn.add(packet)
+                .size(ZombiePacketActor.PACKET_WIDTH, ZombiePacketActor.PACKET_HEIGHT)
+                .padRight(6f);
+        }
+        refreshPacketChrome();
+    }
+
+    private void refreshBeghouledUpgrades() {
+        List<String> names = beghouledUpgradeFromNames();
+        shownPackets = new ArrayList<>(names);
+        packetColumn.clearChildren();
+        Level level = currentLevel();
+        if (!(level instanceof BeghouledLevel beghouled)) {
+            return;
+        }
+        for (BeghouledSettings.UpgradeRule rule : beghouled.getSettings().getUpgrades()) {
+            String from = rule.getFrom();
+            SeedPacketActor packet = new SeedPacketActor(
+                assets.textures, skin, from, rule.getCost(), 1, false, false, true);
+            packet.onClick(() -> tryBeghouledUpgrade(from));
+            packetColumn.add(packet)
+                .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+                .padBottom(6f).row();
+        }
+        refreshPacketChrome();
+    }
+
+    private void tryBeghouledUpgrade(String fromType) {
+        if (isPregame() || endSequenceActive) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.upgradePlant(fromType);
+        showToast(result.getMessage(), !result.isSuccess());
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (sunHud != null && model != null) {
+            sunHud.setAmount(model.getSunAmount());
+        }
+        if (beghouledMatchHud != null) {
+            beghouledMatchHud.sync(model);
+        }
+        refreshPacketChrome();
+    }
+
     private void refreshPacketChrome() {
         GameModel model = App.getInstance().getCurrentGameModel();
         int sun = model == null ? 0 : model.getSunAmount();
+        if (beghouledMode) {
+            Level level = currentLevel();
+            Map<String, Integer> costs = beghouledUpgradeCosts(level);
+            for (Actor actor : packetColumn.getChildren()) {
+                if (!(actor instanceof SeedPacketActor packet) || packet.plantName() == null) {
+                    continue;
+                }
+                Integer cost = costs.get(packet.plantName());
+                packet.setDimmed(cost != null && cost > sun);
+            }
+            return;
+        }
+        if (iZombieMode) {
+            Map<String, Integer> costs = iZombieRosterCosts();
+            for (Actor actor : packetColumn.getChildren()) {
+                if (!(actor instanceof ZombiePacketActor packet) || packet.zombieName() == null) {
+                    continue;
+                }
+                Integer cost = costs.get(packet.zombieName());
+                packet.setDimmed(cost != null && cost > sun);
+            }
+            return;
+        }
+        List<PendingSeedPacket> pending = vaseBreakerMode ? pendingPackets() : List.of();
+        int pendingIndex = 0;
         for (Actor actor : packetColumn.getChildren()) {
             if (!(actor instanceof SeedPacketActor packet) || packet.plantName() == null) {
                 continue;
             }
             String name = packet.plantName();
+            if (bowlingMode || vaseBreakerMode) {
+                packet.setDimmed(false);
+                if (vaseBreakerMode && pendingIndex < pending.size()) {
+                    packet.setExpirySeconds(pending.get(pendingIndex).getTimeToExpiry());
+                }
+                pendingIndex++;
+                continue;
+            }
             boolean ready = model == null || model.isSeedReady(name);
             boolean afford = plantCost(name) <= sun;
             packet.setDimmed(!ready || !afford);
@@ -401,6 +601,27 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
+        if (bowlingMode || vaseBreakerMode) {
+            refreshPackets();
+        } else {
+            refreshPacketChrome();
+        }
+    }
+
+    private void dropZombie(String zombieName, float stageX, float stageY) {
+        if (isPregame()) {
+            return;
+        }
+        stageToWorld(stageX, stageY);
+        if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.placeZombie(zombieName, cellTmp[0], cellTmp[1]);
+        showToast(result.getMessage(), !result.isSuccess());
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (sunHud != null && model != null) {
+            sunHud.setAmount(model.getSunAmount());
+        }
         refreshPacketChrome();
     }
 
@@ -418,7 +639,37 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setShovelMode(false);
             return true;
         }
+        if (vaseBreakerMode && tryBreakVase(worldX, worldY)) {
+            return true;
+        }
         return tryCollectPlantFood(worldX, worldY) || tryCollectSun(worldX, worldY);
+    }
+
+    private boolean tryBreakVase(float worldX, float worldY) {
+        if (isPregame()) {
+            return false;
+        }
+        if (!lawnLayout.worldToCell(worldX, worldY, cellTmp)) {
+            return false;
+        }
+        Level level = currentLevel();
+        if (!(level instanceof VaseBreakerLevel vaseLevel)) {
+            return false;
+        }
+        int col = cellTmp[0];
+        int row = cellTmp[1];
+        Vase vase = vaseLevel.vaseAt(col, row);
+        if (vase == null) {
+            return false;
+        }
+        String pam = VaseBreakerAnim.pamPath(vase);
+        CommandResult<Void> result = gameplay.breakVase(col, row);
+        showToast(result.getMessage(), !result.isSuccess());
+        if (result.isSuccess()) {
+            entityRenderer.playVaseBreak(pam, col, row);
+            refreshPackets();
+        }
+        return true;
     }
 
     private void onCellHover(int col, int row) {
@@ -556,9 +807,15 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void exitToLevels() {
-        Chapter chapter = currentChapter();
+        Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
         App.getInstance().setCurrentGameLoop(null);
+        if (bowlingMode || level instanceof MiniGameLevel) {
+            App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+            game.setScreen(new MiniGameScreen(game));
+            return;
+        }
+        Chapter chapter = currentChapter();
         App.getInstance().setCurrentMenu(MenuType.GAME);
         if (chapter != null) {
             game.setScreen(new ChapterLevelsScreen(game, chapter));
@@ -569,8 +826,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     /** After a win: load the next level in this chapter, or fall back to the map. */
     private void continueToNextLevel() {
-        Chapter chapter = currentChapter();
         Level level = currentLevel();
+        if (level instanceof MiniGameLevel mini) {
+            String type = mini.getMiniGameType().name();
+            int nextStage = mini.getStage() + 1;
+            CommandResult<Void> enter = TravelLogMenuController.getInstance()
+                .enterMiniGame(type, nextStage);
+            if (!enter.isSuccess()) {
+                exitToLevels();
+                return;
+            }
+            game.setScreen(new LevelObjectivesScreen(game, null));
+            return;
+        }
+        Chapter chapter = currentChapter();
         LevelConfig config = level == null ? null : level.getConfig();
         if (chapter == null || config == null) {
             exitToLevels();
@@ -627,8 +896,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartLevel() {
-        Chapter chapter = currentChapter();
         Level level = currentLevel();
+        if (level instanceof MiniGameLevel mini) {
+            restartMiniGame(mini);
+            return;
+        }
+        Chapter chapter = currentChapter();
         LevelConfig config = level == null ? null : level.getConfig();
         if (chapter == null || config == null) {
             showToast("Cannot restart: no level loaded.", true);
@@ -645,6 +918,22 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model != null) {
             model.setSelectedPlants(plants);
+        }
+        CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
+        if (!start.isSuccess()) {
+            showToast(start.getMessage(), true);
+            return;
+        }
+        game.setScreen(new GameplayScreen(game));
+    }
+
+    private void restartMiniGame(MiniGameLevel mini) {
+        String type = mini.getMiniGameType().name();
+        int stage = mini.getStage();
+        CommandResult<Void> enter = TravelLogMenuController.getInstance().enterMiniGame(type, stage);
+        if (!enter.isSuccess()) {
+            showToast(enter.getMessage(), true);
+            return;
         }
         CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
         if (!start.isSuccess()) {
@@ -704,6 +993,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waveProgress != null) {
             waveProgress.sync(model);
         }
+        if (beghouledMatchHud != null) {
+            beghouledMatchHud.sync(model);
+        }
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());
         }
@@ -714,7 +1006,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (previewPlant != null) {
             previewTime += delta;
         }
-        if (!selectedPlants().equals(shownPackets)) {
+        if (!hudPlantNames().equals(shownPackets)) {
             refreshPackets();
         } else {
             refreshPacketChrome();
@@ -781,6 +1073,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (shovelMode) {
             setShovelMode(false);
         }
+        swapDragging = false;
+        swapFromCol = -1;
+        swapFromRow = -1;
         previewPlant = null;
         hoverCol = -1;
         hoverRow = -1;
@@ -792,7 +1087,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
-        boolean highlight = (previewPlant != null || plantfoodMode || shovelMode) && hoverCol >= 0;
+        if (deadLineRenderer != null) {
+            deadLineRenderer.draw(game.batch, lawnLayout, deadLineColumn());
+        }
+        if (brainLaneRenderer != null) {
+            brainLaneRenderer.draw(game.batch, lawnLayout, App.getInstance().getCurrentGameModel());
+        }
+        boolean highlight = (previewPlant != null || plantfoodMode || shovelMode || swapDragging)
+            && hoverCol >= 0;
+        if (highlight && bowlingMode && previewPlant != null && !canBowlAt(hoverCol)) {
+            highlight = false;
+        }
+        if (highlight && iZombieMode && previewPlant != null && !canPlaceIZombieAt(hoverCol)) {
+            highlight = false;
+        }
         if (highlight) {
             if (rowColHighlight == null) {
                 rowColHighlight = new LawnRowColHighlight();
@@ -801,7 +1109,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         if (previewPlant != null) {
-            entityRenderer.drawPlantIdle(game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime);
+            if (iZombieMode) {
+                entityRenderer.drawZombieIdle(
+                    game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, currentChapter());
+            } else {
+                float scale = bowlingMode
+                    ? BowlingWalnutAnim.scale(WallnutBowlingLevel.parseWalnutType(previewPlant))
+                    : AnimScale.PLANT;
+                entityRenderer.drawPlantIdle(
+                    game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, scale);
+            }
         }
     }
 
@@ -883,6 +1200,238 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return level.getConfig().getRules().isShovelEnabled();
     }
 
+    private static boolean plantFoodHudEnabled(GameModel model) {
+        if (model == null) {
+            return true;
+        }
+        if (model.getCurrentLevel() instanceof WallnutBowlingLevel
+                || model.getCurrentLevel() instanceof VaseBreakerLevel
+                || model.getCurrentLevel() instanceof BeghouledLevel
+                || model.getCurrentLevel() instanceof IZombieLevel) {
+            return false;
+        }
+        Level level = model.getCurrentLevel();
+        if (level == null || level.getConfig() == null || level.getConfig().getRules() == null) {
+            return true;
+        }
+        return level.getConfig().getRules().isPlantFoodDrops();
+    }
+
+    private static int deadLineColumn() {
+        Level level = currentLevel();
+        if (level instanceof IZombieLevel iZombie) {
+            return iZombie.redLineColumn();
+        }
+        if (level == null || level.getConfig() == null) {
+            return -1;
+        }
+        int line = level.getConfig().getDeadLineColumn();
+        if (line < 0 && level.getConfig().getRules() != null) {
+            line = level.getConfig().getRules().getDeadLineColumn();
+        }
+        return line;
+    }
+
+    private boolean canBowlAt(int col) {
+        Level level = currentLevel();
+        if (level instanceof WallnutBowlingLevel bowling) {
+            return bowling.canLaunchAtColumn(col);
+        }
+        return true;
+    }
+
+    private boolean canPlaceIZombieAt(int col) {
+        Level level = currentLevel();
+        if (level instanceof IZombieLevel iZombie) {
+            return col >= iZombie.redLineColumn();
+        }
+        return true;
+    }
+
+    private List<String> hudPlantNames() {
+        if (beghouledMode) {
+            return beghouledUpgradeFromNames();
+        }
+        if (iZombieMode) {
+            return iZombieRosterNames();
+        }
+        if (vaseBreakerMode) {
+            List<String> names = new ArrayList<>();
+            for (PendingSeedPacket packet : pendingPackets()) {
+                if (packet.getPlant() != null && packet.getPlant().getName() != null) {
+                    names.add(packet.getPlant().getName());
+                }
+            }
+            return names;
+        }
+        return selectedPlants();
+    }
+
+    private static List<String> iZombieRosterNames() {
+        Level level = currentLevel();
+        if (!(level instanceof IZombieLevel iZombie)) {
+            return List.of();
+        }
+        return new ArrayList<>(iZombie.getSettings().getZombieCosts().keySet());
+    }
+
+    private static Map<String, Integer> iZombieRosterCosts() {
+        Map<String, Integer> costs = new java.util.LinkedHashMap<>();
+        Level level = currentLevel();
+        if (!(level instanceof IZombieLevel iZombie)) {
+            return costs;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        float penalty = model == null ? 1f : model.difficultyPenalty();
+        for (Map.Entry<String, Integer> e : iZombie.getSettings().getZombieCosts().entrySet()) {
+            costs.put(e.getKey(), (int) (e.getValue() * penalty));
+        }
+        return costs;
+    }
+
+    private static List<String> beghouledUpgradeFromNames() {
+        Level level = currentLevel();
+        if (!(level instanceof BeghouledLevel beghouled)) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (BeghouledSettings.UpgradeRule rule : beghouled.getSettings().getUpgrades()) {
+            names.add(rule.getFrom());
+        }
+        return names;
+    }
+
+    private static Map<String, Integer> beghouledUpgradeCosts(Level level) {
+        Map<String, Integer> costs = new java.util.HashMap<>();
+        if (!(level instanceof BeghouledLevel beghouled)) {
+            return costs;
+        }
+        for (BeghouledSettings.UpgradeRule rule : beghouled.getSettings().getUpgrades()) {
+            costs.put(rule.getFrom(), rule.getCost());
+        }
+        return costs;
+    }
+
+    private InputProcessor createBeghouledWorldInput() {
+        return new InputAdapter() {
+            private final int[] cell = new int[2];
+
+            private void updateHover(int screenX, int screenY) {
+                worldViewport.unproject(worldTmp.set(screenX, screenY, 0f));
+                if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cell)) {
+                    hoverCol = -1;
+                    hoverRow = -1;
+                    return;
+                }
+                hoverCol = cell[0];
+                hoverRow = cell[1];
+            }
+
+            @Override
+            public boolean mouseMoved(int screenX, int screenY) {
+                if (swapDragging) {
+                    updateHover(screenX, screenY);
+                }
+                return false;
+            }
+
+            @Override
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                if (swapDragging) {
+                    updateHover(screenX, screenY);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                worldViewport.unproject(worldTmp.set(screenX, screenY, 0f));
+                if (onWorldClick(worldTmp.x, worldTmp.y)) {
+                    return true;
+                }
+                if (isPregame() || endSequenceActive || pauseMenuOpen) {
+                    return false;
+                }
+                if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cell)) {
+                    return false;
+                }
+                Level level = currentLevel();
+                if (!(level instanceof BeghouledLevel beghouled)) {
+                    return false;
+                }
+                if (beghouled.plantAt(cell[1], cell[0]) == null || beghouled.isCrater(cell[1], cell[0])) {
+                    return false;
+                }
+                swapDragging = true;
+                swapFromCol = cell[0];
+                swapFromRow = cell[1];
+                hoverCol = cell[0];
+                hoverRow = cell[1];
+                return true;
+            }
+
+            @Override
+            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                if (!swapDragging) {
+                    return false;
+                }
+                swapDragging = false;
+                worldViewport.unproject(worldTmp.set(screenX, screenY, 0f));
+                int fromCol = swapFromCol;
+                int fromRow = swapFromRow;
+                swapFromCol = -1;
+                swapFromRow = -1;
+                hoverCol = -1;
+                hoverRow = -1;
+                if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cell)) {
+                    return true;
+                }
+                tryBeghouledSwap(fromCol, fromRow, cell[0], cell[1]);
+                return true;
+            }
+        };
+    }
+
+    private void tryBeghouledSwap(int fromCol, int fromRow, int toCol, int toRow) {
+        if (fromCol == toCol && fromRow == toRow) {
+            return;
+        }
+        int dc = toCol - fromCol;
+        int dr = toRow - fromRow;
+        String direction;
+        if (dc == 1 && dr == 0) {
+            direction = "right";
+        } else if (dc == -1 && dr == 0) {
+            direction = "left";
+        } else if (dc == 0 && dr == 1) {
+            direction = "down";
+        } else if (dc == 0 && dr == -1) {
+            direction = "up";
+        } else {
+            showToast("Swap with an adjacent plant.", true);
+            return;
+        }
+        CommandResult<Void> result = gameplay.swapPlant(fromCol, fromRow, direction);
+        showToast(result.getMessage(), !result.isSuccess());
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (sunHud != null && model != null) {
+            sunHud.setAmount(model.getSunAmount());
+        }
+        if (beghouledMatchHud != null) {
+            beghouledMatchHud.sync(model);
+        }
+        refreshPacketChrome();
+    }
+
+    private static List<PendingSeedPacket> pendingPackets() {
+        Level level = currentLevel();
+        if (level instanceof VaseBreakerLevel vaseBreaker) {
+            return vaseBreaker.getPendingSeedPackets();
+        }
+        return List.of();
+    }
+
     private static List<String> selectedPlants() {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model == null || model.getSelectedPlants() == null) {
@@ -936,6 +1485,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityOverlay.dispose();
         if (rowColHighlight != null) {
             rowColHighlight.dispose();
+        }
+        if (deadLineRenderer != null) {
+            deadLineRenderer.dispose();
         }
         restoreOsCursor();
         if (hiddenCursor != null) {

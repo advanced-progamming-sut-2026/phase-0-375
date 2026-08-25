@@ -18,14 +18,16 @@ public final class PvzAssets implements Disposable {
     public final TextureBank textures;
     public final PamPlayer player;
     public final PamCatalog pamCatalog;
+    public final PlantSpritesheetCatalog plantSheets;
     public final String resolution;
     public final FileHandle root;
 
     private PvzAssets(TextureBank textures, PamPlayer player, PamCatalog pamCatalog,
-                      String resolution, FileHandle root) {
+                      PlantSpritesheetCatalog plantSheets, String resolution, FileHandle root) {
         this.textures = textures;
         this.player = player;
         this.pamCatalog = pamCatalog;
+        this.plantSheets = plantSheets;
         this.resolution = resolution;
         this.root = root;
     }
@@ -35,7 +37,8 @@ public final class PvzAssets implements Disposable {
         String res = System.getProperty("pvz.resolution", "768");
         TextureBank textures = new TextureBank(res, root);
         PamCatalog catalog = PamCatalog.load(root);
-        return new PvzAssets(textures, new PamPlayer(textures, root), catalog, res, root);
+        PlantSpritesheetCatalog sheets = new PlantSpritesheetCatalog(root, res);
+        return new PvzAssets(textures, new PamPlayer(textures, root), catalog, sheets, res, root);
     }
 
     /**

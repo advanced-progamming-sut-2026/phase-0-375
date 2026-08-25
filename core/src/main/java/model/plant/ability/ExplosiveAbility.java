@@ -41,8 +41,31 @@ public class ExplosiveAbility implements PlantAbility {
 
     private static final Random RNG = new Random();
 
+    /** Squash leap direction: {@code true} when the target is on/right of the plant. */
+    private boolean smashJumpRight = true;
+    /** Continuous grid X of the smash target when the leap started; {@link Float#NaN} if none. */
+    private float smashTargetGridX = Float.NaN;
+    /** Continuous grid Y (lane) of the smash target when the leap started. */
+    private float smashTargetGridY = Float.NaN;
+
     @Override
     public PlantCategory getCategory() { return PlantCategory.EXPLOSIVE; }
+
+    public boolean isSmashJumpRight() {
+        return smashJumpRight;
+    }
+
+    public boolean hasSmashTarget() {
+        return !Float.isNaN(smashTargetGridX) && !Float.isNaN(smashTargetGridY);
+    }
+
+    public float getSmashTargetGridX() {
+        return smashTargetGridX;
+    }
+
+    public float getSmashTargetGridY() {
+        return smashTargetGridY;
+    }
 
     @Override
     public PlantAction beginAction(PlantInstance plant, PlantAbilityContext context) {
@@ -156,10 +179,90 @@ public class ExplosiveAbility implements PlantAbility {
         if (!armTrap(plant)) {
             return null;
         }
-        if (!hasTrigger(plant, context)) {
+        List<ZombieInstance> triggers = getTriggerZombies(plant, context);
+        if (triggers.isEmpty()) {
             return null;
         }
+        Plant def = plant.getDefinition();
+        if (isSquash(def)) {
+            captureSmashTarget(plant, triggers);
+            return squashClipThen(plant, context, (p, ctx) -> handleDelayed(p, ctx, false));
+        }
         return explodeClipThen(plant, context, (p, ctx) -> handleDelayed(p, ctx, false));
+    }
+
+    private PlantAction squashClipThen(PlantInstance plant, PlantAbilityContext context,
+                                       TimedPlantAction.Effect onFire) {
+        float duration = TimedPlantAction.presentationDurationFor(
+                plant, context, PlantState.ATTACKING, TimedPlantAction.DEFAULT_ATTACK_DURATION);
+        float fraction = TimedPlantAction.DEFAULT_ATTACK_FIRE_FRACTION;
+        if (context != null) {
+            float impact = context.plantAttackImpactFraction(plant);
+            if (impact > 0f) {
+                fraction = impact;
+            }
+        }
+        return new TimedPlantAction(
+                PlantState.ATTACKING,
+                duration,
+                null,
+                onFire,
+                fraction,
+                ExplosiveAbility::finishAndDestroy);
+    }
+
+    /** Remembers which way Squash should leap so the view can pick jump clips. */
+    private void captureSmashTarget(PlantInstance plant, List<ZombieInstance> triggers) {
+        smashJumpRight = true;
+        smashTargetGridX = Float.NaN;
+        smashTargetGridY = Float.NaN;
+        if (plant == null || plant.getPosition() == null || triggers == null || triggers.isEmpty()) {
+            return;
+        }
+        ZombieInstance target = closestTrigger(plant, triggers);
+        if (target == null) {
+            return;
+        }
+        float plantCol = plant.getPosition().getX();
+        float plantRow = plant.getPosition().getY();
+        FloatPoint cont = target.getContinuousPosition();
+        if (cont != null) {
+            smashTargetGridX = cont.getX();
+            smashTargetGridY = cont.getY();
+        } else if (target.getGridPosition() != null) {
+            smashTargetGridX = target.getGridX();
+            smashTargetGridY = target.getGridPosition().getY();
+        } else {
+            smashTargetGridX = plantCol;
+            smashTargetGridY = plantRow;
+        }
+        smashJumpRight = smashTargetGridX >= plantCol;
+    }
+
+    private static ZombieInstance closestTrigger(PlantInstance plant, List<ZombieInstance> triggers) {
+        float plantCol = plant.getPosition().getX();
+        ZombieInstance best = null;
+        float bestDist = Float.MAX_VALUE;
+        for (ZombieInstance zombie : triggers) {
+            if (zombie == null || zombie.isDead()) {
+                continue;
+            }
+            float zx;
+            FloatPoint cont = zombie.getContinuousPosition();
+            if (cont != null) {
+                zx = cont.getX();
+            } else if (zombie.getGridPosition() != null) {
+                zx = zombie.getGridX();
+            } else {
+                continue;
+            }
+            float dist = Math.abs(zx - plantCol);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = zombie;
+            }
+        }
+        return best;
     }
 
     /**

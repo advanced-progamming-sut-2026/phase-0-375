@@ -51,8 +51,10 @@ public class StrikeThroughAbility implements PlantAbility {
         if (def.getAbilityType() != PlantAbilityType.SHOOT_PROJECTILE) return null;
         if (def.isShroom()) {
             if (!hasZombieInFumeRange(plant, context)) return null;
-        } else if (!context.hasZombieInLane(plant.getPosition().getY())) {
-            return null;
+        } else {
+            int row = plant.getPosition().getY();
+            float plantX = plant.getPosition().getX();
+            if (!context.hasZombieOrGraveAhead(row, plantX, +1)) return null;
         }
 
         return TimedPlantAction.attackAt(plant, context, this::execute);
@@ -75,7 +77,7 @@ public class StrikeThroughAbility implements PlantAbility {
             shootFume(plant, context);
             return;
         }
-        if (!context.hasZombieInLane(plant.getPosition().getY())) return;
+        if (!context.hasZombieOrGraveAhead(plant.getPosition().getY(), plant.getPosition().getX(), +1)) return;
 
         int row = plant.getPosition().getY();
         FloatPoint origin = context.plantProjectileOriginOrCell(plant);
@@ -161,22 +163,19 @@ public class StrikeThroughAbility implements PlantAbility {
 
         else if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
             int row = plant.getPosition().getY();
-            for (int i = 0; i < context.getZombiesInLane(row).size(); i++) {
-                float rangeBonus = cumulativeSpecialValue(plant, PlantSpecialTag.TILE_RANGE_EXT);
-                FloatPoint muzzle = context.plantProjectileOriginOrCell(plant);
-                FloatPoint origin = new FloatPoint(muzzle.getX() + rangeBonus, muzzle.getY());
-                for (int j = 0; j < BURST_PROJ_COUNT; j++) {
-                    Pellet pellet = new Pellet(
-                            def.getDamage(),
-                            new FloatPoint(origin.getX() + j * 0.05f, origin.getY()),
-                            row,
-                            PELLET_VELOCITY,
-                            Projectile.Element.NONE,
-                            +1
-                    );
-                    pellet.setPierce(true);
-                    context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
-                }
+            FloatPoint muzzle = context.plantProjectileOriginOrCell(plant);
+            FloatPoint origin = new FloatPoint(muzzle.getX(), muzzle.getY());
+            for (int i = 0; i < BURST_PROJ_COUNT; i++) {
+                Pellet pellet = new Pellet(
+                    def.getDamage(),
+                    new FloatPoint(origin.getX() + i * 0.5f, origin.getY()),
+                    row,
+                    PELLET_VELOCITY,
+                    Projectile.Element.NONE,
+                    +1
+                );
+                pellet.setPierce(true);
+                context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
             }
         }
     }

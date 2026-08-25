@@ -39,6 +39,7 @@ public class WallnutBowlingLevel extends MiniGameLevel {
     private static final float DIAGONAL = (float) (1.0 / Math.sqrt(2.0));
 
     private final List<BowlingWalnut> rolling = new ArrayList<>();
+    private final List<FloatPoint> pendingExplosions = new ArrayList<>();
     private float timeSinceLastDelivery;
     private int nextPoolIndex;
 
@@ -58,13 +59,42 @@ public class WallnutBowlingLevel extends MiniGameLevel {
         };
     }
 
-    /** The plants.json definition name backing a walnut type. */
-    private static String plantNameFor(BowlingWalnutType type) {
+    /** The plants.json / seed-packet name backing a walnut type. */
+    public static String plantNameFor(BowlingWalnutType type) {
+        if (type == null) {
+            return null;
+        }
         return switch (type) {
             case NORMAL -> "Wall-nut";
             case EXPLODE_O_NUT -> "Explode-o-nut";
             case GIANT -> "Giant Wall-nut"; // no definition; crush constant applies
         };
+    }
+
+    /**
+     * Columns strictly left of the red line may launch walnuts.
+     * Falls back to column 0 only when no deadline is configured.
+     */
+    public int maxLaunchColumnExclusive() {
+        int line = getConfig() != null ? getConfig().getDeadLineColumn() : -1;
+        if (line <= 0 && getConfig() != null && getConfig().getRules() != null) {
+            line = getConfig().getRules().getDeadLineColumn();
+        }
+        return line > 0 ? line : 1;
+    }
+
+    public boolean canLaunchAtColumn(int column) {
+        return column >= 0 && column < maxLaunchColumnExclusive();
+    }
+
+    /** Explode-o-nut blast centers since the last drain (model grid units). */
+    public List<FloatPoint> drainExplosions() {
+        if (pendingExplosions.isEmpty()) {
+            return List.of();
+        }
+        List<FloatPoint> out = new ArrayList<>(pendingExplosions);
+        pendingExplosions.clear();
+        return out;
     }
 
     /** Damage a walnut of this type deals, resolved from plants.json. */
@@ -200,10 +230,16 @@ public class WallnutBowlingLevel extends MiniGameLevel {
 
     // --- Launching ---
 
-    /** Rolls a walnut from the leftmost column down the given lane. */
+    /** Rolls a walnut from the given column down the given lane. */
     public void launchWalnut(BowlingWalnutType type, int lane) {
+        launchWalnut(type, 0, lane);
+    }
+
+    /** Rolls a walnut from {@code column} down {@code lane}. */
+    public void launchWalnut(BowlingWalnutType type, int column, int lane) {
+        float startX = Math.max(0f, column);
         BowlingWalnut walnut = new BowlingWalnut(
-                damageFor(type), new FloatPoint(0f, lane), lane, WALNUT_SPEED);
+                damageFor(type), new FloatPoint(startX, lane), lane, WALNUT_SPEED);
         walnut.setType(type);
         walnut.setHorizontalVelocity(WALNUT_SPEED);
         walnut.setVerticalVelocity(0f);
@@ -297,6 +333,7 @@ public class WallnutBowlingLevel extends MiniGameLevel {
     private void explode(GameModel model, BowlingWalnut walnut) {
         int centerRow = walnut.getRow();
         int centerCol = Math.round(walnut.getX());
+        pendingExplosions.add(new FloatPoint(walnut.getX(), walnut.getY()));
         List<ZombieInstance> zombies = model.getZombies();
         if (zombies == null) return;
         for (ZombieInstance zombie : new ArrayList<>(zombies)) {

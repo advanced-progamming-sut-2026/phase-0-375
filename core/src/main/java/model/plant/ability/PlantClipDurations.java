@@ -19,4 +19,12 @@ public interface PlantClipDurations {
      * @return duration in seconds, or {@code 0} if unknown
      */
     float duration(PlantInstance plant, PlantState presentation);
+
+    /**
+     * Fraction of the attack presentation at which the effect should fire
+     * Default matches {@link TimedPlantAction#DEFAULT_ATTACK_FIRE_FRACTION}.
+     */
+    default float attackImpactFraction(PlantInstance plant) {
+        return TimedPlantAction.DEFAULT_ATTACK_FIRE_FRACTION;
+    }
 }

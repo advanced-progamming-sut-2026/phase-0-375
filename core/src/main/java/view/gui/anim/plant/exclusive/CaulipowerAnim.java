@@ -7,9 +7,6 @@ import view.gui.anim.plant.PlantAnimOverrides;
 import view.gui.anim.plant.PlantAnimRole;
 import view.gui.assets.PamCatalog;
 
-/**
- * Caulipower charge idles: {@code idle1_1} … {@code idle4_1} track cooldown remaining.
- */
 public final class CaulipowerAnim {
     private static final int CHARGE_STAGES = 4;
 

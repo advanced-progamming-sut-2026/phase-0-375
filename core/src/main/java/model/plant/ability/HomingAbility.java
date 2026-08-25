@@ -127,6 +127,9 @@ public class HomingAbility implements PlantAbility {
                 +1
         );
         pellet.setHomingTarget(target);
+        if (isCatTail(def)) {
+            pellet.setArtVariant(nextCatTailDigit(plant));
+        }
         context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
     }
 
@@ -296,8 +299,8 @@ public class HomingAbility implements PlantAbility {
                 target = pickTarget(plant, context);
                 if (target == null) break;
             }
-            float dx = (i % 5) * 0.08f;
-            float dy = ((i % 3) - 1) * 0.05f;
+            float dx = (i % 5) * 0.5f;
+            float dy = ((i % 3) - 1) * 0.5f;
             FloatPoint shotOrigin = new FloatPoint(origin.getX() + dx, origin.getY() + dy);
             Pellet pellet = new Pellet(
                     damage,
@@ -308,8 +311,21 @@ public class HomingAbility implements PlantAbility {
                     +1
             );
             pellet.setHomingTarget(target);
+            if (isCatTail(def)) {
+                pellet.setArtVariant(nextCatTailDigit(plant));
+            }
             context.spawnProjectile(pellet, pellet.getX(), pellet.getY());
         }
+    }
+
+    /** Cat-tail projectile skins cycle {@code 8, 6, 6} for consecutive shots. */
+    private static int nextCatTailDigit(PlantInstance plant) {
+        AbilityState state = plant.getAbilityState(plant.getDefinition().getAbilityType());
+        int ordinal = state != null ? state.nextShotOrdinal() : 0;
+        return switch (ordinal % 3) {
+            case 2 -> 8;
+            default -> 6;
+        };
     }
 
     private List<ZombieInstance> listHomingTargets(PlantAbilityContext context) {

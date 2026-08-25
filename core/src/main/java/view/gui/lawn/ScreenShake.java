@@ -5,9 +5,10 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import java.util.Random;
 
 /**
- * Short decaying camera rumble. Pulse from Gargantuar walk stomps (and anything else
- * that should rattle the lawn); {@link view.gui.screen.AbstractGameplayScreen} applies
- * it after anchoring so the house stays pinned.
+ * Short decaying camera rumble. Pulse from Gargantuar walk stomps, plant/zombie
+ * explosions, and anything else that should rattle the lawn;
+ * {@link view.gui.screen.AbstractGameplayScreen} applies it after anchoring so the
+ * house stays pinned.
  */
 public final class ScreenShake {
     private static final float DURATION = 0.22f;

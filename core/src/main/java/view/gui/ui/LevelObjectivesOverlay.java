@@ -16,8 +16,17 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
+import model.app.App;
 import model.enums.LevelType;
+import model.enums.MiniGameType;
+import model.game.core.GameModel;
+import model.game.level.Level;
 import model.game.level.LevelConfig;
+import model.game.level.minigame.MiniGameLevel;
+import model.game.level.minigame.beghouled.BeghouledLevel;
+import model.game.level.minigame.bowling.WallnutBowlingLevel;
+import model.game.level.minigame.izombie.IZombieLevel;
+import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.rule.GameRules;
 
 import java.util.ArrayList;
@@ -46,7 +55,7 @@ public final class LevelObjectivesOverlay {
 
     /** Creates the overlay and returns it ready to add to uiStage. */
     public static Table create(Skin skin, LevelConfig config, Runnable onContinue) {
-        List<String> objectives = objectivesFor(config);
+        List<String> objectives = objectivesFor(App.getInstance().getCurrentGameModel(), config);
 
         Table overlay = new Table();
         overlay.setFillParent(true);
@@ -130,6 +139,26 @@ public final class LevelObjectivesOverlay {
 
     /** Same objective lines shown on the start splash and the pause menu. */
     public static List<String> objectivesFor(LevelConfig config) {
+        return objectivesFor(null, config);
+    }
+
+    public static List<String> objectivesFor(GameModel model, LevelConfig config) {
+        List<String> bowling = bowlingObjectives(model);
+        if (bowling != null) {
+            return bowling;
+        }
+        List<String> vaseBreaker = vaseBreakerObjectives(model);
+        if (vaseBreaker != null) {
+            return vaseBreaker;
+        }
+        List<String> beghouled = beghouledObjectives(model);
+        if (beghouled != null) {
+            return beghouled;
+        }
+        List<String> iZombie = iZombieObjectives(model);
+        if (iZombie != null) {
+            return iZombie;
+        }
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -167,6 +196,82 @@ public final class LevelObjectivesOverlay {
             out.add("Survive the zombie attack!");
         }
         return out;
+    }
+
+    private static List<String> bowlingObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean bowling = level instanceof WallnutBowlingLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.WALLNUT_BOWLING);
+        if (!bowling) {
+            return null;
+        }
+        return List.of(
+                "Roll Wall-nuts into zombies from the conveyor belt",
+                "Only launch left of the red line",
+                "Survive every zombie wave");
+    }
+
+    private static List<String> vaseBreakerObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean vase = level instanceof VaseBreakerLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.VASE_BREAKER);
+        if (!vase) {
+            return null;
+        }
+        return List.of(
+                "Break every vase on the lawn",
+                "Plant free seed packets before they expire",
+                "Don't let zombies eat your brains");
+    }
+
+    private static List<String> beghouledObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean beghouled = level instanceof BeghouledLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.BEGHOULED);
+        if (!beghouled) {
+            return null;
+        }
+        int target = 0;
+        if (level instanceof BeghouledLevel bg) {
+            target = bg.getSettings().getMatchTarget();
+        }
+        String matches = target > 0
+                ? "Make " + target + " matches of 3+ plants"
+                : "Make matches of 3+ plants";
+        return List.of(
+                matches,
+                "Drag plants to swap with neighbors",
+                "Spend sun to upgrade plants on the board",
+                "Don't let zombies reach your house");
+    }
+
+    private static List<String> iZombieObjectives(GameModel model) {
+        if (model == null) {
+            return null;
+        }
+        Level level = model.getCurrentLevel();
+        boolean iZombie = level instanceof IZombieLevel
+                || (level instanceof MiniGameLevel mini
+                && mini.getMiniGameType() == MiniGameType.I_ZOMBIE);
+        if (!iZombie) {
+            return null;
+        }
+        return List.of(
+                "Spend sun to place zombies right of the red line",
+                "Eat every brain on the left side of the lawn",
+                "Collect sun from the glowing zombies on the right");
     }
 
     private static String formatTime(float seconds) {

@@ -92,7 +92,8 @@ public final class PauseMenuOverlay {
         }
         card.pad(28f, 36f, 32f, 36f);
         card.defaults().left().growX();
-        List<String> objectives = LevelObjectivesOverlay.objectivesFor(config);
+        List<String> objectives = LevelObjectivesOverlay.objectivesFor(
+                App.getInstance().getCurrentGameModel(), config);
         for (String text : objectives) {
             CheckBox cb = new CheckBox(" " + text, skin);
             cb.setChecked(false);
