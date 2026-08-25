@@ -36,6 +36,12 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         "Exports/AI generated /Gemini_Generated_Image_5eopbf5eopbf5eop.jpg";
     private static final float PANEL_W = 1500f;
     private static final float PANEL_H = 820f;
+    /** Pushes the "Leaderboard" title down inside the card. */
+    private static final float TITLE_PAD_TOP = -10f;
+    /** Pulls the Back button up (less gap under the table). */
+    private static final float BACK_LIFT = 37f;
+    private static final float HEADER_FONT_SCALE = 0.95f;
+    private static final float BACK_FONT_SCALE = 1.15f;
     private static final float COL_USER = 220f;
     private static final float COL_PROGRESS = 200f;
     private static final float COL_MINI = 140f;
@@ -69,7 +75,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         Label title = new Label("Leaderboard", skin, "big");
         title.setColor(Color.BLACK);
         title.setAlignment(Align.center);
-        card.add(title).padBottom(8f).row();
+        card.add(title).padTop(TITLE_PAD_TOP).padBottom(8f).row();
 
         Label hint = new Label("Click a column header to sort  ·  click again to flip order", skin, "secondary");
         hint.setColor(Color.DARK_GRAY);
@@ -80,16 +86,18 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         ScrollPane scroll = new ScrollPane(body, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
-        card.add(scroll).width(PANEL_W - 80f).height(PANEL_H - 200f).padBottom(16f).row();
+        card.add(scroll).width(PANEL_W - 80f).height(PANEL_H - 200f)
+            .padBottom(16f - BACK_LIFT).row();
 
         TextButton back = new TextButton("Back", skin, "brown");
+        back.getLabel().setFontScale(BACK_FONT_SCALE);
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 onBack.run();
             }
         });
-        card.add(back).width(200f).height(56f);
+        card.add(back).width(200f).height(56f).padTop(-BACK_LIFT);
 
         Table root = new Table();
         root.setFillParent(true);
@@ -172,7 +180,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
             mark = descending ? " ▼" : " ▲";
         }
         TextButton button = new TextButton(label + mark, skin, "brown");
-        button.getLabel().setFontScale(0.78f);
+        button.getLabel().setFontScale(HEADER_FONT_SCALE);
         button.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
