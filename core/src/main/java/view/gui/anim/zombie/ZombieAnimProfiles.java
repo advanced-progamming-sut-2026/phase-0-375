@@ -34,5 +34,6 @@ public final class ZombieAnimProfiles {
         JugglerAnim.register(overrides);
         WizardAnim.register(overrides);
         DarkKingAnim.register(overrides);
+        ZombotanyAnim.register(overrides);
     }
 }

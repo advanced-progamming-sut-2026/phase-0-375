@@ -191,6 +191,10 @@ public final class ZombiePamAliases {
         m.put("ZombieArcade", "ZOMBIE_80S_ARCADE");
         m.put("ZombieBarrelRoller", "ZOMBIE_PIRATE_BARREL_PUSHER");
         m.put("ZombiePirateImp", "ZOMBIE_PIRATE_IMP");
+        m.put("ZombotanyPeashooter", "PEASHOOTER");
+        m.put("ZombotanyWallnut", "WALLNUT");
+        m.put("ZombotanyJalapeno", "JALAPENO");
+        m.put("ZombotanySquash", "SQUASH");
         return Collections.unmodifiableMap(m);
     }
 }

@@ -15,14 +15,25 @@ public class ZombotanyJalapenoBehavior extends ZombotanyAbilityBehavior {
 
     public static final float DEFAULT_FUSE_SECONDS = 10f;
     public static final int DEFAULT_BURN_DAMAGE = 1800;
+    /** Matches {@code TimedPlantAction} attack presentation. */
+    public static final float ATTACK_DURATION = 0.6f;
 
     private float fuseTimer;
-
+    private float attackElapsed;
+    private boolean attacking;
     private boolean ignited;
 
     @Override
     public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         if (zombie == null || context == null || zombie.isDead() || ignited) {
+            return;
+        }
+
+        if (attacking) {
+            attackElapsed += deltaTime;
+            if (attackElapsed >= ATTACK_DURATION) {
+                ignite(zombie, context);
+            }
             return;
         }
 
@@ -36,7 +47,15 @@ public class ZombotanyJalapenoBehavior extends ZombotanyAbilityBehavior {
         if (fuseTimer < fuse) {
             return;
         }
+        attacking = true;
+        attackElapsed = 0f;
+        beginSpecialAction(zombie);
+    }
+
+    private void ignite(ZombieInstance zombie, BehaviorContext context) {
         ignited = true;
+        attacking = false;
+        zombie.markBlownUp();
 
         int burn = definitionDamage("Jalapeno", DEFAULT_BURN_DAMAGE);
         for (PlantInstance plant : new ArrayList<>(context.getPlantsInLane(zombie.getGridY()))) {
@@ -56,6 +75,14 @@ public class ZombotanyJalapenoBehavior extends ZombotanyAbilityBehavior {
 
     public float getFuseTimer() {
         return fuseTimer;
+    }
+
+    public boolean isAttacking() {
+        return attacking && !ignited;
+    }
+
+    public float getAttackElapsed() {
+        return attackElapsed;
     }
 
     public boolean isIgnited() {

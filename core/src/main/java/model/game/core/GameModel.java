@@ -524,6 +524,14 @@ public class GameModel implements BehaviorContext {
     }
 
     @Override
+    public void spawnProjectile(Projectile projectile) {
+        if (projectile == null) {
+            return;
+        }
+        spawnProjectile(projectile, (int) projectile.getX(), projectile.getRow());
+    }
+
+    @Override
     public void removeProjectile(Projectile projectile) {
         if (projectile == null) return;
         activeProjectiles.remove(projectile);

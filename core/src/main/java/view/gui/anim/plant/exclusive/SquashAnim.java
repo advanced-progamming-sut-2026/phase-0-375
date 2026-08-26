@@ -81,30 +81,46 @@ public final class SquashAnim {
 
     /** World-space leap progress 0..1 */
     public static float leapTravelFraction(PlantInstance plant, PamCatalog.PamEntry entry) {
-        if (plant == null || entry == null) {
+        if (plant == null) {
             return 0f;
         }
-        boolean right = jumpRight(plant);
+        return leapTravelFraction(plant.getActiveActionElapsed(), entry, jumpRight(plant));
+    }
+
+    /** World-space leap progress 0..1 for a known attack elapsed time. */
+    public static float leapTravelFraction(float elapsed, PamCatalog.PamEntry entry, boolean right) {
+        if (entry == null) {
+            return 0f;
+        }
         float up = PamCatalog.clipDurationSeconds(entry, right ? "jump_up_right" : "jump_up_left");
         if (up <= 0f) {
             float total = attackDurationSeconds(entry, right);
-            return total <= 0f ? 0f : Math.min(1f, plant.getActiveActionElapsed() / total);
+            return total <= 0f ? 0f : Math.min(1f, elapsed / total);
         }
-        return Math.min(1f, plant.getActiveActionElapsed() / up);
+        return Math.min(1f, elapsed / up);
     }
 
     /** Extra height above the lawn in cell units while leaping. */
     public static float leapVisualHeightCells(PlantInstance plant, PamCatalog.PamEntry entry,
                                              float travelTiles) {
-        if (plant == null || entry == null) {
+        if (plant == null) {
             return 0f;
         }
-        boolean right = jumpRight(plant);
+        return leapVisualHeightCells(plant.getActiveActionElapsed(), entry, travelTiles,
+                jumpRight(plant));
+    }
+
+    /** Extra leap height for a known attack elapsed time. */
+    public static float leapVisualHeightCells(float elapsed, PamCatalog.PamEntry entry,
+                                             float travelTiles, boolean right) {
+        if (entry == null) {
+            return 0f;
+        }
         float total = attackDurationSeconds(entry, right);
         if (total <= 0f) {
             return 0f;
         }
-        float t = plant.getActiveActionElapsed() / total;
+        float t = elapsed / total;
         if (t <= 0f || t >= 1f) {
             return 0f;
         }

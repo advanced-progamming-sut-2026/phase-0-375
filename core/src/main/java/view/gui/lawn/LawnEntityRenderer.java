@@ -56,6 +56,8 @@ import model.zombie.behavior.SummonBehavior;
 import model.zombie.behavior.SwimBehavior;
 import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.behavior.TransformBehavior;
+import model.zombie.behavior.zombotany.ZombotanyJalapenoBehavior;
+import model.zombie.behavior.zombotany.ZombotanySquashBehavior;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import pvz.libpvz.textures.TextureBank;
@@ -90,6 +92,7 @@ import view.gui.anim.zombie.ZombieAnimRole;
 import view.gui.anim.zombie.ZombieFootfallCurve;
 import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
+import view.gui.anim.zombie.ZombotanyAnim;
 import view.gui.assets.BeghouledArt;
 import view.gui.assets.EffectPamPaths;
 import view.gui.assets.PamCatalog;
@@ -286,6 +289,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
+    private final IdentityHashMap<ZombieInstance, Boolean> jalapenoFireSpawned = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Integer> armorBreakFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Integer> meleeAttackFxEpoch = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
@@ -513,6 +517,7 @@ public final class LawnEntityRenderer {
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
         beghouledMotion.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        jalapenoFireSpawned.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie));
         armorBreakFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleeAttackFxEpoch.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         meleePlantFoodFxSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
@@ -670,6 +675,50 @@ public final class LawnEntityRenderer {
                 ? (float) Math.sqrt(dx * dx + dy * dy) / layout.cellWidth()
                 : 1f;
         xy[1] += SquashAnim.leapVisualHeightCells(plant, entry, travelTiles) * layout.cellHeight();
+    }
+
+    private void applyZombotanySquashLeap(ZombieInstance zombie, Chapter chapter, float[] xy) {
+        if (zombie == null || xy == null) {
+            return;
+        }
+        ZombotanySquashBehavior squash =
+                (ZombotanySquashBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOTANY_SQUASH);
+        if (squash == null || !squash.isSquashing()
+                || squash.getSmashTargetGridX() < 0 || squash.getSmashTargetGridY() < 0) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog == null ? null
+                : catalog.forZombie(zombie.getDefinition().getName(), chapter);
+        float[] to = layout.centerOf(squash.getSmashTargetGridY(), squash.getSmashTargetGridX());
+        float dx = to[0] - xy[0];
+        float dy = to[1] - xy[1];
+        float travel = SquashAnim.leapTravelFraction(squash.getAttackElapsed(), entry, true);
+        if (travel > 0f) {
+            xy[0] += dx * travel;
+            xy[1] += dy * travel;
+        }
+        float travelTiles = layout.cellWidth() > 0f
+                ? (float) Math.sqrt(dx * dx + dy * dy) / layout.cellWidth()
+                : 1f;
+        xy[1] += SquashAnim.leapVisualHeightCells(squash.getAttackElapsed(), entry, travelTiles, true)
+                * layout.cellHeight();
+    }
+
+    private void maybeSpawnZombotanyJalapenoFire(ZombieInstance zombie) {
+        if (zombie == null) {
+            return;
+        }
+        ZombotanyJalapenoBehavior jala =
+                (ZombotanyJalapenoBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOTANY_JALAPENO);
+        if (jala == null || !jala.isAttacking()) {
+            return;
+        }
+        if (jalapenoFireSpawned.put(zombie, Boolean.TRUE) != null) {
+            return;
+        }
+        Point pos = new Point(0, zombie.getGridY());
+        float[] xy = layout.centerOf(zombie.getGridY(), Math.max(0, zombie.getGridX()));
+        spawnExplosionSpecs(ExplosivePlantFx.specsForName("Jalapeno"), pos, xy[0], xy[1]);
     }
 
     private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
@@ -1191,7 +1240,8 @@ public final class LawnEntityRenderer {
         }
         ClipRef ref = clips.getOrLoad(entry.path(), clip);
         if (ref != null) {
-            player.draw(batch, ref, time, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, true);
+            float sx = ZombotanyAnim.isPlantHeadName(zombieName) ? -AnimScale.ZOMBIE : AnimScale.ZOMBIE;
+            player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true);
         }
     }
 
@@ -2063,6 +2113,9 @@ public final class LawnEntityRenderer {
         }
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE,
             ZombieAnimAdapter.armorVisibility(zombie, entry));
+        if (ZombotanyAnim.isPlantHead(zombie)) {
+            pose = pose.flipped();
+        }
         drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
     }
 
@@ -2559,6 +2612,7 @@ public final class LawnEntityRenderer {
             entityOverlay.drawZombie(batch, App.getInstance().getCurrentGameModel(), zombie);
             return;
         }
+        applyZombotanySquashLeap(zombie, chapter, xyTmp);
 
         restartArcadePushClock(zombie, pose);
         restartProspectorJumpClock(zombie, pose);
@@ -2639,6 +2693,7 @@ public final class LawnEntityRenderer {
         float glow = zombie.isGlowing() && snorkelMask == null ? glowStrength() : 0f;
         float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase,
             tickHitFlash(zombie, delta), delta, glow);
+        maybeSpawnZombotanyJalapenoFire(zombie);
         maybeGargantuarWalkStomp(zombie, pose, time);
         if (snorkelMask != null) {
             drownShader().end(batch);
@@ -3860,6 +3915,7 @@ public final class LawnEntityRenderer {
         float drownWaterY = Float.NaN;
         float snorkelRise;
         float hitFlash;
+        float holdSeconds = Float.NaN;
 
         DeathFx(AnimPose pose, float x, float y) {
             this(pose, x, y, false);
@@ -3870,6 +3926,13 @@ public final class LawnEntityRenderer {
             this.x = x;
             this.y = y;
             this.drown = drown;
+        }
+
+        float hold(ClipRef ref) {
+            if (!Float.isNaN(holdSeconds)) {
+                return Math.max(0f, holdSeconds);
+            }
+            return ref != null ? ref.duration : 0f;
         }
     }
 
@@ -3914,6 +3977,19 @@ public final class LawnEntityRenderer {
             return;
         }
         if (trySpawnAsh(zombie, snap)) {
+            return;
+        }
+        // Plant-head PAMs have no die clip — falling back to idle would leave them
+        // bobbing on the lawn for a full idle cycle. Fade the last pose instead.
+        if (ZombotanyAnim.isPlantHead(zombie)) {
+            AnimPose fade = AnimPose.once(
+                snap.pose.pamPath(), snap.pose.clipName(), ZombieAnimRole.DIE, snap.pose.visibility());
+            if (snap.pose.flipX()) {
+                fade = fade.flipped();
+            }
+            DeathFx fx = new DeathFx(fade, snap.x, snap.y, false);
+            fx.holdSeconds = 0f;
+            deathFx.add(fx);
             return;
         }
         boolean barrelLeft = attachBarrelLeftover(model, zombie, snap);
@@ -4410,17 +4486,19 @@ public final class LawnEntityRenderer {
                 continue;
             }
             ClipRef ref = clips.getOrLoad(fx.pose.pamPath(), fx.pose.clipName());
-            if (ref == null) {
+            float hold = fx.hold(ref);
+            if (fx.time >= hold + ARMOR_POP_FADE) {
+                deathFx.remove(i);
                 continue;
             }
-            if (fx.time >= ref.duration + ARMOR_POP_FADE) {
-                deathFx.remove(i);
+            if (ref == null) {
+                fx.time += delta;
                 continue;
             }
             // Hold the collapsed last frame and fade it out instead of popping it off-screen.
             float scale = AnimScale.ZOMBIE * fx.pose.scale();
-            float alpha = 1f - Math.max(0f, fx.time - ref.duration) / ARMOR_POP_FADE;
-            float time = Math.min(fx.time, ref.duration);
+            float alpha = 1f - Math.max(0f, fx.time - hold) / ARMOR_POP_FADE;
+            float time = Math.min(fx.time, hold);
             batch.setColor(1f, 1f, 1f, alpha);
             if (fx.drown) {
                 freezeDrownWaterY(fx, ref, scale);

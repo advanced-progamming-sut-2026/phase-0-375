@@ -1,22 +1,37 @@
 package model.zombie.behavior.zombotany;
 
 import model.enums.ZombieBehaviorType;
+import model.game.map.FloatPoint;
+import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
+import model.projectile.Pellet;
 import model.zombie.behavior.BehaviorContext;
 import model.zombie.instance.ZombieInstance;
 
 /**
- * Zombotany Peashooter zombie
+ * Zombotany Peashooter zombie: fires a leftward pea at plants in its lane.
  */
 public class ZombotanyPeashooterBehavior extends ZombotanyAbilityBehavior {
     public static final float DEFAULT_SHOT_INTERVAL_SECONDS = 1.5f;
     public static final int DEFAULT_PEA_DAMAGE = 20;
+    /** Matches {@code ShooterAbility} / {@code TimedPlantAction} presentation. */
+    public static final float ATTACK_DURATION = 0.6f;
+    public static final float FIRE_FRACTION = 0.4f;
+    public static final float PELLET_VELOCITY = 1f;
 
     private float shotTimer;
+    private float attackElapsed;
+    private boolean attacking;
+    private boolean fired;
 
     @Override
     public void execute(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         if (zombie == null || context == null || zombie.isDead()) {
+            return;
+        }
+
+        if (attacking) {
+            tickAttack(zombie, context, deltaTime);
             return;
         }
 
@@ -36,7 +51,36 @@ public class ZombotanyPeashooterBehavior extends ZombotanyAbilityBehavior {
             return;
         }
         shotTimer -= interval;
-        context.damagePlant(target, definitionDamage("Peashooter", DEFAULT_PEA_DAMAGE));
+        attacking = true;
+        fired = false;
+        attackElapsed = 0f;
+    }
+
+    private void tickAttack(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        attackElapsed += deltaTime;
+        if (!fired && attackElapsed >= ATTACK_DURATION * FIRE_FRACTION) {
+            fired = true;
+            spawnPea(zombie, context);
+        }
+        if (attackElapsed >= ATTACK_DURATION) {
+            attacking = false;
+            fired = false;
+            attackElapsed = 0f;
+        }
+    }
+
+    private void spawnPea(ZombieInstance zombie, BehaviorContext context) {
+        Plant source = plantDefinition("Peashooter");
+        int damage = source != null && source.getDamage() > 0
+                ? source.getDamage()
+                : definitionDamage("Peashooter", DEFAULT_PEA_DAMAGE);
+        float x = zombie.getContinuousX() - 0.2f;
+        float y = zombie.getContinuousY() - 0.15f;
+        int row = zombie.getGridY();
+        Pellet pea = new Pellet(damage, new FloatPoint(x, y), row, PELLET_VELOCITY);
+        pea.reflect();
+        pea.setSourcePlant(source);
+        context.spawnProjectile(pea);
     }
 
     @Override
@@ -74,5 +118,13 @@ public class ZombotanyPeashooterBehavior extends ZombotanyAbilityBehavior {
 
     public float getShotTimer() {
         return shotTimer;
+    }
+
+    public boolean isAttacking() {
+        return attacking;
+    }
+
+    public float getAttackElapsed() {
+        return attackElapsed;
     }
 }

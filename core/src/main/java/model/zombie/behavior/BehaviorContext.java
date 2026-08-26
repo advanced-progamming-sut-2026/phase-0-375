@@ -117,6 +117,9 @@ public interface BehaviorContext {
 
     // --- Projectiles ---
 
+    /** Places {@code projectile} on the field using its current world position. */
+    void spawnProjectile(Projectile projectile);
+
     /**
      * @return a list of every {@link Projectile} currently traveling in the
      *         given lane (row).
