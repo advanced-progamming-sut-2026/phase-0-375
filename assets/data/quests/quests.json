@@ -28,7 +28,7 @@
     "rewardNote": "10 seed packets"
   },
   {
-    "name": "Professional Plant Opener",
+    "name": "Plant Specialist",
     "category": "DAILY",
     "condition": "Kill 10 zombies using only plant_type",
     "rewardType": "UNLOCKABLE",
@@ -56,7 +56,7 @@
     "rewardNote": "20 gems"
   },
   {
-    "name": "Economic Plant Eater",
+    "name": "Frugal Planter",
     "category": "MAIN",
     "condition": "Win a level without losing more than n plants",
     "rewardType": "INVENTORY",
@@ -84,7 +84,7 @@
     "rewardNote": "200 gems"
   },
   {
-    "name": "Speed of Action",
+    "name": "Quick Strike",
     "category": "MAIN",
     "condition": "Kill 10 zombies within 30 seconds of the first zombie wave starting",
     "rewardType": "CURRENCY",

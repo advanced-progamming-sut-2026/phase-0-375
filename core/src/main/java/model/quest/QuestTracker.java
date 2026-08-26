@@ -93,12 +93,12 @@ public final class QuestTracker {
             }
         });
         // daily variant: count kills dealt exclusively by today's plant
-        rules.put("Professional Plant Opener",
+        rules.put("Plant Specialist",
                 c -> c.add(c.model().getExclusivePlantKills(c.value())));
         // count kills dealt exclusively by Cactus
         rules.put("Only Cactus",
                 c -> c.add(c.model().getExclusivePlantKills("Cactus")));
-        rules.put("Speed of Action",
+        rules.put("Quick Strike",
                 c -> c.best(c.model().getKillsWithin30s()));
         rules.put("Professional Destroyer",
                 c -> c.best(countCategory(c.planted(), PlantCategory.EXPLOSIVE)));
@@ -112,7 +112,7 @@ public final class QuestTracker {
 
     /** Quests that complete outright when their condition holds at level end. */
     private static void registerCompletionRules(Map<String, QuestRule> rules) {
-        rules.put("Economic Plant Eater",
+        rules.put("Frugal Planter",
                 c -> c.completeIf(c.won() && c.model().getPlantsLost() <= c.intValue()));
         rules.put("Defense Master",
                 c -> c.completeIf(c.won() && c.model().getSunAmount() == 0));

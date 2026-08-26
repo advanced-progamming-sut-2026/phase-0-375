@@ -18,7 +18,7 @@ import java.util.Set;
  * available clip instead of throwing.
  */
 public final class PamClipCache {
-    private static final String[] CLIP_FALLBACKS = {"animation", "idle", "loop", "projectile"};
+    private static final String[] CLIP_FALLBACKS = {"default", "animation", "idle", "loop", "projectile"};
 
     private final PamPlayer player;
     private final Map<String, ClipRef> clips = new HashMap<>();
