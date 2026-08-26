@@ -56,7 +56,7 @@ public final class MiniGameScreen extends AbstractMenuScreen {
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                game.setScreen(new AdventureScreen(game));
+                game.setScreen(new QuestsScreen(game));
             }
         });
         root.add(back).width(250f).height(56f).padTop(18f);

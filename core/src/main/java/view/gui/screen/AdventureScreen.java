@@ -15,12 +15,10 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.GameMenuController;
 import controller.GameMenuController.ChapterSummary;
 import controller.MainMenuController;
-import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.MenuType;
-import model.quest.Quest;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
@@ -172,27 +170,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
     }
 
     private void openQuests() {
-        TravelLogMenuController travel = TravelLogMenuController.getInstance();
-        travel.syncForCurrentUser();
-        App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
-        CommandResult<List<Quest>> quests = travel.showAllQuests();
-        Table list = new Table();
-        if (!quests.isSuccess() || quests.getData() == null) {
-            list.add(new Label(quests.getMessage(), skin, "medium"));
-        } else {
-            for (Quest q : quests.getData()) {
-                list.add(new Label(q.getName(), skin, "medium")).left().padBottom(6f).row();
-            }
-        }
-        TextButton miniGames = new TextButton("MINI-GAMES", skin, "purple");
-        miniGames.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                game.setScreen(new MiniGameScreen(game));
-            }
-        });
-        list.add(miniGames).width(300f).height(58f).padTop(18f).row();
-        game.setScreen(new PlaceholderMenuScreen(game, "Quests", MenuType.TRAVEL_LOG, list));
+        game.setScreen(new QuestsScreen(game));
     }
 
     private void openCollection() {
