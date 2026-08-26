@@ -1,6 +1,8 @@
 package view.gui.screen;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Group;
@@ -9,6 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Container;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import pvz.skin.BorderedTable;
+import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SeedPacketComposite;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
@@ -31,9 +34,11 @@ import model.shop.ShopItem;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
+import view.gui.assets.PvzAssets;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
 import view.gui.ui.AtlasImageButton;
+import view.gui.ui.EdgeFadeOverlay;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.RoundedRegionImage;
 import view.gui.ui.PamEffectActor;
@@ -47,6 +52,9 @@ import java.util.Set;
 
 /** PvZ2-inspired graphical shop backed by the existing Shop controller/model. */
 public final class ShopScreen extends AbstractMenuScreen {
+    private static final float MAX_DELTA = 1f / 30f;
+    /** Same soft black letterbox as Adventure / game menu. */
+    private static final float EDGE_FADE_H = 600f;
     private static final float PANEL_W = 1500f;
     private static final float PANEL_H = 600f;
     /** Distance from the bottom of the screen to the bottom of the panel. */
@@ -80,7 +88,11 @@ public final class ShopScreen extends AbstractMenuScreen {
     private static final float[] ART_SEED_RANDOM  = {154f, 103f, 0f, 10f};
     private static final float[] ART_SEED_CHOSEN  = {154f, 103f, 0f, 10f};
     private static final float[] ART_CONVERSION   = {130f, 125f, 0f, 10f};
-    private static final float[] ART_DAILY        = {130f, 125f, 0f, 10f};
+    private static final float[] ART_DAILY        = {
+        SeedPacketActor.PACKET_WIDTH * 1.23f,
+        SeedPacketActor.PACKET_HEIGHT * 1.23f,
+        0f, 10f
+    };
     /** Coin-conversion artwork: size of the gem, arrow and coin icons. */
     private static final float CONV_GEM_W = 60f, CONV_GEM_H = 47f;
     private static final float CONV_ARROW_W = 60f, CONV_ARROW_H = 38f;
@@ -94,13 +106,8 @@ public final class ShopScreen extends AbstractMenuScreen {
     private static final float ART_SLOT_H = 148f;
     private static final float NAME_H = 46f;
     private static final float DESC_H = 58f;
-    /** Daily-offer seed packet: how the shop wants the composite drawn. */
+    /** Daily-offer seed packet: display scale only; plant/frame ratio matches SeedPacketActor. */
     private static final float PACKET_SCALE = 1.23f;
-    private static final float PACKET_PLANT_SCALE = .70f;
-    /** Fraction of packet width; positive = plant moves right, negative = left. */
-    private static final float PACKET_PLANT_SHIFT_X = -.123f;
-    /** Fraction of packet height; positive = plant moves up. */
-    private static final float PACKET_PLANT_SHIFT_Y = .05f;
     /** Purple price button (replaces the old BUY label). */
     private static final float BUY_W = 130f;
     private static final float BUY_H = 60f;
@@ -187,7 +194,9 @@ public final class ShopScreen extends AbstractMenuScreen {
     private static final float PRICE_ICON = 38f;
 
     private final ShopMenuController controller = ShopMenuController.getInstance();
+    private final MainMenuArt menuArt = new MainMenuArt();
     private final Table cards = new Table();
+    private EdgeFadeOverlay edgeFade;
     private TextureBank textures;
     private ResourceBar resources;
     private Label status;
@@ -200,14 +209,17 @@ public final class ShopScreen extends AbstractMenuScreen {
     public void show() {
         game.ensureAssets();
         TextureBank t = game.assets.textures;
+        menuArt.ensureLoaded(t);
         t.loadSync(ShopArt.ATLAS_STORE);
         t.loadSync(ShopArt.ATLAS_CARDS);
         t.loadSync(ShopArt.ATLAS_SEEDS);
-        t.loadSync(UiRegions.ATLAS_MAIN_MENU_BACKGROUND);
         t.loadSync(AdventureHudRegions.ATLAS_WORLD_MAP);
         t.loadSync(UiRegions.ATLAS_UI_ALWAYS_LOADED);   // sunflower, coin stack, top frame, LOD pinata
         t.loadSync(ShopArt.ATLAS_CALENDAR);             // calendar corner ornaments
         t.loadSync(ShopArt.ATLAS_LOD);                  // birthday gift
+        if (edgeFade == null) {
+            edgeFade = new EdgeFadeOverlay(EDGE_FADE_H);
+        }
         super.show();
     }
 
@@ -216,16 +228,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         App.getInstance().setCurrentMenu(MenuType.SHOP);
         TextureBank t = game.assets.textures;
 
-        // The atlases hold no full-screen store backdrop (only card and gacha
-        // pieces), so the shared main-menu background is used here.
-        TextureRegion backdrop = t.region(UiRegions.MAIN_MENU_BACKGROUND);
-        if (backdrop != null) {
-            Image background = new Image(new TextureRegionDrawable(backdrop));
-            background.setScaling(Scaling.fill);       // cover, keeps aspect
-            background.setBounds(0f, 0f, UI_WIDTH, UI_HEIGHT);
-            background.setTouchable(Touchable.disabled);
-            stage.addActor(background);
-        }
+        // Cosmic main-menu backdrop + edge fade are drawn in render(), not as stage actors.
         if (!DECO_ON_TOP) addDecorations(t);
 
         Table top = new Table();
@@ -605,10 +608,8 @@ public final class ShopScreen extends AbstractMenuScreen {
 
     private Actor artwork(ShopItem item, TextureBank t, String plantOverride, boolean daily) {
         if (daily && plantOverride != null) {
-            return new SeedPacketComposite(t, plantOverride, ART_DAILY[0], ART_DAILY[1])
-                .setCompositeScale(PACKET_SCALE)
-                .setPlantScale(PACKET_PLANT_SCALE)
-                .setPlantShift(PACKET_PLANT_SHIFT_X, PACKET_PLANT_SHIFT_Y);
+            return SeedPacketComposite.matchingActor(t, plantOverride)
+                .setCompositeScale(PACKET_SCALE);
         }
         String id = switch (item.getItemType()) {
             case POT -> ShopArt.POT;
@@ -663,4 +664,45 @@ public final class ShopScreen extends AbstractMenuScreen {
     }
 
     private void goBack() { game.setScreen(new GreenhouseScreen(game)); }
+
+    @Override
+    public void render(float delta) {
+        if (delta > MAX_DELTA) {
+            delta = MAX_DELTA;
+        }
+        Gdx.gl.glClearColor(0f, 0f, 0f, 1f);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        PvzAssets assets = game.assets;
+        if (assets != null) {
+            game.batch.setProjectionMatrix(stage.getViewport().getCamera().combined);
+            game.batch.begin();
+            menuArt.drawBackground(game.batch, assets.textures, UI_WIDTH, UI_HEIGHT);
+            if (edgeFade != null) {
+                edgeFade.draw(game.batch, UI_WIDTH, UI_HEIGHT);
+            }
+            game.batch.end();
+        }
+
+        stage.act(delta);
+        stage.draw();
+    }
+
+    @Override
+    public void hide() {
+        if (edgeFade != null) {
+            edgeFade.dispose();
+            edgeFade = null;
+        }
+        super.hide();
+    }
+
+    @Override
+    public void dispose() {
+        if (edgeFade != null) {
+            edgeFade.dispose();
+            edgeFade = null;
+        }
+        super.dispose();
+    }
 }

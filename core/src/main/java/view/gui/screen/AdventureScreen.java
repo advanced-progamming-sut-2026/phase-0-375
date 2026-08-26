@@ -12,7 +12,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
-import controller.CollectionMenuController;
 import controller.GameMenuController;
 import controller.GameMenuController.ChapterSummary;
 import controller.MainMenuController;
@@ -198,16 +197,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
 
     private void openCollection() {
         App.getInstance().setCurrentMenu(MenuType.COLLECTION);
-        CommandResult<List<String>> plants = CollectionMenuController.getInstance().showPlants();
-        Table list = new Table();
-        if (!plants.isSuccess() || plants.getData() == null) {
-            list.add(new Label(plants.getMessage(), skin, "medium"));
-        } else {
-            for (String name : plants.getData()) {
-                list.add(new Label(name, skin, "medium")).left().padBottom(4f).row();
-            }
-        }
-        game.setScreen(new PlaceholderMenuScreen(game, "Collection", MenuType.COLLECTION, list));
+        game.setScreen(new CollectionScreen(game));
     }
 
     private void openGreenhouse() {

@@ -5,6 +5,7 @@ import model.enums.ZombieState;
 import model.app.App;
 import model.game.core.GameModel;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.zombie.ZombieFactory;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 import view.gui.anim.AnimPose;
@@ -167,6 +168,45 @@ public final class ZombieAnimAdapter {
             parts.add(states);
         }
         return PamVisibility.show(parts);
+    }
+
+    /**
+     * Undamaged armor visibility for Almanac / idle previews (Conehead, Buckethead, …).
+     * Builds a fresh instance so cone/bucket layers are shown without a lawn zombie.
+     */
+    public static Map<String, Boolean> almanacArmorVisibility(String definitionName,
+                                                             PamCatalog.PamEntry entry) {
+        if (definitionName == null) {
+            return null;
+        }
+        try {
+            ZombieInstance zombie = ZombieFactory.createInstance(definitionName);
+            if (zombie != null) {
+                return armorVisibility(zombie, entry);
+            }
+        } catch (RuntimeException ignored) {
+            // ZombieFactory not initialized yet — fall through.
+        }
+        return fallbackArmorStates(definitionName, entry);
+    }
+
+    private static Map<String, Boolean> fallbackArmorStates(String definitionName,
+                                                            PamCatalog.PamEntry entry) {
+        List<String> parts = new ArrayList<>(3);
+        if (definitionName.endsWith("Armor1")) {
+            parts.add("zombie_armor_cone_norm");
+        } else if (definitionName.endsWith("Armor2")) {
+            parts.add("zombie_armor_bucket_norm");
+        } else if (definitionName.endsWith("Armor4")) {
+            parts.add("zombie_armor_brick_norm");
+        }
+        if (entry != null) {
+            String states = ZombiePamAliases.armorStatesPart(entry.name(), definitionName);
+            if (states != null) {
+                parts.add(states);
+            }
+        }
+        return parts.isEmpty() ? null : PamVisibility.show(parts);
     }
 
     static String currentArmorLayer(Armor armor) {

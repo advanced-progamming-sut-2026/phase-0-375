@@ -27,6 +27,9 @@ import view.gui.assets.SeedPacketIds;
  *         .setPlantScale(.70f)
  *         .setPlantShift(0f, .06f);
  * </pre>
+ *
+ * <p>For the same plant-on-frame ratio as {@link SeedPacketActor}, use
+ * {@link #matchingActor(TextureBank, String)} (or the {@code MATCH_ACTOR_*} knobs).</p>
  */
 public final class SeedPacketComposite extends Stack {
     /** Neutral defaults, used when a caller does not override them. */
@@ -34,6 +37,15 @@ public final class SeedPacketComposite extends Stack {
     public static final float DEFAULT_PLANT_SCALE = 1f;
     public static final float DEFAULT_PLANT_SHIFT_X = 0f;
     public static final float DEFAULT_PLANT_SHIFT_Y = 0f;
+
+    /**
+     * Portrait box ≈ {@link SeedPacketActor} height fallback ({@code 0.82} of packet).
+     * Shift X moves the centred plant to the actor's {@code x = 4} left pad.
+     */
+    public static final float MATCH_ACTOR_PLANT_SCALE = 0.82f;
+    public static final float MATCH_ACTOR_PLANT_SHIFT_X =
+        (4f / SeedPacketActor.PACKET_WIDTH) - (1f - MATCH_ACTOR_PLANT_SCALE) * 0.5f;
+    public static final float MATCH_ACTOR_PLANT_SHIFT_Y = 0f;
 
     private final TextureBank textures;
     private final Image base;
@@ -65,6 +77,17 @@ public final class SeedPacketComposite extends Stack {
         // Sized last: setSize fires sizeChanged(), which needs the children.
         setSize(width, height);
         applyLayout();
+    }
+
+    /**
+     * Packet sized and framed like {@link SeedPacketActor} (119×75, plant left-padded).
+     * Callers may still {@link #setCompositeScale(float)} for display size.
+     */
+    public static SeedPacketComposite matchingActor(TextureBank textures, String plantName) {
+        return new SeedPacketComposite(
+                textures, plantName, SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
+            .setPlantScale(MATCH_ACTOR_PLANT_SCALE)
+            .setPlantShift(MATCH_ACTOR_PLANT_SHIFT_X, MATCH_ACTOR_PLANT_SHIFT_Y);
     }
 
     /** Uniform scale of the finished composite, packet and plant together. */

@@ -114,7 +114,25 @@ public class ZombieLoader {
                 fireDamageMultiplier
         );
         populateBehaviorProps(zombie, zombieData);
+        importAlmanacStats(zombie, zombieData);
         return zombie;
+    }
+
+    private static void importAlmanacStats(Zombie zombie, ZombieDataEntry.ZombieObjData data) {
+        if (data.getZombieStats() == null) {
+            return;
+        }
+        for (ZombieDataEntry.ZombieStatEntry stat : data.getZombieStats()) {
+            if (stat == null || stat.getType() == null || stat.getValue() == null) {
+                continue;
+            }
+            String type = stat.getType().trim().toLowerCase();
+            if ("toughness".equals(type)) {
+                zombie.putBehaviorProp("almanacToughness", stat.getValue());
+            } else if ("speed".equals(type)) {
+                zombie.putBehaviorProp("almanacSpeed", stat.getValue());
+            }
+        }
     }
 
     /**

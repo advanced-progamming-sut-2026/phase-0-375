@@ -137,6 +137,20 @@ public class CollectionMenuController extends AppMenuController {
         user.getPlantLevels().put(plantName, collection.getPlantLevel(plantName));
     }
 
+    /** Snapshot of the current user's collection for GUI screens. */
+    public Collection currentCollection() {
+        User user = App.getInstance().getCurrentUser();
+        if (user == null) {
+            return new Collection(null, null);
+        }
+        return buildCollection(user);
+    }
+
+    /** Flat purchase price used by {@link #purchasePlant(String)}. */
+    public int purchaseCostCoins() {
+        return PURCHASE_COST_COINS;
+    }
+
     // ── Show commands ──
 
     /** Returns the list of plant names the user has unlocked. */

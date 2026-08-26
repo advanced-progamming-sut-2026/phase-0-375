@@ -4,7 +4,6 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.Actor;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
@@ -13,7 +12,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
@@ -28,18 +26,12 @@ import java.util.function.Consumer;
 
 /**
  * Shop overlay: pick an unlocked plant for {@code SEED_PACKET_CHOSEN}.
- * Uses {@link SeedPacketComposite} tiles in a scrollable grid (no sun/level/lock chrome).
+ * Grid tiles are {@link SeedPacketActor} (same size/portrait placement as gameplay).
  */
 public final class ShopChosenPlantPicker {
     private static final int GRID_COLS = 5;
-    private static final float PACKET_W = 130f;
-    private static final float PACKET_H = 125f;
-    private static final float PACKET_SCALE = 1.05f;
-    private static final float PLANT_SCALE = 0.70f;
-    /** Fraction of packet width; positive = plant moves right, negative = left. */
-    private static final float PLANT_SHIFT_X = -.123f;
-    /** Fraction of packet height; positive = plant moves up. */
-    private static final float PLANT_SHIFT_Y = 0.05f;
+    private static final float PACKET_W = SeedPacketActor.PACKET_WIDTH;
+    private static final float PACKET_H = SeedPacketActor.PACKET_HEIGHT;
     private static final float MODAL_W = 920f;
     private static final float GRID_H = 420f;
     private static final float FADE_IN = 0.2f;
@@ -82,13 +74,13 @@ public final class ShopChosenPlantPicker {
         } else {
             int col = 0;
             for (String plantName : sorted) {
-                Actor tile = packetTile(textures, plantName, name ->
+                Actor tile = packetTile(textures, skin, plantName, name ->
                     dismiss(overlay, () -> {
                         if (onPick != null) {
                             onPick.accept(name);
                         }
                     }));
-                grid.add(tile).size(PACKET_W * PACKET_SCALE + 8f, PACKET_H * PACKET_SCALE + 8f).pad(6f);
+                grid.add(tile).size(PACKET_W + 8f, PACKET_H + 8f).pad(6f);
                 col++;
                 if (col >= GRID_COLS) {
                     grid.row();
@@ -132,20 +124,14 @@ public final class ShopChosenPlantPicker {
         ));
     }
 
-    private static Actor packetTile(TextureBank textures, String plantName, Consumer<String> onPick) {
+    private static Actor packetTile(TextureBank textures, Skin skin, String plantName,
+                                    Consumer<String> onPick) {
         Table hit = new Table();
-        hit.setTouchable(Touchable.enabled);
-        SeedPacketComposite packet = new SeedPacketComposite(textures, plantName, PACKET_W, PACKET_H)
-            .setCompositeScale(PACKET_SCALE)
-            .setPlantScale(PLANT_SCALE)
-            .setPlantShift(PLANT_SHIFT_X, PLANT_SHIFT_Y);
+        // Same READY frame + native portrait placement as collection / plant selection.
+        SeedPacketActor packet = new SeedPacketActor(
+            textures, skin, plantName, 0, 1, false, false, false);
+        packet.onClick(() -> onPick.accept(plantName));
         hit.add(packet).size(PACKET_W, PACKET_H);
-        hit.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                onPick.accept(plantName);
-            }
-        });
         return hit;
     }
 

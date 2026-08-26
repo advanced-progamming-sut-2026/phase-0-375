@@ -203,6 +203,10 @@ public class ZombieDataEntry {
         @JsonProperty("RunningSpeedScale")
         private float runningSpeedScale;
 
+        /** Almanac toughness / speed codes (e.g. {@code toughness3}, {@code speed2}). */
+        @JsonProperty("ZombieStats")
+        private List<ZombieStatEntry> zombieStats;
+
         /** ZombieDarkKingProps – seconds between knighting actions. */
         @JsonProperty("DelayBetweenKnightings")
         private float delayBetweenKnightings;
@@ -382,6 +386,27 @@ public class ZombieDataEntry {
 
         public float getFireDamageMultiplier() {
             return fireDamageMultiplier;
+        }
+
+        public List<ZombieStatEntry> getZombieStats() {
+            return zombieStats;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ZombieStatEntry {
+        @JsonProperty("Type")
+        private String type;
+
+        @JsonProperty("Value")
+        private String value;
+
+        public String getType() {
+            return type;
+        }
+
+        public String getValue() {
+            return value;
         }
     }
 

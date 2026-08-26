@@ -77,7 +77,8 @@ public final class SeedPacketActor extends WidgetGroup {
         addActor(chrome);
 
         if (plantName != null) {
-            portrait = image(textures, SeedPacketIds.portraitId(plantName));
+            String portraitRegion = SeedPacketIds.portraitId(plantName);
+            portrait = image(textures, portraitRegion);
             float ph = portrait.getPrefHeight() > 0 ? portrait.getPrefHeight() : PACKET_HEIGHT * 0.82f;
             float pw = portrait.getPrefWidth() > 0 ? portrait.getPrefWidth() : PACKET_WIDTH * 0.52f;
             portrait.setSize(pw, ph);
