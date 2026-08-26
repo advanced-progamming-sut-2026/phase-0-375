@@ -375,6 +375,15 @@ public class GameModel implements BehaviorContext {
         return laneSlidesView;
     }
 
+    /**
+     * Width of the dynamic tide band (columns from the right edge the water
+     * may flood); {@code 0} outside Big Wave Beach levels.
+     */
+    public int getTideLimitColumns() {
+        LevelConfig config = currentLevel != null ? currentLevel.getConfig() : null;
+        return config != null ? Math.max(0, config.getTideLimitColumn()) : 0;
+    }
+
     @Override
     public List<Sun> getActiveSuns() {
         return activeSuns;
