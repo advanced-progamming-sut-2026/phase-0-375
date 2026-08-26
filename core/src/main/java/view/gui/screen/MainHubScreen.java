@@ -11,6 +11,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import controller.MainMenuController;
 import controller.NewsMenuController;
+import controller.ProfileMenuController;
+import controller.SettingsMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
@@ -19,7 +21,9 @@ import view.gui.PvzGdxGame;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
 import view.gui.ui.NewsOverlay;
+import view.gui.ui.ProfileOverlay;
 import view.gui.ui.ResourceBar;
+import view.gui.ui.SettingsOverlay;
 import view.gui.ui.SkinIconButton;
 
 /**
@@ -153,17 +157,41 @@ public final class MainHubScreen extends AbstractMenuScreen {
     private void enterProfile() {
         CommandResult<Void> r = controller.menuEnter("profile");
         showToast(r.getMessage(), !r.isSuccess());
-        if (r.isSuccess()) {
-            game.setScreen(new ProfileScreen(game));
+        if (!r.isSuccess()) {
+            return;
         }
+        Table overlay = ProfileOverlay.create(
+                skin,
+                this::showToast,
+                () -> {
+                    CommandResult<Void> exit = ProfileMenuController.getInstance().menuExit();
+                    if (!exit.isSuccess()) {
+                        showToast(exit.getMessage(), true);
+                    }
+                },
+                () -> resourceBar.refresh());
+        stage.addActor(overlay);
+        toast.toFront();
     }
 
     private void enterSettings() {
         CommandResult<Void> r = controller.menuEnter("settings");
         showToast(r.getMessage(), !r.isSuccess());
-        if (r.isSuccess()) {
-            game.setScreen(new SettingsScreen(game));
+        if (!r.isSuccess()) {
+            return;
         }
+        Table overlay = SettingsOverlay.create(
+                skin,
+                this::showToast,
+                () -> {
+                    CommandResult<Void> exit = SettingsMenuController.getInstance().menuExit();
+                    if (!exit.isSuccess()) {
+                        showToast(exit.getMessage(), true);
+                    }
+                },
+                () -> resourceBar.refresh());
+        stage.addActor(overlay);
+        toast.toFront();
     }
 
     private void openNewsOverlay() {
