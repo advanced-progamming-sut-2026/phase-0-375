@@ -194,6 +194,7 @@ public class ChapterEffectsSystem implements Tickable {
         StringBuilder hitRows = new StringBuilder();
         for (int i = 0; i < hitCount; i++) {
             int row = rows.get(i);
+            gameModel.queueIceWindGust(row);
             for (PlantInstance plant : gameModel.getPlantsInLane(row)) {
                 if (plant.getDefinition() != null
                         && plant.getDefinition().hasTag(PlantTags.FIRE)) {

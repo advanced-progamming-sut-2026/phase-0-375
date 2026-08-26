@@ -119,6 +119,12 @@ public class GameModel implements BehaviorContext {
     private final List<SandstormSpawn> sandstormsView =
             Collections.unmodifiableList(pendingSandstorms);
 
+    /** Frostbite Caves ice winds sweeping hit lanes; presentation-only. */
+    private final List<IceWindGust> iceWinds = new ArrayList<>();
+    /** Read-only view of {@link #iceWinds} for the renderer. */
+    private final List<IceWindGust> iceWindsView =
+            Collections.unmodifiableList(iceWinds);
+
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
     private int coinCount;
@@ -276,6 +282,97 @@ public class GameModel implements BehaviorContext {
     /** Drops cues the view never consumed (TUI, skipped frames). */
     public void discardUnreadProjectileHits() {
         projectileHitCues.clear();
+    }
+
+    /** Slide-tile activations since the last drain, as {@code (col, row)} points. */
+    private final List<Point> slideStartCues = new ArrayList<>();
+
+    /** A slide waiting for its zombie to reach the slide tile's middle. */
+    public static final class ArmedSlide {
+        private final int tileColumn;
+        private final int fromRow;
+        private final int toRow;
+
+        ArmedSlide(int tileColumn, int fromRow, int toRow) {
+            this.tileColumn = tileColumn;
+            this.fromRow = fromRow;
+            this.toRow = toRow;
+        }
+
+        /** Column of the slide tile; its middle sits at this continuous X. */
+        public int getTileColumn() { return tileColumn; }
+        /** Lane the zombie slides from. */
+        public int getFromRow() { return fromRow; }
+        /** Lane the zombie slides into. */
+        public int getToRow() { return toRow; }
+    }
+
+    /** Armed slides keyed by their zombie. */
+    private final Map<ZombieInstance, ArmedSlide> armedSlides = new HashMap<>();
+
+    /** Slides still gliding between lanes; presentation-only. */
+    private final List<LaneSlide> laneSlides = new ArrayList<>();
+    /** Read-only view of {@link #laneSlides} for the renderer. */
+    private final List<LaneSlide> laneSlidesView =
+            Collections.unmodifiableList(laneSlides);
+
+    @Override
+    public void armLaneSlide(ZombieInstance zombie, Cell slideTile, int toRow) {
+        if (zombie == null || slideTile == null) {
+            return;
+        }
+        armedSlides.put(zombie,
+                new ArmedSlide(slideTile.getColumn(), slideTile.getRow(), toRow));
+    }
+
+    /**
+     * Fires {@code zombie}'s armed slide once it reaches the slide tile's
+     * middle. Zombies walk left, and integer continuous X is a tile centre,
+     * so the midpoint is crossed at {@code continuousX <= tileColumn}.
+     *
+     * @return true exactly when the slide fired this tick
+     */
+    public boolean tickArmedSlide(ZombieInstance zombie, float continuousX) {
+        if (zombie == null || zombie.isMovingBackward()) {
+            return false;
+        }
+        ArmedSlide armed = armedSlides.get(zombie);
+        if (armed == null || continuousX > armed.getTileColumn()) {
+            return false;
+        }
+        armedSlides.remove(zombie);
+        // Logical relocation happens here; the LaneSlide record below only
+        // drives the visual glide between the two lanes.
+        moveZombieToLane(zombie, armed.getToRow());
+        if (armed.getFromRow() != armed.getToRow()) {
+            laneSlides.add(new LaneSlide(zombie, armed.getFromRow(), armed.getToRow()));
+        }
+        slideStartCues.add(new Point(armed.getTileColumn(), armed.getFromRow()));
+        return true;
+    }
+
+    /**
+     * Slide activations since the last drain. The lawn renderer consumes this
+     * each frame to play the slider active_start / active_end clips; empty
+     * when nothing slid.
+     */
+    public List<Point> drainSlideStarts() {
+        if (slideStartCues.isEmpty()) {
+            return List.of();
+        }
+        List<Point> drained = new ArrayList<>(slideStartCues);
+        slideStartCues.clear();
+        return drained;
+    }
+
+    /** Drops cues the view never consumed (TUI, skipped frames). */
+    public void discardUnreadSlideStarts() {
+        slideStartCues.clear();
+    }
+
+    /** In-flight slide glides (read-only) for the view layer. */
+    public List<LaneSlide> getLaneSlides() {
+        return laneSlidesView;
     }
 
     @Override
@@ -459,6 +556,21 @@ public class GameModel implements BehaviorContext {
         return sandstormsView;
     }
 
+    /**
+     * Frostbite Caves ice wind: queues a gust visual sweeping {@code lane}
+     * (the frost damage itself is applied by the chapter effects system).
+     */
+    public void queueIceWindGust(int lane) {
+        if (lane >= 0) {
+            iceWinds.add(new IceWindGust(lane));
+        }
+    }
+
+    /** Active ice winds (read-only) for the view layer. */
+    public List<IceWindGust> getIceWinds() {
+        return iceWindsView;
+    }
+
     /** Hook invoked by the wave manager when a new wave begins. */
     public void onWaveStarted(Wave wave) {
         announceWave(wave);
@@ -615,6 +727,8 @@ public class GameModel implements BehaviorContext {
             chapterEffects.tick(deltaTime);
         }
         tickSandstorms(deltaTime);
+        tickIceWinds(deltaTime);
+        tickLaneSlides(deltaTime);
         if (!seedCooldowns.isEmpty()) {
             Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
             while (it.hasNext()) {
@@ -632,6 +746,33 @@ public class GameModel implements BehaviorContext {
             return;
         }
         Iterator<SandstormSpawn> iterator = pendingSandstorms.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished ice-wind gusts. */
+    private void tickIceWinds(float deltaTime) {
+        if (iceWinds.isEmpty()) {
+            return;
+        }
+        Iterator<IceWindGust> iterator = iceWinds.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished lane glides and drops arms of dead zombies. */
+    private void tickLaneSlides(float deltaTime) {
+        armedSlides.keySet().removeIf(ZombieInstance::isDead);
+        if (laneSlides.isEmpty()) {
+            return;
+        }
+        Iterator<LaneSlide> iterator = laneSlides.iterator();
         while (iterator.hasNext()) {
             if (iterator.next().tick(deltaTime)) {
                 iterator.remove();

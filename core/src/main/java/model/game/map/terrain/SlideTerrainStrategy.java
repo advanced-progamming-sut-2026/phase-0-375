@@ -9,6 +9,11 @@ import model.plant.definition.Plant;
 
 /**
  * Terrain strategy for the Frostbite Caves slide tile.
+ *
+ * <p>Entering zombies do not slide immediately; the slide is armed here and
+ * fires once the zombie reaches the middle of the tile (see
+ * {@code GameModel#tickArmedSlide}), so it visibly steps onto the slider
+ * first.
  */
 public class SlideTerrainStrategy implements TerrainStrategy {
 
@@ -30,7 +35,7 @@ public class SlideTerrainStrategy implements TerrainStrategy {
 
     @Override
     public boolean isPassable(ZombieInstance zombie, Cell cell) {
-        // Zombies enter the tile freely; the slide effect triggers on entry.
+        // Zombies enter the tile freely; the slide effect triggers at midpoint.
         return true;
     }
 
@@ -39,23 +44,16 @@ public class SlideTerrainStrategy implements TerrainStrategy {
         if (zombie == null || cell == null || context == null) {
             return;
         }
-        // Flying zombies (e.g. Dodo Rider) soar over slides untouched.
-        if (zombie.isFlying()) {
+        int targetRow = targetRowFor(zombie, cell, context.getRowCount());
+        if (targetRow < 0) {
             return;
         }
-        int targetRow = targetRow(cell, context);
-        if (targetRow < 0 || targetRow >= context.getRowCount()) {
-            // Off the board: leave the zombie where it is.
-            return;
-        }
-        // Delegate the actual relocation so cell lists & continuous position
-        // stay consistent with the rest of the movement code.
-        context.moveZombieToLane(zombie, targetRow);
+        context.armLaneSlide(zombie, cell, targetRow);
     }
 
     @Override
     public void onTick(Cell cell, Placeable model, BehaviorContext context, float deltaTime) {
-        // The slide is an instantaneous on-entry effect, not a per-tick one.
+        // The slide is an armed on-entry effect, not a per-tick one.
     }
 
     /** @return the direction this tile shunts zombies. */
@@ -64,11 +62,27 @@ public class SlideTerrainStrategy implements TerrainStrategy {
     }
 
     /**
+     * @param zombie the zombie stepping onto this tile.
      * @param cell the slide tile's cell.
-     * @param context the game context.
+     * @param rowCount total lane count for bounds checking.
+     * @return the row this zombie will be shunted to, or {@code -1} when it
+     *         flies over the slide or the target row would leave the board.
+     */
+    public int targetRowFor(ZombieInstance zombie, Cell cell, int rowCount) {
+        // Flying zombies (e.g. Dodo Rider) soar over slides untouched.
+        if (zombie == null || cell == null || zombie.isFlying()) {
+            return -1;
+        }
+        int row = targetRow(cell);
+        // Off the board: no slide.
+        return row >= 0 && row < rowCount ? row : -1;
+    }
+
+    /**
+     * @param cell the slide tile's cell.
      * @return the row index the zombie should be moved to.
      */
-    private int targetRow(Cell cell, BehaviorContext context) {
+    private int targetRow(Cell cell) {
         int row = cell.getRow();
         return slideDirection == SlideDirection.UP ? row - 1 : row + 1;
     }
