@@ -17,6 +17,8 @@ public class ScoreLevel extends RegularLevel {
 
     private final MyopointTracker tracker = new MyopointTracker();
     private boolean scored;
+    private boolean newPersonalBest;
+    private int previousPersonalBest;
 
     public ScoreLevel(LevelConfig config) {
         super(config);
@@ -24,6 +26,16 @@ public class ScoreLevel extends RegularLevel {
 
     public MyopointTracker getTracker() {
         return tracker;
+    }
+
+    /** True after scoring if this run beat the player's prior Myopoint best. */
+    public boolean isNewPersonalBest() {
+        return newPersonalBest;
+    }
+
+    /** Profile best before this run was written back (0 if never scored). */
+    public int getPreviousPersonalBest() {
+        return previousPersonalBest;
     }
 
     @Override
@@ -66,10 +78,11 @@ public class ScoreLevel extends RegularLevel {
 
         User user = App.getInstance().getCurrentUser();
         if (user == null) return;
-        int previousBest = user.getHighestMyopoint();
+        previousPersonalBest = user.getHighestMyopoint();
         App.getInstance().getUserRepository()
                 .updateHighestMyopoint(user.getUsername(), tracker.getTotalPoints());
-        if (tracker.getTotalPoints() > previousBest) {
+        if (tracker.getTotalPoints() > previousPersonalBest) {
+            newPersonalBest = true;
             System.out.println("New personal best: " + tracker.getTotalPoints() + " Myopoints!");
         }
     }

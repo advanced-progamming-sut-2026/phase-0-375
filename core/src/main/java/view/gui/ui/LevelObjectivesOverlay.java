@@ -28,6 +28,7 @@ import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.level.minigame.zombotany.ZombotanyLevel;
+import model.game.level.special.ScoreLevel;
 import model.game.rule.GameRules;
 
 import java.util.ArrayList;
@@ -144,6 +145,10 @@ public final class LevelObjectivesOverlay {
     }
 
     public static List<String> objectivesFor(GameModel model, LevelConfig config) {
+        List<String> scoreGame = scoreGameObjectives(model);
+        if (scoreGame != null) {
+            return scoreGame;
+        }
         List<String> bowling = bowlingObjectives(model);
         if (bowling != null) {
             return bowling;
@@ -201,6 +206,17 @@ public final class LevelObjectivesOverlay {
             out.add("Survive the zombie attack!");
         }
         return out;
+    }
+
+    private static List<String> scoreGameObjectives(GameModel model) {
+        if (model == null || !(model.getCurrentLevel() instanceof ScoreLevel)) {
+            return null;
+        }
+        return List.of(
+                "Survive today's five Myopoint waves",
+                "Earn points for stylish kills and combos",
+                "Bonus for multi-kills, quick kills, and perfect waves",
+                "Your best score appears on the leaderboard");
     }
 
     private static List<String> bowlingObjectives(GameModel model) {

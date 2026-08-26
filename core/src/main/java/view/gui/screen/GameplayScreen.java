@@ -18,6 +18,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import controller.GameMenuController;
 import controller.GameplayMenuController;
+import controller.MainMenuController;
 import controller.PlantSelectionMenuController;
 import controller.TravelLogMenuController;
 import controller.result.CommandResult;
@@ -37,6 +38,8 @@ import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.PendingSeedPacket;
 import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.special.ScoreLevel;
+import model.game.score.MyopointTracker;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
@@ -59,6 +62,9 @@ import view.gui.ui.CoinHud;
 import view.gui.ui.BeghouledMatchHud;
 import view.gui.ui.LootRewardPopup;
 import view.gui.ui.LoseResultsOverlay;
+import view.gui.ui.MyopointAwardFeed;
+import view.gui.ui.MyopointHud;
+import view.gui.ui.MyopointResultsOverlay;
 import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.ReadySetPlantBanner;
@@ -93,6 +99,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private SunHud sunHud;
     private CoinHud coinHud;
     private BeghouledMatchHud beghouledMatchHud;
+    private MyopointHud myopointHud;
+    private MyopointAwardFeed myopointAwardFeed;
     private PlantFoodBankHud plantFoodBank;
     private LootRewardPopup lootRewardPopup;
     private ReadySetPlantBanner readySetPlant;
@@ -111,6 +119,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final boolean vaseBreakerMode;
     private final boolean beghouledMode;
     private final boolean iZombieMode;
+    private final boolean scoreMode;
     private int swapFromCol = -1;
     private int swapFromRow = -1;
     private boolean swapDragging;
@@ -121,6 +130,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private boolean endSequenceActive;
     private LoseResultsOverlay loseOverlay;
     private WinResultsOverlay winOverlay;
+    private MyopointResultsOverlay myopointResultsOverlay;
     private final List<Actor> hudRoots = new ArrayList<>();
     private ImageButton shovelButton;
     private ImageButton pauseButton;
@@ -144,6 +154,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
         beghouledMode = currentLevel() instanceof BeghouledLevel;
         iZombieMode = currentLevel() instanceof IZombieLevel;
+        scoreMode = currentLevel() instanceof ScoreLevel;
         Chapter chapter = currentChapter();
         LawnBackgroundRenderer.Style lawnStyle = LawnBackgroundRenderer.Style.forChapter(chapter);
         lawnBackground = new LawnBackgroundRenderer(assets.textures, lawnStyle);
@@ -281,23 +292,29 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(topRight);
         hudRoots.add(topRight);
 
-        if (WaveProgressHud.showFor(model)) {
-            waveProgress = new WaveProgressHud(skin, assets.textures);
+        if (WaveProgressHud.showFor(model) || BeghouledMatchHud.showFor(model) || MyopointHud.showFor(model)) {
             Table topCenter = new Table();
             topCenter.setFillParent(true);
             topCenter.setTouchable(Touchable.childrenOnly);
             topCenter.top().padTop(8f);
-            topCenter.add(waveProgress).top();
-            uiStage.addActor(topCenter);
-            hudRoots.add(topCenter);
-        } else if (BeghouledMatchHud.showFor(model)) {
-            beghouledMatchHud = new BeghouledMatchHud(skin);
-            beghouledMatchHud.sync(model);
-            Table topCenter = new Table();
-            topCenter.setFillParent(true);
-            topCenter.setTouchable(Touchable.disabled);
-            topCenter.top().padTop(8f);
-            topCenter.add(beghouledMatchHud).top();
+            boolean stacked = false;
+            if (WaveProgressHud.showFor(model)) {
+                waveProgress = new WaveProgressHud(skin, assets.textures);
+                topCenter.add(waveProgress).top().row();
+                stacked = true;
+            } else if (BeghouledMatchHud.showFor(model)) {
+                beghouledMatchHud = new BeghouledMatchHud(skin);
+                beghouledMatchHud.sync(model);
+                topCenter.add(beghouledMatchHud).top().row();
+                stacked = true;
+            }
+            if (MyopointHud.showFor(model)) {
+                myopointHud = new MyopointHud(skin);
+                myopointHud.sync(model);
+                topCenter.add(myopointHud).top().padTop(stacked ? 4f : 0f).row();
+                myopointAwardFeed = new MyopointAwardFeed(skin);
+                topCenter.add(myopointAwardFeed).top().padTop(6f);
+            }
             uiStage.addActor(topCenter);
             hudRoots.add(topCenter);
         }
@@ -810,6 +827,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
         App.getInstance().setCurrentGameLoop(null);
+        if (scoreMode || level instanceof ScoreLevel) {
+            App.getInstance().setCurrentMenu(MenuType.GAME);
+            game.setScreen(new AdventureScreen(game));
+            return;
+        }
         if (bowlingMode || level instanceof MiniGameLevel) {
             App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
             game.setScreen(new MiniGameScreen(game));
@@ -827,6 +849,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     /** After a win: load the next level in this chapter, or fall back to the map. */
     private void continueToNextLevel() {
         Level level = currentLevel();
+        if (scoreMode || level instanceof ScoreLevel) {
+            exitToLevels();
+            return;
+        }
         if (level instanceof MiniGameLevel mini) {
             String type = mini.getMiniGameType().name();
             int nextStage = mini.getStage() + 1;
@@ -897,6 +923,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     private void restartLevel() {
         Level level = currentLevel();
+        if (scoreMode || level instanceof ScoreLevel) {
+            restartScoreGame();
+            return;
+        }
         if (level instanceof MiniGameLevel mini) {
             restartMiniGame(mini);
             return;
@@ -911,6 +941,25 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         int levelId = config.getLevelId();
         String chapterArg = chapter.name().toLowerCase(Locale.ROOT);
         CommandResult<Void> enter = GameMenuController.getInstance().enterChapter(chapterArg, levelId);
+        if (!enter.isSuccess()) {
+            showToast(enter.getMessage(), true);
+            return;
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            model.setSelectedPlants(plants);
+        }
+        CommandResult<Void> start = PlantSelectionMenuController.getInstance().startGame();
+        if (!start.isSuccess()) {
+            showToast(start.getMessage(), true);
+            return;
+        }
+        game.setScreen(new GameplayScreen(game));
+    }
+
+    private void restartScoreGame() {
+        List<String> plants = new ArrayList<>(selectedPlants());
+        CommandResult<Void> enter = MainMenuController.getInstance().enterScoreGame();
         if (!enter.isSuccess()) {
             showToast(enter.getMessage(), true);
             return;
@@ -962,6 +1011,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (winOverlay != null && entityRenderer.isWinFadeDone()) {
                 winOverlay.play();
             }
+            if (myopointResultsOverlay != null
+                && (entityRenderer.isLoseFadeDone() || entityRenderer.isWinFadeDone())) {
+                myopointResultsOverlay.play();
+            }
             return;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
@@ -982,6 +1035,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (winOverlay != null && entityRenderer.isWinFadeDone()) {
                 winOverlay.play();
             }
+            if (myopointResultsOverlay != null
+                && (entityRenderer.isLoseFadeDone() || entityRenderer.isWinFadeDone())) {
+                myopointResultsOverlay.play();
+            }
             return;
         }
         if (model != null && waveAnnounce != null && !waveAnnounce.isPlaying()) {
@@ -996,6 +1053,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (beghouledMatchHud != null) {
             beghouledMatchHud.sync(model);
         }
+        if (myopointHud != null) {
+            myopointHud.sync(model);
+        }
+        syncMyopointAwards(model);
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());
         }
@@ -1010,6 +1071,21 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             refreshPackets();
         } else {
             refreshPacketChrome();
+        }
+    }
+
+    private void syncMyopointAwards(GameModel model) {
+        if (myopointAwardFeed == null || model == null) {
+            return;
+        }
+        MyopointTracker tracker = null;
+        if (model.getCurrentLevel() instanceof ScoreLevel scoreLevel) {
+            tracker = scoreLevel.getTracker();
+        } else if (model.getMyopointTracker() != null) {
+            tracker = model.getMyopointTracker();
+        }
+        if (tracker != null) {
+            myopointAwardFeed.push(tracker.drainAwardEvents());
         }
     }
 
@@ -1033,9 +1109,15 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             closePauseMenu();
         }
         entityRenderer.beginLoseFade();
-        loseOverlay = new LoseResultsOverlay(
-            skin, assets.textures, this::restartLevel, this::exitToLevels);
-        uiStage.addActor(loseOverlay);
+        if (scoreMode && currentLevel() instanceof ScoreLevel scoreLevel) {
+            myopointResultsOverlay = new MyopointResultsOverlay(
+                skin, scoreLevel, false, this::restartLevel, this::exitToLevels);
+            uiStage.addActor(myopointResultsOverlay);
+        } else {
+            loseOverlay = new LoseResultsOverlay(
+                skin, assets.textures, this::restartLevel, this::exitToLevels);
+            uiStage.addActor(loseOverlay);
+        }
         toast.toFront();
     }
 
@@ -1047,9 +1129,15 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             closePauseMenu();
         }
         entityRenderer.beginWinFade();
-        winOverlay = new WinResultsOverlay(
-            skin, assets.textures, this::continueToNextLevel, this::exitToLevels);
-        uiStage.addActor(winOverlay);
+        if (scoreMode && currentLevel() instanceof ScoreLevel scoreLevel) {
+            myopointResultsOverlay = new MyopointResultsOverlay(
+                skin, scoreLevel, true, this::restartLevel, this::exitToLevels);
+            uiStage.addActor(myopointResultsOverlay);
+        } else {
+            winOverlay = new WinResultsOverlay(
+                skin, assets.textures, this::continueToNextLevel, this::exitToLevels);
+            uiStage.addActor(winOverlay);
+        }
         toast.toFront();
     }
 

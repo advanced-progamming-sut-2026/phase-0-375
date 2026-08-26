@@ -78,8 +78,17 @@ public class MyopointTracker {
         }
     }
 
+    /** One scored award the GUI can toast without re-parsing the breakdown. */
+    public record AwardEvent(String key, int points) {
+        /** True for stylish bonuses (everything except the base kill award). */
+        public boolean isBonus() {
+            return !KEY_KILLS.equals(key);
+        }
+    }
+
     private int totalPoints;
     private final Map<String, Integer> breakdown = new LinkedHashMap<>();
+    private final Deque<AwardEvent> pendingAwards = new ArrayDeque<>();
 
     private final Map<ZombieInstance, Float> spawnTimes = new HashMap<>();
     private final Deque<KillRecord> recentKills = new ArrayDeque<>();
@@ -228,10 +237,35 @@ public class MyopointTracker {
         if (points <= 0) return;
         totalPoints += points;
         breakdown.merge(key, points, Integer::sum);
+        pendingAwards.addLast(new AwardEvent(key, points));
     }
 
     public int getTotalPoints() {
         return totalPoints;
+    }
+
+    /** Current combo streak length (1 after a lone kill, 0 before any kill). */
+    public int getComboStreak() {
+        return comboStreak;
+    }
+
+    public boolean isFinished() {
+        return finished;
+    }
+
+    /**
+     * Drains award events queued since the last call so the HUD can show
+     * floating "+N" toasts without missing or double-counting awards.
+     */
+    public List<AwardEvent> drainAwardEvents() {
+        if (pendingAwards.isEmpty()) {
+            return List.of();
+        }
+        List<AwardEvent> out = new ArrayList<>(pendingAwards.size());
+        while (!pendingAwards.isEmpty()) {
+            out.add(pendingAwards.removeFirst());
+        }
+        return out;
     }
 
     /** Per-pattern point breakdown, in stable display order. */
@@ -247,5 +281,19 @@ public class MyopointTracker {
             lines.add("  " + entry.getKey() + ": " + entry.getValue());
         }
         return lines;
+    }
+
+    /** Short label for a floating HUD toast (e.g. {@code Quick kill!}). */
+    public static String toastLabel(String key) {
+        if (key == null) return "Myopoint!";
+        return switch (key) {
+            case KEY_MULTI -> "Multi-kill!";
+            case KEY_QUICK -> "Quick kill!";
+            case KEY_SIMULTANEOUS -> "Simultaneous!";
+            case KEY_COMBO -> "Combo!";
+            case KEY_PERFECT -> "Perfect wave!";
+            case KEY_KILLS -> "Kill!";
+            default -> key + "!";
+        };
     }
 }
