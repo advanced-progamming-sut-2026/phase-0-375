@@ -29,7 +29,8 @@ public final class SeedPacketActor extends WidgetGroup {
 
     private final TextureBank textures;
     private final Image chrome;
-    private final Image portrait;
+    private Image portrait;
+    private boolean portraitOverride;
     private final Image lock;
     private final Image select;
     private final String plantName;
@@ -229,11 +230,46 @@ public final class SeedPacketActor extends WidgetGroup {
         return plantName;
     }
 
+    /**
+     * Use a spritesheet frame (or any region) when no {@code IMAGE_UI_PACKETS_*} portrait exists.
+     */
+    public void setPortraitOverride(TextureRegion region) {
+        setPortraitOverride(region, 1f, 0f, 0f);
+    }
+
+    /**
+     * @param scaleMul extra multiplier on top of the fit-to-packet bounds (e.g. Cat-tail sheet art)
+     */
+    public void setPortraitOverride(TextureRegion region, float scaleMul) {
+        setPortraitOverride(region, scaleMul, 0f, 0f);
+    }
+
+    /**
+     * @param offsetX extra X after default left inset (positive = right)
+     * @param offsetY extra Y after vertical centering (positive = up)
+     */
+    public void setPortraitOverride(TextureRegion region, float scaleMul, float offsetX, float offsetY) {
+        if (portrait == null || region == null) {
+            return;
+        }
+        float maxH = PACKET_HEIGHT * 0.82f;
+        float maxW = PACKET_WIDTH * 0.52f;
+        float fit = Math.min(maxW / Math.max(1, region.getRegionWidth()),
+            maxH / Math.max(1, region.getRegionHeight()));
+        float scale = fit * Math.max(0.1f, scaleMul);
+        float pw = region.getRegionWidth() * scale;
+        float ph = region.getRegionHeight() * scale;
+        portrait.setDrawable(new TextureRegionDrawable(region));
+        portrait.setSize(pw, ph);
+        portrait.setPosition(4f + offsetX, Math.max(2f, (PACKET_HEIGHT - ph) * 0.5f) + offsetY);
+        portraitOverride = true;
+    }
+
     @Override
     public void act(float delta) {
         super.act(delta);
         bind(chrome, chromeId);
-        if (portrait != null) {
+        if (portrait != null && !portraitOverride) {
             bind(portrait, SeedPacketIds.portraitId(plantName));
         }
         bind(select, SeedPacketIds.SELECT);

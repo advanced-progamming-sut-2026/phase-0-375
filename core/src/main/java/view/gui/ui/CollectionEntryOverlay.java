@@ -44,10 +44,12 @@ import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.PamVisibility;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.AlmanacArt;
 import view.gui.assets.AlmanacZombieLabels;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SeedPacketIds;
 import view.gui.assets.ShopArt;
@@ -138,6 +140,18 @@ public final class CollectionEntryOverlay {
     public static float PLANT_PAM_SCALE = 0.62f;
     /** 0 = bottom of preview frame, 0.5 = vertical center, 1 = top. */
     public static float PLANT_PAM_ANCHOR_Y = 0.5f;
+    /**
+     * Extra Y for Cat-tail spritesheet preview (negative = lower).
+     * Custom sheet origin differs from PAM plants.
+     */
+    public static float CATTAIL_PREVIEW_OFFSET_Y = -45f;
+    /** Spritesheet preview scale multiplier for Cat-tail only (1 = default). */
+    public static float CATTAIL_PREVIEW_SCALE = 0.75f;
+    /** Portrait scale on collection grid seed packet for Cat-tail (1 = default fit). */
+    public static float CATTAIL_PACKET_PORTRAIT_SCALE = 1.5f;
+    /** Portrait nudge on collection grid seed packet (Cat-tail only). */
+    public static float CATTAIL_PACKET_PORTRAIT_OFFSET_X = 0f;
+    public static float CATTAIL_PACKET_PORTRAIT_OFFSET_Y = -10f;
     public static float LEVEL_LABEL_PAD_BOTTOM = 12f;
     public static float PREVIEW_PAD_BOTTOM = 14f;
     /** Pushes preview / seed bar / buttons down in the plant left column. */
@@ -1197,12 +1211,17 @@ public final class CollectionEntryOverlay {
     private static final class IdlePreview extends Actor {
         private final PamPlayer player;
         private final PamCatalog catalog;
+        private final PlantSpritesheetCatalog sheets;
         private final PamClipCache clips;
+        private final SpritesheetClipCache sheetClips;
         private final float drawScale;
         private final float anchorY;
         private String pamPath;
         private String clipName;
+        private PlantSpritesheetCatalog.ClipSpec sheetSpec;
         private Map<String, Boolean> visibility;
+        private float sheetOffsetY;
+        private float sheetScaleMul = 1f;
         private float time;
 
         private IdlePreview(PvzAssets assets, PamClipCache clips) {
@@ -1212,7 +1231,9 @@ public final class CollectionEntryOverlay {
         private IdlePreview(PvzAssets assets, PamClipCache clips, float drawScale, float anchorY) {
             this.player = assets.player;
             this.catalog = assets.pamCatalog;
+            this.sheets = assets.plantSheets;
             this.clips = clips;
+            this.sheetClips = new SpritesheetClipCache(assets.root);
             this.drawScale = drawScale;
             this.anchorY = anchorY;
         }
@@ -1220,8 +1241,25 @@ public final class CollectionEntryOverlay {
         void setPlant(String name) {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
             time = 0f;
+            if (sheets != null && sheets.hasSheets(name)) {
+                // Full sheet loop for almanac preview (e.g. Cat-tail attack = all frames).
+                sheetSpec = sheets.resolveClip(name, "attack");
+                if (sheetSpec == null) {
+                    sheetSpec = sheets.anyClip(name);
+                }
+                if (sheetSpec != null) {
+                    if ("Cat-tail".equalsIgnoreCase(name)) {
+                        sheetOffsetY = CATTAIL_PREVIEW_OFFSET_Y;
+                        sheetScaleMul = CATTAIL_PREVIEW_SCALE;
+                    }
+                    return;
+                }
+            }
             PamCatalog.PamEntry entry = catalog.forPlant(name);
             if (entry == null) {
                 return;
@@ -1236,6 +1274,7 @@ public final class CollectionEntryOverlay {
         void setZombie(String name) {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
             time = 0f;
             PamCatalog.PamEntry entry = catalog.forZombie(name);
@@ -1250,7 +1289,10 @@ public final class CollectionEntryOverlay {
         void clearEntity() {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
         }
 
         @Override public void act(float delta) {
@@ -1259,6 +1301,23 @@ public final class CollectionEntryOverlay {
         }
 
         @Override public void draw(Batch batch, float parentAlpha) {
+            float a = batch.getColor().a * parentAlpha * getColor().a;
+            batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, a);
+            float cx = getX() + getWidth() * 0.5f;
+            float cy = getY() + getHeight() * anchorY + sheetOffsetY;
+            if (sheetSpec != null) {
+                SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(sheetSpec);
+                if (sheet != null && sheet.animation() != null) {
+                    TextureRegion frame = sheet.animation().getKeyFrame(time, true);
+                    if (frame != null) {
+                        float scale = drawScale * 0.85f * sheetScaleMul;
+                        float w = frame.getRegionWidth() * scale;
+                        float h = frame.getRegionHeight() * scale;
+                        batch.draw(frame, cx - w * 0.5f, cy, w, h);
+                    }
+                    return;
+                }
+            }
             if (pamPath == null || clipName == null) {
                 return;
             }
@@ -1266,14 +1325,10 @@ public final class CollectionEntryOverlay {
             if (ref == null) {
                 return;
             }
-            float a = batch.getColor().a * parentAlpha * getColor().a;
-            batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, a);
             if (visibility != null) {
-                player.draw(batch, ref, time, getX() + getWidth() * 0.5f,
-                    getY() + getHeight() * anchorY, drawScale, drawScale, true, visibility);
+                player.draw(batch, ref, time, cx, cy, drawScale, drawScale, true, visibility);
             } else {
-                player.draw(batch, ref, time, getX() + getWidth() * 0.5f,
-                    getY() + getHeight() * anchorY, drawScale, drawScale, true);
+                player.draw(batch, ref, time, cx, cy, drawScale, drawScale, true);
             }
         }
     }

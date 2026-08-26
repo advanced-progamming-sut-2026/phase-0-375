@@ -22,12 +22,15 @@ import pvz.libpvz.pam.PamPlayer;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.AlmanacArt;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.ShopArt;
 import view.gui.ui.AtlasImageButton;
+import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.ResourceBar;
 
 import java.util.Map;
@@ -44,6 +47,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
 
     private final CollectionMenuController controller = CollectionMenuController.getInstance();
     private final PamClipCache clips;
+    private final SpritesheetClipCache sheetClips;
     private final CollectionScreen.Tab returnTab;
     private final boolean plant;
     private final String entryName;
@@ -60,6 +64,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
                                   boolean plant, String entryName) {
         super(game);
         this.clips = new PamClipCache(game.assets.player);
+        this.sheetClips = new SpritesheetClipCache(game.assets.root);
         this.returnTab = returnTab == null ? CollectionScreen.Tab.PLANTS : returnTab;
         this.plant = plant;
         this.entryName = entryName;
@@ -99,7 +104,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         title.setAlignment(Align.center);
         card.add(title).growX().padBottom(12f).row();
 
-        preview = new IdlePreview(game.assets, clips);
+        preview = new IdlePreview(game.assets, clips, sheetClips);
         card.add(preview).size(260f, 260f).padBottom(10f).row();
 
         seedLabel = new Label("", skin, "medium");
@@ -211,26 +216,59 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         game.setScreen(new CollectionScreen(game, returnTab));
     }
 
+    @Override
+    public void dispose() {
+        if (sheetClips != null) {
+            sheetClips.dispose();
+        }
+        super.dispose();
+    }
+
     private static final class IdlePreview extends Actor {
         private final PamPlayer player;
         private final PamCatalog catalog;
+        private final PlantSpritesheetCatalog sheets;
         private final PamClipCache clips;
+        private final SpritesheetClipCache sheetClips;
         private String pamPath;
         private String clipName;
+        private PlantSpritesheetCatalog.ClipSpec sheetSpec;
         private Map<String, Boolean> visibility;
+        private float sheetOffsetY;
+        private float sheetScaleMul = 1f;
         private float time;
 
-        private IdlePreview(PvzAssets assets, PamClipCache clips) {
+        private IdlePreview(PvzAssets assets, PamClipCache clips, SpritesheetClipCache sheetClips) {
             this.player = assets.player;
             this.catalog = assets.pamCatalog;
+            this.sheets = assets.plantSheets;
             this.clips = clips;
+            this.sheetClips = sheetClips;
         }
 
         void setPlant(String name) {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
             time = 0f;
+            // Prefer installed spritesheets (e.g. Cat-tail) over missing PAM clips.
+            // Full sheet loop for almanac preview (attack = all frames when available).
+            if (sheets != null && sheets.hasSheets(name)) {
+                sheetSpec = sheets.resolveClip(name, "attack");
+                if (sheetSpec == null) {
+                    sheetSpec = sheets.anyClip(name);
+                }
+                if (sheetSpec != null) {
+                    if ("Cat-tail".equalsIgnoreCase(name)) {
+                        sheetOffsetY = CollectionEntryOverlay.CATTAIL_PREVIEW_OFFSET_Y;
+                        sheetScaleMul = CollectionEntryOverlay.CATTAIL_PREVIEW_SCALE;
+                    }
+                    return;
+                }
+            }
             PamCatalog.PamEntry entry = catalog.forPlant(name);
             if (entry == null) {
                 return;
@@ -242,6 +280,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         void setZombie(String name) {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
             time = 0f;
             PamCatalog.PamEntry entry = catalog.forZombie(name);
@@ -256,7 +295,10 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         void clearEntity() {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
         }
 
         @Override public void act(float delta) {
@@ -265,6 +307,23 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         }
 
         @Override public void draw(Batch batch, float parentAlpha) {
+            float a = batch.getColor().a * parentAlpha * getColor().a;
+            batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, a);
+            float cx = getX() + getWidth() * 0.5f;
+            float cy = getY() + getHeight() * 0.15f + sheetOffsetY;
+            if (sheetSpec != null && sheetClips != null) {
+                SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(sheetSpec);
+                if (sheet != null && sheet.animation() != null) {
+                    TextureRegion frame = sheet.animation().getKeyFrame(time, true);
+                    if (frame != null) {
+                        float scale = 0.55f * sheetScaleMul;
+                        float w = frame.getRegionWidth() * scale;
+                        float h = frame.getRegionHeight() * scale;
+                        batch.draw(frame, cx - w * 0.5f, cy, w, h);
+                    }
+                    return;
+                }
+            }
             if (pamPath == null || clipName == null) {
                 return;
             }
@@ -272,14 +331,10 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             if (ref == null) {
                 return;
             }
-            float a = batch.getColor().a * parentAlpha * getColor().a;
-            batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, a);
             if (visibility != null) {
-                player.draw(batch, ref, time, getX() + getWidth() * 0.5f,
-                    getY() + getHeight() * 0.15f, 0.7f, 0.7f, true, visibility);
+                player.draw(batch, ref, time, cx, cy, 0.7f, 0.7f, true, visibility);
             } else {
-                player.draw(batch, ref, time, getX() + getWidth() * 0.5f,
-                    getY() + getHeight() * 0.15f, 0.7f, 0.7f, true);
+                player.draw(batch, ref, time, cx, cy, 0.7f, 0.7f, true);
             }
         }
     }

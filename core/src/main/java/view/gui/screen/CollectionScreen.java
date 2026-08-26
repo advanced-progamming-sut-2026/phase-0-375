@@ -35,9 +35,12 @@ import model.zombie.definition.Zombie;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
-import view.gui.assets.PvzAssets;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.AlmanacArt;
+import view.gui.assets.PlantSpritesheetCatalog;
+import view.gui.assets.PvzAssets;
+import view.gui.assets.SeedPacketIds;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
 import view.gui.ui.AtlasImageButton;
@@ -177,6 +180,7 @@ public final class CollectionScreen extends AbstractMenuScreen {
     private final MainMenuArt menuArt = new MainMenuArt();
     private EdgeFadeOverlay edgeFade;
     private PamClipCache pamClips;
+    private SpritesheetClipCache sheetClips;
     private ResourceBar resources;
     private Table grid;
     private Label statusLabel;
@@ -202,6 +206,9 @@ public final class CollectionScreen extends AbstractMenuScreen {
         game.ensureAssets();
         if (pamClips == null) {
             pamClips = new PamClipCache(game.assets.player);
+        }
+        if (sheetClips == null && game.assets != null && game.assets.root != null) {
+            sheetClips = new SpritesheetClipCache(game.assets.root);
         }
         menuArt.ensureLoaded(game.assets.textures);
         if (edgeFade == null) {
@@ -473,6 +480,7 @@ public final class CollectionScreen extends AbstractMenuScreen {
             SeedPacketActor packet = new SeedPacketActor(
                 t, skin, name, plant.getCost(), Math.max(1, level), false, !owned, false);
             packet.onClick(() -> openPlantDetail(name));
+            applySheetPortraitIfNeeded(packet, name);
             // Scale via wrapper so Table layout does not fight setScale.
             Group packetSlot = new Group();
             packetSlot.setSize(PACKET_W, PACKET_H);
@@ -650,6 +658,35 @@ public final class CollectionScreen extends AbstractMenuScreen {
         return tex;
     }
 
+    private void applySheetPortraitIfNeeded(SeedPacketActor packet, String plantName) {
+        if (packet == null || plantName == null || SeedPacketIds.portraitId(plantName) != null) {
+            return;
+        }
+        PvzAssets assets = game.assets;
+        if (assets == null || assets.plantSheets == null || sheetClips == null) {
+            return;
+        }
+        PlantSpritesheetCatalog.ClipSpec spec = assets.plantSheets.idleFallback(plantName);
+        if (spec == null) {
+            return;
+        }
+        SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(spec);
+        if (sheet == null || sheet.animation() == null) {
+            return;
+        }
+        TextureRegion frame = sheet.animation().getKeyFrame(0f);
+        if (frame != null) {
+            if ("Cat-tail".equalsIgnoreCase(plantName)) {
+                packet.setPortraitOverride(frame,
+                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_SCALE,
+                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_X,
+                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_Y);
+            } else {
+                packet.setPortraitOverride(frame);
+            }
+        }
+    }
+
     private static int seedCount(User user, String plant) {
         if (user == null || user.getSeedPackets() == null) {
             return 0;
@@ -722,6 +759,10 @@ public final class CollectionScreen extends AbstractMenuScreen {
         if (boardGradient != null) {
             boardGradient.dispose();
             boardGradient = null;
+        }
+        if (sheetClips != null) {
+            sheetClips.dispose();
+            sheetClips = null;
         }
         super.dispose();
     }
