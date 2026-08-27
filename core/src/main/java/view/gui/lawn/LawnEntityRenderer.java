@@ -3031,7 +3031,9 @@ public final class LawnEntityRenderer {
             if (emerge != null && emerge.progress() < 1f - 1e-3f) {
                 snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
                 float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
-                Rectangle box = player.bounds(pose.pamPath(), pose.clipName());
+                Rectangle box = pose.isSpritesheet()
+                        ? null
+                        : player.bounds(pose.pamPath(), pose.clipName());
                 float artTop = box != null
                         ? standY - box.y * scale
                         : standY + layout.cellHeight();
@@ -4042,7 +4044,7 @@ public final class LawnEntityRenderer {
 
     /** {@code particle_arm} hops off {@code particles} at half HP. */
     private void maybePopLostHand(ZombieInstance zombie, AnimPose pose, float x, float y) {
-        if (zombie == null || pose == null || lostHands.containsKey(zombie)) {
+        if (zombie == null || pose == null || pose.isSpritesheet() || lostHands.containsKey(zombie)) {
             return;
         }
         if (!atOrBelowHalfHp(zombie)) {
@@ -4350,6 +4352,17 @@ public final class LawnEntityRenderer {
         if (trySpawnAsh(zombie, snap)) {
             return;
         }
+        if (snap.pose.isSpritesheet()) {
+            AnimPose fade = AnimPose.sheetOnce(
+                    snap.pose.pamPath(), snap.pose.clipName(), ZombieAnimRole.DIE);
+            if (snap.pose.flipX()) {
+                fade = fade.flipped();
+            }
+            DeathFx fx = new DeathFx(fade, snap.x, snap.y, false);
+            fx.holdSeconds = 0.4f;
+            deathFx.add(fx);
+            return;
+        }
         // Plant-head PAMs have no die clip — falling back to idle would leave them
         // bobbing on the lawn for a full idle cycle. Fade the last pose instead.
         if (ZombotanyAnim.isPlantHead(zombie)) {
@@ -4542,7 +4555,8 @@ public final class LawnEntityRenderer {
     }
 
     private void maybeGargantuarWalkStomp(ZombieInstance zombie, AnimPose pose, float time) {
-        if (screenShake == null || pose == null || !"walk".equals(pose.clipName())) {
+        if (screenShake == null || pose == null || pose.isSpritesheet()
+                || !"walk".equals(pose.clipName())) {
             return;
         }
         if (!isGargantuar(pose.pamPath())) {
@@ -4856,21 +4870,32 @@ public final class LawnEntityRenderer {
             if (layout.rowAt(fx.y) != row) {
                 continue;
             }
-            ClipRef ref = clips.getOrLoad(fx.pose.pamPath(), fx.pose.clipName());
-            float hold = fx.hold(ref);
+            ClipRef ref = fx.pose.isSpritesheet()
+                    ? null
+                    : clips.getOrLoad(fx.pose.pamPath(), fx.pose.clipName());
+            float hold = fx.pose.isSpritesheet()
+                    ? (fx.holdSeconds > 0f ? fx.holdSeconds : 0.4f)
+                    : fx.hold(ref);
             if (fx.time >= hold + ARMOR_POP_FADE) {
                 deathFx.remove(i);
                 continue;
             }
-            if (ref == null) {
+            if (!fx.pose.isSpritesheet() && ref == null) {
                 fx.time += delta;
                 continue;
             }
             // Hold the collapsed last frame and fade it out instead of popping it off-screen.
-            float scale = AnimScale.ZOMBIE * fx.pose.scale();
+            float scale = AnimScale.forZombie(fx.pose) * fx.pose.scale();
             float alpha = 1f - Math.max(0f, fx.time - hold) / ARMOR_POP_FADE;
             float time = Math.min(fx.time, hold);
             batch.setColor(1f, 1f, 1f, alpha);
+            if (fx.pose.isSpritesheet()) {
+                drawPose(batch, fx, fx.pose, fx.x, fx.y, AnimScale.forZombie(fx.pose), NO_PHASE,
+                        0f, 0f);
+                batch.setColor(1f, 1f, 1f, 1f);
+                fx.time += delta;
+                continue;
+            }
             if (fx.drown) {
                 freezeDrownWaterY(fx, ref, scale);
             }

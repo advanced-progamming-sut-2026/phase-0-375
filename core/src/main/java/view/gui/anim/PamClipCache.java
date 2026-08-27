@@ -32,7 +32,7 @@ public final class PamClipCache {
      * @return ready clip, or {@code null} if still loading / missing
      */
     public ClipRef getOrLoad(String pamPath, String clipName) {
-        if (pamPath == null || clipName == null) {
+        if (pamPath == null || clipName == null || isImageAssetPath(pamPath)) {
             return null;
         }
         String key = pamPath + "#" + clipName;
@@ -60,6 +60,23 @@ public final class PamClipCache {
             clips.put(key, resolved);
         }
         return resolved;
+    }
+
+    /**
+     * Spritesheet PNG paths are assets-root relative ({@code IMAGES/.../*.png}). PamPlayer
+     * already roots under {@code IMAGES/}, so feeding those paths triggers a missing
+     * {@code IMAGES/IMAGES/...} lookup on the async worker.
+     */
+    static boolean isImageAssetPath(String path) {
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+        String lower = path.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".png")
+                || lower.endsWith(".jpg")
+                || lower.endsWith(".jpeg")
+                || lower.endsWith(".webp")
+                || lower.endsWith(".gif");
     }
 
     private ClipRef resolveLoadedClip(String pamPath, String clipName, ClipRef whole) {
@@ -105,7 +122,7 @@ public final class PamClipCache {
 
     /** Optional sync preload for a known PAM + clips (loading screens / level start). */
     public void preloadSync(String pamPath, String... clipNames) {
-        if (pamPath == null) {
+        if (pamPath == null || isImageAssetPath(pamPath)) {
             return;
         }
         player.loadSync(pamPath);
