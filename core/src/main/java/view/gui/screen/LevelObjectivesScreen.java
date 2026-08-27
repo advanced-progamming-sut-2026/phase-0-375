@@ -5,6 +5,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import controller.PlantSelectionMenuController;
 import controller.result.CommandResult;
 import model.app.App;
+import model.data.level.NpcDialogueData;
+import model.data.level.NpcDialogueRegistry;
 import model.enums.Chapter;
 import model.enums.MenuType;
 import model.game.core.GameModel;
@@ -20,6 +22,7 @@ import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.LevelObjectivesOverlay;
+import view.gui.ui.NpcDialogueOverlay;
 
 /**
  * Full-screen "Level Objectives" splash shown before plant selection.
@@ -46,6 +49,28 @@ public final class LevelObjectivesScreen extends AbstractGameplayScreen {
             ? new WaterUnderlayerRenderer(assets, lawnLayout())
             : null;
 
+        // Check for NPC dialogue
+        LevelConfig config = levelConfig();
+        if (config != null && chapter != null) {
+            NpcDialogueRegistry registry = NpcDialogueRegistry.getInstance();
+            NpcDialogueData dialogueData = registry.getDialogue(chapter.name(), config.getLevelId());
+            
+            if (dialogueData != null && dialogueData.getNpcs() != null && !dialogueData.getNpcs().isEmpty()) {
+                // Show NPC dialogue first, then objectives
+                NpcDialogueOverlay npcOverlay = new NpcDialogueOverlay(
+                    skin, assets.textures, dialogueData.getNpcs(), this::showObjectives);
+                uiStage.addActor(npcOverlay);
+            } else {
+                // No NPC dialogue, show objectives directly
+                showObjectives();
+            }
+        } else {
+            showObjectives();
+        }
+        toast.toFront();
+    }
+
+    private void showObjectives() {
         LevelConfig config = levelConfig();
         Table overlay = LevelObjectivesOverlay.create(skin, config, this::proceed);
         uiStage.addActor(overlay);

@@ -1,0 +1,15 @@
+{
+  "ANCIENT_EGYPT_1": {
+    "npcs": [
+      {
+        "imagePath": "npcs/npc_dr_fazli.png",
+        "dialogueLines": [
+          "Rise and shine,",
+          "Dr. Zarrabi.",
+          "Rise and shine."
+        ],
+        "continueText": "Press to continue"
+      }
+    ]
+  }
+}
