@@ -176,9 +176,9 @@ public final class ShopScreen extends AbstractMenuScreen {
      */
     private static final Deco[] DECORATIONS = {
         new Deco(ShopArt.DECO_TOP_FRAME,  490.0f,  690.0f, 1.00f), // x=490.0 y=690.0 scale=1.00
-        new Deco(ShopArt.DECO_LOD_PINATA,   62.2f,  309.0f, 1.00f), // x=62.2 y=309.0 scale=1.00
-        new Deco(ShopArt.DECO_COIN_STACK, 1771.1f,  239.1f, 1.00f), // x=1771.1 y=239.1 scale=1.00
-        new Deco(ShopArt.DECO_LOD_BDAY_GIFT, 1827.8f,  229.9f, 0.81f), // x=1827.8 y=229.9 scale=0.81
+        new Deco(ShopArt.DECO_LOD_PINATA,   62.2f,  364.0f, 1.00f), // x=62.2 y=309.0 scale=1.00
+        new Deco(ShopArt.DECO_COIN_STACK, 1771.1f,  309.1f, 1.00f), // x=1771.1 y=239.1 scale=1.00
+        new Deco(ShopArt.DECO_LOD_BDAY_GIFT, 1827.8f,  299.9f, 0.81f), // x=1827.8 y=229.9 scale=0.81
         new Deco(ShopArt.DECO_CALENDAR_LEFT_TOMBTANGLER,  225.7f,  208.8f, 0.81f), // x=225.7 y=208.8 scale=0.81
         new Deco(ShopArt.DECO_CALENDAR_RIGHT_TOMBTANGLER, 1530.9f,  210.5f, 0.81f), // x=1530.9 y=210.5 scale=0.81
         new Deco(ShopArt.DECO_SUNFLOWER,  348.0f,  205.3f, 0.81f), // x=348.0 y=205.3 scale=0.81
