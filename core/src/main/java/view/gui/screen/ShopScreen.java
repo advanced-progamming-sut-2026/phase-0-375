@@ -35,9 +35,13 @@ import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.PvzAssets;
+import view.gui.assets.SeedPacketIds;
+import view.gui.assets.SheetPacketPortraits;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.ui.AtlasImageButton;
+import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.EdgeFadeOverlay;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.RoundedRegionImage;
@@ -202,6 +206,8 @@ public final class ShopScreen extends AbstractMenuScreen {
     private Label status;
     /** Set when rebuild should keep a fading sparkle on the sold-out daily card. */
     private boolean fadeDailySparkle;
+    /** Spritesheet portraits for plants without {@code IMAGE_UI_PACKETS_*} art (e.g. Cat-tail). */
+    private SpritesheetClipCache sheetClips;
 
     public ShopScreen(PvzGdxGame game) { super(game); }
 
@@ -587,7 +593,7 @@ public final class ShopScreen extends AbstractMenuScreen {
             status.setColor(Color.SCARLET);
             return;
         }
-        ShopChosenPlantPicker.open(stage, skin, textures, plants, plant ->
+        ShopChosenPlantPicker.open(stage, skin, textures, game.assets, plants, plant ->
             confirmPurchase(item, plant, 1));
     }
 
@@ -609,8 +615,10 @@ public final class ShopScreen extends AbstractMenuScreen {
 
     private Actor artwork(ShopItem item, TextureBank t, String plantOverride, boolean daily) {
         if (daily && plantOverride != null) {
-            return SeedPacketComposite.matchingActor(t, plantOverride)
-                .setCompositeScale(PACKET_SCALE);
+            SeedPacketComposite packet = SeedPacketComposite.matchingActor(t, plantOverride)
+                    .setCompositeScale(PACKET_SCALE);
+            applySheetPortraitToComposite(packet, plantOverride);
+            return packet;
         }
         String id = switch (item.getItemType()) {
             case POT -> ShopArt.POT;
@@ -633,6 +641,36 @@ public final class ShopScreen extends AbstractMenuScreen {
         }
         TextureRegion region = t.region(id);
         return region == null ? null : new Image(new TextureRegionDrawable(region));
+    }
+
+    private void applySheetPortraitToComposite(SeedPacketComposite packet, String plantName) {
+        if (packet == null || plantName == null || SeedPacketIds.portraitId(plantName) != null) {
+            return;
+        }
+        ensureSheetClips();
+        TextureRegion frame = SheetPacketPortraits.idleFrame(plantName, game.assets, sheetClips);
+        if (frame == null) {
+            return;
+        }
+        packet.setPortraitRegion(frame);
+        if ("Cat-tail".equalsIgnoreCase(plantName)) {
+            packet.setPlantScale(
+                    SeedPacketComposite.MATCH_ACTOR_PLANT_SCALE
+                            * CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_SCALE);
+            float shiftY = SeedPacketComposite.MATCH_ACTOR_PLANT_SHIFT_Y
+                    + CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_Y
+                    / SeedPacketActor.PACKET_HEIGHT;
+            float shiftX = SeedPacketComposite.MATCH_ACTOR_PLANT_SHIFT_X
+                    + CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_X
+                    / SeedPacketActor.PACKET_WIDTH;
+            packet.setPlantShift(shiftX, shiftY);
+        }
+    }
+
+    private void ensureSheetClips() {
+        if (sheetClips == null && game.assets != null && game.assets.root != null) {
+            sheetClips = new SpritesheetClipCache(game.assets.root);
+        }
     }
 
     private static String labelFor(ShopItem item) {
@@ -700,6 +738,10 @@ public final class ShopScreen extends AbstractMenuScreen {
             edgeFade.dispose();
             edgeFade = null;
         }
+        if (sheetClips != null) {
+            sheetClips.dispose();
+            sheetClips = null;
+        }
         super.hide();
     }
 
@@ -708,6 +750,10 @@ public final class ShopScreen extends AbstractMenuScreen {
         if (edgeFade != null) {
             edgeFade.dispose();
             edgeFade = null;
+        }
+        if (sheetClips != null) {
+            sheetClips.dispose();
+            sheetClips = null;
         }
         super.dispose();
     }

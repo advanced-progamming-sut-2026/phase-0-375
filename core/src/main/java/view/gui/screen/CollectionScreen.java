@@ -42,6 +42,7 @@ import view.gui.assets.AlmanacZombiePacketIds;
 import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SeedPacketIds;
+import view.gui.assets.SheetPacketPortraits;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
 import view.gui.anim.zombie.SunshineAnim;
@@ -669,32 +670,7 @@ public final class CollectionScreen extends AbstractMenuScreen {
     }
 
     private void applySheetPortraitIfNeeded(SeedPacketActor packet, String plantName) {
-        if (packet == null || plantName == null || SeedPacketIds.portraitId(plantName) != null) {
-            return;
-        }
-        PvzAssets assets = game.assets;
-        if (assets == null || assets.plantSheets == null || sheetClips == null) {
-            return;
-        }
-        PlantSpritesheetCatalog.ClipSpec spec = assets.plantSheets.idleFallback(plantName);
-        if (spec == null) {
-            return;
-        }
-        SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(spec);
-        if (sheet == null || sheet.animation() == null) {
-            return;
-        }
-        TextureRegion frame = sheet.animation().getKeyFrame(0f);
-        if (frame != null) {
-            if ("Cat-tail".equalsIgnoreCase(plantName)) {
-                packet.setPortraitOverride(frame,
-                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_SCALE,
-                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_X,
-                        CollectionEntryOverlay.CATTAIL_PACKET_PORTRAIT_OFFSET_Y);
-            } else {
-                packet.setPortraitOverride(frame);
-            }
-        }
+        SheetPacketPortraits.applyIfNeeded(packet, plantName, game.assets, sheetClips);
     }
 
     private void applyZombieSheetPortraitIfNeeded(ZombieAlmanacPacket packet, String zombieName) {

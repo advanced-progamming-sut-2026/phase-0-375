@@ -128,6 +128,21 @@ public final class SeedPacketComposite extends Stack {
         plant.setVisible(region != null);
     }
 
+    /**
+     * Spritesheet / any region portrait when no {@code IMAGE_UI_PACKETS_*} art exists
+     * (same idea as {@link SeedPacketActor#setPortraitOverride}).
+     */
+    public void setPortraitRegion(TextureRegion region) {
+        if (region == null) {
+            plant.setDrawable(null);
+            plant.setVisible(false);
+            return;
+        }
+        plant.setDrawable(new TextureRegionDrawable(region));
+        plant.setVisible(true);
+        plant.setScaling(com.badlogic.gdx.utils.Scaling.fit);
+    }
+
     @Override
     protected void sizeChanged() {
         super.sizeChanged();

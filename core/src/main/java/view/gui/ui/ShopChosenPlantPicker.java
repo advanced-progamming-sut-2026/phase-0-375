@@ -4,6 +4,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
@@ -17,6 +18,9 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
+import view.gui.anim.SpritesheetClipCache;
+import view.gui.assets.PvzAssets;
+import view.gui.assets.SheetPacketPortraits;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,12 +30,14 @@ import java.util.function.Consumer;
 
 /**
  * Shop overlay: pick an unlocked plant for {@code SEED_PACKET_CHOSEN}.
- * Grid tiles are {@link SeedPacketActor} (same size/portrait placement as gameplay).
+ * Grid tiles match collection: {@link SeedPacketActor} + sheet portrait fallback (Cat-tail).
  */
 public final class ShopChosenPlantPicker {
     private static final int GRID_COLS = 5;
-    private static final float PACKET_W = SeedPacketActor.PACKET_WIDTH;
-    private static final float PACKET_H = SeedPacketActor.PACKET_HEIGHT;
+    /** Same scale as {@code CollectionScreen} plant grid. */
+    private static final float PACKET_SCALE = 1.2f;
+    private static final float PACKET_W = SeedPacketActor.PACKET_WIDTH * PACKET_SCALE;
+    private static final float PACKET_H = SeedPacketActor.PACKET_HEIGHT * PACKET_SCALE;
     private static final float MODAL_W = 920f;
     private static final float GRID_H = 420f;
     private static final float FADE_IN = 0.2f;
@@ -47,10 +53,20 @@ public final class ShopChosenPlantPicker {
      */
     public static Table open(Stage stage, Skin skin, TextureBank textures,
                              Collection<String> plants, Consumer<String> onPick) {
+        return open(stage, skin, textures, null, plants, onPick);
+    }
+
+    public static Table open(Stage stage, Skin skin, TextureBank textures, PvzAssets assets,
+                             Collection<String> plants, Consumer<String> onPick) {
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
         overlay.setTouchable(Touchable.enabled);
+
+        SpritesheetClipCache sheetClips = assets != null && assets.root != null
+                ? new SpritesheetClipCache(assets.root)
+                : null;
+        overlay.setUserObject(sheetClips);
 
         BorderedTable card = new BorderedTable();
         Label heading = new Label("Choose a plant", skin, "big");
@@ -74,12 +90,12 @@ public final class ShopChosenPlantPicker {
         } else {
             int col = 0;
             for (String plantName : sorted) {
-                Actor tile = packetTile(textures, skin, plantName, name ->
-                    dismiss(overlay, () -> {
-                        if (onPick != null) {
-                            onPick.accept(name);
-                        }
-                    }));
+                Actor tile = packetTile(textures, skin, assets, sheetClips, plantName, name ->
+                        dismiss(overlay, () -> {
+                            if (onPick != null) {
+                                onPick.accept(name);
+                            }
+                        }));
                 grid.add(tile).size(PACKET_W + 8f, PACKET_H + 8f).pad(6f);
                 col++;
                 if (col >= GRID_COLS) {
@@ -114,24 +130,36 @@ public final class ShopChosenPlantPicker {
         overlay.setTouchable(Touchable.disabled);
         overlay.clearActions();
         overlay.addAction(Actions.sequence(
-            Actions.fadeOut(FADE_OUT),
-            Actions.run(() -> {
-                overlay.remove();
-                if (after != null) {
-                    after.run();
-                }
-            })
+                Actions.fadeOut(FADE_OUT),
+                Actions.run(() -> {
+                    overlay.remove();
+                    Object held = overlay.getUserObject();
+                    if (held instanceof SpritesheetClipCache clips) {
+                        clips.dispose();
+                    }
+                    overlay.setUserObject(null);
+                    if (after != null) {
+                        after.run();
+                    }
+                })
         ));
     }
 
-    private static Actor packetTile(TextureBank textures, Skin skin, String plantName,
+    private static Actor packetTile(TextureBank textures, Skin skin, PvzAssets assets,
+                                    SpritesheetClipCache sheetClips, String plantName,
                                     Consumer<String> onPick) {
         Table hit = new Table();
-        // Same READY frame + native portrait placement as collection / plant selection.
+        // Same construction as CollectionScreen plant grid (no sun/LVL chrome text).
         SeedPacketActor packet = new SeedPacketActor(
-            textures, skin, plantName, 0, 1, false, false, false);
+                textures, skin, plantName, 0, 1, false, false, false);
+        SheetPacketPortraits.applyIfNeeded(packet, plantName, assets, sheetClips);
         packet.onClick(() -> onPick.accept(plantName));
-        hit.add(packet).size(PACKET_W, PACKET_H);
+        Group packetSlot = new Group();
+        packetSlot.setSize(PACKET_W, PACKET_H);
+        packet.setTransform(true);
+        packet.setScale(PACKET_SCALE);
+        packetSlot.addActor(packet);
+        hit.add(packetSlot).size(PACKET_W, PACKET_H);
         return hit;
     }
 
