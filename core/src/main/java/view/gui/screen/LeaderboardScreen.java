@@ -33,7 +33,7 @@ import java.util.List;
  */
 public final class LeaderboardScreen extends AbstractMenuScreen {
     private static final String BG_RELATIVE =
-        "Exports/AI generated /Gemini_Generated_Image_5eopbf5eopbf5eop.jpg";
+        "Exports/AI generated/Gemini_Generated_Image_5eopbf5eopbf5eop.jpg";
     private static final float PANEL_W = 1500f;
     private static final float PANEL_H = 820f;
     /** Pushes the "Leaderboard" title down inside the card. */
