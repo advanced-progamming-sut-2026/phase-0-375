@@ -31,8 +31,8 @@ public final class SeedPacketIds {
         if (plantName == null || plantName.isBlank()) {
             return null;
         }
-        // No packet art shipped for Cat-tail / catTail-mint — leave portrait empty.
-        if ("Cat-tail".equals(plantName) || "catTail-mint".equals(plantName)) {
+        // No packet art shipped for Cat-tail — sheet portrait is applied in CollectionScreen.
+        if ("Cat-tail".equals(plantName)) {
             return null;
         }
         return PREFIX + atlasSuffix(plantName);
@@ -131,6 +131,7 @@ public final class SeedPacketIds {
         m.put("Iceberg Lettuce", "ICEBURG");
         m.put("Cherry Bomb", "CHERRY_BOMB");
         m.put("Pierce-mint", "PEPPERMINT");
+        m.put("catTail-mint", "SPEARMINT");
         m.put("Mega Gatling Pea", "MEGAGATLING");
         m.put("Giant Wall-nut", "WALLNUT");
         m.put("Explode-o-nut", "EXPLODEONUT");
