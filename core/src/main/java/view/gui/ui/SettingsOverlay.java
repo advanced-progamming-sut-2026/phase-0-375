@@ -38,8 +38,8 @@ public final class SettingsOverlay {
     public static float CARD_PAD_X = 50f;
     /** Vertical inner padding (top / bottom) of the settings card. */
     public static float CARD_PAD_Y = 42f;
-    private static final float FADE_IN = 0.20f;
-    private static final float FADE_OUT = 0.17f;
+    private static final float FADE_IN = 0.11f;
+    private static final float FADE_OUT = 0.07f;
     private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
     private static final Color INK = CollectionEntryOverlay.INK;
     private static final Color MUTED = CollectionEntryOverlay.MUTED;

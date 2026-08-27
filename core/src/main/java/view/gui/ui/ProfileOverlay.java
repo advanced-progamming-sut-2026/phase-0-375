@@ -42,8 +42,8 @@ public final class ProfileOverlay {
 
     public static float CARD_PAD = 40f;
     public static float INFO_PAD = 12f;
-    private static final float FADE_IN = 0.20f;
-    private static final float FADE_OUT = 0.17f;
+    private static final float FADE_IN = 0.11f;
+    private static final float FADE_OUT = 0.07f;
     private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
     private static final Color INK = CollectionEntryOverlay.INK;
     private static final Color MUTED = CollectionEntryOverlay.MUTED;

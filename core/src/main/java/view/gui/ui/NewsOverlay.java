@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.Action;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -28,13 +29,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Dimmed modal news panel shown over the main hub.
+ * Dimmed modal news panel shown over the main hub (fade in/out).
  */
 public final class NewsOverlay {
+    private static final float FADE_IN = 0.11f;
+    private static final float FADE_OUT = 0.07f;
+    /** Inner vertical padding of the news card (top / bottom). */
+    public static float CARD_PAD_Y = 28f;
+    /** Inner horizontal padding of the news card (left / right). */
+    public static float CARD_PAD_X = 0f;
     private static final Color TITLE_COLOR = rgb(250, 228, 101);
     private static final Color DATE_COLOR = rgb(10, 64, 68);
     private static final Color NEWS_COLOR = rgb(67, 62, 0);
-    private static final Color DIM = new Color(0f, 0f, 0f, 0.3f);
+    private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
 
     private static Texture pixel;
     private static final Vector2 TEMP = new Vector2();
@@ -54,13 +61,13 @@ public final class NewsOverlay {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 if (event.getTarget() == overlay) {
-                    close(overlay, onClose);
+                    dismiss(overlay, onClose);
                 }
             }
         });
 
         BorderedTable card = new BorderedTable();
-        card.pad(0f);
+        card.pad(CARD_PAD_Y, CARD_PAD_X, CARD_PAD_Y, CARD_PAD_X);
 
         Table header = new Table();
         Label title = new Label("News", skin, "big_outline");
@@ -73,24 +80,39 @@ public final class NewsOverlay {
         body.add(buildContent(skin, controller)).grow().padBottom(18f).row();
 
         TextButton back = new TextButton("Back", skin, "brown");
+        UiMotion.bindPressScale(back);
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                close(overlay, onClose);
+                dismiss(overlay, onClose);
             }
         });
         body.add(back).width(200f).height(56f);
         card.add(body).grow();
 
         overlay.add(card).width(1000f).height(800f).pad(40f);
+        fadeIn(overlay);
+        UiMotion.fadeSlideIn(card, 0.35f);
         return overlay;
     }
 
-    private static void close(Table overlay, Runnable onClose) {
-        if (onClose != null) {
-            onClose.run();
-        }
-        overlay.remove();
+    private static void fadeIn(Table overlay) {
+        overlay.getColor().a = 0f;
+        overlay.addAction(Actions.fadeIn(FADE_IN));
+    }
+
+    private static void dismiss(Table overlay, Runnable after) {
+        overlay.setTouchable(Touchable.disabled);
+        overlay.clearActions();
+        overlay.addAction(Actions.sequence(
+            Actions.fadeOut(FADE_OUT),
+            Actions.run(() -> {
+                overlay.remove();
+                if (after != null) {
+                    after.run();
+                }
+            })
+        ));
     }
 
     private static ScrollPane buildContent(Skin skin, NewsMenuController controller) {
