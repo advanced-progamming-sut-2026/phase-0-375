@@ -58,8 +58,11 @@ public final class SettingsOverlay {
 
         Table overlay = new Table();
         overlay.setFillParent(true);
+        overlay.setName(view.gui.screen.AbstractMenuScreen.OVERLAY_NAME);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(DIM));
         overlay.setTouchable(Touchable.enabled);
+        Runnable closer = () -> dismiss(overlay, onClose);
+        overlay.setUserObject(closer);
 
         ScrollPane scroll = new ScrollPane(panel.card, skin);
         scroll.setFadeScrollBars(false);
@@ -71,7 +74,7 @@ public final class SettingsOverlay {
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                dismiss(overlay, onClose);
+                closer.run();
             }
         });
 

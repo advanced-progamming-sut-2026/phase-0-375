@@ -12,6 +12,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.assets.ShopArt;
+import view.gui.assets.WorldMapArt;
 import view.gui.ui.DraggableDecoActor;
 
 import java.lang.reflect.Field;
@@ -47,7 +48,9 @@ public final class DecoLayoutDebugger {
     private InputListener stageControls;
 
     public DecoLayoutDebugger() {
-        this.printNames = shopArtConstantNames();
+        this.printNames = new HashMap<>();
+        printNames.putAll(constantNames(ShopArt.class, "DECO_"));
+        printNames.putAll(constantNames(WorldMapArt.class, "DECOR_"));
     }
 
     /** Adds every spec as a draggable actor on {@code stage}. Missing regions are skipped. */
@@ -73,13 +76,17 @@ public final class DecoLayoutDebugger {
 
     /** Small Save button that prints the current layout to the log / stdout. */
     public TextButton addSaveButton(Stage stage, Skin skin, float x, float y) {
+        return addSaveButton(stage, skin, x, y, "ChapterLevelsScreen.DECORATIONS");
+    }
+
+    public TextButton addSaveButton(Stage stage, Skin skin, float x, float y, String pasteTarget) {
         TextButton save = new TextButton("Save Deco Layout", skin, "brown");
         save.setSize(220f, 52f);
         save.setPosition(x, y);
         save.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                printLayout();
+                printLayout(pasteTarget);
             }
         });
         stage.addActor(save);
@@ -88,8 +95,12 @@ public final class DecoLayoutDebugger {
 
     /** Logs paste-ready {@code new Deco(id, x, y, scale)} lines (scale included). */
     public void printLayout() {
+        printLayout("ShopScreen.DECORATIONS");
+    }
+
+    public void printLayout(String pasteTarget) {
         StringBuilder sb = new StringBuilder();
-        sb.append("\n// === Deco layout dump — paste into ShopScreen.DECORATIONS ===\n");
+        sb.append("\n// === Deco layout dump — paste into ").append(pasteTarget).append(" ===\n");
         sb.append("// format: new Deco(asset, x, y, scale)\n");
         sb.append("private static final Deco[] DECORATIONS = {\n");
         for (DraggableDecoActor actor : actors) {
@@ -183,21 +194,21 @@ public final class DecoLayoutDebugger {
         return null;
     }
 
-    /** Maps region id → {@code ShopArt.DECO_*} field name for pretty dumps. */
-    private static Map<String, String> shopArtConstantNames() {
+    /** Maps region id → {@code Class.FIELD} name for pretty dumps. */
+    private static Map<String, String> constantNames(Class<?> type, String prefix) {
         Map<String, String> map = new HashMap<>();
-        for (Field field : ShopArt.class.getDeclaredFields()) {
+        for (Field field : type.getDeclaredFields()) {
             if (!String.class.equals(field.getType())) {
                 continue;
             }
             String name = field.getName();
-            if (!name.startsWith("DECO_")) {
+            if (!name.startsWith(prefix)) {
                 continue;
             }
             try {
                 String value = (String) field.get(null);
                 if (value != null) {
-                    map.put(value, "ShopArt." + name);
+                    map.put(value, type.getSimpleName() + "." + name);
                 }
             } catch (IllegalAccessException ignored) {
                 // skip inaccessible fields

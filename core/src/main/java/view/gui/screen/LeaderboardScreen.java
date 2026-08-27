@@ -52,7 +52,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
     private static final Color ROW = new Color(0.12f, 0.08f, 0.04f, 1f);
     private static final Color SELF = new Color(0.45f, 0.22f, 0.05f, 1f);
 
-    private final Runnable onBack;
+    private final Runnable backAction;
     private final GameMenuController controller = GameMenuController.getInstance();
 
     private Texture backgroundTex;
@@ -62,7 +62,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
 
     public LeaderboardScreen(PvzGdxGame game, Runnable onBack) {
         super(game);
-        this.onBack = onBack != null ? onBack : () -> game.setScreen(new MainHubScreen(game));
+        this.backAction = onBack != null ? onBack : () -> game.setScreen(new MainHubScreen(game));
     }
 
     @Override
@@ -94,7 +94,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                onBack.run();
+                backAction.run();
             }
         });
         card.add(back).width(200f).height(56f).padTop(-BACK_LIFT);
@@ -105,6 +105,11 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         stage.addActor(root);
 
         refreshRows();
+    }
+
+    @Override
+    protected void onBack() {
+        backAction.run();
     }
 
     private void addBackground() {

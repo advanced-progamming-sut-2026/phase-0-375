@@ -180,17 +180,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
         next.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.register(
-                        username.getText(),
-                        password.getText(),
-                        passwordConfirm.getText(),
-                        nickname.getText(),
-                        email.getText(),
-                        gender.getSelected());
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    showSecurityStep();
-                }
+                submitRegisterFields();
             }
         });
         t.add(next).width(260f).height(52f).padBottom(8f).row();
@@ -200,15 +190,33 @@ public final class RegisterScreen extends AbstractMenuScreen {
         toLogin.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.menuEnter("login");
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(new LoginScreen(game));
-                }
+                goToLogin();
             }
         });
         t.add(toLogin).width(260f).height(48f);
         return t;
+    }
+
+    private void submitRegisterFields() {
+        CommandResult<Void> r = controller.register(
+                username.getText(),
+                password.getText(),
+                passwordConfirm.getText(),
+                nickname.getText(),
+                email.getText(),
+                gender.getSelected());
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            showSecurityStep();
+        }
+    }
+
+    private void goToLogin() {
+        CommandResult<Void> r = controller.menuEnter("login");
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(new LoginScreen(game));
+        }
     }
 
     private void showSecurityStep() {
@@ -260,17 +268,35 @@ public final class RegisterScreen extends AbstractMenuScreen {
         finish.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                int qNumber = question.getSelectedIndex() + 1;
-                CommandResult<Void> r = controller.pickQuestion(
-                        qNumber, answer.getText(), answerConfirm.getText());
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(new LoginScreen(game));
-                }
+                submitSecurity();
             }
         });
         t.add(finish).width(300f).height(56f).padTop(4f);
         return t;
+    }
+
+    private void submitSecurity() {
+        int qNumber = question.getSelectedIndex() + 1;
+        CommandResult<Void> r = controller.pickQuestion(
+                qNumber, answer.getText(), answerConfirm.getText());
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(new LoginScreen(game));
+        }
+    }
+
+    @Override
+    protected void onBack() {
+        goToLogin();
+    }
+
+    @Override
+    protected void onConfirm() {
+        if (contentCell != null && contentCell.getActor() == stepSecurity) {
+            submitSecurity();
+        } else {
+            submitRegisterFields();
+        }
     }
 
     private Label scaledLabel(String text, String style, com.badlogic.gdx.graphics.Color color) {

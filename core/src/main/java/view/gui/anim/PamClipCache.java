@@ -113,7 +113,9 @@ public final class PamClipCache {
             if (lower.equals(needle)) {
                 return name;
             }
-            if (prefixHit == null && lower.startsWith(needle)) {
+            // Prefix only when needle is a true prefix (never match unlocked_* via "locked_*").
+            if (prefixHit == null && lower.startsWith(needle) && lower.length() > needle.length()
+                    && (lower.charAt(needle.length()) == '_' || lower.charAt(needle.length()) == '-')) {
                 prefixHit = name;
             }
         }

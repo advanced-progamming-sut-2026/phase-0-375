@@ -55,13 +55,16 @@ public final class NewsOverlay {
 
         Table overlay = new Table();
         overlay.setFillParent(true);
+        overlay.setName(view.gui.screen.AbstractMenuScreen.OVERLAY_NAME);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(DIM));
         overlay.setTouchable(Touchable.enabled);
+        Runnable closer = () -> dismiss(overlay, onClose);
+        overlay.setUserObject(closer);
         overlay.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 if (event.getTarget() == overlay) {
-                    dismiss(overlay, onClose);
+                    closer.run();
                 }
             }
         });
@@ -84,7 +87,7 @@ public final class NewsOverlay {
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                dismiss(overlay, onClose);
+                closer.run();
             }
         });
         body.add(back).width(200f).height(56f);

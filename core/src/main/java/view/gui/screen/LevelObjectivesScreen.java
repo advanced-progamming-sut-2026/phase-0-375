@@ -90,6 +90,20 @@ public final class LevelObjectivesScreen extends AbstractGameplayScreen {
     }
 
     @Override
+    protected void onConfirm() {
+        proceed();
+    }
+
+    @Override
+    protected void onBack() {
+        if (chapter != null) {
+            game.setScreen(new ChapterLevelsScreen(game, chapter));
+        } else {
+            game.setScreen(new AdventureScreen(game));
+        }
+    }
+
+    @Override
     protected void renderWorld(float delta) {
         lawnBackground.draw(game.batch);
         if (waterUnderlayer != null) {

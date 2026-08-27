@@ -186,6 +186,24 @@ public final class LoginScreen extends AbstractMenuScreen {
         }
     }
 
+    @Override
+    protected void onConfirm() {
+        if (hasOverlay()) {
+            return;
+        }
+        submitLogin();
+    }
+
+    private boolean hasOverlay() {
+        var actors = stage.getActors();
+        for (int i = actors.size - 1; i >= 0; i--) {
+            if (OVERLAY_NAME.equals(actors.get(i).getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void openForgotModal() {
         resetStep = 0;
         Table body = new Table();

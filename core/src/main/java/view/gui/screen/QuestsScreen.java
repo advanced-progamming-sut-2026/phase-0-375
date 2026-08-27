@@ -725,6 +725,11 @@ public final class QuestsScreen extends AbstractMenuScreen {
         game.setScreen(new AdventureScreen(game));
     }
 
+    @Override
+    protected void onBack() {
+        goBack();
+    }
+
     private static String prettyType(String raw) {
         if (raw == null || raw.isBlank()) {
             return "Mini-Game";

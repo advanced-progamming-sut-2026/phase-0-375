@@ -63,6 +63,11 @@ public final class MiniGameScreen extends AbstractMenuScreen {
         stage.addActor(root);
     }
 
+    @Override
+    protected void onBack() {
+        game.setScreen(new QuestsScreen(game));
+    }
+
     private void addEntry(Table list, MiniGameDataEntry entry) {
         String type = prettyType(entry.getMiniGameType());
         String label = type + "  •  Stage " + entry.getStage()

@@ -13,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
+import view.gui.screen.AbstractMenuScreen;
 import pvz.skin.BorderedTable;
 
 /**
@@ -28,6 +29,7 @@ public final class ModalCard {
     public static Table create(Skin skin, String title, Actor body, Runnable onClose) {
         Table overlay = new Table();
         overlay.setFillParent(true);
+        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
 
         BorderedTable card = new BorderedTable();
@@ -36,11 +38,14 @@ public final class ModalCard {
         card.add(heading).padBottom(16f).row();
         card.add(body).growX().padBottom(16f).row();
 
+        Runnable closer = () -> dismiss(overlay, onClose);
+        overlay.setUserObject(closer);
+
         TextButton close = new TextButton("Close", skin, "brown");
         close.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                dismiss(overlay, onClose);
+                closer.run();
             }
         });
         card.add(close).width(180f).height(56f);
@@ -60,6 +65,7 @@ public final class ModalCard {
                                 Runnable onConfirm) {
         Table overlay = new Table();
         overlay.setFillParent(true);
+        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
 
         BorderedTable card = new BorderedTable();
@@ -74,12 +80,15 @@ public final class ModalCard {
         body.setAlignment(Align.center);
         card.add(body).width(440f).padBottom(20f).row();
 
+        Runnable cancel = () -> dismiss(overlay, null);
+        overlay.setUserObject(cancel);
+
         Table actions = new Table();
-        TextButton cancel = new TextButton("Cancel", skin, "brown");
-        cancel.addListener(new ChangeListener() {
+        TextButton cancelBtn = new TextButton("Cancel", skin, "brown");
+        cancelBtn.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                dismiss(overlay, null);
+                cancel.run();
             }
         });
         TextButton yes = new TextButton(yesLabel != null ? yesLabel : "Yes", skin, "purple");
@@ -89,7 +98,7 @@ public final class ModalCard {
                 dismiss(overlay, onConfirm);
             }
         });
-        actions.add(cancel).width(160f).height(56f).padRight(12f);
+        actions.add(cancelBtn).width(160f).height(56f).padRight(12f);
         actions.add(yes).width(160f).height(56f);
         card.add(actions);
 

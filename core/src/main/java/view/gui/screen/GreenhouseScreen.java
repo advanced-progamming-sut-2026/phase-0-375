@@ -198,6 +198,11 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         }
     }
 
+    @Override
+    protected void onBack() {
+        goBack();
+    }
+
     private void refreshAll() {
         Greenhouse gh = Greenhouse.getInstance(App.getInstance().getCurrentUser());
         int[] next = gh.nextPotToUnlock();

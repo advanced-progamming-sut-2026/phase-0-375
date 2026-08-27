@@ -1,8 +1,12 @@
 package view.gui.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -11,11 +15,17 @@ import view.gui.ui.ToastBanner;
 
 /**
  * Scene2D-only menu base (no world / PAM). Clamps delta and hosts a toast layer.
+ * <p>
+ * Keyboard: Escape → dismiss top {@code pvz-overlay} or {@link #onBack()};
+ * Enter → {@link #onConfirm()}; Left/Right → {@link #onLeft()}/{@link #onRight()}.
  */
 public abstract class AbstractMenuScreen implements Screen {
     protected static final float UI_WIDTH = 1920f;
     protected static final float UI_HEIGHT = 1080f;
     private static final float MAX_DELTA = 1f / 30f;
+
+    /** Actor name for dimmed modal overlays so Escape can dismiss them. */
+    public static final String OVERLAY_NAME = "pvz-overlay";
 
     protected final PvzGdxGame game;
     protected final Skin skin;
@@ -32,13 +42,78 @@ public abstract class AbstractMenuScreen implements Screen {
 
     protected abstract void buildUi();
 
+    /** Escape when no overlay is open. Default: no-op. */
+    protected void onBack() {}
+
+    /** Enter / keypad-enter. Default: no-op. */
+    protected void onConfirm() {}
+
+    /** Left arrow / A. Default: no-op. */
+    protected void onLeft() {}
+
+    /** Right arrow / D. Default: no-op. */
+    protected void onRight() {}
+
     @Override
     public void show() {
         stage.clear();
         toast.clearMessage();
         buildUi();
-        stage.addActor(toast); // keep toast above screen chrome
+        stage.addActor(toast);
+        installMenuKeys();
         Gdx.input.setInputProcessor(stage);
+    }
+
+    private void installMenuKeys() {
+        stage.addListener(new InputListener() {
+            @Override
+            public boolean keyDown(InputEvent event, int keycode) {
+                if (keycode == Input.Keys.ESCAPE) {
+                    if (dismissTopOverlay()) {
+                        return true;
+                    }
+                    onBack();
+                    return true;
+                }
+                if (keycode == Input.Keys.ENTER || keycode == Input.Keys.NUMPAD_ENTER
+                        || keycode == Input.Keys.SPACE) {
+                    onConfirm();
+                    return true;
+                }
+                if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
+                    onLeft();
+                    return true;
+                }
+                if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
+                    onRight();
+                    return true;
+                }
+                return false;
+            }
+        });
+    }
+
+    /**
+     * Closes the topmost actor named {@link #OVERLAY_NAME}.
+     * Prefer a {@link Runnable} in {@link Actor#getUserObject()} (fade dismiss);
+     * otherwise removes the actor.
+     */
+    protected boolean dismissTopOverlay() {
+        var actors = stage.getActors();
+        for (int i = actors.size - 1; i >= 0; i--) {
+            Actor actor = actors.get(i);
+            if (!OVERLAY_NAME.equals(actor.getName())) {
+                continue;
+            }
+            Object user = actor.getUserObject();
+            if (user instanceof Runnable closer) {
+                closer.run();
+            } else {
+                actor.remove();
+            }
+            return true;
+        }
+        return false;
     }
 
     @Override

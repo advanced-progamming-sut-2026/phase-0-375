@@ -667,6 +667,11 @@ public final class ShopScreen extends AbstractMenuScreen {
     private void goBack() { game.setScreen(new GreenhouseScreen(game)); }
 
     @Override
+    protected void onBack() {
+        goBack();
+    }
+
+    @Override
     public void render(float delta) {
         if (delta > MAX_DELTA) {
             delta = MAX_DELTA;

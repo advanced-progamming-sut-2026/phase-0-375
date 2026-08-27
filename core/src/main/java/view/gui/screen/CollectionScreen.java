@@ -646,6 +646,11 @@ public final class CollectionScreen extends AbstractMenuScreen {
         game.setScreen(new AdventureScreen(game));
     }
 
+    @Override
+    protected void onBack() {
+        goBack();
+    }
+
     private static Texture verticalGradient(Color top, Color bottom, int height) {
         Pixmap pm = new Pixmap(1, Math.max(2, height), Pixmap.Format.RGBA8888);
         for (int y = 0; y < pm.getHeight(); y++) {

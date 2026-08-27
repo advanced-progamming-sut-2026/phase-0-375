@@ -138,33 +138,51 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.menuExit();
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    clearTransientGame();
-                    if (returnChapter != null) {
-                        game.setScreen(new ChapterLevelsScreen(game, returnChapter));
-                    } else {
-                        game.setScreen(new AdventureScreen(game));
-                    }
-                }
+                goBack();
             }
         });
         TextButton start = new TextButton("Let's Rock", skin);
         start.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.startGame();
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(openGameplay(game));
-                }
+                startGame();
             }
         });
         bottom.add(back).width(180f).height(48f).left().expandX();
         bottom.add(start).width(240f).height(52f).right();
         uiStage.addActor(bottom);
         toast.toFront();
+    }
+
+    private void goBack() {
+        CommandResult<Void> r = controller.menuExit();
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            clearTransientGame();
+            if (returnChapter != null) {
+                game.setScreen(new ChapterLevelsScreen(game, returnChapter));
+            } else {
+                game.setScreen(new AdventureScreen(game));
+            }
+        }
+    }
+
+    private void startGame() {
+        CommandResult<Void> r = controller.startGame();
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(openGameplay(game));
+        }
+    }
+
+    @Override
+    protected void onBack() {
+        goBack();
+    }
+
+    @Override
+    protected void onConfirm() {
+        startGame();
     }
 
     private void refreshPackets() {

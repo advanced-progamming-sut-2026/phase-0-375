@@ -179,12 +179,37 @@ public abstract class AbstractGameplayScreen implements Screen {
     @Override
     public void show() {
         wirePlantPresentation();
+        installMenuKeys();
         InputMultiplexer mux = new InputMultiplexer();
         mux.addProcessor(uiStage);
         if (worldInput != null) {
             mux.addProcessor(worldInput);
         }
         Gdx.input.setInputProcessor(mux);
+    }
+
+    /** Escape → {@link #onBack()}; Enter/Space → {@link #onConfirm()}. */
+    protected void onBack() {}
+
+    protected void onConfirm() {}
+
+    private void installMenuKeys() {
+        uiStage.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+            @Override
+            public boolean keyDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, int keycode) {
+                if (keycode == com.badlogic.gdx.Input.Keys.ESCAPE) {
+                    onBack();
+                    return true;
+                }
+                if (keycode == com.badlogic.gdx.Input.Keys.ENTER
+                        || keycode == com.badlogic.gdx.Input.Keys.NUMPAD_ENTER
+                        || keycode == com.badlogic.gdx.Input.Keys.SPACE) {
+                    onConfirm();
+                    return true;
+                }
+                return false;
+            }
+        });
     }
 
     /** Lets timed plant actions use real PAM clip lengths and muzzle part bounds. */

@@ -218,6 +218,11 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
     }
 
     @Override
+    protected void onBack() {
+        goBack();
+    }
+
+    @Override
     public void dispose() {
         if (sheetClips != null) {
             sheetClips.dispose();

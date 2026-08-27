@@ -217,6 +217,24 @@ public final class MainHubScreen extends AbstractMenuScreen {
         }
     }
 
+    @Override
+    protected void onConfirm() {
+        if (hasOverlay()) {
+            return;
+        }
+        enterAdventure();
+    }
+
+    private boolean hasOverlay() {
+        var actors = stage.getActors();
+        for (int i = actors.size - 1; i >= 0; i--) {
+            if (OVERLAY_NAME.equals(actors.get(i).getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void enterProfile() {
         CommandResult<Void> r = controller.menuEnter("profile");
         showToast(r.getMessage(), !r.isSuccess());

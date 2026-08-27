@@ -110,7 +110,38 @@ public final class AdventureScreen extends AbstractMenuScreen {
         addHudIcons();
         addNavButtons();
         addFooter();
-        addKeyboardNav();
+    }
+
+    private void goBack() {
+        CommandResult<Void> r = controller.menuExit();
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(new MainHubScreen(game));
+        }
+    }
+
+    @Override
+    protected void onBack() {
+        goBack();
+    }
+
+    @Override
+    protected void onConfirm() {
+        tryEnterSelected();
+    }
+
+    @Override
+    protected void onLeft() {
+        move(-1);
+    }
+
+    @Override
+    protected void onRight() {
+        move(1);
+    }
+
+    private void openQuests() {
+        game.setScreen(new QuestsScreen(game));
     }
 
     private void addHudIcons() {
@@ -159,18 +190,6 @@ public final class AdventureScreen extends AbstractMenuScreen {
         AtlasImageButton button = new AtlasImageButton(up, down, HUD_ICON, action);
         button.setPosition(x, y);
         return button;
-    }
-
-    private void goBack() {
-        CommandResult<Void> r = controller.menuExit();
-        showToast(r.getMessage(), !r.isSuccess());
-        if (r.isSuccess()) {
-            game.setScreen(new MainHubScreen(game));
-        }
-    }
-
-    private void openQuests() {
-        game.setScreen(new QuestsScreen(game));
     }
 
     private void openCollection() {
@@ -289,28 +308,6 @@ public final class AdventureScreen extends AbstractMenuScreen {
             }
         });
         stage.addActor(debug);
-    }
-
-    private void addKeyboardNav() {
-        stage.addListener(new InputListener() {
-            @Override
-            public boolean keyDown(InputEvent event, int keycode) {
-                if (keycode == Input.Keys.LEFT || keycode == Input.Keys.A) {
-                    move(-1);
-                    return true;
-                }
-                if (keycode == Input.Keys.RIGHT || keycode == Input.Keys.D) {
-                    move(1);
-                    return true;
-                }
-                if (keycode == Input.Keys.ENTER || keycode == Input.Keys.SPACE) {
-                    tryEnterSelected();
-                    return true;
-                }
-                return false;
-            }
-        });
-        Gdx.input.setInputProcessor(stage);
     }
 
     private void move(int delta) {
