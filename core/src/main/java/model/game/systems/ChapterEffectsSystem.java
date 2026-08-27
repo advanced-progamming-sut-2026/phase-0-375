@@ -9,7 +9,7 @@ import model.game.core.Tickable;
 import model.game.level.LevelConfig;
 import model.game.map.Cell;
 import model.game.map.Point;
-import model.game.map.terrain.TerrainStrategyFactory;
+import model.game.map.TideState;
 import model.game.wave.EntryRuntime;
 import model.game.wave.Wave;
 import model.game.wave.WaveRandomGenerator;
@@ -99,9 +99,6 @@ public class ChapterEffectsSystem implements Tickable {
     private final GameModel gameModel;
     private final Random random = new Random();
 
-    /** Rightmost columns currently flooded by the tide (dynamic band only). */
-    private int tideColumns;
-
     public ChapterEffectsSystem(GameModel gameModel) {
         this.gameModel = gameModel;
     }
@@ -170,7 +167,7 @@ public class ChapterEffectsSystem implements Tickable {
         if (chapter == Chapter.FROSTBITE_CAVES) {
             maybeBlowIceWind();
         } else if (chapter == Chapter.BIG_WAVE_BEACH) {
-            shiftTide();
+            shiftTide(wave);
             maybeAmbushFromLowTide(wave);
         } else if (chapter == Chapter.DARK_AGES) {
             maybeSpawnDarkGraves();
@@ -194,6 +191,7 @@ public class ChapterEffectsSystem implements Tickable {
         StringBuilder hitRows = new StringBuilder();
         for (int i = 0; i < hitCount; i++) {
             int row = rows.get(i);
+            gameModel.queueIceWindGust(row);
             for (PlantInstance plant : gameModel.getPlantsInLane(row)) {
                 if (plant.getDefinition() != null
                         && plant.getDefinition().hasTag(PlantTags.FIRE)) {
@@ -211,58 +209,34 @@ public class ChapterEffectsSystem implements Tickable {
     // --- Tide ---
 
     /**
-     * Rolls a new water line inside the dynamic tide band (the rightmost
-     * {@code tideLimitColumn} columns) and re-types the affected tiles.
-     * Static water tiles from the level config always stay water. Plants
-     * stranded by rising water are destroyed by the TerrainSystem.
+     * Rolls a new water line inside the dynamic tide band and re-types cells
+     * via {@link TideState#applyToMap}. Static sea always stays flooded.
      */
-    private void shiftTide() {
-        LevelConfig config = levelConfig();
-        if (config == null) return;
-        int limit = config.getTideLimitColumn();
-        if (limit <= 0) return;
-
-        int cols = gameModel.getColumnCount();
-        int rows = gameModel.getRowCount();
-        limit = Math.min(limit, cols);
-
-        int newTide = random.nextInt(limit + 1); // 0..limit flooded columns
-        if (newTide == tideColumns) return;
-
-        for (int col = cols - limit; col < cols; col++) {
-            boolean flooded = col >= cols - newTide;
-            for (int row = 0; row < rows; row++) {
-                Cell cell = gameModel.getCellAt(row, col);
-                if (cell == null || isStaticWater(config, row, col)) continue;
-
-                if (flooded) {
-                    GroundType ground = isLowTideCell(config, row, col)
-                            ? GroundType.LOW_TIDE
-                            : GroundType.WATER;
-                    cell.setGroundType(ground);
-                    cell.setTerrainStrategy(TerrainStrategyFactory.create(ground));
-                } else if (cell.getGroundType() == GroundType.WATER
-                        || cell.getGroundType() == GroundType.LOW_TIDE) {
-                    cell.setGroundType(GroundType.NORMAL);
-                    cell.setTerrainStrategy(
-                            TerrainStrategyFactory.create(GroundType.NORMAL));
-                }
-            }
+    private void shiftTide(Wave wave) {
+        TideState tide = gameModel.getTideState();
+        if (tide == null || !tide.hasDynamicBand()) {
+            return;
         }
 
-        boolean rising = newTide > tideColumns;
-        tideColumns = newTide;
-        App.logToShell("[Tide] The water " + (rising ? "rises" : "recedes")
-                + ": the rightmost " + newTide + " column(s) are now flooded."
-                + (rising ? " Stranded plants will drown!" : ""));
+        int prev = tide.getDynamicColumns();
+        tide.setLowTide(lowTideTilesFor(wave));
+        int limit = tide.getLimitColumns();
+        int newTide = random.nextInt(limit + 1);
+        tide.setDynamicColumns(newTide);
+        tide.applyToMap(gameModel.getMap());
+
+        if (newTide != prev) {
+            boolean rising = newTide > prev;
+            App.logToShell("[Tide] The water " + (rising ? "rises" : "recedes")
+                    + ": the rightmost " + newTide + " column(s) are now flooded."
+                    + (rising ? " Stranded plants will drown!" : ""));
+        }
     }
 
     // --- Low-tide ambush ---
 
     private void maybeAmbushFromLowTide(Wave wave) {
-        LevelConfig config = levelConfig();
-        if (config == null || wave == null) return;
-        List<Point> lowTides = config.getLowTideTiles();
+        List<Point> lowTides = lowTideTilesFor(wave);
         if (lowTides == null || lowTides.isEmpty()) return;
 
         boolean ambushed = false;
@@ -281,6 +255,8 @@ public class ChapterEffectsSystem implements Tickable {
                     gameModel.spawnZombieAt(zombie.getName(), p.getY(), p.getX());
             if (spawned != null) {
                 ambushed = true;
+                // It surfaces with the Snorkel-style water mask + ripple.
+                gameModel.beginWaterEmerge(spawned);
                 App.logToShell("[Ambush] A " + zombie.getName()
                         + " bursts out of the shallows at row " + (p.getY() + 1)
                         + ", column " + (p.getX() + 1) + "!");
@@ -389,19 +365,12 @@ public class ChapterEffectsSystem implements Tickable {
                 : null;
     }
 
-    private boolean isStaticWater(LevelConfig config, int row, int col) {
-        return containsPoint(config.getWaterTiles(), row, col);
-    }
-
-    private boolean isLowTideCell(LevelConfig config, int row, int col) {
-        return containsPoint(config.getLowTideTiles(), row, col);
-    }
-
-    private boolean containsPoint(List<Point> points, int row, int col) {
-        if (points == null) return false;
-        for (Point p : points) {
-            if (p.getY() == row && p.getX() == col) return true;
+    /** This wave's ambush cells, or the level fallback when a wave has none. */
+    private List<Point> lowTideTilesFor(Wave wave) {
+        if (wave != null && wave.getLowTideTiles() != null && !wave.getLowTideTiles().isEmpty()) {
+            return wave.getLowTideTiles();
         }
-        return false;
+        LevelConfig config = levelConfig();
+        return config != null ? config.getLowTideTiles() : null;
     }
 }

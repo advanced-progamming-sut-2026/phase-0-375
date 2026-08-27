@@ -15,6 +15,8 @@ import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.map.Lane;
+import model.game.map.TideState;
+import model.game.map.WaterBand;
 import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.TerrainStrategy;
@@ -107,11 +109,26 @@ public class GameModel implements BehaviorContext {
     // Chapter-specific ambient effects (tornado, ice wind, tide)
     private ChapterEffectsSystem chapterEffects;
 
+    /** Big Wave Beach tide / static sea; inactive on other chapters. */
+    private final TideState tideState;
+
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
     /** Center-screen stings (wave / necromancy / low tide); GUI drains FIFO. */
     private final ArrayDeque<String> pendingAnnouncements = new ArrayDeque<>();
+
+    /** Egypt sandstorms in flight; each lands its zombie at touchdown. */
+    private final List<SandstormSpawn> pendingSandstorms = new ArrayList<>();
+    /** Read-only view of {@link #pendingSandstorms} for the renderer. */
+    private final List<SandstormSpawn> sandstormsView =
+            Collections.unmodifiableList(pendingSandstorms);
+
+    /** Frostbite Caves ice winds sweeping hit lanes; presentation-only. */
+    private final List<IceWindGust> iceWinds = new ArrayList<>();
+    /** Read-only view of {@link #iceWinds} for the renderer. */
+    private final List<IceWindGust> iceWindsView =
+            Collections.unmodifiableList(iceWinds);
 
     // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
     private int diamondCount;
@@ -142,6 +159,8 @@ public class GameModel implements BehaviorContext {
         this.orphanedPushables = new ArrayList<>();
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
+
+        this.tideState = TideState.fromConfig(levelConfig);
 
         this.waveManager = new WaveManager(levelConfig.getWaves(), this);
 
@@ -270,6 +289,167 @@ public class GameModel implements BehaviorContext {
     /** Drops cues the view never consumed (TUI, skipped frames). */
     public void discardUnreadProjectileHits() {
         projectileHitCues.clear();
+    }
+
+    /** Slide-tile activations since the last drain, as {@code (col, row)} points. */
+    private final List<Point> slideStartCues = new ArrayList<>();
+
+    /** A slide waiting for its zombie to reach the slide tile's middle. */
+    public static final class ArmedSlide {
+        private final int tileColumn;
+        private final int fromRow;
+        private final int toRow;
+
+        ArmedSlide(int tileColumn, int fromRow, int toRow) {
+            this.tileColumn = tileColumn;
+            this.fromRow = fromRow;
+            this.toRow = toRow;
+        }
+
+        /** Column of the slide tile; its middle sits at this continuous X. */
+        public int getTileColumn() { return tileColumn; }
+        /** Lane the zombie slides from. */
+        public int getFromRow() { return fromRow; }
+        /** Lane the zombie slides into. */
+        public int getToRow() { return toRow; }
+    }
+
+    /** Armed slides keyed by their zombie. */
+    private final Map<ZombieInstance, ArmedSlide> armedSlides = new HashMap<>();
+
+    /** Slides still gliding between lanes; presentation-only. */
+    private final List<LaneSlide> laneSlides = new ArrayList<>();
+    /** Read-only view of {@link #laneSlides} for the renderer. */
+    private final List<LaneSlide> laneSlidesView =
+            Collections.unmodifiableList(laneSlides);
+
+    /** Low-tide ambushes still surfacing; presentation-only. */
+    private final List<WaterEmerge> waterEmerges = new ArrayList<>();
+    /** Read-only view of {@link #waterEmerges} for the renderer. */
+    private final List<WaterEmerge> waterEmergesView =
+            Collections.unmodifiableList(waterEmerges);
+
+    /**
+     * Marks a freshly spawned ambush zombie as surfacing from the shallow
+     * water; the view plays the Snorkel-style mask + ripple while it rises.
+     */
+    public void beginWaterEmerge(ZombieInstance zombie) {
+        if (zombie != null) {
+            waterEmerges.add(new WaterEmerge(zombie));
+        }
+    }
+
+    /** In-flight water emergences (read-only) for the view layer. */
+    public List<WaterEmerge> getWaterEmerges() {
+        return waterEmergesView;
+    }
+
+    /** True while a low-tide ambush zombie is still surfacing. */
+    public boolean isWaterEmerging(ZombieInstance zombie) {
+        if (zombie == null || waterEmerges.isEmpty()) {
+            return false;
+        }
+        for (WaterEmerge emerge : waterEmerges) {
+            if (emerge.getZombie() == zombie) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void armLaneSlide(ZombieInstance zombie, Cell slideTile, int toRow) {
+        if (zombie == null || slideTile == null) {
+            return;
+        }
+        armedSlides.put(zombie,
+                new ArmedSlide(slideTile.getColumn(), slideTile.getRow(), toRow));
+    }
+
+    /**
+     * Fires {@code zombie}'s armed slide once it reaches the slide tile's
+     * middle. Zombies walk left, and integer continuous X is a tile centre,
+     * so the midpoint is crossed at {@code continuousX <= tileColumn}.
+     *
+     * @return true exactly when the slide fired this tick
+     */
+    public boolean tickArmedSlide(ZombieInstance zombie, float continuousX) {
+        if (zombie == null || zombie.isMovingBackward()) {
+            return false;
+        }
+        ArmedSlide armed = armedSlides.get(zombie);
+        if (armed == null || continuousX > armed.getTileColumn()) {
+            return false;
+        }
+        armedSlides.remove(zombie);
+        // Logical relocation happens here; the LaneSlide record below only
+        // drives the visual glide between the two lanes.
+        moveZombieToLane(zombie, armed.getToRow());
+        if (armed.getFromRow() != armed.getToRow()) {
+            laneSlides.add(new LaneSlide(zombie, armed.getFromRow(), armed.getToRow()));
+        }
+        slideStartCues.add(new Point(armed.getTileColumn(), armed.getFromRow()));
+        return true;
+    }
+
+    /**
+     * Slide activations since the last drain. The lawn renderer consumes this
+     * each frame to play the slider active_start / active_end clips; empty
+     * when nothing slid.
+     */
+    public List<Point> drainSlideStarts() {
+        if (slideStartCues.isEmpty()) {
+            return List.of();
+        }
+        List<Point> drained = new ArrayList<>(slideStartCues);
+        slideStartCues.clear();
+        return drained;
+    }
+
+    /** Drops cues the view never consumed (TUI, skipped frames). */
+    public void discardUnreadSlideStarts() {
+        slideStartCues.clear();
+    }
+
+    /** In-flight slide glides (read-only) for the view layer. */
+    public List<LaneSlide> getLaneSlides() {
+        return laneSlidesView;
+    }
+
+    /**
+     * Width of the dynamic tide band (columns from the right edge the water
+     * may flood); {@code 0} outside Big Wave Beach levels.
+     */
+    public int getTideLimitColumns() {
+        LevelConfig config = currentLevel != null ? currentLevel.getConfig() : null;
+        return config != null ? Math.max(0, config.getTideLimitColumn()) : 0;
+    }
+
+    /**
+     * Columns currently flooded by the dynamic tide, counting from the right
+     * edge; {@code 0} when the tide is fully out. Static sea is not counted.
+     */
+    public int getTideColumns() {
+        return tideState.getDynamicColumns();
+    }
+
+    /** Beach tide state; inactive ({@link TideState#isActive()} false) elsewhere. */
+    public TideState getTideState() {
+        return tideState;
+    }
+
+    /**
+     * Rightmost flooded column count for the wave PAM: dynamic tide width with
+     * a floor at permanent {@code waterTiles}.
+     */
+    public int getFloodedColumns() {
+        if (gameMap == null) {
+            return 0;
+        }
+        if (tideState.isActive()) {
+            return tideState.floodedColumns(gameMap.getCols(), gameMap.getRows());
+        }
+        return WaterBand.columnsFromRight(gameMap);
     }
 
     @Override
@@ -406,13 +586,16 @@ public class GameModel implements BehaviorContext {
 
     /**
      * Ancient Egypt tornado entry (final wave): the zombie is carried in by a
-     * tornado and touches down 1-4 columns ahead of the normal entry edge.
+     * sandstorm and touches down 1-4 columns ahead of the normal entry edge.
+     *
+     * @return the landed instance, so sandstorm records can hide it behind
+     *         the outro fade
      */
-    public void spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
+    public ZombieInstance spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
         ZombieInstance instance = ZombieFactory.createInstance(zombie);
         instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
         recordZombieSeen(zombie.getName());
-        int col = Math.max(0, gameMap.getCols() - Math.max(1, columnsAhead));
+        int col = tornadoColumn(gameMap.getCols(), columnsAhead);
         instance.setContinuousPosition(new FloatPoint(col, lane));
         instance.setGridPosition(new Point(col, lane));
         activeZombies.add(instance);
@@ -423,10 +606,46 @@ public class GameModel implements BehaviorContext {
         if (waveManager != null) {
             waveManager.onWaveZombieSpawned(instance);
         }
-        App.logToShell("[Tornado] A " + zombie.getName()
-                + " is carried in by a tornado and lands " + columnsAhead
+        App.logToShell("[Sandstorm] A " + zombie.getName()
+                + " is carried in by a sandstorm and lands " + columnsAhead
                 + " column(s) ahead in lane " + (lane + 1) + "!");
         eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+        return instance;
+    }
+
+    /** Touchdown column for a storm entry landing inside the right edge. */
+    public static int tornadoColumn(int columnCount, int columnsAhead) {
+        return Math.max(0, columnCount - Math.max(1, columnsAhead));
+    }
+
+    /**
+     * Ancient Egypt sandstorm entry: queues a storm that carries
+     * {@code zombie} in from off-screen right and spawns it
+     * {@code columnsAhead} columns inside the normal entry edge when the
+     * storm touches down.
+     */
+    public void queueSandstormSpawn(Zombie zombie, int lane, int columnsAhead) {
+        pendingSandstorms.add(new SandstormSpawn(this, zombie, lane, columnsAhead));
+    }
+
+    /** In-flight sandstorms (read-only) for the view layer. */
+    public List<SandstormSpawn> getSandstorms() {
+        return sandstormsView;
+    }
+
+    /**
+     * Frostbite Caves ice wind: queues a gust visual sweeping {@code lane}
+     * (the frost damage itself is applied by the chapter effects system).
+     */
+    public void queueIceWindGust(int lane) {
+        if (lane >= 0) {
+            iceWinds.add(new IceWindGust(lane));
+        }
+    }
+
+    /** Active ice winds (read-only) for the view layer. */
+    public List<IceWindGust> getIceWinds() {
+        return iceWindsView;
     }
 
     /** Hook invoked by the wave manager when a new wave begins. */
@@ -592,6 +811,10 @@ public class GameModel implements BehaviorContext {
         if (chapterEffects != null) {
             chapterEffects.tick(deltaTime);
         }
+        tickSandstorms(deltaTime);
+        tickIceWinds(deltaTime);
+        tickLaneSlides(deltaTime);
+        tickWaterEmerges(deltaTime);
         if (!seedCooldowns.isEmpty()) {
             Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
             while (it.hasNext()) {
@@ -599,6 +822,59 @@ public class GameModel implements BehaviorContext {
                 float remaining = e.getValue() - deltaTime;
                 if (remaining <= 0f) it.remove();
                 else e.setValue(remaining);
+            }
+        }
+    }
+
+    /** Advances in-flight sandstorms, spawning each zombie at touchdown. */
+    private void tickSandstorms(float deltaTime) {
+        if (pendingSandstorms.isEmpty()) {
+            return;
+        }
+        Iterator<SandstormSpawn> iterator = pendingSandstorms.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished ice-wind gusts. */
+    private void tickIceWinds(float deltaTime) {
+        if (iceWinds.isEmpty()) {
+            return;
+        }
+        Iterator<IceWindGust> iterator = iceWinds.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished lane glides and drops arms of dead zombies. */
+    private void tickLaneSlides(float deltaTime) {
+        armedSlides.keySet().removeIf(ZombieInstance::isDead);
+        if (laneSlides.isEmpty()) {
+            return;
+        }
+        Iterator<LaneSlide> iterator = laneSlides.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished water emergences (and ones whose zombie is gone). */
+    private void tickWaterEmerges(float deltaTime) {
+        if (waterEmerges.isEmpty()) {
+            return;
+        }
+        Iterator<WaterEmerge> iterator = waterEmerges.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
             }
         }
     }

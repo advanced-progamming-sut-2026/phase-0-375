@@ -14,6 +14,10 @@ import model.enums.PlantState;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
+import model.game.core.IceWindGust;
+import model.game.core.LaneSlide;
+import model.game.core.SandstormSpawn;
+import model.game.core.WaterEmerge;
 import model.game.level.minigame.bowling.BowlingWalnut;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.beghouled.BeghouledLevel;
@@ -34,8 +38,10 @@ import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.enums.LootPickupKind;
 import model.enums.GroundType;
+import model.enums.SlideDirection;
 import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
+import model.game.map.terrain.SlideTerrainStrategy;
 import model.item.placeable.Placeable;
 import model.item.pushable.ArcadeMachine;
 import model.item.pushable.Barrel;
@@ -65,10 +71,13 @@ import pvz.libpvz.pam.PamPlayer;
 import view.gui.anim.AnimPose;
 import view.gui.anim.AnimScale;
 import view.gui.anim.GraveAnim;
+import view.gui.anim.IceWindAnim;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SlideTileAnim;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
+import view.gui.anim.SandstormAnim;
 import view.gui.anim.plant.ExplosivePlantFx;
 import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.anim.plant.MeleePlantFx;
@@ -298,6 +307,27 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
+    /** Egypt sandstorms in flight, keyed by their model record. */
+    private final IdentityHashMap<SandstormSpawn, SandstormFx> sandstorms = new IdentityHashMap<>();
+    /** Zombies spawned under a still-fading sandstorm; hidden until the outro ends. */
+    private final Set<ZombieInstance> sandstormConcealed =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    /** The sandstorm PAM was force-loaded once so intro/loop/outro timings are known. */
+    private boolean sandstormPamReady;
+    /** Frostbite Caves ice winds in flight, keyed by their model record. */
+    private final IdentityHashMap<IceWindGust, IceWindFx> iceWinds = new IdentityHashMap<>();
+    /** The chill-wind PAM was force-loaded once so the sweep can start instantly. */
+    private boolean iceWindPamReady;
+    /** Frostbite slide tiles keyed by their cell; idle loop + active bursts. */
+    private final IdentityHashMap<Cell, SlideTileFx> slideTiles = new IdentityHashMap<>();
+    /** Both slider PAMs were force-loaded once so activations play instantly. */
+    private boolean slideTilePamReady;
+    /** Slides still gliding between lanes, keyed by their zombie. */
+    private final IdentityHashMap<ZombieInstance, LaneSlide> laneGlides =
+            new IdentityHashMap<>();
+    /** Low-tide ambushes still surfacing, keyed by their zombie. */
+    private final IdentityHashMap<ZombieInstance, WaterEmerge> waterEmerges =
+            new IdentityHashMap<>();
     private final List<SunFlight> sunFlights = new ArrayList<>();
     private final List<PlantFoodFlight> plantFoodFlights = new ArrayList<>();
     private final List<LootFlight> lootFlights = new ArrayList<>();
@@ -319,7 +349,7 @@ public final class LawnEntityRenderer {
     private HitFlashShader hitFlashShader;
     private GlowGreenShader glowGreenShader;
     private float snorkelRippleTime;
-    private boolean snorkelRippleLoaded;
+    private final Set<String> snorkelRippleLoaded = new HashSet<>();
     private ScreenShake screenShake;
 
     private LawnMowerRenderer mowerRenderer;
@@ -440,6 +470,8 @@ public final class LawnEntityRenderer {
         }
         lastCabinets.entrySet().removeIf(e -> !liveCabinets.contains(e.getKey()));
         Set<Cell> liveIce = syncTerrainIce(model);
+        Set<Cell> liveSlides = syncSlideTiles(model);
+        harvestSlideStarts(model);
 
         // Win fade: hold plant idle (and plant ghosts) still under the dim.
         float plantDelta = endMode == EndMode.WIN ? 0f : delta;
@@ -457,6 +489,10 @@ public final class LawnEntityRenderer {
         harvestBeghouledClears(model);
         drawEffects(batch, backEffects, delta);
         prepareBowlingWalnuts(model);
+        updateSandstorms(model, delta);
+        updateIceWinds(model, delta);
+        updateLaneGlides(model);
+        updateWaterEmerges(model);
 
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
         livePlants.addAll(plants);
@@ -487,9 +523,11 @@ public final class LawnEntityRenderer {
                     drawPushable(batch, model, cabinet, delta);
                 }
             }
+            drawSlideTiles(batch, liveSlides, delta, row);
             drawTerrainIce(batch, model, liveIce, delta, row);
             for (ZombieInstance zombie : model.getZombies()) {
-                if (clampRow(zombieRow(zombie), rows) == row) {
+                if (clampRow(zombieRow(zombie), rows) == row
+                        && !sandstormConcealed.contains(zombie)) {
                     Chapter skin = artChapterFor(zombie, model.getChapter());
                     drawZombie(batch, zombie, skin, delta);
                 }
@@ -501,6 +539,8 @@ public final class LawnEntityRenderer {
             drawProspectorBlasts(batch, delta, row);
             drawMowers(batch, model, delta, row);
         }
+        drawSandstorms(batch);
+        drawIceWinds(batch);
         drawOctopi(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
@@ -940,6 +980,167 @@ public final class LawnEntityRenderer {
         return 1.5f;
     }
 
+    /**
+     * Phase machine for every active Egypt sandstorm: intro plays as the storm
+     * starts moving, loop repeats until touchdown, then outro fades it away
+     * once over the landed zombie. Also collects the freshly landed zombies
+     * that must stay hidden behind their storm's outro.
+     */
+    private void updateSandstorms(GameModel model, float delta) {
+        sandstormConcealed.clear();
+        if (model.getSandstorms().isEmpty()) {
+            sandstorms.clear();
+            return;
+        }
+        for (SandstormSpawn storm : model.getSandstorms()) {
+            SandstormFx fx = sandstorms.get(storm);
+            if (fx == null) {
+                fx = beginSandstorm(storm);
+            }
+            fx.clock += delta;
+            float progress = storm.travelProgress();
+            fx.x = fx.startX + (fx.targetX - fx.startX) * progress;
+            if (!storm.hasLanded()) {
+                fx.visible = true;
+                if (fx.introDuration > 0f && fx.clock < fx.introDuration) {
+                    fx.clip = SandstormAnim.INTRO_CLIP;
+                    fx.clipTime = fx.clock;
+                    fx.loop = false;
+                } else {
+                    fx.clip = SandstormAnim.LOOP_CLIP;
+                    fx.clipTime = fx.clock - fx.introDuration;
+                    fx.loop = true;
+                }
+            } else {
+                if (!fx.landedSeen) {
+                    fx.landedSeen = true;
+                    fx.outroClock = 0f;
+                }
+                fx.outroClock += delta;
+                fx.clip = SandstormAnim.OUTRO_CLIP;
+                fx.clipTime = Math.min(fx.outroClock, fx.outroDuration);
+                fx.loop = false;
+                fx.visible = fx.outroClock < fx.outroDuration;
+                if (fx.visible && storm.getSpawned() != null) {
+                    sandstormConcealed.add(storm.getSpawned());
+                }
+            }
+            cacheStormScale(fx);
+        }
+        Set<SandstormSpawn> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        live.addAll(model.getSandstorms());
+        sandstorms.keySet().removeIf(storm -> !live.contains(storm));
+    }
+
+    /** First sighting of a model sandstorm: resolve placement + clip timings. */
+    private SandstormFx beginSandstorm(SandstormSpawn storm) {
+        if (!sandstormPamReady) {
+            sandstormPamReady = true;
+            clips.preloadSync(SandstormAnim.PAM_PATH, SandstormAnim.LOOP_CLIP);
+        }
+        SandstormFx fx = new SandstormFx();
+        // Materialises past the zombie entry edge, off-screen right.
+        fx.startX = layout.centerOf(storm.getLane(), layout.cols())[0]
+                + SandstormAnim.START_MARGIN_PX;
+        float[] target = layout.centerOf(storm.getLane(), storm.getColumn());
+        fx.targetX = target[0];
+        // Raised half a tile so the dust cloud doesn't sink into the lane below.
+        fx.y = target[1] + layout.cellHeight() * 0.5f;
+        fx.introDuration = player.clipDurationSeconds(
+                SandstormAnim.PAM_PATH, SandstormAnim.INTRO_CLIP);
+        fx.outroDuration = player.clipDurationSeconds(
+                SandstormAnim.PAM_PATH, SandstormAnim.OUTRO_CLIP);
+        if (fx.outroDuration <= 0f) {
+            fx.outroDuration = 0.8f;
+        }
+        fx.outroDuration = Math.min(fx.outroDuration, SandstormSpawn.OUTRO_SECONDS);
+        sandstorms.put(storm, fx);
+        return fx;
+    }
+
+    /** Storm art is scaled to cover a fixed number of lawn cells in height. */
+    private void cacheStormScale(SandstormFx fx) {
+        if (fx.scale > 0f || fx.clip == null) {
+            return;
+        }
+        Rectangle bounds = player.bounds(SandstormAnim.PAM_PATH, fx.clip);
+        fx.scale = bounds != null && bounds.height > 0f
+                ? layout.cellHeight() * SandstormAnim.HEIGHT_CELLS / bounds.height
+                : AnimScale.LAWN;
+    }
+
+    /** Draws the storms above lawn content; their zombie hides underneath. */
+    private void drawSandstorms(Batch batch) {
+        for (SandstormFx fx : sandstorms.values()) {
+            if (!fx.visible || fx.clip == null || fx.scale <= 0f) {
+                continue;
+            }
+            ClipRef ref = clips.getOrLoad(SandstormAnim.PAM_PATH, fx.clip);
+            if (ref == null) {
+                continue;
+            }
+            player.draw(batch, ref, fx.clipTime, fx.x, fx.y, fx.scale, fx.scale, fx.loop);
+        }
+    }
+
+    /**
+     * Syncs the view gusts with the model's ice winds; each gust sweeps
+     * right-to-left across its lane for {@link IceWindGust#SWEEP_SECONDS}.
+     */
+    private void updateIceWinds(GameModel model, float delta) {
+        if (model.getIceWinds().isEmpty()) {
+            iceWinds.clear();
+            return;
+        }
+        for (IceWindGust gust : model.getIceWinds()) {
+            IceWindFx fx = iceWinds.get(gust);
+            if (fx == null) {
+                fx = beginIceWind(gust);
+            }
+            fx.clock += delta;
+            float progress = gust.progress();
+            fx.x = fx.startX + (fx.endX - fx.startX) * progress;
+        }
+        Set<IceWindGust> live = Collections.newSetFromMap(new IdentityHashMap<>());
+        live.addAll(model.getIceWinds());
+        iceWinds.keySet().removeIf(gust -> !live.contains(gust));
+    }
+
+    /** First sighting of a model ice wind: resolve placement + art scale. */
+    private IceWindFx beginIceWind(IceWindGust gust) {
+        if (!iceWindPamReady) {
+            iceWindPamReady = true;
+            clips.preloadSync(IceWindAnim.PAM_PATH, IceWindAnim.CLIP);
+        }
+        IceWindFx fx = new IceWindFx();
+        // Enters past the zombie entry edge and exits past the house edge.
+        fx.startX = layout.centerOf(gust.getLane(), layout.cols())[0]
+                + IceWindAnim.START_MARGIN_PX;
+        fx.endX = layout.centerOf(gust.getLane(), 0)[0]
+                - IceWindAnim.START_MARGIN_PX;
+        fx.y = layout.centerY(gust.getLane());
+        Rectangle bounds = player.bounds(IceWindAnim.PAM_PATH, IceWindAnim.CLIP);
+        fx.scale = bounds != null && bounds.height > 0f
+                ? layout.cellHeight() * IceWindAnim.HEIGHT_CELLS / bounds.height
+                : AnimScale.LAWN;
+        iceWinds.put(gust, fx);
+        return fx;
+    }
+
+    /** Draws the ice winds above lawn content so frost puffs ride over plants. */
+    private void drawIceWinds(Batch batch) {
+        for (IceWindFx fx : iceWinds.values()) {
+            if (fx.scale <= 0f) {
+                continue;
+            }
+            ClipRef ref = clips.getOrLoad(IceWindAnim.PAM_PATH, IceWindAnim.CLIP);
+            if (ref == null) {
+                continue;
+            }
+            player.draw(batch, ref, fx.clock, fx.x, fx.y, fx.scale, fx.scale, true);
+        }
+    }
+
     private void drawProjectile(Batch batch, Projectile projectile, float delta) {
         if (projectile == null) {
             return;
@@ -1283,11 +1484,7 @@ public final class LawnEntityRenderer {
         if (map == null || catalog == null) {
             return;
         }
-        PamCatalog.PamEntry entry = catalog.byName(GraveAnim.PAM);
-        if (entry == null) {
-            return;
-        }
-        String path = entry.path();
+        Chapter chapter = model.getChapter();
         int cols = map.getCols();
         for (int col = 0; col < cols; col++) {
             Cell cell = map.getCell(col, row);
@@ -1296,7 +1493,11 @@ public final class LawnEntityRenderer {
             }
             if (cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave grave
                 && !grave.isDestroyed()) {
-                drawGrave(batch, grave, row, col, path, delta);
+                PamCatalog.PamEntry entry = catalog.byName(GraveAnim.pamFor(chapter, grave));
+                if (entry == null) {
+                    continue;
+                }
+                drawGrave(batch, grave, row, col, entry.path(), delta);
             }
         }
     }
@@ -2078,6 +2279,140 @@ public final class LawnEntityRenderer {
         return !ice.isMelted();
     }
 
+    /**
+     * Frostbite slide tiles: every cell with a {@link SlideTerrainStrategy}
+     * keeps a visual state; stale entries (level teardown) are dropped.
+     */
+    private Set<Cell> syncSlideTiles(GameModel model) {
+        GameMap map = model.getMap();
+        Set<Cell> live = new HashSet<>();
+        if (map == null) {
+            slideTiles.clear();
+            return live;
+        }
+        for (int row = 0; row < map.getRows(); row++) {
+            for (int col = 0; col < map.getCols(); col++) {
+                Cell cell = model.getCellAt(row, col);
+                if (cell != null
+                        && cell.getTerrainStrategy() instanceof SlideTerrainStrategy) {
+                    live.add(cell);
+                    slideTiles.computeIfAbsent(cell, key -> beginSlideTile(key));
+                }
+            }
+        }
+        slideTiles.keySet().removeIf(cell -> !live.contains(cell));
+        return live;
+    }
+
+    /** First sighting of a model slide tile: preload art + resolve scale. */
+    private SlideTileFx beginSlideTile(Cell cell) {
+        if (!slideTilePamReady) {
+            slideTilePamReady = true;
+            clips.preloadSync(SlideTileAnim.DOWN_PAM_PATH,
+                    SlideTileAnim.IDLE_CLIP, SlideTileAnim.START_CLIP, SlideTileAnim.END_CLIP);
+            clips.preloadSync(SlideTileAnim.UP_PAM_PATH,
+                    SlideTileAnim.IDLE_CLIP, SlideTileAnim.START_CLIP, SlideTileAnim.END_CLIP);
+        }
+        SlideTileFx fx = new SlideTileFx();
+        String pam = pamFor(cell);
+        // The slider PAM's origin is its middle: fit the art over one tile so
+        // that origin lands exactly on the tile centre when drawn there.
+        Rectangle bounds = player.bounds(pam, SlideTileAnim.IDLE_CLIP);
+        fx.scale = bounds != null && bounds.width > 0f && bounds.height > 0f
+                ? Math.max(layout.cellWidth() / bounds.width,
+                        layout.cellHeight() / bounds.height)
+                : AnimScale.LAWN;
+        return fx;
+    }
+
+    /** Consumes model slide cues and kicks each hit tile's active burst. */
+    private void harvestSlideStarts(GameModel model) {
+        for (Point cue : model.drainSlideStarts()) {
+            Cell cell = model.getCellAt(cue.getY(), cue.getX());
+            SlideTileFx fx = cell != null ? slideTiles.get(cell) : null;
+            if (fx == null) {
+                continue;
+            }
+            fx.phase = SlideTileFx.Phase.ACTIVE_START;
+            fx.clock = 0f;
+        }
+    }
+
+    /**
+     * Mirrors the model's in-flight lane glides so {@link #zombieWorldCenter}
+     * can drift a sliding zombie between lanes instead of snapping it.
+     */
+    private void updateLaneGlides(GameModel model) {
+        if (model.getLaneSlides().isEmpty()) {
+            laneGlides.clear();
+            return;
+        }
+        laneGlides.clear();
+        for (LaneSlide glide : model.getLaneSlides()) {
+            laneGlides.put(glide.getZombie(), glide);
+        }
+        Set<ZombieInstance> live = new HashSet<>(model.getZombies());
+        laneGlides.keySet().removeIf(zombie -> !live.contains(zombie));
+    }
+
+    /** Mirrors the model's surfacing ambush zombies for the water mask. */
+    private void updateWaterEmerges(GameModel model) {
+        if (model.getWaterEmerges().isEmpty()) {
+            waterEmerges.clear();
+            return;
+        }
+        waterEmerges.clear();
+        for (WaterEmerge emerge : model.getWaterEmerges()) {
+            waterEmerges.put(emerge.getZombie(), emerge);
+        }
+        Set<ZombieInstance> live = new HashSet<>(model.getZombies());
+        waterEmerges.keySet().removeIf(zombie -> !live.contains(zombie));
+    }
+
+    private void drawSlideTiles(Batch batch, Set<Cell> live, float delta, int row) {
+        for (Cell cell : live) {
+            if (cell.getRow() != row) {
+                continue;
+            }
+            SlideTileFx fx = slideTiles.get(cell);
+            if (fx == null || fx.scale <= 0f) {
+                continue;
+            }
+            String pam = pamFor(cell);
+            String clip = switch (fx.phase) {
+                case IDLE -> SlideTileAnim.IDLE_CLIP;
+                case ACTIVE_START -> SlideTileAnim.START_CLIP;
+                case ACTIVE_END -> SlideTileAnim.END_CLIP;
+            };
+            ClipRef ref = clips.getOrLoad(pam, clip);
+            if (ref == null) {
+                continue;
+            }
+            // The PAM's (0,0) axis sits on its middle, so drawing at the tile
+            // centre puts exactly that point on the middle of the tile.
+            float[] xy = layout.centerOf(cell.getRow(), cell.getColumn());
+            player.draw(batch, ref, fx.clock, xy[0], xy[1], fx.scale, fx.scale,
+                    fx.phase == SlideTileFx.Phase.IDLE);
+            fx.clock += delta;
+            if (fx.phase != SlideTileFx.Phase.IDLE) {
+                float duration = player.clipDurationSeconds(pam, clip);
+                if (duration > 0f && fx.clock >= duration) {
+                    fx.phase = fx.phase == SlideTileFx.Phase.ACTIVE_START
+                            ? SlideTileFx.Phase.ACTIVE_END
+                            : SlideTileFx.Phase.IDLE;
+                    fx.clock = 0f;
+                }
+            }
+        }
+    }
+
+    private static String pamFor(Cell cell) {
+        SlideTerrainStrategy slide = (SlideTerrainStrategy) cell.getTerrainStrategy();
+        return slide.getSlideDirection() == SlideDirection.UP
+                ? SlideTileAnim.UP_PAM_PATH
+                : SlideTileAnim.DOWN_PAM_PATH;
+    }
+
     private void drawTerrainIceCell(Batch batch, GameModel model, Cell cell, float delta) {
         IceTerrainStrategy ice = (IceTerrainStrategy) cell.getTerrainStrategy();
         float[] xy = layout.centerOf(cell.getRow(), cell.getColumn());
@@ -2628,6 +2963,7 @@ public final class LawnEntityRenderer {
 
         float x = xyTmp[0];
         float y = xyTmp[1];
+        float modelX = x;
         ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
         if (flight != null) {
             alignToss(zombie, flight, pose, x, y);
@@ -2667,13 +3003,15 @@ public final class LawnEntityRenderer {
             x += holdBack;
         }
         float standY = y;
+        GameModel model = App.getInstance().getCurrentGameModel();
         Rectangle snorkelMask = null;
         float snorkelWaterY = Float.NaN;
+        float rippleX = x;
+        float scale = AnimScale.ZOMBIE * pose.scale();
         SwimBehavior swim = SnorkelerAnim.isSnorkelerPam(pose.pamPath())
             ? (SwimBehavior) zombie.getBehavior(ZombieBehaviorType.SWIM)
             : null;
         if (swim != null && (swim.isSubmerged() || swim.isSurfaced()) && swim.getRise() < 1f - 1e-3f) {
-            float scale = AnimScale.ZOMBIE * pose.scale();
             float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
             Rectangle skull = ref != null ? partAt(ref, measureT, SnorkelerAnim.SKULL_PART) : null;
             if (skull == null) {
@@ -2682,6 +3020,28 @@ public final class LawnEntityRenderer {
             snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
             y = SnorkelerAnim.drawOriginY(standY, snorkelWaterY, skull, scale, swim.getRise());
             snorkelMask = FishermanAnim.drownMaskWorld(layout, x, zombie.getGridY(), snorkelWaterY);
+            rippleX = SnorkelerAnim.skullCenterWorldX(x, skull, scale, pose.flipX());
+        } else {
+            WaterEmerge emerge = waterEmerges.get(zombie);
+            if (emerge != null && emerge.progress() < 1f - 1e-3f) {
+                snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+                float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
+                Rectangle box = player.bounds(pose.pamPath(), pose.clipName());
+                float artTop = box != null
+                        ? standY - box.y * scale
+                        : standY + layout.cellHeight();
+                float extraSink = FishermanAnim.emergeExtraSink(layout.cellHeight(), zombie);
+                y = WaterEmerge.drawOriginY(
+                        standY, snorkelWaterY, artTop, emerge.progress(), extraSink);
+                snorkelMask = FishermanAnim.drownMaskWorld(
+                        layout, modelX, zombie.getGridY(), snorkelWaterY,
+                        FishermanAnim.emergeMaskWidthTiles(zombie),
+                        FishermanAnim.EMERGE_MASK_BELOW_TILES);
+                rippleX = modelX;
+            } else if (shouldRippleOnWater(zombie, model, swim, jump)) {
+                snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+                rippleX = modelX;
+            }
         }
         if (snorkelMask != null) {
             drownShader().begin(batch, snorkelMask);
@@ -2699,7 +3059,7 @@ public final class LawnEntityRenderer {
             drownShader().end(batch);
         }
         if (!Float.isNaN(snorkelWaterY)) {
-            drawSnorkelRipple(batch, pose, ref, time, x, y, snorkelWaterY);
+            drawSnorkelRipple(batch, pose, zombie, rippleX, snorkelWaterY);
         }
         if (zombie.isGlowing()) {
             drawGlowingPlantFoodOverlay(batch, zombie, x, y, delta);
@@ -3426,7 +3786,13 @@ public final class LawnEntityRenderer {
         } else {
             return false;
         }
-        float[] xy = layout.centerOf(Math.round(row), progressX);
+        // Slide glide: drift the sprite between lanes instead of snapping.
+        LaneSlide glide = laneGlides.get(zombie);
+        if (glide != null && glide.progress() < 1f) {
+            row = glide.getFromRow()
+                    + (glide.getToRow() - glide.getFromRow()) * glide.progress();
+        }
+        float[] xy = layout.centerOf(row, progressX);
         out[0] = xy[0];
         out[1] = xy[1];
         out[2] = progressX;
@@ -4562,28 +4928,52 @@ public final class LawnEntityRenderer {
         return GLOW_BASE + GLOW_PULSE * wave;
     }
 
-    private void drawSnorkelRipple(Batch batch, AnimPose pose, ClipRef body, float time,
-                                   float x, float y, float waterY) {
-        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(SnorkelerAnim.RIPPLE_NAME);
-        String path = entry != null ? entry.path() : SnorkelerAnim.RIPPLE_PATH;
+    private void drawSnorkelRipple(Batch batch, AnimPose pose, ZombieInstance zombie,
+                                   float rippleX, float tileWaterY) {
+        String rippleName = SnorkelerAnim.rippleName(zombie);
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(rippleName);
+        String path = entry != null ? entry.path() : SnorkelerAnim.ripplePath(zombie);
         String clip = entry != null
             ? catalog.resolveClip(entry, SnorkelerAnim.RIPPLE_CLIP, "ripple_exit")
             : SnorkelerAnim.RIPPLE_CLIP;
         ClipRef ripple = clips.getOrLoad(path, clip);
-        if (ripple == null && !snorkelRippleLoaded) {
-            snorkelRippleLoaded = true;
+        if (ripple == null && !snorkelRippleLoaded.contains(path)) {
+            snorkelRippleLoaded.add(path);
             clips.preloadSync(path, clip);
             ripple = clips.getOrLoad(path, clip);
         }
         if (ripple == null) {
             return;
         }
-        float scale = AnimScale.ZOMBIE * pose.scale();
-        Rectangle skull = body != null ? partAt(body, time, SnorkelerAnim.SKULL_PART) : null;
-        float rx = SnorkelerAnim.skullCenterWorldX(x, skull, scale, pose.flipX());
+        boolean gargantuar = zombie.getDefinition() != null
+                && zombie.getDefinition().getSize() == ZombieSize.LARGE;
+        float rippleScale = AnimScale.ZOMBIE * (gargantuar ? 1f : pose.scale());
+        float anchorY = tileWaterY;
+        if (gargantuar) {
+            // Tile waterline is one cell low for the large unit; same anchor as normal zombies.
+            anchorY += layout.cellHeight();
+        }
         Rectangle clipBox = player.bounds(path, clip);
-        float ry = SnorkelerAnim.rippleDrawY(waterY, clipBox, scale);
-        player.draw(batch, ripple, snorkelRippleTime, rx, ry, scale, scale, true);
+        float ry = SnorkelerAnim.rippleDrawY(anchorY, clipBox, rippleScale);
+        player.draw(batch, ripple, snorkelRippleTime, rippleX, ry, rippleScale, rippleScale, true);
+    }
+
+    /** Ripple-only on shallow tiles after emerge; no foot mask (that hid the whole body). */
+    private boolean shouldRippleOnWater(ZombieInstance zombie, GameModel model,
+                                        SwimBehavior swim, JumpBehavior jump) {
+        if (model == null || zombie == null || zombie.isDead()) {
+            return false;
+        }
+        if (waterEmerges.containsKey(zombie)) {
+            return false;
+        }
+        if (jump != null && jump.getPhase() == JumpBehavior.JumpPhase.JUMPING) {
+            return false;
+        }
+        if (swim != null && (swim.isSubmerged() || swim.isSurfaced())) {
+            return false;
+        }
+        return model.isWaterTile(zombie.getGridY(), zombie.getGridX());
     }
 
     private void freezeDrownWaterY(DeathFx fx, ClipRef die, float scale) {
@@ -4689,5 +5079,42 @@ public final class LawnEntityRenderer {
             case LOOP -> EffectPamPaths.PLANTFOOD_FX_LOOP;
             case OFF -> EffectPamPaths.PLANTFOOD_FX_OFF;
         };
+    }
+
+    /** Per-sandstorm visual state: placement, clip choice and clocks. */
+    private static final class SandstormFx {
+        float startX;
+        float targetX;
+        float y;
+        float x;
+        float scale = -1f;
+        float introDuration;
+        float outroDuration;
+        float clock;
+        float outroClock;
+        boolean landedSeen;
+        boolean visible;
+        boolean loop;
+        float clipTime;
+        String clip;
+    }
+
+    /** Per-ice-wind visual state: sweep endpoints and playback clock. */
+    private static final class IceWindFx {
+        float startX;
+        float endX;
+        float y;
+        float x;
+        float scale = -1f;
+        float clock;
+    }
+
+    /** Per-slide-tile visual state: idle loop or active burst playback. */
+    private static final class SlideTileFx {
+        enum Phase { IDLE, ACTIVE_START, ACTIVE_END }
+
+        Phase phase = Phase.IDLE;
+        float clock;
+        float scale = -1f;
     }
 }

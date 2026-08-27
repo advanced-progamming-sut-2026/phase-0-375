@@ -251,7 +251,7 @@ public final class PamCatalog {
         if (upper.contains("/BACKGROUNDS/WAVE_UPPERLAYER/")) {
             return true;
         }
-        if (upper.contains("/BACKGROUNDS/WATER_ZOMBIE_RIPPLE/")) {
+        if (upper.contains("/BACKGROUNDS/WATER_") && upper.contains("_RIPPLE/")) {
             return true;
         }
         if (upper.contains("/EFFECTS/")) {

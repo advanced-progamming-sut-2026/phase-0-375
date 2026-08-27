@@ -1,23 +1,49 @@
 package view.gui.anim;
 
+import model.enums.Chapter;
 import model.item.Grave;
 
 /**
- * Egypt gravestone clip + a short squash-and-stretch pop out of the ground.
+ * Gravestone clip + a short squash-and-stretch pop out of the ground.
+ *
+ * <p>Egypt uses {@link #PAM_EGYPT}; Dark Ages picks {@link #PAM_DARK_PLAIN},
+ * {@link #PAM_DARK_SUN}, or {@link #PAM_DARK_PLANTFOOD} from {@link Grave.GraveType}.
+ * Damage tiers and emerge timing match Egypt tombs.
  *
  * <p>Classic emerge (anticipation squash → stretch → settle), not a PAM clip.
  * Progress {@code 0} is a wide pancake; {@code 1} is rest scale.
  */
 public final class GraveAnim {
-    public static final String PAM = "EGYPT_HIEROGLYPH";
+    public static final String PAM_EGYPT = "EGYPT_HIEROGLYPH";
+    public static final String PAM_DARK_PLAIN = "DARK_NOOP";
+    public static final String PAM_DARK_SUN = "DARK_SUN";
+    public static final String PAM_DARK_PLANTFOOD = "DARK_PLANTFOOD";
 
-    /** Egypt tomb PAM canvas (animations.json); scale is about this centre. */
+    /** Egypt default; prefer {@link #pamFor(Chapter, Grave)}. */
+    public static final String PAM = PAM_EGYPT;
+
+    /** Egypt / Dark Ages tomb PAM canvas (animations.json); scale is about this centre. */
     public static final float CANVAS = 390f;
 
     /** Whole pop is a few tenths of a second. */
     public static final float EMERGE_DURATION = 0.28f;
 
     private GraveAnim() {}
+
+    /** Catalog PAM name for the active chapter and grave loot type. */
+    public static String pamFor(Chapter chapter, Grave grave) {
+        if (chapter == Chapter.DARK_AGES) {
+            if (grave == null) {
+                return PAM_DARK_PLAIN;
+            }
+            return switch (grave.getType()) {
+                case SUN -> PAM_DARK_SUN;
+                case PLANT_FOOD -> PAM_DARK_PLANTFOOD;
+                default -> PAM_DARK_PLAIN;
+            };
+        }
+        return PAM_EGYPT;
+    }
 
     public static String clipForHp(int hp, int maxHp) {
         if (maxHp <= 0) {

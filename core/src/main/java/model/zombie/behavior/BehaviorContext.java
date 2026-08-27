@@ -156,4 +156,13 @@ public interface BehaviorContext {
 
     /** Removes an orphaned pushable from the world list. */
     void removeOrphanedPushable(Pushable pushable);
+
+    // --- Presentation cues ---
+
+    /**
+     * Arms a slide: {@code zombie} entered {@code slideTile} heading for
+     * {@code toRow}. The slide fires once the zombie reaches the tile's
+     * middle; the view then plays the activation FX and glides the zombie.
+     */
+    void armLaneSlide(ZombieInstance zombie, Cell slideTile, int toRow);
 }

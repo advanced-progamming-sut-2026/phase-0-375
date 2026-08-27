@@ -9,6 +9,7 @@ import model.game.core.GameModel;
 import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.Point;
+import model.game.map.TideState;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.SlideTerrainStrategy;
 import model.game.map.terrain.TerrainStrategyFactory;
@@ -65,28 +66,18 @@ public class RegularLevel extends Level {
 
     /**
      * Applies the chapter terrain declared in the level config to the map:
-     * Big Wave Beach water / low-tide tiles ({@link model.game.map.WaterBand}
-     * for a right-edge default; GUI draws {@code WAVE_UPPERLAYER.PAM} over it),
+     * Big Wave Beach water / low-tide via {@link TideState},
      * Frostbite Caves slide tiles and
      * initial ice blocks (each holding a frozen zombie), and Dark Ages
      * necromancy tiles.
      */
     private void applyChapterTerrain(GameModel model) {
-        List<Point> water = getConfig().getWaterTiles();
-        if (water != null) {
-            for (Point p : water) {
-                setGround(model, p, GroundType.WATER);
-            }
-        }
-        List<Point> lowTides = getConfig().getLowTideTiles();
-        if (lowTides != null) {
-            for (Point p : lowTides) {
-                // Low-tide cells inside the permanent sea start submerged;
-                // ones on dry land stay normal until the tide covers them.
-                Cell cell = model.getCellAt(p.getY(), p.getX());
-                if (cell != null && cell.getGroundType() == GroundType.WATER) {
-                    setGround(model, p, GroundType.LOW_TIDE);
-                }
+        if (getConfig().getChapter() == Chapter.BIG_WAVE_BEACH) {
+            TideState tide = model.getTideState();
+            if (tide.isActive()) {
+                tide.setLowTide(getConfig().getLowTideTiles());
+                tide.setDynamicColumns(0);
+                tide.applyToMap(model.getMap());
             }
         }
         Map<Point, SlideDirection> slides = getConfig().getSlideTiles();

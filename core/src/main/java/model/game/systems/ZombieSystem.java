@@ -71,6 +71,7 @@ public class ZombieSystem implements Tickable {
 
     @Override
     public void tick(float deltaTime) {
+        gameModel.discardUnreadSlideStarts();
         List<ZombieInstance> zombies = gameModel.getZombies();
         if (zombies == null || zombies.isEmpty()) return;
 
@@ -145,6 +146,8 @@ public class ZombieSystem implements Tickable {
         }
 
         zombie.setContinuousX(newX);
+        // Slides fire when the zombie reaches the slide tile's middle.
+        gameModel.tickArmedSlide(zombie, newX);
         if (newGridX != zombie.getGridX() && newGridX >= 0) {
             zombie.setGridX(newGridX);
             onZombieEnteredCell(zombie, context);
@@ -251,6 +254,9 @@ public class ZombieSystem implements Tickable {
                 || state == ZombieState.SPAWNING
                 || state == ZombieState.DYING
                 || state == ZombieState.DEAD) {
+            return false;
+        }
+        if (gameModel.isWaterEmerging(zombie)) {
             return false;
         }
         return !zombie.isFrozen();

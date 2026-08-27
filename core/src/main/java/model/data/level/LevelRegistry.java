@@ -182,7 +182,18 @@ public class LevelRegistry {
         config.setConveyorIntervalSeconds(entry.getConveyorIntervalSeconds());
         config.setConveyorCapacity(entry.getConveyorCapacity());
         config.setWaterTiles(points(entry.getWaterTiles()));
-        config.setLowTideTiles(points(entry.getLowTideTiles()));
+        // Prefer wave-authored low-tide cells; fall back to legacy level field.
+        List<Point> levelLowTide = points(entry.getLowTideTiles());
+        if ((levelLowTide == null || levelLowTide.isEmpty()) && entry.getWaves() != null) {
+            for (LevelDataEntry.WaveData w : entry.getWaves()) {
+                List<Point> fromWave = points(w.getLowTideTiles());
+                if (fromWave != null && !fromWave.isEmpty()) {
+                    levelLowTide = fromWave;
+                    break;
+                }
+            }
+        }
+        config.setLowTideTiles(levelLowTide);
         config.setTideLimitColumn(entry.getTideLimitColumn());
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
@@ -274,6 +285,7 @@ public class LevelRegistry {
                 rawWave.isHugeWave(), isFinal
         );
         wave.setWaveBudget(budget);
+        wave.setLowTideTiles(points(rawWave.getLowTideTiles()));
         assignSpawnStrategies(wave, runtimes, patternTypes, budget);
         return wave;
     }

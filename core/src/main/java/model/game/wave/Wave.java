@@ -4,6 +4,7 @@ import model.enums.Chapter;
 import model.enums.WaveState;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
+import model.game.map.Point;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ public class Wave implements Tickable {
     private WaveRandomGenerator rng;
     private float waveClock;
     private int rowCount;
+
+    /** Big Wave Beach: cells that may ambush when submerged during this wave. */
+    private List<Point> lowTideTiles = List.of();
 
     public Wave(int waveNumber,
                 List<EntryRuntime> zombieEntries,
@@ -246,6 +250,17 @@ public class Wave implements Tickable {
         this.waveBudget = waveBudget;
     }
 
+    /** Big Wave Beach ambush cells for this wave; never null. */
+    public List<Point> getLowTideTiles() {
+        return lowTideTiles;
+    }
+
+    public void setLowTideTiles(List<Point> lowTideTiles) {
+        this.lowTideTiles = lowTideTiles == null || lowTideTiles.isEmpty()
+                ? List.of()
+                : List.copyOf(lowTideTiles);
+    }
+
     // -- spawn functions --------
 
     public void spawnOne(WaveZombieEntry entry) {
@@ -258,12 +273,12 @@ public class Wave implements Tickable {
         if (gameModel == null) return;   // not wired up yet — silently skip
         Zombie z = rng.rollZombiePool(entry.getPool());
         if (z == null) return;
-        // Ancient Egypt: final-wave zombies may ride in on a tornado and
+        // Ancient Egypt: final-wave zombies may ride in on a sandstorm and
         // touch down 1-4 columns ahead of the normal entry point.
         if (isFinalWave
                 && gameModel.getChapter() == Chapter.ANCIENT_EGYPT
                 && rng.nextBoolean(TORNADO_CHANCE)) {
-            gameModel.spawnZombieWithTornado(z, lane,
+            gameModel.queueSandstormSpawn(z, lane,
                     rng.nextInt(1, TORNADO_MAX_COLUMNS_AHEAD));
             return;
         }

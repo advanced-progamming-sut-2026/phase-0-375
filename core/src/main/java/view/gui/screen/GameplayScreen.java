@@ -57,6 +57,7 @@ import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
+import view.gui.lawn.NecromancyTileRenderer;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
 import view.gui.ui.BeghouledMatchHud;
@@ -108,6 +109,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private WaveProgressHud waveProgress;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
+    private NecromancyTileRenderer necromancyTiles;
     private DeadLineRenderer deadLineRenderer;
     private BrainLaneRenderer brainLaneRenderer;
     private String previewPlant;
@@ -162,6 +164,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         waterUnderlayer = chapter == Chapter.BIG_WAVE_BEACH
             ? new WaterUnderlayerRenderer(assets, lawnLayout)
             : null;
+        if (chapter == Chapter.DARK_AGES) {
+            necromancyTiles = new NecromancyTileRenderer();
+        }
         entityOverlay = new DebugEntityOverlay(lawnLayout, resolveFont());
         entityRenderer = new LawnEntityRenderer(assets, lawnLayout, entityOverlay);
         entityRenderer.setScreenShake(screenShake);
@@ -390,9 +395,19 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 }
             });
 
+            TextButton nuke = new TextButton("Nuke", skin, "brown");
+            nuke.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    CommandResult<Void> result = gameplay.releaseNuke();
+                    showToast(result.getMessage(), !result.isSuccess());
+                }
+            });
+
             Table cheats = new Table();
             cheats.add(addSun).width(160f).height(44f).padRight(8f);
-            cheats.add(addPlantFood).width(180f).height(44f);
+            cheats.add(addPlantFood).width(180f).height(44f).padRight(8f);
+            cheats.add(nuke).width(100f).height(44f);
             bottomRight.add(cheats).right().padBottom(8f).row();
         }
 
@@ -1175,6 +1190,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (waterUnderlayer != null) {
             waterUnderlayer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         }
+        if (necromancyTiles != null) {
+            necromancyTiles.draw(game.batch, lawnLayout,
+                App.getInstance().getCurrentGameModel(), delta);
+        }
         if (deadLineRenderer != null) {
             deadLineRenderer.draw(game.batch, lawnLayout, deadLineColumn());
         }
@@ -1573,6 +1592,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         entityOverlay.dispose();
         if (rowColHighlight != null) {
             rowColHighlight.dispose();
+        }
+        if (necromancyTiles != null) {
+            necromancyTiles.dispose();
         }
         if (deadLineRenderer != null) {
             deadLineRenderer.dispose();
