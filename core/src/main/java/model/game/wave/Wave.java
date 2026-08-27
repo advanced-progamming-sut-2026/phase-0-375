@@ -4,6 +4,7 @@ import model.enums.Chapter;
 import model.enums.WaveState;
 import model.game.core.GameModel;
 import model.game.core.Tickable;
+import model.game.map.Point;
 import model.zombie.definition.Zombie;
 
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ public class Wave implements Tickable {
     private WaveRandomGenerator rng;
     private float waveClock;
     private int rowCount;
+
+    /** Big Wave Beach: cells that may ambush when submerged during this wave. */
+    private List<Point> lowTideTiles = List.of();
 
     public Wave(int waveNumber,
                 List<EntryRuntime> zombieEntries,
@@ -244,6 +248,17 @@ public class Wave implements Tickable {
     /** Sets this wave's wavePointCost budget (Phase-2). */
     public void setWaveBudget(int waveBudget) {
         this.waveBudget = waveBudget;
+    }
+
+    /** Big Wave Beach ambush cells for this wave; never null. */
+    public List<Point> getLowTideTiles() {
+        return lowTideTiles;
+    }
+
+    public void setLowTideTiles(List<Point> lowTideTiles) {
+        this.lowTideTiles = lowTideTiles == null || lowTideTiles.isEmpty()
+                ? List.of()
+                : List.copyOf(lowTideTiles);
     }
 
     // -- spawn functions --------

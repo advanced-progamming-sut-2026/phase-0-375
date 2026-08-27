@@ -465,6 +465,8 @@ public class LevelDataEntry {
         private boolean finalWave;
         private int waveBudget = 0;
         private List<WaveEntryData> entries;
+        /** Big Wave Beach: ambush cells for this wave (same set on every wave of a level). */
+        private List<PointData> lowTideTiles;
 
         public int getWaveNumber() {
             return waveNumber;
@@ -512,6 +514,14 @@ public class LevelDataEntry {
 
         public void setEntries(List<WaveEntryData> entries) {
             this.entries = entries;
+        }
+
+        public List<PointData> getLowTideTiles() {
+            return lowTideTiles;
+        }
+
+        public void setLowTideTiles(List<PointData> lowTideTiles) {
+            this.lowTideTiles = lowTideTiles;
         }
     }
 

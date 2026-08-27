@@ -15,6 +15,8 @@ import model.game.map.Cell;
 import model.game.map.FloatPoint;
 import model.game.map.GameMap;
 import model.game.map.Lane;
+import model.game.map.TideState;
+import model.game.map.WaterBand;
 import model.game.map.terrain.CraterTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.TerrainStrategy;
@@ -107,6 +109,9 @@ public class GameModel implements BehaviorContext {
     // Chapter-specific ambient effects (tornado, ice wind, tide)
     private ChapterEffectsSystem chapterEffects;
 
+    /** Big Wave Beach tide / static sea; inactive on other chapters. */
+    private final TideState tideState;
+
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
@@ -154,6 +159,8 @@ public class GameModel implements BehaviorContext {
         this.orphanedPushables = new ArrayList<>();
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
+
+        this.tideState = TideState.fromConfig(levelConfig);
 
         this.waveManager = new WaveManager(levelConfig.getWaves(), this);
 
@@ -316,6 +323,40 @@ public class GameModel implements BehaviorContext {
     private final List<LaneSlide> laneSlidesView =
             Collections.unmodifiableList(laneSlides);
 
+    /** Low-tide ambushes still surfacing; presentation-only. */
+    private final List<WaterEmerge> waterEmerges = new ArrayList<>();
+    /** Read-only view of {@link #waterEmerges} for the renderer. */
+    private final List<WaterEmerge> waterEmergesView =
+            Collections.unmodifiableList(waterEmerges);
+
+    /**
+     * Marks a freshly spawned ambush zombie as surfacing from the shallow
+     * water; the view plays the Snorkel-style mask + ripple while it rises.
+     */
+    public void beginWaterEmerge(ZombieInstance zombie) {
+        if (zombie != null) {
+            waterEmerges.add(new WaterEmerge(zombie));
+        }
+    }
+
+    /** In-flight water emergences (read-only) for the view layer. */
+    public List<WaterEmerge> getWaterEmerges() {
+        return waterEmergesView;
+    }
+
+    /** True while a low-tide ambush zombie is still surfacing. */
+    public boolean isWaterEmerging(ZombieInstance zombie) {
+        if (zombie == null || waterEmerges.isEmpty()) {
+            return false;
+        }
+        for (WaterEmerge emerge : waterEmerges) {
+            if (emerge.getZombie() == zombie) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void armLaneSlide(ZombieInstance zombie, Cell slideTile, int toRow) {
         if (zombie == null || slideTile == null) {
@@ -382,6 +423,33 @@ public class GameModel implements BehaviorContext {
     public int getTideLimitColumns() {
         LevelConfig config = currentLevel != null ? currentLevel.getConfig() : null;
         return config != null ? Math.max(0, config.getTideLimitColumn()) : 0;
+    }
+
+    /**
+     * Columns currently flooded by the dynamic tide, counting from the right
+     * edge; {@code 0} when the tide is fully out. Static sea is not counted.
+     */
+    public int getTideColumns() {
+        return tideState.getDynamicColumns();
+    }
+
+    /** Beach tide state; inactive ({@link TideState#isActive()} false) elsewhere. */
+    public TideState getTideState() {
+        return tideState;
+    }
+
+    /**
+     * Rightmost flooded column count for the wave PAM: dynamic tide width with
+     * a floor at permanent {@code waterTiles}.
+     */
+    public int getFloodedColumns() {
+        if (gameMap == null) {
+            return 0;
+        }
+        if (tideState.isActive()) {
+            return tideState.floodedColumns(gameMap.getCols(), gameMap.getRows());
+        }
+        return WaterBand.columnsFromRight(gameMap);
     }
 
     @Override
@@ -738,6 +806,7 @@ public class GameModel implements BehaviorContext {
         tickSandstorms(deltaTime);
         tickIceWinds(deltaTime);
         tickLaneSlides(deltaTime);
+        tickWaterEmerges(deltaTime);
         if (!seedCooldowns.isEmpty()) {
             Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
             while (it.hasNext()) {
@@ -782,6 +851,19 @@ public class GameModel implements BehaviorContext {
             return;
         }
         Iterator<LaneSlide> iterator = laneSlides.iterator();
+        while (iterator.hasNext()) {
+            if (iterator.next().tick(deltaTime)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    /** Expires finished water emergences (and ones whose zombie is gone). */
+    private void tickWaterEmerges(float deltaTime) {
+        if (waterEmerges.isEmpty()) {
+            return;
+        }
+        Iterator<WaterEmerge> iterator = waterEmerges.iterator();
         while (iterator.hasNext()) {
             if (iterator.next().tick(deltaTime)) {
                 iterator.remove();

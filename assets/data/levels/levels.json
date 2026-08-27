@@ -1011,6 +1011,14 @@
       {
         "waveNumber": 1,
         "startDelay": 10,
+        "lowTideTiles": [
+          { "x": 6, "y": 1 },
+          { "x": 6, "y": 3 },
+          { "x": 7, "y": 2 },
+          { "x": 8, "y": 1 },
+          { "x": 8, "y": 2 },
+          { "x": 8, "y": 3 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1039,6 +1047,14 @@
         "startDelay": 18,
         "hugeWave": true,
         "finalWave": true,
+        "lowTideTiles": [
+          { "x": 6, "y": 1 },
+          { "x": 6, "y": 3 },
+          { "x": 7, "y": 2 },
+          { "x": 8, "y": 1 },
+          { "x": 8, "y": 2 },
+          { "x": 8, "y": 3 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1067,17 +1083,7 @@
         "waveBudget": 3000
       }
     ],
-    "tideLimitColumn": 3,
-    "lowTideTiles": [
-      {
-        "x": 7,
-        "y": 2
-      },
-      {
-        "x": 8,
-        "y": 1
-      }
-    ]
+    "tideLimitColumn": 3
   },
   {
     "chapter": "BIG_WAVE_BEACH",
@@ -1119,6 +1125,14 @@
       {
         "waveNumber": 1,
         "startDelay": 10,
+        "lowTideTiles": [
+          { "x": 5, "y": 2 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 2 },
+          { "x": 6, "y": 4 },
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 4 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1147,6 +1161,14 @@
         "startDelay": 18,
         "hugeWave": true,
         "finalWave": true,
+        "lowTideTiles": [
+          { "x": 5, "y": 2 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 2 },
+          { "x": 6, "y": 4 },
+          { "x": 8, "y": 0 },
+          { "x": 8, "y": 4 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1176,20 +1198,6 @@
       }
     ],
     "tideLimitColumn": 4,
-    "lowTideTiles": [
-      {
-        "x": 6,
-        "y": 2
-      },
-      {
-        "x": 8,
-        "y": 0
-      },
-      {
-        "x": 8,
-        "y": 4
-      }
-    ],
     "deadLineColumn": 2
   },
   {
@@ -1227,20 +1235,18 @@
       }
     ],
     "tideLimitColumn": 4,
-    "lowTideTiles": [
-      {
-        "x": 7,
-        "y": 1
-      },
-      {
-        "x": 7,
-        "y": 3
-      }
-    ],
     "waves": [
       {
         "waveNumber": 1,
         "startDelay": 8,
+        "lowTideTiles": [
+          { "x": 5, "y": 1 },
+          { "x": 5, "y": 3 },
+          { "x": 6, "y": 2 },
+          { "x": 7, "y": 1 },
+          { "x": 7, "y": 3 },
+          { "x": 8, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1267,6 +1273,14 @@
       {
         "waveNumber": 2,
         "startDelay": 15,
+        "lowTideTiles": [
+          { "x": 5, "y": 1 },
+          { "x": 5, "y": 3 },
+          { "x": 6, "y": 2 },
+          { "x": 7, "y": 1 },
+          { "x": 7, "y": 3 },
+          { "x": 8, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1297,6 +1311,14 @@
       {
         "waveNumber": 3,
         "startDelay": 18,
+        "lowTideTiles": [
+          { "x": 5, "y": 1 },
+          { "x": 5, "y": 3 },
+          { "x": 6, "y": 2 },
+          { "x": 7, "y": 1 },
+          { "x": 7, "y": 3 },
+          { "x": 8, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1373,24 +1395,18 @@
       }
     ],
     "tideLimitColumn": 5,
-    "lowTideTiles": [
-      {
-        "x": 6,
-        "y": 0
-      },
-      {
-        "x": 6,
-        "y": 4
-      },
-      {
-        "x": 7,
-        "y": 2
-      }
-    ],
     "waves": [
       {
         "waveNumber": 1,
         "startDelay": 8,
+        "lowTideTiles": [
+          { "x": 4, "y": 2 },
+          { "x": 5, "y": 0 },
+          { "x": 5, "y": 4 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 4 },
+          { "x": 7, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1417,6 +1433,14 @@
       {
         "waveNumber": 2,
         "startDelay": 15,
+        "lowTideTiles": [
+          { "x": 4, "y": 2 },
+          { "x": 5, "y": 0 },
+          { "x": 5, "y": 4 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 4 },
+          { "x": 7, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1447,6 +1471,14 @@
       {
         "waveNumber": 3,
         "startDelay": 18,
+        "lowTideTiles": [
+          { "x": 4, "y": 2 },
+          { "x": 5, "y": 0 },
+          { "x": 5, "y": 4 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 4 },
+          { "x": 7, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [
@@ -1478,6 +1510,14 @@
       {
         "waveNumber": 4,
         "startDelay": 20,
+        "lowTideTiles": [
+          { "x": 4, "y": 2 },
+          { "x": 5, "y": 0 },
+          { "x": 5, "y": 4 },
+          { "x": 6, "y": 0 },
+          { "x": 6, "y": 4 },
+          { "x": 7, "y": 2 }
+        ],
         "entries": [
           {
             "pool": [

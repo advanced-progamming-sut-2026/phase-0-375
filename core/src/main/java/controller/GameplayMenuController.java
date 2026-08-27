@@ -21,6 +21,7 @@ import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.map.Cell;
 import model.game.map.GameMap;
 import model.game.map.Point;
+import model.game.map.TideState;
 import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
@@ -360,6 +361,32 @@ public class GameplayMenuController extends AppMenuController {
     }
 
     /**
+     * Cheat: same spawn path as a low-tide ambush — {@link GameModel#spawnZombieAt}
+     * plus {@link GameModel#beginWaterEmerge} for the Snorkel-style surface.
+     */
+    public CommandResult<Void> cheatLowTideAmbush(String zombieType, int x, int y) {
+        if (zombieType == null || zombieType.isBlank()) {
+            return CommandResult.error("Zombie type cannot be empty.");
+        }
+        CommandResult<Void> guard = guardGameRunning();
+        if (guard != null) return guard;
+
+        GameModel model = requireGame();
+        GameMap map = model.getMap();
+        if (!inBounds(map, x, y)) {
+            return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds.");
+        }
+
+        ZombieInstance spawned = model.spawnZombieAt(zombieType, y, x);
+        if (spawned == null) {
+            return CommandResult.error("Unknown zombie type: '" + zombieType
+                    + "'. Make sure ZombieFactory has been initialized.");
+        }
+        model.beginWaterEmerge(spawned);
+        return CommandResult.success("Low-tide ambush: '" + zombieType + "' at (" + x + ", " + y + ").");
+    }
+
+    /**
      * Cheat: plants a frozen zombie inside a Frostbite ice block at the cell.
      * The zombie is not on the walking list until the ice melts.
      */
@@ -409,6 +436,16 @@ public class GameplayMenuController extends AppMenuController {
         }
         GameModel model = requireGame();
         GameMap map = model.getMap();
+        TideState tide = model.getTideState();
+        if (tide.hasDynamicBand()) {
+            tide.setDynamicColumns(Math.min(columnsFromRight, map.getCols()));
+            tide.applyToMap(map);
+            int live = tide.floodedColumns(map.getCols(), map.getRows());
+            if (live == 0) {
+                return CommandResult.success("Cleared the water band.");
+            }
+            return CommandResult.success("Water on the rightmost " + live + " column(s).");
+        }
         WaterBand.applyFromRight(map, columnsFromRight);
         int live = WaterBand.columnsFromRight(map);
         if (live == 0) {
@@ -425,6 +462,21 @@ public class GameplayMenuController extends AppMenuController {
         if (guard != null) return guard;
         GameModel model = requireGame();
         GameMap map = model.getMap();
+        TideState tide = model.getTideState();
+        if (tide.hasDynamicBand()) {
+            int before = tide.getDynamicColumns();
+            int next = Math.max(0, Math.min(map.getCols(), before + delta));
+            tide.setDynamicColumns(next);
+            tide.applyToMap(map);
+            if (next == before) {
+                return CommandResult.success(next >= map.getCols()
+                        ? "Water already reaches the leftmost column."
+                        : "Water is already gone.");
+            }
+            String dir = next > before ? "left" : "right";
+            return CommandResult.success("Water line moved " + dir + " 1 tile ("
+                    + tide.floodedColumns(map.getCols(), map.getRows()) + " column(s)).");
+        }
         int before = WaterBand.columnsFromRight(map);
         int live = WaterBand.nudgeFromRight(map, delta);
         if (live == before) {

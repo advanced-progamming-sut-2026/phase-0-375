@@ -373,9 +373,19 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 }
             });
 
+            TextButton nuke = new TextButton("Nuke", skin, "brown");
+            nuke.addListener(new ChangeListener() {
+                @Override
+                public void changed(ChangeEvent event, Actor actor) {
+                    CommandResult<Void> result = gameplay.releaseNuke();
+                    showToast(result.getMessage(), !result.isSuccess());
+                }
+            });
+
             Table cheats = new Table();
             cheats.add(addSun).width(160f).height(44f).padRight(8f);
-            cheats.add(addPlantFood).width(180f).height(44f);
+            cheats.add(addPlantFood).width(180f).height(44f).padRight(8f);
+            cheats.add(nuke).width(100f).height(44f);
             bottomRight.add(cheats).right().padBottom(8f).row();
         }
 

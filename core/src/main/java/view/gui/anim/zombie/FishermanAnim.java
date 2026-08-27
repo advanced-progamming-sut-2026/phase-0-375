@@ -53,6 +53,38 @@ public final class FishermanAnim {
      * Three-tile-wide strip (centered on his column) from below this tile up
      * to the waterline, so a sinking body that hangs under the cell is still covered.
      */
+    public static final float WADE_MASK_WIDTH_TILES = 3f;
+    /** Low-tide emerge: wide/tall strip so large zombies stay clipped while submerged. */
+    public static final float EMERGE_MASK_WIDTH_TILES = 5f;
+    public static final float EMERGE_MASK_BELOW_TILES = 2.5f;
+
+    /** Extra downward sink while a low-tide ambush is still submerged. */
+    public static float emergeExtraSink(float cellHeight, ZombieInstance zombie) {
+        if (cellHeight <= 0f) {
+            return 0f;
+        }
+        if (zombie == null || zombie.getDefinition() == null) {
+            return cellHeight * 0.12f;
+        }
+        return switch (zombie.getDefinition().getSize()) {
+            case LARGE -> cellHeight * 0.55f;
+            case IMP -> cellHeight * 0.05f;
+            default -> cellHeight * 0.18f;
+        };
+    }
+
+    /** Mask width in lawn tiles for a submerged ambush zombie. */
+    public static float emergeMaskWidthTiles(ZombieInstance zombie) {
+        if (zombie == null || zombie.getDefinition() == null) {
+            return EMERGE_MASK_WIDTH_TILES;
+        }
+        return switch (zombie.getDefinition().getSize()) {
+            case LARGE -> 7f;
+            case IMP -> WADE_MASK_WIDTH_TILES;
+            default -> EMERGE_MASK_WIDTH_TILES;
+        };
+    }
+
     public static Rectangle drownMaskWorld(LawnLayout layout, float originX, float originY,
                                            float waterY) {
         if (layout == null) {
@@ -64,19 +96,31 @@ public final class FishermanAnim {
     /** Same strip, pinned to a grid row so a sunk origin cannot pick the lane below. */
     public static Rectangle drownMaskWorld(LawnLayout layout, float originX, int row,
                                            float waterY) {
+        return drownMaskWorld(layout, originX, row, waterY,
+                WADE_MASK_WIDTH_TILES, 1f);
+    }
+
+    /**
+     * Configurable strip centered on the zombie column: {@code widthTiles} wide,
+     * extending {@code belowTiles} cell-heights under the row bottom up to {@code waterY}.
+     * Fragments inside are discarded by {@link FishermanDrownShader}.
+     */
+    public static Rectangle drownMaskWorld(LawnLayout layout, float originX, int row,
+                                           float waterY, float widthTiles, float belowTiles) {
         if (layout == null) {
             return null;
         }
         int col = colAt(layout, originX);
         int r = Math.max(0, Math.min(layout.rows() - 1, row));
         float tile = layout.cellWidth();
-        float left = layout.cellLeft(col) - tile;
-        float bottom = layout.cellBottom(r) - layout.cellHeight();
+        float halfExtra = Math.max(0f, (widthTiles - 1f) * 0.5f);
+        float left = layout.cellLeft(col) - tile * halfExtra;
+        float bottom = layout.cellBottom(r) - layout.cellHeight() * Math.max(1f, belowTiles);
         float h = waterY - bottom;
         if (h <= 1f) {
             return null;
         }
-        return new Rectangle(left, bottom, tile * 3f, h);
+        return new Rectangle(left, bottom, tile * widthTiles, h);
     }
 
     /** True when the invisible tile mask covers any of the zombie's world box. */

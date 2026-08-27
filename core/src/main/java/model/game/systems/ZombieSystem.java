@@ -256,6 +256,9 @@ public class ZombieSystem implements Tickable {
                 || state == ZombieState.DEAD) {
             return false;
         }
+        if (gameModel.isWaterEmerging(zombie)) {
+            return false;
+        }
         return !zombie.isFrozen();
     }
 

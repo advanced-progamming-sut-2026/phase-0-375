@@ -17,6 +17,7 @@ import model.game.core.GameModel;
 import model.game.core.IceWindGust;
 import model.game.core.LaneSlide;
 import model.game.core.SandstormSpawn;
+import model.game.core.WaterEmerge;
 import model.game.level.minigame.bowling.BowlingWalnut;
 import model.game.level.minigame.bowling.WallnutBowlingLevel;
 import model.game.level.minigame.beghouled.BeghouledLevel;
@@ -320,6 +321,9 @@ public final class LawnEntityRenderer {
     /** Slides still gliding between lanes, keyed by their zombie. */
     private final IdentityHashMap<ZombieInstance, LaneSlide> laneGlides =
             new IdentityHashMap<>();
+    /** Low-tide ambushes still surfacing, keyed by their zombie. */
+    private final IdentityHashMap<ZombieInstance, WaterEmerge> waterEmerges =
+            new IdentityHashMap<>();
     private final List<SunFlight> sunFlights = new ArrayList<>();
     private final List<PlantFoodFlight> plantFoodFlights = new ArrayList<>();
     private final List<LootFlight> lootFlights = new ArrayList<>();
@@ -341,7 +345,7 @@ public final class LawnEntityRenderer {
     private HitFlashShader hitFlashShader;
     private GlowGreenShader glowGreenShader;
     private float snorkelRippleTime;
-    private boolean snorkelRippleLoaded;
+    private final Set<String> snorkelRippleLoaded = new HashSet<>();
     private ScreenShake screenShake;
 
     private LawnMowerRenderer mowerRenderer;
@@ -484,6 +488,7 @@ public final class LawnEntityRenderer {
         updateSandstorms(model, delta);
         updateIceWinds(model, delta);
         updateLaneGlides(model);
+        updateWaterEmerges(model);
 
         Set<PlantInstance> livePlants = Collections.newSetFromMap(new IdentityHashMap<>());
         livePlants.addAll(plants);
@@ -2300,6 +2305,20 @@ public final class LawnEntityRenderer {
         laneGlides.keySet().removeIf(zombie -> !live.contains(zombie));
     }
 
+    /** Mirrors the model's surfacing ambush zombies for the water mask. */
+    private void updateWaterEmerges(GameModel model) {
+        if (model.getWaterEmerges().isEmpty()) {
+            waterEmerges.clear();
+            return;
+        }
+        waterEmerges.clear();
+        for (WaterEmerge emerge : model.getWaterEmerges()) {
+            waterEmerges.put(emerge.getZombie(), emerge);
+        }
+        Set<ZombieInstance> live = new HashSet<>(model.getZombies());
+        waterEmerges.keySet().removeIf(zombie -> !live.contains(zombie));
+    }
+
     private void drawSlideTiles(Batch batch, Set<Cell> live, float delta, int row) {
         for (Cell cell : live) {
             if (cell.getRow() != row) {
@@ -2890,6 +2909,7 @@ public final class LawnEntityRenderer {
 
         float x = xyTmp[0];
         float y = xyTmp[1];
+        float modelX = x;
         ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
         if (flight != null) {
             alignToss(zombie, flight, pose, x, y);
@@ -2929,13 +2949,15 @@ public final class LawnEntityRenderer {
             x += holdBack;
         }
         float standY = y;
+        GameModel model = App.getInstance().getCurrentGameModel();
         Rectangle snorkelMask = null;
         float snorkelWaterY = Float.NaN;
+        float rippleX = x;
+        float scale = AnimScale.ZOMBIE * pose.scale();
         SwimBehavior swim = SnorkelerAnim.isSnorkelerPam(pose.pamPath())
             ? (SwimBehavior) zombie.getBehavior(ZombieBehaviorType.SWIM)
             : null;
         if (swim != null && (swim.isSubmerged() || swim.isSurfaced()) && swim.getRise() < 1f - 1e-3f) {
-            float scale = AnimScale.ZOMBIE * pose.scale();
             float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
             Rectangle skull = ref != null ? partAt(ref, measureT, SnorkelerAnim.SKULL_PART) : null;
             if (skull == null) {
@@ -2944,6 +2966,28 @@ public final class LawnEntityRenderer {
             snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
             y = SnorkelerAnim.drawOriginY(standY, snorkelWaterY, skull, scale, swim.getRise());
             snorkelMask = FishermanAnim.drownMaskWorld(layout, x, zombie.getGridY(), snorkelWaterY);
+            rippleX = SnorkelerAnim.skullCenterWorldX(x, skull, scale, pose.flipX());
+        } else {
+            WaterEmerge emerge = waterEmerges.get(zombie);
+            if (emerge != null && emerge.progress() < 1f - 1e-3f) {
+                snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+                float measureT = phase >= 0f && ref != null ? phase * ref.duration : 0f;
+                Rectangle box = player.bounds(pose.pamPath(), pose.clipName());
+                float artTop = box != null
+                        ? standY - box.y * scale
+                        : standY + layout.cellHeight();
+                float extraSink = FishermanAnim.emergeExtraSink(layout.cellHeight(), zombie);
+                y = WaterEmerge.drawOriginY(
+                        standY, snorkelWaterY, artTop, emerge.progress(), extraSink);
+                snorkelMask = FishermanAnim.drownMaskWorld(
+                        layout, modelX, zombie.getGridY(), snorkelWaterY,
+                        FishermanAnim.emergeMaskWidthTiles(zombie),
+                        FishermanAnim.EMERGE_MASK_BELOW_TILES);
+                rippleX = modelX;
+            } else if (shouldRippleOnWater(zombie, model, swim, jump)) {
+                snorkelWaterY = SnorkelerAnim.waterLineY(layout, zombie.getGridY());
+                rippleX = modelX;
+            }
         }
         if (snorkelMask != null) {
             drownShader().begin(batch, snorkelMask);
@@ -2960,7 +3004,7 @@ public final class LawnEntityRenderer {
             drownShader().end(batch);
         }
         if (!Float.isNaN(snorkelWaterY)) {
-            drawSnorkelRipple(batch, pose, ref, time, x, y, snorkelWaterY);
+            drawSnorkelRipple(batch, pose, zombie, rippleX, snorkelWaterY);
         }
         if (zombie.isGlowing()) {
             drawGlowingPlantFoodOverlay(batch, zombie, x, y, delta);
@@ -4806,28 +4850,52 @@ public final class LawnEntityRenderer {
         return GLOW_BASE + GLOW_PULSE * wave;
     }
 
-    private void drawSnorkelRipple(Batch batch, AnimPose pose, ClipRef body, float time,
-                                   float x, float y, float waterY) {
-        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(SnorkelerAnim.RIPPLE_NAME);
-        String path = entry != null ? entry.path() : SnorkelerAnim.RIPPLE_PATH;
+    private void drawSnorkelRipple(Batch batch, AnimPose pose, ZombieInstance zombie,
+                                   float rippleX, float tileWaterY) {
+        String rippleName = SnorkelerAnim.rippleName(zombie);
+        PamCatalog.PamEntry entry = catalog == null ? null : catalog.byName(rippleName);
+        String path = entry != null ? entry.path() : SnorkelerAnim.ripplePath(zombie);
         String clip = entry != null
             ? catalog.resolveClip(entry, SnorkelerAnim.RIPPLE_CLIP, "ripple_exit")
             : SnorkelerAnim.RIPPLE_CLIP;
         ClipRef ripple = clips.getOrLoad(path, clip);
-        if (ripple == null && !snorkelRippleLoaded) {
-            snorkelRippleLoaded = true;
+        if (ripple == null && !snorkelRippleLoaded.contains(path)) {
+            snorkelRippleLoaded.add(path);
             clips.preloadSync(path, clip);
             ripple = clips.getOrLoad(path, clip);
         }
         if (ripple == null) {
             return;
         }
-        float scale = AnimScale.ZOMBIE * pose.scale();
-        Rectangle skull = body != null ? partAt(body, time, SnorkelerAnim.SKULL_PART) : null;
-        float rx = SnorkelerAnim.skullCenterWorldX(x, skull, scale, pose.flipX());
+        boolean gargantuar = zombie.getDefinition() != null
+                && zombie.getDefinition().getSize() == ZombieSize.LARGE;
+        float rippleScale = AnimScale.ZOMBIE * (gargantuar ? 1f : pose.scale());
+        float anchorY = tileWaterY;
+        if (gargantuar) {
+            // Tile waterline is one cell low for the large unit; same anchor as normal zombies.
+            anchorY += layout.cellHeight();
+        }
         Rectangle clipBox = player.bounds(path, clip);
-        float ry = SnorkelerAnim.rippleDrawY(waterY, clipBox, scale);
-        player.draw(batch, ripple, snorkelRippleTime, rx, ry, scale, scale, true);
+        float ry = SnorkelerAnim.rippleDrawY(anchorY, clipBox, rippleScale);
+        player.draw(batch, ripple, snorkelRippleTime, rippleX, ry, rippleScale, rippleScale, true);
+    }
+
+    /** Ripple-only on shallow tiles after emerge; no foot mask (that hid the whole body). */
+    private boolean shouldRippleOnWater(ZombieInstance zombie, GameModel model,
+                                        SwimBehavior swim, JumpBehavior jump) {
+        if (model == null || zombie == null || zombie.isDead()) {
+            return false;
+        }
+        if (waterEmerges.containsKey(zombie)) {
+            return false;
+        }
+        if (jump != null && jump.getPhase() == JumpBehavior.JumpPhase.JUMPING) {
+            return false;
+        }
+        if (swim != null && (swim.isSubmerged() || swim.isSurfaced())) {
+            return false;
+        }
+        return model.isWaterTile(zombie.getGridY(), zombie.getGridX());
     }
 
     private void freezeDrownWaterY(DeathFx fx, ClipRef die, float scale) {
