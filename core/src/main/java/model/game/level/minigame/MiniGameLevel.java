@@ -86,7 +86,7 @@ public abstract class MiniGameLevel extends Level {
                 user.setCoins(user.getCoins() + coinReward);
             }
             user.setCompletedMiniGames(user.getCompletedMiniGames() + 1);
-            App.getInstance().getUserRepository().flush();
+            App.getInstance().getUserRepository().incrementGamesPlayed(user.getUsername());
         }
     }
 }

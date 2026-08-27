@@ -81,6 +81,7 @@ public class ScoreLevel extends RegularLevel {
         previousPersonalBest = user.getHighestMyopoint();
         App.getInstance().getUserRepository()
                 .updateHighestMyopoint(user.getUsername(), tracker.getTotalPoints());
+        App.getInstance().getUserRepository().incrementGamesPlayed(user.getUsername());
         if (tracker.getTotalPoints() > previousPersonalBest) {
             newPersonalBest = true;
             System.out.println("New personal best: " + tracker.getTotalPoints() + " Myopoints!");

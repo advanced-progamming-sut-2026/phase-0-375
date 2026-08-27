@@ -173,7 +173,7 @@ public class RegularLevel extends Level {
             }
         }
 
-        App.getInstance().getUserRepository().flush();
+        App.getInstance().getUserRepository().incrementGamesPlayed(user.getUsername());
     }
 
     @Override
