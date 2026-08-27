@@ -718,6 +718,12 @@ public final class CollectionScreen extends AbstractMenuScreen {
             return;
         }
         TextureRegion frame = sheet.animation().getKeyFrame(0f);
+        if (SunshineAnim.isSunshineName(zombieName)) {
+            TextureRegion upright = SunshineAnim.packetPortraitFrame(sheet.animation());
+            if (upright != null) {
+                frame = upright;
+            }
+        }
         if (frame == null) {
             return;
         }
