@@ -10,6 +10,9 @@ public final class UiRegions {
     public static final String ATLAS_UI_ALWAYS_LOADED = "UI_AlwaysLoaded_768";
 
     public static final String MAIN_MENU_BACKGROUND = "IMAGE_MAINMENU_BACKGROUND";
+    /** Wide banner used as auth (Register/Login) backdrop. */
+    public static final String MAIN_MENU_CONTENT_DOWNLOADING =
+            "IMAGE_UI_MAINMENU_MAINMENU_CONTENT_DOWNLOADING";
     public static final String LOGO = "IMAGE_UI_MAINMENU_PVZ2_LOGO_HORIZONTAL";
     public static final String NEWS_ICON = "IMAGE_UI_MAINMENU_MM_NEWSICON";
     public static final String SETTINGS_ICON = "IMAGE_UI_MAINMENU_MM_SETTINGS";

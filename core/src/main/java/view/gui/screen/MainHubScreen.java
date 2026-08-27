@@ -1,14 +1,21 @@
 package view.gui.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.Interpolation;
 import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Group;
+import com.badlogic.gdx.scenes.scene2d.Touchable;
+import com.badlogic.gdx.scenes.scene2d.actions.Actions;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
+import com.badlogic.gdx.utils.Align;
 import controller.MainMenuController;
 import controller.NewsMenuController;
 import controller.ProfileMenuController;
@@ -20,11 +27,13 @@ import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
+import view.gui.ui.ModalCard;
 import view.gui.ui.NewsOverlay;
 import view.gui.ui.ProfileOverlay;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.SettingsOverlay;
 import view.gui.ui.SkinIconButton;
+import view.gui.ui.ZarrabiIntro;
 
 /**
  * PvZ2-style main hub: cosmic background, brown icon buttons, PLAY → adventure.
@@ -37,9 +46,16 @@ public final class MainHubScreen extends AbstractMenuScreen {
     private static final float PLAY_HEIGHT = 85f;
     private static final float LOGO_WIDTH = 720f;
     private static final float PLAY_FONT_SCALE = 1.7f;
+    /** Play Zarrabi fly-in once per app session when hub opens while logged in. */
+    private static boolean zarrabiPlayedThisSession;
+    /** Pulsing "gone" message when Zarrabi already visited this session. */
+    public static float ZARRABI_GONE_FADE_SEC = 0.85f;
+    public static float ZARRABI_GONE_HOLD_SEC = 0.35f;
+    public static float ZARRABI_GONE_Y = 420f;
 
     private final MainMenuController controller = MainMenuController.getInstance();
     private final MainMenuArt art = new MainMenuArt();
+    private ZarrabiIntro zarrabiIntro;
 
     private SkinIconButton newsButton;
     private ResourceBar resourceBar;
@@ -71,6 +87,44 @@ public final class MainHubScreen extends AbstractMenuScreen {
         addPlayButton();
         addCornerIcons(textures);
         addLogoutButton();
+        playZarrabiIntroIfNeeded();
+    }
+
+    private void playZarrabiIntroIfNeeded() {
+        if (zarrabiPlayedThisSession) {
+            showZarrabiGoneMessage();
+            return;
+        }
+        zarrabiPlayedThisSession = true;
+        if (zarrabiIntro != null) {
+            zarrabiIntro.dispose();
+        }
+        zarrabiIntro = new ZarrabiIntro();
+        FileHandle root = game.assets != null ? game.assets.root : null;
+        Group portrait = zarrabiIntro.play(UI_WIDTH, UI_HEIGHT, root);
+        if (portrait != null) {
+            stage.addActor(portrait);
+            portrait.toFront();
+            toast.toFront();
+        }
+    }
+
+    private void showZarrabiGoneMessage() {
+        Label label = new Label("Zarrabi's just gone :((", skin, "big");
+        label.setAlignment(Align.center);
+        label.setTouchable(Touchable.disabled);
+        label.pack();
+        label.setPosition((UI_WIDTH - label.getWidth()) * 0.5f, ZARRABI_GONE_Y);
+        label.getColor().a = 0f;
+        label.addAction(Actions.forever(Actions.sequence(
+                Actions.fadeIn(ZARRABI_GONE_FADE_SEC, Interpolation.sine),
+                Actions.delay(ZARRABI_GONE_HOLD_SEC),
+                Actions.fadeOut(ZARRABI_GONE_FADE_SEC, Interpolation.sine),
+                Actions.delay(ZARRABI_GONE_HOLD_SEC)
+        )));
+        stage.addActor(label);
+        label.toFront();
+        toast.toFront();
     }
 
     private void addLogo(TextureBank textures) {
@@ -134,11 +188,20 @@ public final class MainHubScreen extends AbstractMenuScreen {
         logout.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.logout();
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(new RegisterScreen(game));
-                }
+                Table overlay = ModalCard.confirm(
+                        skin,
+                        "Logout",
+                        "Are you sure you want to log out?",
+                        "Logout",
+                        () -> {
+                            CommandResult<Void> r = controller.logout();
+                            showToast(r.getMessage(), !r.isSuccess());
+                            if (r.isSuccess()) {
+                                game.setScreen(new RegisterScreen(game));
+                            }
+                        });
+                stage.addActor(overlay);
+                toast.toFront();
             }
         });
         logout.setSize(160f, 52f);
@@ -238,5 +301,14 @@ public final class MainHubScreen extends AbstractMenuScreen {
 
         stage.act(delta);
         stage.draw();
+    }
+
+    @Override
+    public void dispose() {
+        if (zarrabiIntro != null) {
+            zarrabiIntro.dispose();
+            zarrabiIntro = null;
+        }
+        super.dispose();
     }
 }

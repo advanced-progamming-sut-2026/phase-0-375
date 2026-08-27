@@ -10,6 +10,10 @@ import view.gui.assets.UiRegions;
  * Preloads and draws main-menu art from libPVZ {@link TextureBank}.
  */
 public final class MainMenuArt {
+    /** Shared Register/Login full-bleed backdrop under {@code assets/}. */
+    public static final String AUTH_BG_RELATIVE =
+            "Exports/AI generated/Gemini_Generated_Image_ee6xnxee6xnxee6x.jpg";
+
     private boolean loaded;
 
     public void ensureLoaded(TextureBank textures) {
@@ -35,7 +39,17 @@ public final class MainMenuArt {
 
     /** Full-bleed background with a multiply tint (e.g. turquoise for Adventure). */
     public void drawBackground(Batch batch, TextureBank textures, float width, float height, Color tint) {
-        TextureRegion bg = region(textures, UiRegions.MAIN_MENU_BACKGROUND);
+        drawRegion(batch, textures, UiRegions.MAIN_MENU_BACKGROUND, width, height, tint);
+    }
+
+    /** Auth screens: content-downloading banner stretched to fill. */
+    public void drawAuthBackground(Batch batch, TextureBank textures, float width, float height) {
+        drawRegion(batch, textures, UiRegions.MAIN_MENU_CONTENT_DOWNLOADING, width, height, Color.WHITE);
+    }
+
+    private void drawRegion(Batch batch, TextureBank textures, String regionId,
+                            float width, float height, Color tint) {
+        TextureRegion bg = region(textures, regionId);
         if (bg == null) {
             return;
         }

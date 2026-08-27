@@ -595,6 +595,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         String detail = confirmLabel(item, targetPlant);
         stage.addActor(ModalCard.confirm(skin, "Confirm purchase",
             "Are you sure you want to buy this?\n" + detail,
+            "Buy",
             () -> purchase(item.getId(), targetPlant, count)));
     }
 

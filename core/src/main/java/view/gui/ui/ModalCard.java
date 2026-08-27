@@ -32,6 +32,7 @@ public final class ModalCard {
 
         BorderedTable card = new BorderedTable();
         Label heading = new Label(title, skin, "big");
+        heading.setColor(Color.BLACK);
         card.add(heading).padBottom(16f).row();
         card.add(body).growX().padBottom(16f).row();
 
@@ -52,6 +53,11 @@ public final class ModalCard {
      * Yes/Cancel confirm overlay. {@code onConfirm} runs after the overlay has faded out.
      */
     public static Table confirm(Skin skin, String title, String message, Runnable onConfirm) {
+        return confirm(skin, title, message, "Yes", onConfirm);
+    }
+
+    public static Table confirm(Skin skin, String title, String message, String yesLabel,
+                                Runnable onConfirm) {
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
@@ -76,7 +82,7 @@ public final class ModalCard {
                 dismiss(overlay, null);
             }
         });
-        TextButton yes = new TextButton("Buy", skin, "purple");
+        TextButton yes = new TextButton(yesLabel != null ? yesLabel : "Yes", skin, "purple");
         yes.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
