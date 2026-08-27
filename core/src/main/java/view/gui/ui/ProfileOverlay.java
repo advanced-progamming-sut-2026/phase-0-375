@@ -29,10 +29,24 @@ import java.util.function.BiConsumer;
  */
 public final class ProfileOverlay {
     private static final float FIELD_WIDTH = 400f;
-    private static final float BUTTON_WIDTH = 280f;
+
+    // ── Profile action buttons (tune in place) ─────────────────────────────
+    public static float EDIT_BTN_W = 200f;
+    public static float EDIT_BTN_H = 45;
+    public static float BACK_BTN_W = 200f;
+    public static float BACK_BTN_H = 50f;
+    /** Label scale on purple edit buttons. */
+    public static float EDIT_BTN_FONT_SCALE = 0.9f;
+    /** Label scale on the brown Back button. */
+    public static float BACK_BTN_FONT_SCALE = 0.95f;
+
+    public static float CARD_PAD = 40f;
+    public static float INFO_PAD = 12f;
     private static final float FADE_IN = 0.20f;
     private static final float FADE_OUT = 0.17f;
     private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
+    private static final Color INK = CollectionEntryOverlay.INK;
+    private static final Color MUTED = CollectionEntryOverlay.MUTED;
 
     private static Texture pixel;
 
@@ -96,10 +110,13 @@ public final class ProfileOverlay {
             this.onResourceBarRefresh = onResourceBarRefresh;
 
             card = new BorderedTable();
-            card.pad(28f);
-            card.add(new Label("Profile", skin, "big")).padBottom(16f).row();
+            card.pad(CARD_PAD);
+            Label title = new Label("Profile", skin, "big");
+            title.setColor(INK);
+            card.add(title).padBottom(20f).row();
 
             Table info = new Table();
+            info.pad(INFO_PAD);
             usernameValue = addInfoRow(info, "Username");
             nicknameValue = addInfoRow(info, "Nickname");
             emailValue = addInfoRow(info, "Email");
@@ -110,18 +127,17 @@ public final class ProfileOverlay {
             myopointValue = addInfoRow(info, "Highest myopoint");
             card.add(info).growX().padBottom(20f).row();
 
-            card.add(editButton("Change username", this::openChangeUsername)).width(BUTTON_WIDTH).height(48f)
+            card.add(editButton("Change username", this::openChangeUsername)).width(EDIT_BTN_W).height(EDIT_BTN_H)
                     .padBottom(8f).row();
-            card.add(editButton("Change nickname", this::openChangeNickname)).width(BUTTON_WIDTH).height(48f)
+            card.add(editButton("Change nickname", this::openChangeNickname)).width(EDIT_BTN_W).height(EDIT_BTN_H)
                     .padBottom(8f).row();
-            card.add(editButton("Change email", this::openChangeEmail)).width(BUTTON_WIDTH).height(48f)
+            card.add(editButton("Change email", this::openChangeEmail)).width(EDIT_BTN_W).height(EDIT_BTN_H)
                     .padBottom(8f).row();
-            card.add(editButton("Change password", this::openChangePassword)).width(BUTTON_WIDTH).height(48f)
+            card.add(editButton("Change password", this::openChangePassword)).width(EDIT_BTN_W).height(EDIT_BTN_H)
                     .padBottom(16f).row();
 
-            back = new TextButton("Back", skin, "brown");
-            UiMotion.bindPressScale(back);
-            card.add(back).width(BUTTON_WIDTH).height(56f);
+            back = styledButton("Back", "brown", BACK_BTN_FONT_SCALE);
+            card.add(back).width(BACK_BTN_W).height(BACK_BTN_H);
         }
 
         void bindStage(Table overlay) {
@@ -134,21 +150,29 @@ public final class ProfileOverlay {
 
         private Label addInfoRow(Table info, String label) {
             Label key = new Label(label + ":", skin, "secondary");
+            key.setColor(MUTED);
             Label value = new Label("—", skin, "medium");
-             info.add(key).left().padRight(16f).padBottom(6f);
-            info.add(value).left().expandX().padBottom(6f).row();
+            value.setColor(INK);
+            info.add(key).left().padRight(20f).padBottom(10f);
+            info.add(value).left().expandX().padBottom(10f).row();
             return value;
         }
 
         private TextButton editButton(String text, Runnable action) {
-            TextButton button = new TextButton(text, skin, "purple");
-            UiMotion.bindPressScale(button);
+            TextButton button = styledButton(text, "purple", EDIT_BTN_FONT_SCALE);
             button.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
                     action.run();
                 }
             });
+            return button;
+        }
+
+        private TextButton styledButton(String text, String style, float fontScale) {
+            TextButton button = new TextButton(text, skin, style);
+            button.getLabel().setFontScale(fontScale);
+            UiMotion.bindPressScale(button);
             return button;
         }
 

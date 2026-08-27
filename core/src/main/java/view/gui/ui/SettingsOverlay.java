@@ -32,11 +32,17 @@ import java.util.function.BiConsumer;
  * Settings panel over the main hub (dim + fade).
  */
 public final class SettingsOverlay {
-    private static final float CARD_WIDTH = 640f;
+    private static final float CARD_WIDTH = 720f;
     private static final float ROW_HEIGHT = 48f;
+    /** Horizontal inner padding (left / right) of the settings card. */
+    public static float CARD_PAD_X = 50f;
+    /** Vertical inner padding (top / bottom) of the settings card. */
+    public static float CARD_PAD_Y = 42f;
     private static final float FADE_IN = 0.20f;
     private static final float FADE_OUT = 0.17f;
     private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
+    private static final Color INK = CollectionEntryOverlay.INK;
+    private static final Color MUTED = CollectionEntryOverlay.MUTED;
 
     private static Texture pixel;
 
@@ -103,11 +109,14 @@ public final class SettingsOverlay {
             syncing = true;
 
             card = new BorderedTable();
-            card.pad(28f);
-            card.add(new Label("Settings", skin, "big")).padBottom(8f).row();
+            card.pad(CARD_PAD_Y, CARD_PAD_X, CARD_PAD_Y, CARD_PAD_X);
+            Label title = new Label("Settings", skin, "big");
+            title.setColor(INK);
+            card.add(title).padBottom(8f).row();
             summary = new Label("", skin, "secondary");
+            summary.setColor(MUTED);
             summary.setWrap(true);
-            card.add(summary).width(CARD_WIDTH - 56f).padBottom(18f).row();
+            card.add(summary).width(CARD_WIDTH - CARD_PAD_X * 2f - 24f).padBottom(18f).row();
 
             card.add(sectionLabel(skin, "Difficulty")).left().padBottom(6f).row();
             difficultyGroup = new ButtonGroup<>();
@@ -157,6 +166,7 @@ public final class SettingsOverlay {
 
             card.add(sectionLabel(skin, "Display & debug")).left().padBottom(6f).row();
             lawnGrid = new CheckBox(" Show lawn grid (red lines in game)", skin);
+            lawnGrid.getLabel().setColor(MUTED);
             lawnGrid.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
@@ -169,6 +179,7 @@ public final class SettingsOverlay {
             card.add(lawnGrid).left().padBottom(8f).row();
 
             debugMode = new CheckBox(" Debug mode (all levels / coins / gems / sun / plant food cheats)", skin);
+            debugMode.getLabel().setColor(MUTED);
             debugMode.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
@@ -182,6 +193,7 @@ public final class SettingsOverlay {
 
             card.add(sectionLabel(skin, "Audio")).left().padBottom(6f).row();
             musicValue = new Label("100%", skin, "medium");
+            musicValue.setColor(INK);
             musicSlider = volumeSlider(skin);
             musicSlider.addListener(new ChangeListener() {
                 @Override
@@ -206,6 +218,7 @@ public final class SettingsOverlay {
             card.add(volumeRow(skin, "Music", musicSlider, musicValue)).growX().padBottom(10f).row();
 
             sfxValue = new Label("100%", skin, "medium");
+            sfxValue.setColor(INK);
             sfxSlider = volumeSlider(skin);
             sfxSlider.addListener(new ChangeListener() {
                 @Override
@@ -347,7 +360,9 @@ public final class SettingsOverlay {
     }
 
     private static Label sectionLabel(Skin skin, String text) {
-        return new Label(text, skin, "medium");
+        Label label = new Label(text, skin, "medium");
+        label.setColor(INK);
+        return label;
     }
 
     private static TextButton choiceButton(Skin skin, String text) {
@@ -369,7 +384,9 @@ public final class SettingsOverlay {
 
     private static Table volumeRow(Skin skin, String title, Slider slider, Label value) {
         Table row = new Table();
-        row.add(new Label(title, skin, "secondary")).width(90f).left();
+        Label titleLabel = new Label(title, skin, "secondary");
+        titleLabel.setColor(MUTED);
+        row.add(titleLabel).width(90f).left();
         row.add(slider).growX().height(36f).padRight(12f);
         row.add(value).width(64f).right();
         return row;
