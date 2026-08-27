@@ -92,6 +92,7 @@ import view.gui.anim.zombie.HunterAnim;
 import view.gui.anim.zombie.JugglerAnim;
 import view.gui.anim.zombie.OctopusAnim;
 import view.gui.anim.zombie.SnorkelerAnim;
+import view.gui.anim.zombie.SunshineAnim;
 import view.gui.anim.plant.PlantFreezeAnim;
 import view.gui.anim.plant.PlantAnimRole;
 import view.gui.anim.zombie.TroglobiteAnim;
@@ -367,7 +368,7 @@ public final class LawnEntityRenderer {
     public LawnEntityRenderer(PvzAssets assets, LawnLayout layout, DebugEntityOverlay entityOverlay) {
         this(assets, layout,
                 new PlantAnimAdapter(assets.pamCatalog, assets.plantSheets),
-                new ZombieAnimAdapter(assets.pamCatalog),
+                new ZombieAnimAdapter(assets.pamCatalog, assets.plantSheets),
                 entityOverlay);
     }
 
@@ -436,7 +437,7 @@ public final class LawnEntityRenderer {
                               DebugEntityOverlay entityOverlay) {
         this(assets, layout,
                 new PlantAnimAdapter(catalog, assets.plantSheets),
-                new ZombieAnimAdapter(catalog),
+                new ZombieAnimAdapter(catalog, assets.plantSheets),
                 entityOverlay);
     }
 
@@ -2963,6 +2964,9 @@ public final class LawnEntityRenderer {
 
         float x = xyTmp[0];
         float y = xyTmp[1];
+        if (SunshineAnim.isSunshine(zombie)) {
+            y += SunshineAnim.drawOffsetY(layout.cellHeight());
+        }
         float modelX = x;
         ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
         if (flight != null) {
@@ -2989,7 +2993,7 @@ public final class LawnEntityRenderer {
         }
         float phase = NO_PHASE;
         ZombieGait gait = gaitFor(zombie);
-        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+        ClipRef ref = pose.isSpritesheet() ? null : clips.getOrLoad(pose.pamPath(), pose.clipName());
         if (ref != null && jump != null && jump.getPhase() == JumpBehavior.JumpPhase.JUMPING
             && ref.duration > 0f) {
             // Fuse hit → blastoff this frame. Do not let the gait walk clock finish first.
@@ -3007,7 +3011,8 @@ public final class LawnEntityRenderer {
         Rectangle snorkelMask = null;
         float snorkelWaterY = Float.NaN;
         float rippleX = x;
-        float scale = AnimScale.ZOMBIE * pose.scale();
+        float baseScale = AnimScale.forZombie(pose);
+        float scale = baseScale * pose.scale();
         SwimBehavior swim = SnorkelerAnim.isSnorkelerPam(pose.pamPath())
             ? (SwimBehavior) zombie.getBehavior(ZombieBehaviorType.SWIM)
             : null;
@@ -3051,7 +3056,7 @@ public final class LawnEntityRenderer {
             pose = pose.withHiddenParts(lostArmBodyParts(pose.pamPath()));
         }
         float glow = zombie.isGlowing() && snorkelMask == null ? glowStrength() : 0f;
-        float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, phase,
+        float time = drawPose(batch, zombie, pose, x, y, baseScale, phase,
             tickHitFlash(zombie, delta), delta, glow);
         maybeSpawnZombotanyJalapenoFire(zombie);
         maybeGargantuarWalkStomp(zombie, pose, time);

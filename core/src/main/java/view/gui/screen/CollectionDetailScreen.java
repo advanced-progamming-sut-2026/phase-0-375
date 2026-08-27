@@ -23,6 +23,7 @@ import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
+import view.gui.anim.zombie.SunshineAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.AlmanacArt;
 import view.gui.assets.PamCatalog;
@@ -282,7 +283,22 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             clipName = null;
             sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
             time = 0f;
+            if (sheets != null && sheets.hasSheets(name)) {
+                sheetSpec = sheets.resolveClip(name, "idle", "walk");
+                if (sheetSpec == null) {
+                    sheetSpec = sheets.anyClip(name);
+                }
+                if (sheetSpec != null) {
+                    if (SunshineAnim.isSunshineName(name)) {
+                        sheetOffsetY = CollectionEntryOverlay.SUNSHINE_PREVIEW_OFFSET_Y;
+                        sheetScaleMul = CollectionEntryOverlay.SUNSHINE_PREVIEW_SCALE;
+                    }
+                    return;
+                }
+            }
             PamCatalog.PamEntry entry = catalog.forZombie(name);
             if (entry == null) {
                 return;

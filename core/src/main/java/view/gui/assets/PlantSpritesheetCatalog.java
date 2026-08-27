@@ -12,7 +12,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Fallback plant / effect art when no PAM exists: PNG spritesheets under
+ * Fallback plant / zombie / effect art when no PAM exists: PNG spritesheets under
  * {@code IMAGES/{res}/...} with optional {@code sprites.json}.
  */
 public final class PlantSpritesheetCatalog {
@@ -237,9 +237,23 @@ public final class PlantSpritesheetCatalog {
         if (definitionName == null || root == null) {
             return null;
         }
-        String folderName = folderNameFor(definitionName);
-        String relativeDir = resolution + "/FULL/PLANT/" + folderName;
-        String key = "plant:" + folderName;
+        FolderMeta plant = folderUnder("PLANT", "plant:", plantFolderNameFor(definitionName));
+        if (plant != null) {
+            return plant;
+        }
+        String zombieFolder = zombieFolderNameFor(definitionName);
+        if (zombieFolder == null) {
+            return null;
+        }
+        return folderUnder("ZOMBIE", "zombie:", zombieFolder);
+    }
+
+    private FolderMeta folderUnder(String kind, String cachePrefix, String folderName) {
+        if (folderName == null || folderName.isBlank()) {
+            return null;
+        }
+        String relativeDir = resolution + "/FULL/" + kind + "/" + folderName;
+        String key = cachePrefix + folderName;
         FolderMeta cached = folderCache.get(key);
         if (cached != null) {
             return cached.missing ? null : cached;
@@ -255,8 +269,19 @@ public final class PlantSpritesheetCatalog {
         return meta.missing ? null : meta;
     }
 
-    private String folderNameFor(String definitionName) {
+    private String plantFolderNameFor(String definitionName) {
         String alias = plantFolderAliases.get(definitionName);
+        if (alias != null && !alias.isBlank()) {
+            return alias.trim().toUpperCase(Locale.ROOT);
+        }
+        return PamCatalog.normalize(definitionName);
+    }
+
+    private String zombieFolderNameFor(String definitionName) {
+        if (ZombiePamAliases.usesChapterArt(definitionName)) {
+            return null;
+        }
+        String alias = ZombiePamAliases.pamName(definitionName, null);
         if (alias != null && !alias.isBlank()) {
             return alias.trim().toUpperCase(Locale.ROOT);
         }

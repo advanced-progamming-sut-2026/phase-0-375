@@ -45,6 +45,7 @@ import pvz.skin.BorderedTable;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.PamVisibility;
 import view.gui.anim.SpritesheetClipCache;
+import view.gui.anim.zombie.SunshineAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
 import view.gui.assets.AlmanacArt;
 import view.gui.assets.AlmanacZombieLabels;
@@ -110,6 +111,17 @@ public final class CollectionEntryOverlay {
     public static float ZOMBIE_PAM_SCALE = 0.8f;
     /** PAM vertical anchor: 0 = bottom of frame, 0.5 = center, 1 = top. Higher = zombie moves up. */
     public static float ZOMBIE_PAM_ANCHOR_Y = 0.28f;
+    /**
+     * Extra Y for I, Zombie sunshine spritesheet preview (negative = lower).
+     * Sheet frames are taller than PAM canvases and overflow the almanac box.
+     */
+    public static float SUNSHINE_PREVIEW_OFFSET_Y = -70f;
+    /** Spritesheet preview scale multiplier for sunshine zombie only (1 = default). */
+    public static float SUNSHINE_PREVIEW_SCALE = 0.8f;
+    /** Portrait scale on collection grid packet for sunshine (1 = default fit). */
+    public static float SUNSHINE_PACKET_PORTRAIT_SCALE = 1.05f;
+    public static float SUNSHINE_PACKET_PORTRAIT_OFFSET_X = 0f;
+    public static float SUNSHINE_PACKET_PORTRAIT_OFFSET_Y = -6f;
     public static float ZOMBIE_LEFT_COL_W = 280f;
     public static float ZOMBIE_TITLE_PAD_BOTTOM = 16f;
     public static float ZOMBIE_STATS_PAD_BOTTOM = 12f;
@@ -1276,7 +1288,22 @@ public final class CollectionEntryOverlay {
             clipName = null;
             sheetSpec = null;
             visibility = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
             time = 0f;
+            if (sheets != null && sheets.hasSheets(name)) {
+                sheetSpec = sheets.resolveClip(name, "idle", "walk");
+                if (sheetSpec == null) {
+                    sheetSpec = sheets.anyClip(name);
+                }
+                if (sheetSpec != null) {
+                    if (SunshineAnim.isSunshineName(name)) {
+                        sheetOffsetY = SUNSHINE_PREVIEW_OFFSET_Y;
+                        sheetScaleMul = SUNSHINE_PREVIEW_SCALE;
+                    }
+                    return;
+                }
+            }
             PamCatalog.PamEntry entry = catalog.forZombie(name);
             if (entry == null) {
                 return;

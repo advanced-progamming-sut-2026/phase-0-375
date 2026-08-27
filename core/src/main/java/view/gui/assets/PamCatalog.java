@@ -94,6 +94,7 @@ public final class PamCatalog {
             if (e != null) {
                 return e;
             }
+            return null;
         }
         return resolve(definitionName);
     }

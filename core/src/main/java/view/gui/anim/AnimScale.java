@@ -26,6 +26,9 @@ public final class AnimScale {
 
     public static final float PLANT_SHEET = 0.35f;
 
+    /** I, Zombie sunshine and other PNG zombie sheets (cell-sized frames). */
+    public static final float ZOMBIE_SHEET = 0.3f;
+
     public static final float PROJECTILE_SHEET = 0.35f;
 
     /** Lawn collectible. {@code SUN.PAM} canvas is 200, smaller than plant/zombie 390. */
@@ -40,6 +43,11 @@ public final class AnimScale {
     /** {@link #PLANT_SHEET} for spritesheet poses, otherwise {@link #PLANT}. */
     public static float forPlant(AnimPose pose) {
         return pose != null && pose.isSpritesheet() ? PLANT_SHEET : PLANT;
+    }
+
+    /** {@link #ZOMBIE_SHEET} for spritesheet poses, otherwise {@link #ZOMBIE}. */
+    public static float forZombie(AnimPose pose) {
+        return pose != null && pose.isSpritesheet() ? ZOMBIE_SHEET : ZOMBIE;
     }
 
     /** {@link #PROJECTILE_SHEET} for spritesheet poses, otherwise {@link #PROJECTILE}. */

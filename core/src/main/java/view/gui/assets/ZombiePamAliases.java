@@ -20,10 +20,10 @@ public final class ZombiePamAliases {
     public static final String ICEAGE_BASIC = "ZOMBIE_ICEAGE_BASIC";
     public static final String BEACH_BASIC = "ZOMBIE_BEACH_BASIC";
     public static final String DARK_BASIC = "ZOMBIE_DARK_BASIC";
+    public static final String SUNSHINE = "ZOMBIE_SUNSHINE";
 
     private static final Set<String> BIOME_BASIC_BODIES = Set.of(
-            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4",
-            "ZombieIZombieSun");
+            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4");
 
     private static final Map<String, String> BY_NAME = createByName();
 
@@ -168,6 +168,7 @@ public final class ZombiePamAliases {
     private static Map<String, String> createByName() {
         Map<String, String> m = new HashMap<>();
         m.put("ZombieDarkArmor3", DARK_BASIC);
+        m.put("ZombieIZombieSun", SUNSHINE);
         m.put("ZombieRa", "ZOMBIE_EGYPT_RA");
         m.put("ZombieExplorer", "ZOMBIE_EGYPT_EXPLORER");
         m.put("ZombieTombRaiser", "ZOMBIE_EGYPT_TOMBRAISER");

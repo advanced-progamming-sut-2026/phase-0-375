@@ -72,7 +72,7 @@ public final class AlmanacZombiePacketIds {
         m.put("ZombieArcade", "EIGHTIES_ARCADE");
         m.put("ZombieBarrelRoller", "BARRELROLLER");
         m.put("ZombiePirateImp", "PIRATE_IMP");
-        // Zombotany / I,Zombie may lack dedicated almanac packets — portrait stays empty.
+        // Sheet-only zombies (e.g. ZombieIZombieSun) fall back to spritesheet portraits.
         return m;
     }
 }

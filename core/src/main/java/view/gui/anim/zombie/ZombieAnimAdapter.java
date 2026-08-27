@@ -12,6 +12,7 @@ import view.gui.anim.AnimPose;
 import view.gui.anim.PamVisibility;
 import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.ZombiePamAliases;
 
 import java.util.ArrayList;
@@ -19,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Global zombie defaults: model → {@link ZombieAnimRole} → PAM clip.
+ * Global zombie defaults: model → {@link ZombieAnimRole} → PAM clip (or spritesheet fallback).
  *
  * <p><b>Ownership:</b> zombie team. Exclusive zombies go through {@link ZombieAnimOverrides}.
  * Do not mutate the model here.
@@ -28,14 +29,25 @@ public final class ZombieAnimAdapter {
     public static final String BUTTER_PART = "butter";
 
     private final PamCatalog catalog;
+    private final PlantSpritesheetCatalog sheets;
     private final ZombieAnimOverrides overrides;
 
     public ZombieAnimAdapter(PamCatalog catalog) {
-        this(catalog, ZombieAnimOverrides.createDefault());
+        this(catalog, null, ZombieAnimOverrides.createDefault());
+    }
+
+    public ZombieAnimAdapter(PamCatalog catalog, PlantSpritesheetCatalog sheets) {
+        this(catalog, sheets, ZombieAnimOverrides.createDefault());
     }
 
     public ZombieAnimAdapter(PamCatalog catalog, ZombieAnimOverrides overrides) {
+        this(catalog, null, overrides);
+    }
+
+    public ZombieAnimAdapter(PamCatalog catalog, PlantSpritesheetCatalog sheets,
+                             ZombieAnimOverrides overrides) {
         this.catalog = catalog;
+        this.sheets = sheets;
         this.overrides = overrides != null ? overrides : ZombieAnimOverrides.createDefault();
     }
 
@@ -51,18 +63,18 @@ public final class ZombieAnimAdapter {
         if (zombie.getState() == ZombieState.DEAD) {
             return null;
         }
+        ZombieAnimRole role = roleFor(zombie);
         PamCatalog.PamEntry entry = entryFor(zombie, chapter);
         if (entry == null) {
-            return null;
+            return withButterVisibility(zombie, sheetPose(zombie, role));
         }
-        ZombieAnimRole role = roleFor(zombie);
         AnimPose custom = overrides.tryResolve(zombie, entry, role);
         if (custom != null) {
             return withButterVisibility(zombie, custom);
         }
         String clip = catalog.resolveClip(entry, preferredClips(role));
         if (clip == null) {
-            return null;
+            return withButterVisibility(zombie, sheetPose(zombie, role));
         }
         Map<String, Boolean> vis = armorVisibility(zombie, entry);
         AnimPose pose;
@@ -72,6 +84,32 @@ public final class ZombieAnimAdapter {
             pose = AnimPose.looping(entry.path(), clip, role, vis);
         }
         return withButterVisibility(zombie, pose);
+    }
+
+    private AnimPose sheetPose(ZombieInstance zombie, ZombieAnimRole role) {
+        if (sheets == null || zombie.getDefinition() == null) {
+            return null;
+        }
+        String name = zombie.getDefinition().getName();
+        PlantSpritesheetCatalog.ClipSpec spec = resolveSheet(name, role);
+        if (spec == null) {
+            return null;
+        }
+        if (role == ZombieAnimRole.DIE) {
+            return AnimPose.sheetOnce(spec.relativePath(), spec.cacheKey(), role);
+        }
+        return AnimPose.sheetLooping(spec.relativePath(), spec.cacheKey(), role);
+    }
+
+    private PlantSpritesheetCatalog.ClipSpec resolveSheet(String definitionName, ZombieAnimRole role) {
+        PlantSpritesheetCatalog.ClipSpec spec = sheets.resolveClip(definitionName, preferredClips(role));
+        if (spec != null) {
+            return spec;
+        }
+        if (role == ZombieAnimRole.IDLE || role == ZombieAnimRole.WALK || role == ZombieAnimRole.DIE) {
+            return sheets.idleFallback(definitionName);
+        }
+        return sheets.anyClip(definitionName);
     }
 
     private PamCatalog.PamEntry entryFor(ZombieInstance zombie, Chapter chapter) {
@@ -103,6 +141,9 @@ public final class ZombieAnimAdapter {
 
     public static boolean isDistanceDriven(ZombieInstance zombie, AnimPose pose) {
         if (zombie == null || pose == null || pose.role() != ZombieAnimRole.WALK) {
+            return false;
+        }
+        if (pose.isSpritesheet()) {
             return false;
         }
         return switch (zombie.getState()) {
