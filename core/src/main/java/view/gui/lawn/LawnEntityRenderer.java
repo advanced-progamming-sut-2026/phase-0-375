@@ -1434,11 +1434,7 @@ public final class LawnEntityRenderer {
         if (map == null || catalog == null) {
             return;
         }
-        PamCatalog.PamEntry entry = catalog.byName(GraveAnim.PAM);
-        if (entry == null) {
-            return;
-        }
-        String path = entry.path();
+        Chapter chapter = model.getChapter();
         int cols = map.getCols();
         for (int col = 0; col < cols; col++) {
             Cell cell = map.getCell(col, row);
@@ -1447,7 +1443,11 @@ public final class LawnEntityRenderer {
             }
             if (cell.getPlaceable(PlacableLayer.GROUND) instanceof Grave grave
                 && !grave.isDestroyed()) {
-                drawGrave(batch, grave, row, col, path, delta);
+                PamCatalog.PamEntry entry = catalog.byName(GraveAnim.pamFor(chapter, grave));
+                if (entry == null) {
+                    continue;
+                }
+                drawGrave(batch, grave, row, col, entry.path(), delta);
             }
         }
     }
