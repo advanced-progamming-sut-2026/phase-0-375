@@ -354,7 +354,7 @@ public class ZombieInstance implements Tickable, Placeable {
      * own state and decides whether to act.
      */
     public void tickBehaviors(float deltaTime, BehaviorContext context) {
-        if (isHypnotized()) {
+        if (isHypnotized() || isFrozen()) {
             return;
         }
         for(ZombieBehavior behavior : behaviors) {

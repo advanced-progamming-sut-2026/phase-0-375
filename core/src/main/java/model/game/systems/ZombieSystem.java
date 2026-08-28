@@ -91,7 +91,9 @@ public class ZombieSystem implements Tickable {
             }
 
             // Behavior tick
-            zombie.tickBehaviors(deltaTime, context);
+            if (!zombie.isFrozen()) {
+                zombie.tickBehaviors(deltaTime, context);
+            }
 
             // Movement
             if (canMove(zombie)) {
@@ -99,7 +101,9 @@ public class ZombieSystem implements Tickable {
             }
 
             // Cell-entry event
-            handleEating(zombie, context, deltaTime);
+            if (!zombie.isFrozen()) {
+                handleEating(zombie, context, deltaTime);
+            }
         }
 
         // Death pass

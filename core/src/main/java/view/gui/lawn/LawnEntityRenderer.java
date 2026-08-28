@@ -297,6 +297,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, Float> plantIceIntro = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Object> plantIceClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Object> plantChillClocks = new IdentityHashMap<>();
+    private final IdentityHashMap<ZombieInstance, Object> zombieChillClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
@@ -350,6 +351,7 @@ public final class LawnEntityRenderer {
     private FishermanDrownShader drownShader;
     private HitFlashShader hitFlashShader;
     private GlowGreenShader glowGreenShader;
+    private ChillBlueShader chillBlueShader;
     private float snorkelRippleTime;
     private final Set<String> snorkelRippleLoaded = new HashSet<>();
     private ScreenShake screenShake;
@@ -580,6 +582,7 @@ public final class LawnEntityRenderer {
             }
         }
         plantChillClocks.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
+        zombieChillClocks.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie) || !zombie.isFrozen());
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
             && !plant.isTransformed());
@@ -2455,7 +2458,7 @@ public final class LawnEntityRenderer {
         if (ZombotanyAnim.isPlantHead(zombie)) {
             pose = pose.flipped();
         }
-        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, 0f);
+        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, 0f, pose.cacheKey(), 0f, 1.0f);
     }
 
     private static void collectIcedOccupants(GameModel model, Set<ZombieInstance> into) {
@@ -2787,6 +2790,23 @@ public final class LawnEntityRenderer {
                 flash, delta, clockKey);
     }
 
+    private void drawZombieFreezeChill(Batch batch, ZombieInstance zombie,
+                                       float x, float y, float flash, float delta) {
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(PlantFreezeAnim.CHILL_PAM);
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, PlantFreezeAnim.CHILL_STAGE2_CLIP);
+        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        Object chillClock = zombieChillClocks.computeIfAbsent(zombie, z -> new Object());
+        String clockKey = pose.cacheKey() + "#zombie-frozen-chill-stage2";
+        drawPose(batch, chillClock, pose, x, y, AnimScale.ZOMBIE, NO_PHASE,
+                flash, delta, clockKey);
+    }
+
     private void drawPlantFreezeIce(Batch batch, PlantInstance plant,
                                     float x, float y, float flash, float delta) {
         boolean show = plant.isFrozen() && !plant.hasOctopusCoating();
@@ -2977,17 +2997,19 @@ public final class LawnEntityRenderer {
         }
         applyZombotanySquashLeap(zombie, chapter, xyTmp);
 
-        restartArcadePushClock(zombie, pose);
-        restartProspectorJumpClock(zombie, pose);
-        restartTombRaiseClock(zombie, pose);
-        restartDodoFlyClock(zombie, pose);
-        restartHunterThrowClock(zombie, pose);
-        restartJugglerSpinClock(zombie, pose);
-        restartOctopusTossClock(zombie, pose);
-        restartFishermanClock(zombie, pose);
-        restartDarkKingClock(zombie, pose);
-        restartWizardSheepClock(zombie, pose);
-        spawnHunterSplat(zombie);
+        if (!zombie.isFrozen()) {
+            restartArcadePushClock(zombie, pose);
+            restartProspectorJumpClock(zombie, pose);
+            restartTombRaiseClock(zombie, pose);
+            restartDodoFlyClock(zombie, pose);
+            restartHunterThrowClock(zombie, pose);
+            restartJugglerSpinClock(zombie, pose);
+            restartOctopusTossClock(zombie, pose);
+            restartFishermanClock(zombie, pose);
+            restartDarkKingClock(zombie, pose);
+            restartWizardSheepClock(zombie, pose);
+            spawnHunterSplat(zombie);
+        }
 
         float x = xyTmp[0];
         float y = xyTmp[1];
@@ -3085,9 +3107,13 @@ public final class LawnEntityRenderer {
             pose = pose.withHiddenParts(lostArmBodyParts(pose.pamPath()));
         }
         float glow = zombie.isGlowing() && snorkelMask == null ? glowStrength() : 0f;
+        float chill = (zombie.isChilled() || zombie.isFrozen()) && snorkelMask == null ? 1.0f : 0f;
         float animDelta = zombie.isFrozen() ? 0f : delta;
         float time = drawPose(batch, zombie, pose, x, y, baseScale, phase,
-            tickHitFlash(zombie, delta), animDelta, glow);
+            tickHitFlash(zombie, delta), animDelta, pose.cacheKey(), glow, chill);
+        if (zombie.isFrozen()) {
+            drawZombieFreezeChill(batch, zombie, x, y, tickHitFlash(zombie, delta), delta);
+        }
         maybeSpawnZombotanyJalapenoFire(zombie);
         maybeGargantuarWalkStomp(zombie, pose, time);
         if (snorkelMask != null) {
@@ -3859,24 +3885,30 @@ public final class LawnEntityRenderer {
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                            float x, float y, float baseScale, float phase, float flash, float delta,
                            float glow) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), glow);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), glow, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey, float glow) {
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, glow, 0f);
+    }
+
+    private float drawPose(Batch batch, Object entity, AnimPose pose,
+                          float x, float y, float baseScale, float phase, float flash, float delta,
+                          String clockKey, float glow, float chill) {
         seenThisFrame.add(entity);
         if (pose.isSpritesheet()) {
             return drawSheetPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey);
@@ -3903,6 +3935,10 @@ public final class LawnEntityRenderer {
             glowGreenShader().begin(batch, glow);
             body.run();
             glowGreenShader().end(batch);
+        } else if (chill > 0f) {
+            chillBlueShader().begin(batch, chill);
+            body.run();
+            chillBlueShader().end(batch);
         } else {
             body.run();
         }
@@ -4974,6 +5010,13 @@ public final class LawnEntityRenderer {
             glowGreenShader = new GlowGreenShader();
         }
         return glowGreenShader;
+    }
+
+    private ChillBlueShader chillBlueShader() {
+        if (chillBlueShader == null) {
+            chillBlueShader = new ChillBlueShader();
+        }
+        return chillBlueShader;
     }
 
     /** Subtle green with a slow pulse flash. */
