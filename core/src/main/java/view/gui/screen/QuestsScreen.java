@@ -46,6 +46,7 @@ import view.gui.ui.EdgeFadeOverlay;
 import view.gui.ui.PamEffectActor;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.RoundedRegionImage;
+import view.gui.ui.SkinFonts;
 
 import java.util.List;
 
@@ -466,13 +467,13 @@ public final class QuestsScreen extends AbstractMenuScreen {
         Label name = new Label(title == null ? "" : title, skin, "medium");
         name.setColor(INK);
         name.setWrap(true);
-        name.setFontScale(TEXT_TITLE);
+        SkinFonts.scaleLabel(name, skin, "medium", TEXT_TITLE);
 
         String descText = description == null ? "" : description.trim();
         Label desc = new Label(descText, skin, "secondary");
         desc.setColor(new Color(0.35f, 0.32f, 0.30f, 1f));
         desc.setWrap(true);
-        desc.setFontScale(TEXT_DESC);
+        SkinFonts.scaleLabel(desc, skin, "secondary", TEXT_DESC);
 
         ProgressBar bar = new ProgressBar(0f, Math.max(1, target), 1f, false,
             skin.get(ready || current >= target ? "xp_green" : "xp_yellow",
@@ -484,7 +485,7 @@ public final class QuestsScreen extends AbstractMenuScreen {
         Label progressLabel = new Label(current + "/" + target, skin, "secondary");
         progressLabel.setColor(BAR_TEXT);
         progressLabel.setAlignment(Align.center);
-        progressLabel.setFontScale(TEXT_PROGRESS);
+        SkinFonts.scaleLabel(progressLabel, skin, "secondary", TEXT_PROGRESS);
 
         Table barWrap = new Table();
         barWrap.stack(bar, progressLabel).growX().height(22f * Math.max(1f, TEXT_PROGRESS));
@@ -499,7 +500,7 @@ public final class QuestsScreen extends AbstractMenuScreen {
         body.add(mid).growX().left().padRight(12f);
 
         body.add(rewardColumn(reward, fallbackCoins)).width(REWARD_COL_W).center().padRight(12f);
-        action.getLabel().setFontScale(TEXT_BUTTON);
+        SkinFonts.scaleButton(action, skin, "purple", TEXT_BUTTON);
         body.add(action).width(BTN_W).height(BTN_H).padTop(BTN_SHIFT_Y);
 
         // Keep body at preferred height inside the stack so list min-sizing cannot
@@ -604,13 +605,13 @@ public final class QuestsScreen extends AbstractMenuScreen {
             Label amt = new Label("x" + amount, skin, "secondary");
             amt.setColor(REWARD_AMT);
             amt.setAlignment(Align.center);
-            amt.setFontScale(TEXT_REWARD);
+            SkinFonts.scaleLabel(amt, skin, "secondary", TEXT_REWARD);
             chip.add(amt);
         } else if (caption != null && !caption.isBlank()) {
             Label label = new Label(caption, skin, "secondary");
             label.setColor(REWARD_AMT);
             label.setAlignment(Align.center);
-            label.setFontScale(TEXT_REWARD * 0.85f);
+            SkinFonts.scaleLabel(label, skin, "secondary", TEXT_REWARD * 0.85f);
             chip.add(label);
         }
         return chip;
@@ -850,7 +851,7 @@ public final class QuestsScreen extends AbstractMenuScreen {
             caption.setAlignment(Align.center);
             caption.setTouchable(Touchable.disabled);
             float scale = "Mini-Games".equals(title) ? TAB_LABEL_SCALE_MINI : TAB_LABEL_SCALE;
-            caption.setFontScale(scale);
+            SkinFonts.scaleLabel(caption, skin, "medium", scale);
             caption.setSize(TAB_LABEL_W, TAB_LABEL_H);
             caption.setPosition(TAB_LABEL_X, TAB_LABEL_Y);
             addActor(caption);

@@ -27,6 +27,7 @@ import view.gui.assets.UiRegions;
 import view.gui.audio.GameAudio;
 import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.ModalCard;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.UiMotion;
 
 /**
@@ -221,7 +222,7 @@ public final class LoginScreen extends AbstractMenuScreen {
 
         Runnable showIdentityStep = () -> {
             body.clearChildren();
-            resetPrompt.setFontScale(1f);
+            SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1f);
             body.add(resetPrompt).width(400f).left().padBottom(12f).row();
             body.add(userField).width(400f).height(48f).padBottom(8f).row();
             body.add(emailField).width(400f).height(48f).padBottom(8f).row();
@@ -260,7 +261,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                     }
                     resetStep = 1;
                     resetPrompt.setText(r.getMessage());
-                    resetPrompt.setFontScale(1.28f);
+                    SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1.28f);
                     resetField.setPasswordMode(false);
                     resetField.setText("");
                     resetField.setMessageText("Your answer");
@@ -276,7 +277,7 @@ public final class LoginScreen extends AbstractMenuScreen {
                     }
                     resetStep = 2;
                     resetPrompt.setText(r.getMessage());
-                    resetPrompt.setFontScale(1f);
+                    SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1f);
                     resetField.setText("");
                     resetField.setPasswordMode(true);
                     resetField.setPasswordCharacter('*');

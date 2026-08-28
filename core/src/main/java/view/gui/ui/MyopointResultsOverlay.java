@@ -53,10 +53,10 @@ public final class MyopointResultsOverlay extends Table {
             new Label.LabelStyle(big, won ? TITLE_WIN : TITLE_LOSE));
         title.setAlignment(Align.center);
 
+        BitmapFont scoreFont = SkinFonts.outlined(SkinFonts.getScaled(skin, "big", 1.35f));
         Label score = new Label(String.valueOf(tracker.getTotalPoints()),
-            new Label.LabelStyle(big, Color.WHITE));
+            new Label.LabelStyle(scoreFont, Color.WHITE));
         score.setAlignment(Align.center);
-        score.setFontScale(1.35f);
 
         Label scoreCaption = new Label("Myopoints",
             new Label.LabelStyle(medium, BODY));

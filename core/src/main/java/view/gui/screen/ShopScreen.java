@@ -13,6 +13,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import pvz.skin.BorderedTable;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SeedPacketComposite;
+import view.gui.ui.SkinFonts;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -302,7 +303,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         // Title last so it paints above panel, banner and decorations.
         Label title = new Label("SHOP", skin, "big");
         title.setColor(Color.BLACK);
-        title.setFontScale(TITLE_FONT_SCALE);
+        SkinFonts.scaleLabel(title, skin, "big", TITLE_FONT_SCALE);
         title.setPosition(TITLE_X, TITLE_Y);
         stage.addActor(title);
     }
@@ -332,7 +333,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         Label text = new Label(SKU_BANNER_TEXT, skin, "medium");
         text.setColor(Color.BLACK);
         text.setAlignment(Align.center);
-        text.setFontScale(SKU_BANNER_TEXT_SCALE);
+        SkinFonts.scaleLabel(text, skin, "medium", SKU_BANNER_TEXT_SCALE);
         text.pack();
         // SHIFT is offset from the banner centre (+X right, +Y up).
         text.setPosition(
@@ -530,7 +531,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         Label percent = new Label(BANNER_TEXT, skin, "medium");
         percent.setColor(Color.WHITE);
         percent.setAlignment(Align.center);
-        percent.setFontScale(BANNER_TEXT_SCALE);
+        SkinFonts.scaleLabel(percent, skin, "medium", BANNER_TEXT_SCALE);
         percent.pack();
         // SHIFT is offset from the ribbon centre (+X right, +Y up in local space).
         percent.setPosition(
@@ -555,8 +556,8 @@ public final class ShopScreen extends AbstractMenuScreen {
     /** Purple button whose face is the currency icon plus the price. */
     private TextButton priceButton(ShopItem item, int price, TextureBank t) {
         TextButton button = new TextButton(String.valueOf(price), skin, "purple");
+        SkinFonts.scaleButton(button, skin, "purple", PRICE_TEXT_SCALE);
         Label amount = button.getLabel();
-        amount.setFontScale(PRICE_TEXT_SCALE);
         TextureRegion icon = t.region(item.getCurrency() == CurrencyType.COIN ? ShopArt.COIN : ShopArt.GEM);
         button.clearChildren();
         if (icon != null) {

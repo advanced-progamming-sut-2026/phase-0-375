@@ -70,7 +70,7 @@ public final class LevelEnterOverlay {
         card.add(body).width(420f).padBottom(28f).row();
 
         TextButton play = new TextButton("Play", skin, "purple");
-        play.getLabel().setFontScale(1.25f);
+        SkinFonts.scaleButton(play, skin, "purple", 1.25f);
         play.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {

@@ -98,7 +98,7 @@ public final class PauseMenuOverlay {
             CheckBox cb = new CheckBox(" " + text, skin);
             cb.setChecked(false);
             cb.setTouchable(Touchable.disabled);
-            cb.getLabel().setFontScale(1.15f);
+            SkinFonts.scaleCheckBox(cb, skin, "default", 1.15f);
             cb.getLabel().setColor(OBJECTIVE_COLOR);
             card.add(cb).padBottom(10f).row();
         }

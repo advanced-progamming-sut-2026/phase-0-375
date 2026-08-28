@@ -11,6 +11,7 @@ import view.gui.audio.GameAudio;
 import view.gui.screen.LoginScreen;
 import view.gui.screen.MainHubScreen;
 import view.gui.screen.RegisterScreen;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.SkinSmoothing;
 
 /**
@@ -73,6 +74,7 @@ public class PvzGdxGame extends Game {
             skin.dispose();
             skin = null;
         }
+        SkinFonts.disposeDynamicFonts();
         super.dispose();
     }
 }

@@ -29,6 +29,7 @@ import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
 import view.gui.assets.UiRegions;
 import view.gui.ui.CollectionEntryOverlay;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.UiMotion;
 
 /**
@@ -221,7 +222,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
 
     private void showSecurityStep() {
         registerTitle.setText("Security question");
-        registerTitle.setFontScale(SECURITY_FONT_SCALE);
+        SkinFonts.scaleLabel(registerTitle, skin, "big", SECURITY_FONT_SCALE);
         contentCell.setActor(stepSecurity);
         if (scrollCell != null) {
             scrollCell.width(SECURITY_CARD_W);
@@ -263,7 +264,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
         t.add(answerConfirm).width(SECURITY_FIELD_W).height(SECURITY_FIELD_H).padBottom(22f).row();
 
         TextButton finish = new TextButton("Create account", skin, "purple");
-        finish.getLabel().setFontScale(SECURITY_FONT_SCALE);
+        SkinFonts.scaleButton(finish, skin, "purple", SECURITY_FONT_SCALE);
         UiMotion.bindPressScale(finish);
         finish.addListener(new ChangeListener() {
             @Override
@@ -302,7 +303,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
     private Label scaledLabel(String text, String style, com.badlogic.gdx.graphics.Color color) {
         Label label = new Label(text, skin, style);
         label.setColor(color);
-        label.setFontScale(SECURITY_FONT_SCALE);
+        SkinFonts.scaleLabel(label, skin, style, SECURITY_FONT_SCALE);
         return label;
     }
 

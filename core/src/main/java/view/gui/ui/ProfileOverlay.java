@@ -174,7 +174,7 @@ public final class ProfileOverlay {
 
         private TextButton styledButton(String text, String style, float fontScale) {
             TextButton button = new TextButton(text, skin, style);
-            button.getLabel().setFontScale(fontScale);
+            SkinFonts.scaleButton(button, skin, style, fontScale);
             UiMotion.bindPressScale(button);
             return button;
         }

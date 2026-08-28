@@ -126,9 +126,8 @@ public final class PotSlotActor extends Table {
             }
         });
         unlockPriceLabel = new Label(String.valueOf(POT_PRICE),
-            new Label.LabelStyle(SkinFonts.outlined(skin, "medium"), Color.WHITE));
+            new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", UNLOCK_PRICE_FONT_SCALE)), Color.WHITE));
         unlockPriceLabel.setAlignment(Align.left);
-        unlockPriceLabel.setFontScale(UNLOCK_PRICE_FONT_SCALE);
         unlockPriceLabel.setTouchable(Touchable.disabled);
         unlockPriceLabel.setVisible(false);
 
@@ -162,9 +161,8 @@ public final class PotSlotActor extends Table {
         potStack.add(plantView);
 
         timerBg = regionImage(ZenGardenArt.TIMER_BG);
-        timerLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(skin, "medium"), Color.WHITE));
+        timerLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", TIMER_FONT_SCALE)), Color.WHITE));
         timerLabel.setAlignment(Align.center);
-        timerLabel.setFontScale(TIMER_FONT_SCALE);
         timerStack = new Stack();
         timerStack.add(timerBg);
         Table timerText = new Table();
@@ -174,9 +172,8 @@ public final class PotSlotActor extends Table {
         timerStack.setVisible(false);
 
         growChrome = regionImage(ZenGardenArt.UNLOCK_ACTIVE);
-        growCostLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(skin, "medium"), Color.WHITE));
+        growCostLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", GROW_FONT_SCALE)), Color.WHITE));
         growCostLabel.setAlignment(Align.center);
-        growCostLabel.setFontScale(GROW_FONT_SCALE);
         growCostLabel.setTouchable(Touchable.disabled);
         growStack = new Stack();
         growStack.add(growChrome);
@@ -194,7 +191,7 @@ public final class PotSlotActor extends Table {
         });
 
         collectButton = new TextButton("Collect", skin, "brown");
-        collectButton.getLabel().setFontScale(0.68f);
+        SkinFonts.scaleButton(collectButton, skin, "brown", 0.68f);
         collectButton.setVisible(false);
         collectButton.addListener(new ChangeListener() {
             @Override

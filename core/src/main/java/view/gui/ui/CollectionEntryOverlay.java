@@ -594,7 +594,7 @@ public final class CollectionEntryOverlay {
             seedBar.setAnimateDuration(0f);
             seedBar.setTouchable(Touchable.disabled);
             seedCountLabel = inkLabel(skin, "secondary", "", ink);
-            seedCountLabel.setFontScale(SEED_BAR_FONT_SCALE);
+            SkinFonts.scaleLabel(seedCountLabel, skin, "secondary", SEED_BAR_FONT_SCALE);
             seedCountLabel.setAlignment(Align.center);
             xpIcon = new Image();
             xpIcon.setScaling(Scaling.fit);
@@ -608,8 +608,8 @@ public final class CollectionEntryOverlay {
 
             upgradeBtn = new TextButton("UPGRADE", skin, "purple");
             buyBtn = new TextButton("BUY", skin, "brown");
-            upgradeBtn.getLabel().setFontScale(UI_FONT_SCALE);
-            buyBtn.getLabel().setFontScale(UI_FONT_SCALE);
+            SkinFonts.scaleButton(upgradeBtn, skin, "purple", UI_FONT_SCALE);
+            SkinFonts.scaleButton(buyBtn, skin, "brown", UI_FONT_SCALE);
             upgradeBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, Actor actor) {
                     CommandResult<Void> r = controller.upgradePlant(currentName());
@@ -1196,7 +1196,7 @@ public final class CollectionEntryOverlay {
 
     private static Label inkLabel(Skin skin, String style, String text, Color color) {
         Label label = whiteLabel(skin, style, text, color);
-        label.setFontScale(UI_FONT_SCALE);
+        SkinFonts.scaleLabel(label, skin, style, UI_FONT_SCALE);
         return label;
     }
 

@@ -91,7 +91,7 @@ public final class LevelObjectivesOverlay {
             CheckBox cb = new CheckBox(" " + text, skin);
             cb.setChecked(false);
             cb.setTouchable(Touchable.disabled);
-            cb.getLabel().setFontScale(1.1f);
+            SkinFonts.scaleCheckBox(cb, skin, "default", 1.1f);
             cb.getLabel().setColor(OBJECTIVE_COLOR);
             body.add(cb).padBottom(10f).row();
         }

@@ -206,10 +206,9 @@ public final class NpcDialogueOverlay extends Table {
         root.setSize(w, h);
         root.addActor(bg);
 
-        BitmapFont dialogueFont = resolveFont(DIALOGUE_FONT);
+        BitmapFont dialogueFont = SkinFonts.getScaled(skin, DIALOGUE_FONT, DIALOGUE_FONT_SCALE);
         Label.LabelStyle dialogueStyle = new Label.LabelStyle(dialogueFont, TEXT_COLOR);
         Label dialogue = new Label(joinLines(dialogueLines), dialogueStyle);
-        dialogue.setFontScale(DIALOGUE_FONT_SCALE);
         dialogue.setAlignment(Align.center);
         dialogue.setWrap(true);
 

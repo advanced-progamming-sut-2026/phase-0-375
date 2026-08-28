@@ -28,6 +28,7 @@ import view.gui.PvzGdxGame;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
 import view.gui.ui.ModalCard;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.NewsOverlay;
 import view.gui.ui.ProfileOverlay;
 import view.gui.ui.ResourceBar;
@@ -144,7 +145,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
         TextButton play = new TextButton("PLAY", skin, "purple");
         play.setSize(PLAY_WIDTH, PLAY_HEIGHT);
         play.setPosition((UI_WIDTH - PLAY_WIDTH) * 0.5f, CORNER_PAD);
-        play.getLabel().setFontScale(PLAY_FONT_SCALE);
+        SkinFonts.scaleButton(play, skin, "purple", PLAY_FONT_SCALE);
         play.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {

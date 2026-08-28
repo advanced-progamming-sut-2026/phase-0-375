@@ -30,6 +30,7 @@ import view.gui.anim.PamClipCache;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.PotSlotActor;
 import view.gui.ui.ResourceBar;
+import view.gui.ui.SkinFonts;
 
 /**
  * Greenhouse / Zen Garden: terracotta pots on painted platforms.
@@ -141,7 +142,7 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         Label text = new Label("sale", skin, "medium");
         text.setColor(Color.WHITE);
         text.setAlignment(Align.center);
-        text.setFontScale(SALE_BANNER_TEXT_SCALE);
+        SkinFonts.scaleLabel(text, skin, "medium", SALE_BANNER_TEXT_SCALE);
         text.pack();
         text.setPosition(
             (SALE_BANNER_W - text.getWidth()) * 0.5f + SALE_BANNER_TEXT_SHIFT_X,

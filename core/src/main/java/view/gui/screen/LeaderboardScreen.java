@@ -23,6 +23,7 @@ import model.enums.Chapter;
 import model.user.User;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.ui.SkinFonts;
 
 import java.util.List;
 
@@ -90,7 +91,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
             .padBottom(16f - BACK_LIFT).row();
 
         TextButton back = new TextButton("Back", skin, "brown");
-        back.getLabel().setFontScale(BACK_FONT_SCALE);
+        SkinFonts.scaleButton(back, skin, "brown", BACK_FONT_SCALE);
         back.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -185,7 +186,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
             mark = descending ? " ▼" : " ▲";
         }
         TextButton button = new TextButton(label + mark, skin, "brown");
-        button.getLabel().setFontScale(HEADER_FONT_SCALE);
+        SkinFonts.scaleButton(button, skin, "brown", HEADER_FONT_SCALE);
         button.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {

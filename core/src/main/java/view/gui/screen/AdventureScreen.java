@@ -28,6 +28,7 @@ import view.gui.ui.AtlasImageButton;
 import view.gui.ui.ChapterCarousel;
 import view.gui.ui.EdgeFadeOverlay;
 import view.gui.ui.ResourceBar;
+import view.gui.ui.SkinFonts;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -284,7 +285,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
     private void addFooter() {
         enterButton = new TextButton("Enter", skin, "purple");
         enterButton.setSize(280f, 72f);
-        enterButton.getLabel().setFontScale(1.5f);
+        SkinFonts.scaleButton(enterButton, skin, "purple", 1.5f);
         enterButton.setPosition((UI_WIDTH - 280f) * 0.5f, CORNER_PAD + 70f);
         enterButton.addListener(new ChangeListener() {
             @Override

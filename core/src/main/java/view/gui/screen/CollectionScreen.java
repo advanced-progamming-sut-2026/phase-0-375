@@ -53,6 +53,7 @@ import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.RoundedRegionImage;
 import view.gui.ui.SeedPacketActor;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.ZombieAlmanacPacket;
 
 import java.util.ArrayList;
@@ -365,7 +366,7 @@ public final class CollectionScreen extends AbstractMenuScreen {
 
     private TextButton statusButton(String label, PlantFilter f) {
         TextButton b = new TextButton(label, skin, "purple");
-        b.getLabel().setFontScale(0.85f);
+        SkinFonts.scaleButton(b, skin, "purple", 0.85f);
         b.setUserObject(f);
         // ClickListener (not ButtonGroup/checked): purple TextButtons don't toggle reliably.
         b.addListener(new ClickListener() {

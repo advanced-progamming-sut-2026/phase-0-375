@@ -90,14 +90,12 @@ public final class SeedPacketActor extends WidgetGroup {
             addActor(portrait);
 
             if (showCostAndLevel) {
-                BitmapFont font = SkinFonts.outlined(skin, "secondary");
-                Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
                 float textW = PACKET_WIDTH * 0.52f;
                 float textX = PACKET_WIDTH * 0.44f;
-                addActor(packetLabel("LVL " + Math.max(1, level), style, 1.2f,
+                addActor(packetLabel(skin, "LVL " + Math.max(1, level), 1.2f,
                         textX, PACKET_HEIGHT - 18f, textW, 16f));
                 if (!locked) {
-                    addActor(packetLabel(String.valueOf(sunCost), style, 2f,
+                    addActor(packetLabel(skin, String.valueOf(sunCost), 2f,
                             textX, 4f, textW, 18f));
                 }
             }
@@ -206,9 +204,7 @@ public final class SeedPacketActor extends WidgetGroup {
         if (expiryLabel != null || plantName == null) {
             return;
         }
-        BitmapFont font = SkinFonts.outlined(skin, "secondary");
-        Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
-        expiryLabel = packetLabel("0s", style, 1.6f,
+        expiryLabel = packetLabel(skin, "0s", 1.6f,
                 PACKET_WIDTH * 0.44f, 4f, PACKET_WIDTH * 0.52f, 18f);
         addActor(expiryLabel);
     }
@@ -224,6 +220,18 @@ public final class SeedPacketActor extends WidgetGroup {
         } else {
             expiryLabel.setColor(Color.WHITE);
         }
+    }
+
+    private static Label packetLabel(
+            Skin skin, String text, float scale,
+            float x, float y, float width, float height) {
+        BitmapFont font = SkinFonts.outlined(SkinFonts.getScaled(skin, "secondary", scale));
+        Label label = new Label(text, new Label.LabelStyle(font, Color.WHITE));
+        label.setAlignment(Align.right);
+        label.setSize(width, height);
+        label.setPosition(x, y);
+        label.setTouchable(Touchable.disabled);
+        return label;
     }
 
     public String plantName() {
@@ -308,19 +316,6 @@ public final class SeedPacketActor extends WidgetGroup {
                 image.setPosition(4f, Math.max(2f, (PACKET_HEIGHT - region.getRegionHeight()) * 0.5f));
             }
         }
-    }
-
-    private static Label packetLabel(
-            String text, Label.LabelStyle style, float scale,
-            float x, float y, float width, float height) {
-        SkinFonts.linear(style.font);
-        Label label = new Label(text, style);
-        label.setFontScale(scale);
-        label.setAlignment(Align.right);
-        label.setSize(width, height);
-        label.setPosition(x, y);
-        label.setTouchable(Touchable.disabled);
-        return label;
     }
 
     private static Image lockImage(TextureBank textures, Skin skin) {

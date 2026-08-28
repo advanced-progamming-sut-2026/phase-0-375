@@ -49,11 +49,9 @@ public final class ZombiePacketActor extends WidgetGroup {
         layoutPortrait(portrait);
         addActor(portrait);
 
-        BitmapFont font = SkinFonts.outlined(skin, "secondary");
-        Label.LabelStyle style = new Label.LabelStyle(font, Color.WHITE);
         float textW = PACKET_WIDTH * 0.55f;
         float textX = PACKET_WIDTH * 0.40f;
-        addActor(packetLabel(String.valueOf(Math.max(0, sunCost)), style, 1.5f,
+        addActor(packetLabel(skin, String.valueOf(Math.max(0, sunCost)), 1.5f,
                 textX, 4f, textW, 16f));
 
         select = image(textures, ZombiePacketIds.SELECT);
@@ -199,11 +197,10 @@ public final class ZombiePacketActor extends WidgetGroup {
     }
 
     private static Label packetLabel(
-            String text, Label.LabelStyle style, float scale,
+            Skin skin, String text, float scale,
             float x, float y, float width, float height) {
-        SkinFonts.linear(style.font);
-        Label label = new Label(text, style);
-        label.setFontScale(scale);
+        BitmapFont font = SkinFonts.outlined(SkinFonts.getScaled(skin, "secondary", scale));
+        Label label = new Label(text, new Label.LabelStyle(font, Color.WHITE));
         label.setAlignment(Align.right);
         label.setSize(width, height);
         label.setPosition(x, y);

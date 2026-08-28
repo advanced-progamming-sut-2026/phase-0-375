@@ -69,7 +69,7 @@ public final class ResourceBar extends Table {
         Label label = new Label("0", skin, "medium");
         label.setAlignment(Align.left);
         label.setColor(Color.WHITE);
-        label.setFontScale(SCALE);
+        SkinFonts.scaleLabel(label, skin, "medium", SCALE);
         label.setTouchable(Touchable.disabled);
         return label;
     }
