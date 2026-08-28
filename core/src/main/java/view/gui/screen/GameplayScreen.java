@@ -56,6 +56,7 @@ import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnEntityRenderer;
+import view.gui.lawn.LawnGridRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.NecromancyTileRenderer;
@@ -111,6 +112,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private NecromancyTileRenderer necromancyTiles;
+    private LawnGridRenderer lawnGridRenderer;
     private DeadLineRenderer deadLineRenderer;
     private BrainLaneRenderer brainLaneRenderer;
     private DangerRedShader dangerShader;
@@ -1200,6 +1202,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             necromancyTiles.draw(game.batch, lawnLayout,
                 App.getInstance().getCurrentGameModel(), delta);
         }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null && model.isShowLawnGrid()) {
+            if (lawnGridRenderer == null) {
+                lawnGridRenderer = new LawnGridRenderer();
+            }
+            lawnGridRenderer.draw(game.batch, lawnLayout);
+        }
         if (deadLineRenderer != null) {
             deadLineRenderer.draw(game.batch, lawnLayout, deadLineColumn());
         }
@@ -1604,6 +1613,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (necromancyTiles != null) {
             necromancyTiles.dispose();
+        }
+        if (lawnGridRenderer != null) {
+            lawnGridRenderer.dispose();
+            lawnGridRenderer = null;
         }
         if (deadLineRenderer != null) {
             deadLineRenderer.dispose();
