@@ -251,6 +251,7 @@ public class LevelDataEntry {
         private int maxPlantDeaths = -1;
         private float timedWarLimit = -1f;
         private int timedWarTargetKills = -1;
+        private float timedWarDecayInterval = 5.0f;
 
         public boolean isSkyDropEnabled() {
             return skyDropEnabled;
@@ -410,6 +411,14 @@ public class LevelDataEntry {
 
         public void setTimedWarTargetKills(int timedWarTargetKills) {
             this.timedWarTargetKills = timedWarTargetKills;
+        }
+
+        public float getTimedWarDecayInterval() {
+            return timedWarDecayInterval;
+        }
+
+        public void setTimedWarDecayInterval(float timedWarDecayInterval) {
+            this.timedWarDecayInterval = timedWarDecayInterval;
         }
     }
 

@@ -28,6 +28,7 @@ public class GameRules {
     private int maxPlantDeaths;                  // for Love Your Plants: max plant deaths allowed (-1 = unlimited)
     private float timedWarLimit;                 // for Timed War: time limit in seconds (-1 = no limit)
     private int timedWarTargetKills;             // for Timed War: target zombie kills (-1 = not timed war)
+    private float timedWarDecayInterval = 5.0f;  // for Timed War: combo lapse decay interval in seconds
 
     public GameRules(boolean skyDropEnabled, boolean zombiesFreezable, int initialSun,
                      double sunDropRateModifier, int minPlantsRequired, int maxPlantsAllowed,
@@ -169,5 +170,13 @@ public class GameRules {
 
     public void setTimedWarTargetKills(int timedWarTargetKills) {
         this.timedWarTargetKills = timedWarTargetKills;
+    }
+
+    public float getTimedWarDecayInterval() {
+        return timedWarDecayInterval;
+    }
+
+    public void setTimedWarDecayInterval(float timedWarDecayInterval) {
+        this.timedWarDecayInterval = timedWarDecayInterval;
     }
 }

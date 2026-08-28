@@ -68,4 +68,18 @@ class WaveManagerProgressTest {
         assertEquals(0.5f, wm.debugWaveKillFraction(), 0.0001f);
         assertEquals(0.25f, wm.progress01(), 0.0001f);
     }
+
+    @Test
+    void progressIsMonotonicallyNonDecreasing() {
+        Wave a = new Wave(1, List.of(), 0f, false, false);
+        Wave b = new Wave(2, List.of(), 0f, false, true);
+        WaveManager wm = new WaveManager(List.of(a, b));
+        wm.tick(1f);
+        wm.debugSetWaveCounts(4, 2); // 50% of wave 1 -> 0.25
+        assertEquals(0.25f, wm.progress01(), 0.0001f);
+
+        // If total spawns dynamically increase, progress should not drop
+        wm.debugSetWaveCounts(8, 2); // 25% of wave 1 -> would calculate 0.125
+        assertEquals(0.25f, wm.progress01(), 0.0001f);
+    }
 }

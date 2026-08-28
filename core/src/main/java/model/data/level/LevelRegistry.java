@@ -225,6 +225,7 @@ public class LevelRegistry {
         rules.setMaxPlantDeaths(data.getMaxPlantDeaths());
         rules.setTimedWarLimit(data.getTimedWarLimit());
         rules.setTimedWarTargetKills(data.getTimedWarTargetKills());
+        rules.setTimedWarDecayInterval(data.getTimedWarDecayInterval());
         applyLevelTypeDefaults(rules, levelType, entry);
         return rules;
     }

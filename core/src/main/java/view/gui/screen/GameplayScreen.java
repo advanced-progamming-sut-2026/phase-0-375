@@ -76,6 +76,7 @@ import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SkinFonts;
 import view.gui.ui.SunHud;
+import view.gui.ui.TimedProgressHud;
 import view.gui.ui.WaveAnnounceBanner;
 import view.gui.ui.WaveProgressHud;
 import view.gui.ui.WinResultsOverlay;
@@ -113,6 +114,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private ReadySetPlantBanner readySetPlant;
     private WaveAnnounceBanner waveAnnounce;
     private WaveProgressHud waveProgress;
+    private TimedProgressHud timedProgressHud;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private NecromancyTileRenderer necromancyTiles;
@@ -339,34 +341,56 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(topRight);
         hudRoots.add(topRight);
 
-        if (WaveProgressHud.showFor(model) || BeghouledMatchHud.showFor(model) || MyopointHud.showFor(model)) {
-            Table topCenter = new Table();
-            topCenter.setFillParent(true);
-            topCenter.setTouchable(Touchable.childrenOnly);
-            topCenter.top().padTop(8f);
-            boolean stacked = false;
+        if (TimedProgressHud.showFor(model) || WaveProgressHud.showFor(model) || BeghouledMatchHud.showFor(model) || MyopointHud.showFor(model)) {
+            Table topBar = new Table();
+            topBar.setFillParent(true);
+            topBar.setTouchable(Touchable.childrenOnly);
+            topBar.top().padTop(8f);
+
+            // Left placeholder matching sun bank width (~160f)
+            topBar.add().width(160f);
+
+            // Mid-left area between sun bank and center meter (expands horizontally)
+            Table midLeft = new Table();
+            midLeft.setTouchable(Touchable.childrenOnly);
+            if (TimedProgressHud.showFor(model)) {
+                timedProgressHud = new TimedProgressHud(skin, assets.textures);
+                timedProgressHud.sync(model);
+                midLeft.add(timedProgressHud).center();
+            }
+            topBar.add(midLeft).expandX().center();
+
+            // Center area: wave progress or beghouled match HUD (centered on screen)
+            Table centerHud = new Table();
+            centerHud.setTouchable(Touchable.childrenOnly);
             if (WaveProgressHud.showFor(model)) {
                 waveProgress = new WaveProgressHud(skin, assets.textures);
                 boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
                         && lastStand.isSetupPhase();
                 waveProgress.setVisible(!inSetup);
-                topCenter.add(waveProgress).top().row();
-                stacked = true;
+                centerHud.add(waveProgress).center();
             } else if (BeghouledMatchHud.showFor(model)) {
                 beghouledMatchHud = new BeghouledMatchHud(skin);
                 beghouledMatchHud.sync(model);
-                topCenter.add(beghouledMatchHud).top().row();
-                stacked = true;
+                centerHud.add(beghouledMatchHud).center();
             }
+            topBar.add(centerHud).center();
+
+            // Mid-right symmetrical expanding spacer matching midLeft
+            topBar.add().expandX();
+
+            // Right placeholder matching coin bank width (~160f)
+            topBar.add().width(160f).row();
+
             if (MyopointHud.showFor(model)) {
                 myopointHud = new MyopointHud(skin);
                 myopointHud.sync(model);
-                topCenter.add(myopointHud).top().padTop(stacked ? 4f : 0f).row();
+                topBar.add(myopointHud).colspan(5).top().padTop(4f).row();
                 myopointAwardFeed = new MyopointAwardFeed(skin);
-                topCenter.add(myopointAwardFeed).top().padTop(6f);
+                topBar.add(myopointAwardFeed).colspan(5).top().padTop(6f);
             }
-            uiStage.addActor(topCenter);
-            hudRoots.add(topCenter);
+            uiStage.addActor(topBar);
+            hudRoots.add(topBar);
         }
 
         lootRewardPopup = new LootRewardPopup(skin);
@@ -1148,6 +1172,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (!inSetup) {
                 waveProgress.sync(model);
             }
+        }
+        if (timedProgressHud != null) {
+            timedProgressHud.sync(model);
         }
         if (beghouledMatchHud != null) {
             beghouledMatchHud.sync(model);

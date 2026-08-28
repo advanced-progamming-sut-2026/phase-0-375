@@ -179,9 +179,9 @@ public final class LevelObjectivesOverlay {
 
         if (type == LevelType.TIMED_WAR && rules != null) {
             int kills = rules.getTimedWarTargetKills();
-            float limit = rules.getTimedWarLimit();
-            if (kills > 0 && limit > 0) {
-                out.add("Defeat " + kills + " zombies in " + formatTime(limit));
+            float lapse = rules.getTimedWarDecayInterval();
+            if (kills > 0 && lapse > 0) {
+                out.add("Defeat " + kills + " zombies in " + (int) lapse + " seconds");
             } else if (kills > 0) {
                 out.add("Defeat " + kills + " zombies");
             }

@@ -24,4 +24,20 @@ class LevelObjectivesOverlayTest {
     void sunflowerTiltsClockwiseToTheRight() {
         assertEquals(-15f, PauseMenuOverlay.SUNFLOWER_TILT_DEG, 0.001f);
     }
+
+    @Test
+    void timedWarObjectiveDisplaysKillsAndSeconds() {
+        LevelConfig config = new LevelConfig();
+        config.setLevelType(LevelType.TIMED_WAR);
+        model.game.rule.GameRules rules = new model.game.rule.GameRules(
+                false, false, 150, 1.0, 0, 99,
+                java.util.Set.of(), java.util.Set.of(), java.util.Set.of());
+        rules.setTimedWarTargetKills(10);
+        rules.setTimedWarDecayInterval(5.0f);
+        config.setRules(rules);
+
+        List<String> lines = LevelObjectivesOverlay.objectivesFor(config);
+        assertEquals(1, lines.size());
+        assertEquals("Defeat 10 zombies in 5 seconds", lines.get(0));
+    }
 }

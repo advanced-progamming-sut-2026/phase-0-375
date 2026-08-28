@@ -77,7 +77,14 @@ public final class WaveProgressHud extends WidgetGroup {
         bindImage(head, HEAD_ID, HEAD_W, HEAD_H);
     }
 
+    private GameModel lastModel;
+    private float maxProgress = 0f;
+
     public void sync(GameModel model) {
+        if (model != lastModel) {
+            lastModel = model;
+            maxProgress = 0f;
+        }
         if (model == null || model.getWaveManager() == null) {
             setVisible(false);
             return;
@@ -88,11 +95,14 @@ public final class WaveProgressHud extends WidgetGroup {
             return;
         }
         setVisible(true);
-        float progress = waves.progress01();
-        bar.setValue(1f - progress);
+        float raw = waves.progress01();
+        if (raw > maxProgress) {
+            maxProgress = raw;
+        }
+        bar.setValue(1f - maxProgress);
         float[] stops = waves.flagStops01();
         ensureFlags(stops.length);
-        layoutDecorations(progress, stops);
+        layoutDecorations(maxProgress, stops);
     }
 
     public static boolean showFor(GameModel model) {

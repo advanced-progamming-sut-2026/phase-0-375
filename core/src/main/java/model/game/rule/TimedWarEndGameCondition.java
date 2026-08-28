@@ -20,7 +20,7 @@ public class TimedWarEndGameCondition extends AbstractEndGameCondition {
     public boolean isWin(GameModel model) {
         int targetKills = rules().getTimedWarTargetKills();
         if (targetKills <= 0) return super.isWin(model);
-        return model.getZombiesKilled() >= targetKills;
+        return timedWarLevel.getEffectiveKills() >= targetKills;
     }
 
     @Override

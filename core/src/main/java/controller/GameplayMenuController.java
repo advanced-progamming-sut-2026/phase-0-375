@@ -9,6 +9,8 @@ import model.enums.PlacableLayer;
 import model.enums.PlantCategory;
 import model.enums.PlantTags;
 import model.enums.WaveManagerPhase;
+import model.enums.ZombieState;
+import model.event.GameEvent;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.enums.BowlingWalnutType;
@@ -323,10 +325,20 @@ public class GameplayMenuController extends AppMenuController {
         // then strip the board, including anything those hooks spawned.
         List<ZombieInstance> snapshot = new ArrayList<>(model.getZombies());
         for (ZombieInstance z : snapshot) {
-            z.fireOnDeathBehaviors(model);
+            if (z != null) {
+                z.fireOnDeathBehaviors(model);
+            }
         }
         for (ZombieInstance z : new ArrayList<>(model.getZombies())) {
-            model.removeZombie(z);
+            if (z != null) {
+                z.setState(ZombieState.DEAD);
+                model.recordZombieKilled(z);
+                model.notifyZombieKilledForScore(z);
+                model.removeZombie(z);
+            }
+        }
+        if (model.getEventBus() != null) {
+            model.getEventBus().dispatch(new GameEvent(GameEvent.Type.ZOMBIE_KILLED));
         }
         return CommandResult.success("Nuke released! " + killed + " zombie(s) vaporized.");
     }

@@ -203,12 +203,23 @@ public class WaveManager implements Tickable {
     public List<Wave> getWaves() { return Collections.unmodifiableList(waves); }
     public WaveManagerPhase getPhase() { return phase; }
 
+    private float maxReportedProgress = 0f;
+
     /**
      * Level progress in {@code [0, 1]}: the bar is split into {@code n} equal
      * sections (one per wave). The current wave interpolates by zombies killed.
+     * Guaranteed to be monotonically non-decreasing.
      */
     public float progress01() {
-        return progress01(waves.size(), currentWaveIndex, phase, currentWaveFraction());
+        float current = progress01(waves.size(), currentWaveIndex, phase, currentWaveFraction());
+        if (current > maxReportedProgress) {
+            maxReportedProgress = current;
+        }
+        return maxReportedProgress;
+    }
+
+    public void resetProgress() {
+        maxReportedProgress = 0f;
     }
 
     /**
