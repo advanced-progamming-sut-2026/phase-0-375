@@ -300,6 +300,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, Object> plantIceClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Object> plantChillClocks = new IdentityHashMap<>();
     private final IdentityHashMap<ZombieInstance, Object> zombieChillClocks = new IdentityHashMap<>();
+    private final IdentityHashMap<ZombieInstance, Float> zombieDangerElapsed = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
@@ -354,6 +355,7 @@ public final class LawnEntityRenderer {
     private HitFlashShader hitFlashShader;
     private GlowGreenShader glowGreenShader;
     private ChillBlueShader chillBlueShader;
+    private DangerRedShader dangerRedShader;
     private float snorkelRippleTime;
     private final Set<String> snorkelRippleLoaded = new HashSet<>();
     private ScreenShake screenShake;
@@ -586,6 +588,7 @@ public final class LawnEntityRenderer {
         }
         plantChillClocks.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         zombieChillClocks.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie) || !zombie.isFrozen());
+        zombieDangerElapsed.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie));
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
             && !plant.isTransformed());
@@ -3198,9 +3201,18 @@ public final class LawnEntityRenderer {
         }
         float glow = zombie.isGlowing() && snorkelMask == null ? glowStrength() : 0f;
         float chill = (zombie.isChilled() || zombie.isFrozen()) && snorkelMask == null ? 1.0f : 0f;
+        float danger;
+        if (DangerRedShader.isZombieInDangerZone(zombie) && snorkelMask == null) {
+            float elapsed = zombieDangerElapsed.getOrDefault(zombie, 0f) + delta;
+            zombieDangerElapsed.put(zombie, elapsed);
+            danger = DangerRedShader.dangerStrength(elapsed);
+        } else {
+            zombieDangerElapsed.remove(zombie);
+            danger = 0f;
+        }
         float animDelta = zombie.isFrozen() ? 0f : delta;
         float time = drawPose(batch, zombie, pose, x, y, baseScale, phase,
-            tickHitFlash(zombie, delta), animDelta, pose.cacheKey(), glow, chill);
+            tickHitFlash(zombie, delta), animDelta, pose.cacheKey(), glow, chill, danger);
         if (zombie.isFrozen()) {
             drawZombieFreezeChill(batch, zombie, x, y, tickHitFlash(zombie, delta), delta);
         }
@@ -3975,30 +3987,36 @@ public final class LawnEntityRenderer {
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), 0f, 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), 0f, 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, 0f, 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, 0f, 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                            float x, float y, float baseScale, float phase, float flash, float delta,
                            float glow) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), glow, 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, pose.cacheKey(), glow, 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey, float glow) {
-        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, glow, 0f);
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, glow, 0f, 0f);
     }
 
     private float drawPose(Batch batch, Object entity, AnimPose pose,
                           float x, float y, float baseScale, float phase, float flash, float delta,
                           String clockKey, float glow, float chill) {
+        return drawPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey, glow, chill, 0f);
+    }
+
+    private float drawPose(Batch batch, Object entity, AnimPose pose,
+                          float x, float y, float baseScale, float phase, float flash, float delta,
+                          String clockKey, float glow, float chill, float dangerRed) {
         seenThisFrame.add(entity);
         if (pose.isSpritesheet()) {
             return drawSheetPose(batch, entity, pose, x, y, baseScale, phase, flash, delta, clockKey);
@@ -4029,6 +4047,10 @@ public final class LawnEntityRenderer {
             chillBlueShader().begin(batch, chill);
             body.run();
             chillBlueShader().end(batch);
+        } else if (dangerRed > 0f) {
+            dangerRedShader().begin(batch, dangerRed);
+            body.run();
+            dangerRedShader().end(batch);
         } else {
             body.run();
         }
@@ -5107,6 +5129,13 @@ public final class LawnEntityRenderer {
             chillBlueShader = new ChillBlueShader();
         }
         return chillBlueShader;
+    }
+
+    private DangerRedShader dangerRedShader() {
+        if (dangerRedShader == null) {
+            dangerRedShader = new DangerRedShader();
+        }
+        return dangerRedShader;
     }
 
     /** Subtle green with a slow pulse flash. */
