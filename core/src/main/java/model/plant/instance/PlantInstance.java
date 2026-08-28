@@ -556,6 +556,8 @@ public class PlantInstance implements Placeable {
 
     // --- Freeze handling ---
     public boolean isFrozen() { return state == PlantState.FROZEN; }
+    public int getFreezeHitCount() { return freezeHitCount; }
+    public boolean isChilled() { return !isFrozen() && freezeHitCount > 0; }
     public void registerFreezeHit(int hitsToFreeze) {
         if (isFrozen()) return;
         freezeHitCount++;

@@ -228,6 +228,10 @@ public final class PamCatalog {
                 && !upper.contains("BEHIND")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/FROSTBITE_CHILL_PLANT/")
+                && !upper.contains("BEHIND")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/")) {
             return true;
         }

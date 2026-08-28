@@ -296,6 +296,7 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, LiveSnap> lastPlantIce = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Float> plantIceIntro = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Object> plantIceClocks = new IdentityHashMap<>();
+    private final IdentityHashMap<PlantInstance, Object> plantChillClocks = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, SheepFx> sheepFx = new IdentityHashMap<>();
     private final IdentityHashMap<Grave, Float> graveEmerge = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, Boolean> explosionSpawned = new IdentityHashMap<>();
@@ -578,6 +579,7 @@ public final class LawnEntityRenderer {
                 spawnIceShatter(lastPlantIce.remove(plant));
             }
         }
+        plantChillClocks.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         graveEmerge.keySet().removeIf(grave -> !seenThisFrame.contains(grave));
         sheepFx.keySet().removeIf(plant -> !seenThisFrame.contains(plant)
             && !plant.isTransformed());
@@ -685,6 +687,7 @@ public final class LawnEntityRenderer {
         float animDelta = plant.isFrozen() ? 0f : delta;
         float time = drawPose(batch, plant, pose, xy[0], xy[1], AnimScale.forPlant(pose), NO_PHASE,
                 flash, animDelta, clockKey);
+        drawPlantChill(batch, plant, xy[0], xy[1], flash, delta);
         drawPlantFreezeIce(batch, plant, xy[0], xy[1], flash, delta);
         updateAndDrawPlantFoodFx(batch, plant, pfXy[0], pfXy[1], delta);
         lastPlants.put(plant, new LiveSnap(pose, xy[0], xy[1], false, time));
@@ -2758,6 +2761,30 @@ public final class LawnEntityRenderer {
         if (entry != null) {
             clips.getOrLoad(entry.path(), catalog.resolveClip(entry, "animation"));
         }
+    }
+
+    private void drawPlantChill(Batch batch, PlantInstance plant,
+                                float x, float y, float flash, float delta) {
+        int hits = plant.getFreezeHitCount();
+        boolean show = !plant.isFrozen() && hits > 0 && !plant.hasOctopusCoating();
+        if (!show) {
+            plantChillClocks.remove(plant);
+            return;
+        }
+        if (catalog == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(PlantFreezeAnim.CHILL_PAM);
+        if (entry == null) {
+            return;
+        }
+        String preferredClip = hits == 1 ? PlantFreezeAnim.CHILL_STAGE1_CLIP : PlantFreezeAnim.CHILL_STAGE2_CLIP;
+        String clip = catalog.resolveClip(entry, preferredClip);
+        AnimPose pose = AnimPose.looping(entry.path(), clip, PlantAnimRole.IDLE);
+        Object chillClock = plantChillClocks.computeIfAbsent(plant, p -> new Object());
+        String clockKey = pose.cacheKey() + "#plant-chill-stage" + hits;
+        drawPose(batch, chillClock, pose, x, y, AnimScale.PLANT, NO_PHASE,
+                flash, delta, clockKey);
     }
 
     private void drawPlantFreezeIce(Batch batch, PlantInstance plant,
