@@ -305,7 +305,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         topRight.top().right().pad(12f);
 
         coinHud = new CoinHud(skin, assets.textures);
-        coinHud.setAmount(model == null ? 0 : model.getCoinCount());
+        coinHud.setAmount(currentTotalCoins());
 
         pauseButton = new ImageButton(skin, "ingame_pause");
         pauseButton.setProgrammaticChangeEvents(false);
@@ -871,7 +871,36 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return true;
     }
 
+    private int currentTotalCoins() {
+        User user = App.getInstance().getCurrentUser();
+        if (user != null) {
+            return user.getCoins();
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        return model == null ? 0 : model.getCoinCount();
+    }
+
+    private void flushPendingLoot() {
+        if (entityRenderer != null) {
+            entityRenderer.drainPendingLootFlights();
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            List<LootPickup> pending = model.getActiveLootPickups();
+            if (pending != null && !pending.isEmpty()) {
+                for (LootPickup loot : new ArrayList<>(pending)) {
+                    model.applyLootPickup(loot);
+                    model.removeLootPickup(loot);
+                }
+            }
+        }
+        if (coinHud != null) {
+            coinHud.setAmount(currentTotalCoins());
+        }
+    }
+
     private void exitToLevels() {
+        flushPendingLoot();
         Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
         App.getInstance().setCurrentGameLoop(null);
@@ -970,6 +999,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartLevel() {
+        flushPendingLoot();
         Level level = currentLevel();
         if (scoreMode || level instanceof ScoreLevel) {
             restartScoreGame();
@@ -1155,6 +1185,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startLoseSequence() {
+        flushPendingLoot();
         endSequenceActive = true;
         clearArmedModes();
         hideHud();
@@ -1175,6 +1206,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startWinSequence() {
+        flushPendingLoot();
         endSequenceActive = true;
         clearArmedModes();
         hideHud();
@@ -1333,7 +1365,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 loot, x0, y0, logoTmp.x, logoTmp.y,
                 () -> {
                     model.applyLootPickup(loot);
-                    coinHud.setAmount(model.getCoinCount());
+                    coinHud.setAmount(currentTotalCoins());
                     if (lootRewardPopup != null) {
                         lootRewardPopup.show(loot);
                     }
@@ -1629,6 +1661,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (shovelMode) {
             setShovelMode(false);
         }
+        flushPendingLoot();
         super.hide();
     }
 

@@ -26,6 +26,7 @@ import model.game.map.WaterBand;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.wave.WaveManager;
 import model.item.Grave;
+import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
 import model.item.placeable.Placeable;
@@ -87,6 +88,13 @@ public class GameplayMenuController extends AppMenuController {
     @Override
     public CommandResult<Void> menuExit() {
         App app = App.getInstance();
+        GameModel model = app.getCurrentGameModel();
+        if (model != null) {
+            for (LootPickup loot : new ArrayList<>(model.getActiveLootPickups())) {
+                model.applyLootPickup(loot);
+                model.removeLootPickup(loot);
+            }
+        }
         app.setCurrentMenu(MenuType.GAME);
         app.setCurrentGameModel(null);
         app.setCurrentGameLoop(null);

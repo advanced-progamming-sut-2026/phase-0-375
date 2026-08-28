@@ -485,15 +485,36 @@ public class GameModel implements BehaviorContext {
     }
 
     public void addDiamonds(int amount) {
-        if (amount > 0) diamondCount += amount;
+        if (amount > 0) {
+            diamondCount += amount;
+            User user = App.getInstance().getCurrentUser();
+            if (user != null) {
+                user.setGems(user.getGems() + amount);
+                App.getInstance().getUserRepository().flush();
+            }
+        }
     }
 
     public void addCoins(int amount) {
-        if (amount > 0) coinCount += amount;
+        if (amount > 0) {
+            coinCount += amount;
+            User user = App.getInstance().getCurrentUser();
+            if (user != null) {
+                user.setCoins(user.getCoins() + amount);
+                App.getInstance().getUserRepository().flush();
+            }
+        }
     }
 
     public void addFlowerPots(int amount) {
-        if (amount > 0) flowerPotCount += amount;
+        if (amount > 0) {
+            flowerPotCount += amount;
+            User user = App.getInstance().getCurrentUser();
+            if (user != null) {
+                user.setUnlockedPots(user.getUnlockedPots() + amount);
+                App.getInstance().getUserRepository().flush();
+            }
+        }
     }
 
     public int getDiamondCount() { return diamondCount; }

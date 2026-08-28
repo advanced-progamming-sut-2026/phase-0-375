@@ -8,8 +8,11 @@ import model.game.level.LevelConfig;
 import model.game.rule.EndGameCondition;
 import model.game.systems.*;
 import model.game.wave.WaveManager;
+import model.item.LootPickup;
 import model.quest.QuestTracker;
 import model.user.User;
+
+import java.util.ArrayList;
 
 public class PvZGameLoop implements GameLoop {
 
@@ -101,6 +104,13 @@ public class PvZGameLoop implements GameLoop {
     private void finish(GameState result, GameEvent.Type eventType) {
         this.gameState = result;
         gameModel.setGameState(result);
+
+        if (gameModel != null) {
+            for (LootPickup loot : new ArrayList<>(gameModel.getActiveLootPickups())) {
+                gameModel.applyLootPickup(loot);
+                gameModel.removeLootPickup(loot);
+            }
+        }
 
         if (result == GameState.WON) {
             gameModel.getCurrentLevel().onComplete();

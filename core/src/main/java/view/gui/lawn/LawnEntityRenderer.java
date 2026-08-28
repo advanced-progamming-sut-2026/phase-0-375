@@ -2156,6 +2156,17 @@ public final class LawnEntityRenderer {
         lootFlights.add(new LootFlight(loot, x0, y0, x1, y1, onComplete));
     }
 
+    public void drainPendingLootFlights() {
+        for (int i = lootFlights.size() - 1; i >= 0; i--) {
+            LootFlight flight = lootFlights.get(i);
+            if (!flight.done && flight.onComplete != null) {
+                flight.onComplete.run();
+                flight.done = true;
+            }
+        }
+        lootFlights.clear();
+    }
+
     private void drawLootFlights(Batch batch, float delta) {
         for (int i = lootFlights.size() - 1; i >= 0; i--) {
             LootFlight flight = lootFlights.get(i);
