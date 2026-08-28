@@ -2455,7 +2455,7 @@ public final class LawnEntityRenderer {
         if (ZombotanyAnim.isPlantHead(zombie)) {
             pose = pose.flipped();
         }
-        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, delta);
+        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, 0f);
     }
 
     private static void collectIcedOccupants(GameModel model, Set<ZombieInstance> into) {
@@ -3085,8 +3085,9 @@ public final class LawnEntityRenderer {
             pose = pose.withHiddenParts(lostArmBodyParts(pose.pamPath()));
         }
         float glow = zombie.isGlowing() && snorkelMask == null ? glowStrength() : 0f;
+        float animDelta = zombie.isFrozen() ? 0f : delta;
         float time = drawPose(batch, zombie, pose, x, y, baseScale, phase,
-            tickHitFlash(zombie, delta), delta, glow);
+            tickHitFlash(zombie, delta), animDelta, glow);
         maybeSpawnZombotanyJalapenoFire(zombie);
         maybeGargantuarWalkStomp(zombie, pose, time);
         if (snorkelMask != null) {
