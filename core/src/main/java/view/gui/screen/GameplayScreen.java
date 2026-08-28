@@ -52,6 +52,7 @@ import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.assets.ZombiePacketIds;
 import view.gui.lawn.BrainLaneRenderer;
+import view.gui.assets.AdventureHudRegions;
 import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
@@ -65,6 +66,7 @@ import view.gui.ui.CoinHud;
 import view.gui.ui.BeghouledMatchHud;
 import view.gui.ui.LootRewardPopup;
 import view.gui.ui.LoseResultsOverlay;
+import view.gui.ui.LoveYourPlantsHud;
 import view.gui.ui.MyopointAwardFeed;
 import view.gui.ui.MyopointHud;
 import view.gui.ui.MyopointResultsOverlay;
@@ -103,6 +105,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private SunHud sunHud;
     private CoinHud coinHud;
     private BeghouledMatchHud beghouledMatchHud;
+    private LoveYourPlantsHud loveYourPlantsHud;
     private MyopointHud myopointHud;
     private MyopointAwardFeed myopointAwardFeed;
     private PlantFoodBankHud plantFoodBank;
@@ -194,6 +197,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_GROUP);
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_0);
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_1);
+        assets.textures.loadSync(AdventureHudRegions.ATLAS_WORLD_MAP);
+        assets.textures.loadSync(AdventureHudRegions.ATLAS_ALWAYS_LOADED);
         assets.textures.loadSync("ZENGARDENGROUP_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_ZENGARDENGROUP_768_00");
         assets.textures.loadSync(PauseMenuOverlay.ATLAS_GROUP);
@@ -272,6 +277,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 sunHud.setAmount(model == null ? 0 : model.getSunAmount());
                 Table sunRow = new Table();
                 sunRow.add(sunHud).left();
+                if (LoveYourPlantsHud.showFor(model)) {
+                    loveYourPlantsHud = new LoveYourPlantsHud(skin, assets.textures);
+                    loveYourPlantsHud.sync(model);
+                    sunRow.add(loveYourPlantsHud).left().padLeft(8f);
+                }
                 if (model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
                         && lastStand.isSetupPhase()) {
                     TextButton letsRock = new TextButton("LET'S ROCK!", skin, "purple");
@@ -293,6 +303,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                     sunRow.add(letsRock).height(46f).padLeft(8f);
                 }
                 left.add(sunRow).left().padBottom(8f).row();
+            } else if (LoveYourPlantsHud.showFor(model)) {
+                loveYourPlantsHud = new LoveYourPlantsHud(skin, assets.textures);
+                loveYourPlantsHud.sync(model);
+                Table loveRow = new Table();
+                loveRow.add(loveYourPlantsHud).left();
+                left.add(loveRow).left().padBottom(8f).row();
             }
             left.add(packetColumn).left().top();
         }
@@ -1135,6 +1151,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (beghouledMatchHud != null) {
             beghouledMatchHud.sync(model);
+        }
+        if (loveYourPlantsHud != null) {
+            loveYourPlantsHud.sync(model);
         }
         if (myopointHud != null) {
             myopointHud.sync(model);
