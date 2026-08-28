@@ -38,6 +38,7 @@ import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.PendingSeedPacket;
 import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.special.PlantWhatYouGetLevel;
 import model.game.level.special.ScoreLevel;
 import model.game.score.MyopointTracker;
 import model.item.LootPickup;
@@ -71,6 +72,7 @@ import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.PlantFoodBankHud;
 import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
+import view.gui.ui.SkinFonts;
 import view.gui.ui.SunHud;
 import view.gui.ui.WaveAnnounceBanner;
 import view.gui.ui.WaveProgressHud;
@@ -268,7 +270,29 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             if (sunBank) {
                 sunHud = new SunHud(skin);
                 sunHud.setAmount(model == null ? 0 : model.getSunAmount());
-                left.add(sunHud).left().padBottom(8f).row();
+                Table sunRow = new Table();
+                sunRow.add(sunHud).left();
+                if (model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
+                        && lastStand.isSetupPhase()) {
+                    TextButton letsRock = new TextButton("LET'S ROCK!", skin, "purple");
+                    SkinFonts.scaleButton(letsRock, skin, "purple", 0.95f);
+                    letsRock.addListener(new ChangeListener() {
+                        @Override
+                        public void changed(ChangeEvent event, Actor actor) {
+                            lastStand.startWaves();
+                            letsRock.remove();
+                            if (waveProgress != null) {
+                                waveProgress.setVisible(true);
+                                waveProgress.sync(model);
+                            }
+                            if (readySetPlant != null) {
+                                readySetPlant.play();
+                            }
+                        }
+                    });
+                    sunRow.add(letsRock).height(46f).padLeft(8f);
+                }
+                left.add(sunRow).left().padBottom(8f).row();
             }
             left.add(packetColumn).left().top();
         }
@@ -307,6 +331,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             boolean stacked = false;
             if (WaveProgressHud.showFor(model)) {
                 waveProgress = new WaveProgressHud(skin, assets.textures);
+                boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
+                        && lastStand.isSetupPhase();
+                waveProgress.setVisible(!inSetup);
                 topCenter.add(waveProgress).top().row();
                 stacked = true;
             } else if (BeghouledMatchHud.showFor(model)) {
@@ -350,7 +377,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
         readySetPlant = new ReadySetPlantBanner(skin);
         uiStage.addActor(readySetPlant);
-        readySetPlant.play();
+        boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
+                && lastStand.isSetupPhase();
+        if (!inSetup) {
+            readySetPlant.play();
+        }
 
         waveAnnounce = new WaveAnnounceBanner(skin);
         uiStage.addActor(waveAnnounce);
@@ -1065,7 +1096,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
         }
         if (waveProgress != null) {
-            waveProgress.sync(model);
+            boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
+                    && lastStand.isSetupPhase();
+            waveProgress.setVisible(!inSetup);
+            if (!inSetup) {
+                waveProgress.sync(model);
+            }
         }
         if (beghouledMatchHud != null) {
             beghouledMatchHud.sync(model);

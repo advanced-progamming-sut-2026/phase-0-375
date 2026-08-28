@@ -26,8 +26,24 @@ import model.game.level.RegularLevel;
  */
 public class PlantWhatYouGetLevel extends RegularLevel {
 
+    private boolean setupPhase = true;
+
     public PlantWhatYouGetLevel(LevelConfig config) {
         super(config);
+    }
+
+    /**
+     * Whether the player is currently in the pre-wave setup phase.
+     */
+    public boolean isSetupPhase() {
+        return setupPhase;
+    }
+
+    /**
+     * Ends the setup phase and unleashes the zombie waves.
+     */
+    public void startWaves() {
+        this.setupPhase = false;
     }
 
     @Override

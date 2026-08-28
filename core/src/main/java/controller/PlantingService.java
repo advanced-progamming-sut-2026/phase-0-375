@@ -170,8 +170,10 @@ final class PlantingService {
             instance.applyLevelUpgrade(level);
         }
 
-        // --- Seed packet recharge (skipped for conveyor — seeds come from the belt) ---
-        if (!conveyor && !model.isSeedReady(definition.getName())) {
+        // --- Seed packet recharge (skipped for conveyor and Last Stand setup phase) ---
+        boolean isSetupPhase = model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
+                && lastStand.isSetupPhase();
+        if (!conveyor && !isSetupPhase && !model.isSeedReady(definition.getName())) {
             return CommandResult.error("'" + type + "' is recharging. "
                     + String.format("%.1f", model.getSeedCooldown(definition.getName())) + "s left.");
         }
@@ -200,11 +202,11 @@ final class PlantingService {
         if (!placed) {
             model.addSun(cost);
             return CommandResult.error("Cannot plant '" + type + "' at (" + x + ", " + y
-                    + "). The terrain rejected it (need a Lily Pad on water?).");
+                    + ") on layer " + targetLayer + ".");
         }
         if (conveyor) {
             selected.remove(type); // consume the seed packet from the belt
-        } else {
+        } else if (!isSetupPhase) {
             float recharge = billing.getRechargeTime();
             if (recharge <= 0f) {
                 recharge = instance.getDefinition().getRechargeTime();
@@ -250,7 +252,9 @@ final class PlantingService {
             return CommandResult.error("'" + type + "' at (" + x + ", " + y
                     + ") is already at its max stack of " + limit + ".");
         }
-        if (!conveyor && !model.isSeedReady(existing.getDefinition().getName())) {
+        boolean isSetupPhase = model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
+                && lastStand.isSetupPhase();
+        if (!conveyor && !isSetupPhase && !model.isSeedReady(existing.getDefinition().getName())) {
             return CommandResult.error("'" + type + "' is recharging. "
                     + String.format("%.1f", model.getSeedCooldown(existing.getDefinition().getName())) + "s left.");
         }
@@ -267,7 +271,7 @@ final class PlantingService {
         }
         if (conveyor) {
             selected.remove(type);
-        } else {
+        } else if (!isSetupPhase) {
             model.startSeedRecharge(existing.getDefinition().getName(), existing.getDefinition().getRechargeTime());
         }
         return CommandResult.success("Stacked another '" + type + "' at (" + x + ", " + y
@@ -533,12 +537,25 @@ final class PlantingService {
             instance.setStackCount(instance.getStackCount() - 1);
             instance.setCurrentHP(Math.max(1,
                     instance.getCurrentHP() - instance.getDefinition().getBaseHP()));
+            if (model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand && lastStand.isSetupPhase()) {
+                int refund = instance.getDefinition().getCost();
+                model.addSun(refund);
+                return CommandResult.success("Refunded " + refund + " sun for one head of '" + plantName
+                        + "' at (" + x + ", " + y + "). Stack remaining: "
+                        + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
+            }
             return CommandResult.success("Plucked one head of '" + plantName
                     + "' at (" + x + ", " + y + "). Stack remaining: "
                     + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
         }
         // PlantInstance implements Placeable; remove via the cell API.
         cell.removePlaceable(instance);
+        if (model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand && lastStand.isSetupPhase()) {
+            int refund = instance.getDefinition().getCost();
+            model.addSun(refund);
+            return CommandResult.success("Refunded " + refund + " sun for plant '" + plantName
+                    + "' (layer=" + layer + ") from (" + x + ", " + y + ").");
+        }
         return CommandResult.success("Plucked plant '" + plantName
                 + "' (layer=" + layer + ") from (" + x + ", " + y + ").");
     }

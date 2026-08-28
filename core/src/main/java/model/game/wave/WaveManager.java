@@ -59,6 +59,11 @@ public class WaveManager implements Tickable {
     public void tick(float deltaTime) {
         if (phase == WaveManagerPhase.LEVEL_DONE) return;
 
+        if (gameModel != null && gameModel.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
+                && lastStand.isSetupPhase()) {
+            return;
+        }
+
         if (phase == WaveManagerPhase.WAITING_FOR_NEXT_WAVE) {
             interWaveTimer -= deltaTime;
             if (interWaveTimer <= 0f) {
