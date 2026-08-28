@@ -146,6 +146,7 @@ public class SunFallSystem implements Tickable {
 
         if (sun.getType() == SunType.RADIOACTIVE) {
             applyRadioactiveDamage(sun.getY(), sun.getX());
+            gameModel.recordRadioactiveSunExplosion(sun.getX(), sun.getY());
         }
     }
 

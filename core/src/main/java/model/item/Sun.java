@@ -16,6 +16,8 @@ public class Sun {
     private float originX;
     private float originY;
     private boolean hasOrigin;
+    private boolean transitioning;
+    private boolean transitioned;
 
     public Sun(SunType type, int value, int x, int y) {
         this.x = x;
@@ -104,5 +106,31 @@ public class Sun {
 
     public float getOriginY() {
         return originY;
+    }
+
+    public boolean isTransitioning() {
+        return transitioning;
+    }
+
+    public void setTransitioning(boolean transitioning) {
+        this.transitioning = transitioning;
+    }
+
+    public boolean isTransitioned() {
+        return transitioned;
+    }
+
+    public void setTransitioned(boolean transitioned) {
+        this.transitioned = transitioned;
+    }
+
+    public void transitionToNormal() {
+        this.transitioning = true;
+    }
+
+    public void completeTransition() {
+        this.transitioning = false;
+        this.transitioned = true;
+        this.type = SunType.NORMAL;
     }
 }

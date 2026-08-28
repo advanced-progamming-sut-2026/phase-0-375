@@ -235,7 +235,7 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/")) {
             return true;
         }
-        if (upper.contains("/EFFECTS/SUN/")) {
+        if (upper.contains("/EFFECTS/SUN/") || upper.contains("SUN_BOMB") || upper.contains("SUNBOMB")) {
             return true;
         }
         if (upper.contains("/EFFECTS/PLANTFOOD_PICKUP/")) {

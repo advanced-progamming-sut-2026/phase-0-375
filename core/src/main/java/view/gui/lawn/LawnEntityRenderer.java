@@ -11,6 +11,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.PlacableLayer;
 import model.enums.PlantState;
+import model.enums.SunType;
 import model.enums.ZombieBehaviorType;
 import model.enums.ZombieSize;
 import model.game.core.GameModel;
@@ -227,6 +228,7 @@ public final class LawnEntityRenderer {
     private static final String CRYSTALSKULL_BEAM_PAM = "CRYSTALSKULL_BEAM";
     /** Lawn collectible — EFFECTS PAM. Yellow/normal is clip {@code animation}. */
     private static final String SUN_PAM = "SUN";
+    private static final String SUN_BOMB_PAM = "SUN_BOMB";
     /** Glowing-zombie / ground plant-food PAM under EFFECTS. */
     private static final String PLANTFOOD_PICKUP_PAM = "PLANTFOOD_PICKUP";
     private static final String COIN_GOLD_PAM = "COIN_GOLD";
@@ -555,6 +557,7 @@ public final class LawnEntityRenderer {
             }
         }
         harvestProjectileHits(model);
+        harvestRadioactiveSunExplosions(model);
         drawEffects(batch, frontEffects, delta);
 
         pruneVaseAge(model);
@@ -1890,35 +1893,122 @@ public final class LawnEntityRenderer {
         if (catalog == null) {
             return;
         }
-        PamCatalog.PamEntry entry = catalog.byName(SUN_PAM);
+        String pamName = sunPam(sun);
+        PamCatalog.PamEntry entry = catalog.byName(pamName);
+        if (entry == null && !SUN_PAM.equals(pamName)) {
+            entry = catalog.byName(SUN_PAM);
+        }
         if (entry == null) {
             return;
         }
-        String clip = catalog.resolveClip(entry, sunClip(sun), "animation");
-        AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE);
+        String[] preferred = preferredClips(sun);
+        String clip = catalog.resolveClip(entry, preferred);
+        boolean loop = sun == null || !sun.isTransitioning();
+        AnimPose pose = loop ? AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE)
+                             : AnimPose.once(entry.path(), clip, ZombieAnimRole.IDLE);
+        float baseScale = AnimScale.SUN * sunScale(sun);
+        float stateTime;
         if (sxN == 1f && syN == 1f) {
-            drawPose(batch, sun, pose, x, y, AnimScale.SUN, NO_PHASE, 0f, delta);
-            return;
+            stateTime = drawPose(batch, sun, pose, x, y, baseScale, NO_PHASE, 0f, delta);
+        } else {
+            seenThisFrame.add(sun);
+            ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
+            if (ref == null) {
+                return;
+            }
+            stateTime = advanceClock(sun, pose.cacheKey(), delta);
+            player.draw(batch, ref, stateTime, x, y,
+                baseScale * sxN, baseScale * syN, pose.loop());
         }
-        seenThisFrame.add(sun);
-        ClipRef ref = clips.getOrLoad(pose.pamPath(), pose.clipName());
-        if (ref == null) {
-            return;
+        if (sun != null && sun.isTransitioning()) {
+            float dur = PamCatalog.clipDurationSeconds(entry, clip);
+            if (dur <= 0f) {
+                dur = 0.5f;
+            }
+            if (stateTime >= dur) {
+                sun.completeTransition();
+            }
         }
-        float stateTime = advanceClock(sun, pose.cacheKey(), delta);
-        player.draw(batch, ref, stateTime, x, y,
-            AnimScale.SUN * sxN, AnimScale.SUN * syN, pose.loop());
     }
 
-    private static String sunClip(Sun sun) {
+    private void harvestRadioactiveSunExplosions(GameModel model) {
+        if (model == null || catalog == null) {
+            return;
+        }
+        List<Point> explosions = model.drainRadioactiveSunExplosions();
+        if (explosions == null || explosions.isEmpty()) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName(SUN_BOMB_PAM);
+        if (entry == null) {
+            entry = catalog.byName(SUN_PAM);
+        }
+        if (entry == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(entry, "attack", "animation");
+        for (Point pt : explosions) {
+            float[] xy = layout.centerOf(pt.getY(), pt.getX());
+            frontEffects.add(new OneShotFx(entry.path(), clip, xy[0], xy[1], AnimScale.SUN * 1.25f, false));
+        }
+    }
+
+    static String sunPam(Sun sun) {
         if (sun == null || sun.getType() == null) {
-            return "animation";
+            return SUN_PAM;
+        }
+        if (sun.getType() == SunType.RADIOACTIVE || sun.isTransitioning() || sun.isTransitioned()) {
+            return SUN_BOMB_PAM;
+        }
+        return SUN_PAM;
+    }
+
+    static float sunScale(Sun sun) {
+        if (sun == null || sun.getType() == null) {
+            return 1f;
+        }
+        if (sun.isTransitioned()) {
+            return 1f;
         }
         return switch (sun.getType()) {
-            case SPECIAL -> "red";
-            case RADIOACTIVE -> "blue";
-            default -> "animation";
+            case SPECIAL -> 1.10f;
+            case RADIOACTIVE -> 1.25f;
+            default -> 1f;
         };
+    }
+
+    static String[] preferredClips(Sun sun) {
+        if (sun == null || sun.getType() == null) {
+            return new String[]{"animation"};
+        }
+        if (sun.isTransitioning()) {
+            return new String[]{"transition", "animation"};
+        }
+        if (sun.isTransitioned()) {
+            return new String[]{"normalSunIdle", "animation"};
+        }
+        if (sun.getType() == SunType.RADIOACTIVE) {
+            if (sun.isFalling()) {
+                float p = sun.fallProgress();
+                if (p < 0.333f) {
+                    return new String[]{"animation", "animation2", "animation3", "blue"};
+                } else if (p < 0.666f) {
+                    return new String[]{"animation2", "animation3", "animation", "blue"};
+                } else {
+                    return new String[]{"animation3", "animation2", "animation", "blue"};
+                }
+            }
+            return new String[]{"animation3", "animation2", "animation", "blue"};
+        }
+        if (sun.getType() == SunType.SPECIAL) {
+            return new String[]{"red", "animation"};
+        }
+        return new String[]{"animation"};
+    }
+
+    static String sunClip(Sun sun) {
+        String[] preferred = preferredClips(sun);
+        return preferred[0];
     }
 
     private void drawPlantFood(Batch batch, GameModel model, float delta) {

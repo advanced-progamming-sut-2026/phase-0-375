@@ -291,6 +291,21 @@ public class GameModel implements BehaviorContext {
         projectileHitCues.clear();
     }
 
+    private final List<Point> radioactiveSunExplosionCues = new ArrayList<>();
+
+    public void recordRadioactiveSunExplosion(int col, int row) {
+        radioactiveSunExplosionCues.add(new Point(col, row));
+    }
+
+    public List<Point> drainRadioactiveSunExplosions() {
+        if (radioactiveSunExplosionCues.isEmpty()) {
+            return List.of();
+        }
+        List<Point> drained = new ArrayList<>(radioactiveSunExplosionCues);
+        radioactiveSunExplosionCues.clear();
+        return drained;
+    }
+
     /** Slide-tile activations since the last drain, as {@code (col, row)} points. */
     private final List<Point> slideStartCues = new ArrayList<>();
 
