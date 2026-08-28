@@ -51,6 +51,7 @@ import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.assets.ZombiePacketIds;
 import view.gui.lawn.BrainLaneRenderer;
+import view.gui.lawn.DangerRedShader;
 import view.gui.lawn.DeadLineRenderer;
 import view.gui.lawn.DebugEntityOverlay;
 import view.gui.lawn.LawnBackgroundRenderer;
@@ -112,6 +113,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private NecromancyTileRenderer necromancyTiles;
     private DeadLineRenderer deadLineRenderer;
     private BrainLaneRenderer brainLaneRenderer;
+    private DangerRedShader dangerShader;
     private String previewPlant;
     private float previewTime;
     private int hoverCol = -1;
@@ -1033,6 +1035,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
+        if (dangerShader == null) {
+            dangerShader = new DangerRedShader();
+        }
+        dangerShader.update(delta, model);
         if (isPregame()) {
             entityRenderer.tickMowerIntro(delta);
         } else {
@@ -1226,6 +1232,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 entityRenderer.drawPlantIdle(
                     game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, scale);
             }
+        }
+        if (dangerShader != null) {
+            dangerShader.draw(game.batch, lawnLayout, LawnLayout.WORLD_WIDTH, LawnLayout.WORLD_HEIGHT);
         }
     }
 
@@ -1598,6 +1607,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (deadLineRenderer != null) {
             deadLineRenderer.dispose();
+        }
+        if (dangerShader != null) {
+            dangerShader.dispose();
+            dangerShader = null;
         }
         restoreOsCursor();
         if (hiddenCursor != null) {
