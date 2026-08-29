@@ -40,6 +40,7 @@ import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.level.special.ConveyorBeltLevel;
 import model.game.level.special.PlantWhatYouGetLevel;
+import model.game.level.special.SaveOurSeedsLevel;
 import model.game.level.special.ScoreLevel;
 import model.game.score.MyopointTracker;
 import model.item.LootPickup;
@@ -62,6 +63,7 @@ import view.gui.lawn.LawnGridRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.NecromancyTileRenderer;
+import view.gui.lawn.ProtectTileRenderer;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
 import view.gui.ui.ConveyorBeltHud;
@@ -123,6 +125,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private LawnGridRenderer lawnGridRenderer;
     private DeadLineRenderer deadLineRenderer;
     private BrainLaneRenderer brainLaneRenderer;
+    private ProtectTileRenderer protectTileRenderer;
     private String previewPlant;
     private float previewTime;
     private int hoverCol = -1;
@@ -134,6 +137,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final boolean beghouledMode;
     private final boolean iZombieMode;
     private final boolean scoreMode;
+    private final boolean saveOurSeedsMode;
     private ConveyorBeltHud conveyorHud;
     private int swapFromCol = -1;
     private int swapFromRow = -1;
@@ -171,6 +175,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         beghouledMode = currentLevel() instanceof BeghouledLevel;
         iZombieMode = currentLevel() instanceof IZombieLevel;
         scoreMode = currentLevel() instanceof ScoreLevel;
+        saveOurSeedsMode = currentLevel() instanceof SaveOurSeedsLevel || ProtectTileRenderer.isProtectLevel(currentLevel());
+        protectTileRenderer = new ProtectTileRenderer(assets.textures);
+        if (saveOurSeedsMode) {
+            protectTileRenderer.ensureLoaded();
+        }
         Chapter chapter = currentChapter();
         LawnBackgroundRenderer.Style lawnStyle = LawnBackgroundRenderer.Style.forChapter(chapter);
         lawnBackground = new LawnBackgroundRenderer(assets.textures, lawnStyle);
@@ -1367,6 +1376,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (necromancyTiles != null) {
             necromancyTiles.draw(game.batch, lawnLayout,
                 App.getInstance().getCurrentGameModel(), delta);
+        }
+        if (protectTileRenderer != null) {
+            protectTileRenderer.draw(game.batch, lawnLayout, App.getInstance().getCurrentGameModel());
         }
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model != null && model.isShowLawnGrid()) {
