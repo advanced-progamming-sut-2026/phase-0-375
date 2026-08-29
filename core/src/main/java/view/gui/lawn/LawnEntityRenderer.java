@@ -1455,7 +1455,12 @@ public final class LawnEntityRenderer {
         ClipRef ref = clips.getOrLoad(entry.path(), clip);
         if (ref != null) {
             float sx = ZombotanyAnim.isPlantHeadName(zombieName) ? -AnimScale.ZOMBIE : AnimScale.ZOMBIE;
-            player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true);
+            Map<String, Boolean> visibility = ZombieAnimAdapter.almanacArmorVisibility(zombieName, entry);
+            if (visibility != null) {
+                player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true, visibility);
+            } else {
+                player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true);
+            }
         }
     }
 

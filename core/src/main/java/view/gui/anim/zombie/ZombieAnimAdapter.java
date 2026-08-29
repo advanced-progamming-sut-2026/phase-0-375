@@ -240,6 +240,10 @@ public final class ZombieAnimAdapter {
             parts.add("zombie_armor_bucket_norm");
         } else if (definitionName.endsWith("Armor4")) {
             parts.add("zombie_armor_brick_norm");
+        } else if ("ZombieDarkArmor3".equals(definitionName) || definitionName.endsWith("Armor3")) {
+            parts.add("zombie_armor_crown_norm");
+            parts.add("_zombie_armor_crown_states");
+            parts.add("zombie_shoulder_armor");
         }
         if (entry != null) {
             String states = ZombiePamAliases.armorStatesPart(entry.name(), definitionName);

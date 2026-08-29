@@ -26,5 +26,10 @@ public final class UiRegions {
     public static final String PREMIUM_NORMAL = "IMAGE_UI_GENERIC_BUTTONS_PREMIUM_NORMAL";
     public static final String PREMIUM_SELECTED = "IMAGE_UI_GENERIC_BUTTONS_PREMIUM_SELECTED";
 
+    /** In-game conveyor belt HUD components (UI_AlwaysLoaded_768). */
+    public static final String CONVEYOR_BELT = "IMAGE_UI_CONVEYOR_CONVEYOR_BELT";
+    public static final String CONVEYOR_SIDE = "IMAGE_UI_CONVEYOR_CONVEYOR_SIDE";
+    public static final String CONVEYOR_TOP = "IMAGE_UI_CONVEYOR_CONVEYOR_TOP";
+
     private UiRegions() {}
 }

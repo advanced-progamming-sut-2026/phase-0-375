@@ -38,6 +38,7 @@ import model.game.level.minigame.izombie.IZombieLevel;
 import model.game.level.minigame.vasebreaker.PendingSeedPacket;
 import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
+import model.game.level.special.ConveyorBeltLevel;
 import model.game.level.special.PlantWhatYouGetLevel;
 import model.game.level.special.ScoreLevel;
 import model.game.score.MyopointTracker;
@@ -63,6 +64,7 @@ import view.gui.lawn.LawnRowColHighlight;
 import view.gui.lawn.NecromancyTileRenderer;
 import view.gui.lawn.WaterUnderlayerRenderer;
 import view.gui.ui.CoinHud;
+import view.gui.ui.ConveyorBeltHud;
 import view.gui.ui.BeghouledMatchHud;
 import view.gui.ui.LootRewardPopup;
 import view.gui.ui.LoseResultsOverlay;
@@ -127,10 +129,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private int hoverRow = -1;
     private List<String> shownPackets = List.of();
     private final boolean bowlingMode;
+    private final boolean conveyorMode;
     private final boolean vaseBreakerMode;
     private final boolean beghouledMode;
     private final boolean iZombieMode;
     private final boolean scoreMode;
+    private ConveyorBeltHud conveyorHud;
     private int swapFromCol = -1;
     private int swapFromRow = -1;
     private boolean swapDragging;
@@ -162,6 +166,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
         lawnLayout = lawnLayout();
         bowlingMode = currentLevel() instanceof WallnutBowlingLevel;
+        conveyorMode = currentLevel() instanceof ConveyorBeltLevel || bowlingMode;
         vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
         beghouledMode = currentLevel() instanceof BeghouledLevel;
         iZombieMode = currentLevel() instanceof IZombieLevel;
@@ -259,6 +264,35 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         GameModel model = App.getInstance().getCurrentGameModel();
         boolean sunBank = SunHud.showFor(model);
 
+        if (conveyorMode) {
+            conveyorHud = new ConveyorBeltHud(assets, skin, new ConveyorBeltHud.DragCallback() {
+                @Override
+                public void onDragStart(SeedPacketActor packet, String plantName) {
+                    previewPlant = plantName;
+                    previewTime = 0f;
+                    entityRenderer.preloadPlantIdle(plantName);
+                    stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
+                    packet.localToStageCoordinates(stageToScreen);
+                    followPlantDrag(stageToScreen.x, stageToScreen.y);
+                }
+
+                @Override
+                public void onDrag(SeedPacketActor packet, String plantName, float stageX, float stageY) {
+                    followPlantDrag(stageX, stageY);
+                }
+
+                @Override
+                public void onDragEnd(SeedPacketActor packet, String plantName, float stageX, float stageY) {
+                    dropPlant(plantName, stageX, stageY);
+                    previewPlant = null;
+                    hoverCol = -1;
+                    hoverRow = -1;
+                }
+            });
+            uiStage.addActor(conveyorHud);
+            hudRoots.add(conveyorHud);
+        }
+
         Table left = new Table();
         left.setFillParent(true);
         left.setTouchable(Touchable.childrenOnly);
@@ -273,7 +307,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             topRow.add(packetColumn).left().top();
             left.add(topRow).left().top();
-        } else {
+            uiStage.addActor(left);
+            hudRoots.add(left);
+        } else if (!conveyorMode) {
             if (sunBank) {
                 sunHud = new SunHud(skin);
                 sunHud.setAmount(model == null ? 0 : model.getSunAmount());
@@ -313,9 +349,17 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 left.add(loveRow).left().padBottom(8f).row();
             }
             left.add(packetColumn).left().top();
+            uiStage.addActor(left);
+            hudRoots.add(left);
+        } else if (LoveYourPlantsHud.showFor(model)) {
+            loveYourPlantsHud = new LoveYourPlantsHud(skin, assets.textures);
+            loveYourPlantsHud.sync(model);
+            Table loveRow = new Table();
+            loveRow.add(loveYourPlantsHud).left();
+            left.add(loveRow).left().padBottom(8f).row();
+            uiStage.addActor(left);
+            hudRoots.add(left);
         }
-        uiStage.addActor(left);
-        hudRoots.add(left);
 
         Table topRight = new Table();
         topRight.setFillParent(true);
@@ -407,7 +451,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             Table bottomLeft = new Table();
             bottomLeft.setFillParent(true);
             bottomLeft.setTouchable(Touchable.childrenOnly);
-            bottomLeft.bottom().left().pad(8f);
+            float leftPad = conveyorMode ? (ConveyorBeltHud.TOTAL_WIDTH + 8f) : 8f;
+            bottomLeft.bottom().left().padLeft(leftPad).padBottom(8f);
             bottomLeft.add(plantFoodBank).left().bottom();
             uiStage.addActor(bottomLeft);
             hudRoots.add(bottomLeft);
@@ -500,6 +545,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void refreshPackets() {
+        if (conveyorMode && conveyorHud != null) {
+            List<String> selected = hudPlantNames();
+            shownPackets = new ArrayList<>(selected);
+            conveyorHud.sync(selected);
+            refreshPacketChrome();
+            return;
+        }
         if (beghouledMode) {
             refreshBeghouledUpgrades();
             return;
@@ -633,6 +685,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void refreshPacketChrome() {
+        if (conveyorMode && conveyorHud != null) {
+            for (SeedPacketActor packet : conveyorHud.getPacketActors()) {
+                packet.setDimmed(false);
+            }
+            return;
+        }
         GameModel model = App.getInstance().getCurrentGameModel();
         int sun = model == null ? 0 : model.getSunAmount();
         if (beghouledMode) {
@@ -706,7 +764,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
-        if (bowlingMode || vaseBreakerMode) {
+        if (conveyorMode || bowlingMode || vaseBreakerMode) {
             refreshPackets();
         } else {
             refreshPacketChrome();
@@ -1726,6 +1784,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (deadLineRenderer != null) {
             deadLineRenderer.dispose();
+        }
+        if (conveyorHud != null) {
+            conveyorHud.dispose();
+            conveyorHud = null;
         }
         restoreOsCursor();
         if (hiddenCursor != null) {
