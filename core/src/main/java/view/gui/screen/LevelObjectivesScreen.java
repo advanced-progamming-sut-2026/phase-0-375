@@ -96,6 +96,14 @@ public final class LevelObjectivesScreen extends AbstractGameplayScreen {
 
     @Override
     protected void onBack() {
+        Level level = currentLevel();
+        if (level instanceof MiniGameLevel) {
+            App.getInstance().setCurrentGameModel(null);
+            App.getInstance().setCurrentGameLoop(null);
+            App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+            game.setScreen(new QuestsScreen(game, QuestsScreen.Tab.MINI_GAMES));
+            return;
+        }
         if (chapter != null) {
             game.setScreen(new ChapterLevelsScreen(game, chapter));
         } else {

@@ -15,6 +15,7 @@ import model.enums.Chapter;
 import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.level.Level;
+import model.game.level.minigame.MiniGameLevel;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.user.User;
@@ -155,11 +156,16 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     }
 
     private void goBack() {
+        Level level = currentLevel();
+        boolean isMini = level instanceof MiniGameLevel;
         CommandResult<Void> r = controller.menuExit();
         showToast(r.getMessage(), !r.isSuccess());
         if (r.isSuccess()) {
             clearTransientGame();
-            if (returnChapter != null) {
+            if (isMini) {
+                App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+                game.setScreen(new QuestsScreen(game, QuestsScreen.Tab.MINI_GAMES));
+            } else if (returnChapter != null) {
                 game.setScreen(new ChapterLevelsScreen(game, returnChapter));
             } else {
                 game.setScreen(new AdventureScreen(game));

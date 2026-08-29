@@ -951,7 +951,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (bowlingMode || level instanceof MiniGameLevel) {
             App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
-            game.setScreen(new MiniGameScreen(game));
+            game.setScreen(new QuestsScreen(game, QuestsScreen.Tab.MINI_GAMES));
             return;
         }
         Chapter chapter = currentChapter();

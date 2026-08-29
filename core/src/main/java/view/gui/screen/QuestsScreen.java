@@ -55,7 +55,7 @@ import java.util.List;
  * Panel chrome matches {@link CollectionScreen} (top rim only + brown gradient).
  */
 public final class QuestsScreen extends AbstractMenuScreen {
-    private enum Tab {
+    public enum Tab {
         DAILY, MAIN, EPIC, MINI_GAMES
     }
 
