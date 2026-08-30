@@ -65,6 +65,11 @@ import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.behavior.TransformBehavior;
 import model.zombie.behavior.zombotany.ZombotanyJalapenoBehavior;
 import model.zombie.behavior.zombotany.ZombotanySquashBehavior;
+import model.zombie.behavior.zomboss.DarkZombossBehavior;
+import model.zombie.behavior.zomboss.ZombossAction;
+import model.zombie.behavior.zomboss.ZombossBehavior;
+import model.zombie.behavior.zomboss.ZombossPendingImpact;
+import model.zombie.behavior.zomboss.ZombossPhase;
 import model.zombie.instance.ZombieInstance;
 import pvz.libpvz.pam.ClipRef;
 import pvz.libpvz.textures.TextureBank;
@@ -87,6 +92,7 @@ import view.gui.anim.plant.exclusive.SquashAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
+import view.gui.anim.zombie.DarkZombossAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.GargantuarAnim;
 import view.gui.anim.zombie.HunterAnim;
@@ -310,6 +316,8 @@ public final class LawnEntityRenderer {
     private final IdentityHashMap<PlantInstance, Boolean> meleePlantFoodFxSpawned = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, OneShotFx> meleeIdlePulses = new IdentityHashMap<>();
     private final IdentityHashMap<PlantInstance, PlantFoodFx> plantFoodFx = new IdentityHashMap<>();
+    private final IdentityHashMap<Cell, FireTileFx> fireTileFx = new IdentityHashMap<>();
+    private boolean fireImpactPamReady;
     private final IdentityHashMap<PlantInstance, float[]> deathBlastSeen = new IdentityHashMap<>();
     private final List<OneShotFx> backEffects = new ArrayList<>();
     private final List<OneShotFx> frontEffects = new ArrayList<>();
@@ -515,6 +523,7 @@ public final class LawnEntityRenderer {
         // Row 0 is the top of the screen; later rows paint over it.
         for (int row = 0; row < rows; row++) {
             drawCraters(batch, model, row);
+            drawFireTiles(batch, model, delta, row);
             drawGraves(batch, model, delta, row);
             drawGraveGhosts(batch, delta, row);
             drawVases(batch, model, delta, row, rows);
@@ -535,7 +544,8 @@ public final class LawnEntityRenderer {
             drawTerrainIce(batch, model, liveIce, delta, row);
             for (ZombieInstance zombie : model.getZombies()) {
                 if (clampRow(zombieRow(zombie), rows) == row
-                        && !sandstormConcealed.contains(zombie)) {
+                        && !sandstormConcealed.contains(zombie)
+                        && !drawsAboveLawn(zombie)) {
                     Chapter skin = artChapterFor(zombie, model.getChapter());
                     drawZombie(batch, zombie, skin, delta);
                 }
@@ -547,9 +557,16 @@ public final class LawnEntityRenderer {
             drawProspectorBlasts(batch, delta, row);
             drawMowers(batch, model, delta, row);
         }
+        for (ZombieInstance zombie : model.getZombies()) {
+            if (drawsAboveLawn(zombie) && !sandstormConcealed.contains(zombie)) {
+                Chapter skin = artChapterFor(zombie, model.getChapter());
+                drawZombie(batch, zombie, skin, delta);
+            }
+        }
         drawSandstorms(batch);
         drawIceWinds(batch);
         drawOctopi(batch, model, delta);
+        drawZombossFireballs(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
         drawLoot(batch, model, delta);
@@ -1252,6 +1269,152 @@ public final class LawnEntityRenderer {
     private static boolean isCraterCell(Cell cell) {
         return cell.getGroundType() == GroundType.CRATER
                 || cell.getTerrainStrategy() instanceof CraterTerrainStrategy;
+    }
+
+    private void drawFireTiles(Batch batch, GameModel model, float delta, int row) {
+        GameMap map = model != null ? model.getMap() : null;
+        if (map == null || batch == null || player == null) {
+            return;
+        }
+        preloadFireImpactPam();
+        float scale = AnimScale.PLANT * 0.8f;
+
+        int cols = Math.min(layout.cols(), map.getCols());
+        for (int c = 0; c < cols; c++) {
+            Cell cell = map.getCell(c, row);
+            if (cell == null || cell.getGroundType() != GroundType.FIRE) {
+                continue;
+            }
+            FireTileFx fx = fireTileFx.get(cell);
+            if (fx == null) {
+                fx = new FireTileFx();
+                fireTileFx.put(cell, fx);
+            }
+            if (fx.phase == FireTileFxPhase.OUTRO) {
+                fx.phase = FireTileFxPhase.INTRO;
+                fx.time = 0f;
+            }
+            drawFireTileFx(batch, fx, row, c, scale, delta);
+        }
+
+        List<Cell> finished = null;
+        for (Map.Entry<Cell, FireTileFx> e : fireTileFx.entrySet()) {
+            Cell cell = e.getKey();
+            if (cell == null || cell.getRow() != row) {
+                continue;
+            }
+            if (cell.getGroundType() == GroundType.FIRE) {
+                continue;
+            }
+            FireTileFx fx = e.getValue();
+            if (fx.phase != FireTileFxPhase.OUTRO) {
+                fx.phase = FireTileFxPhase.OUTRO;
+                fx.time = 0f;
+            }
+            boolean done = drawFireTileFx(batch, fx, row, cell.getColumn(), scale, delta);
+            if (done) {
+                if (finished == null) {
+                    finished = new ArrayList<>();
+                }
+                finished.add(cell);
+            }
+        }
+        if (finished != null) {
+            for (Cell cell : finished) {
+                fireTileFx.remove(cell);
+            }
+        }
+    }
+
+    private boolean drawFireTileFx(Batch batch, FireTileFx fx, int row, int col,
+                                   float scale, float delta) {
+        String clip = fireTileFxClip(fx.phase);
+        ClipRef ref = clips.getOrLoad(EffectPamPaths.POWER_UP_FIRE_IMPACT, clip);
+        if (ref == null) {
+            return fx.phase == FireTileFxPhase.OUTRO;
+        }
+        float duration = effectClipDurationSeconds(ref, EffectPamPaths.POWER_UP_FIRE_IMPACT, clip);
+        boolean loop = fx.phase == FireTileFxPhase.IDLE;
+        float[] xy = layout.centerOf(row, col);
+        player.draw(batch, ref, fx.time, xy[0], xy[1], scale, scale, loop);
+        fx.time += Math.max(0f, delta);
+
+        if (fx.phase == FireTileFxPhase.INTRO && duration > 0f && fx.time >= duration) {
+            fx.phase = FireTileFxPhase.IDLE;
+            fx.time = 0f;
+        } else if (fx.phase == FireTileFxPhase.INTRO && duration <= 0f) {
+            fx.phase = FireTileFxPhase.IDLE;
+            fx.time = 0f;
+        } else if (fx.phase == FireTileFxPhase.OUTRO && duration > 0f && fx.time >= duration) {
+            return true;
+        } else if (fx.phase == FireTileFxPhase.OUTRO && duration <= 0f) {
+            return true;
+        }
+        return false;
+    }
+
+    private void preloadFireImpactPam() {
+        if (fireImpactPamReady) {
+            return;
+        }
+        clips.getOrLoad(EffectPamPaths.POWER_UP_FIRE_IMPACT, EffectPamPaths.POWER_UP_FIRE_IMPACT_INTRO);
+        clips.getOrLoad(EffectPamPaths.POWER_UP_FIRE_IMPACT, EffectPamPaths.POWER_UP_FIRE_IMPACT_IDLE);
+        clips.getOrLoad(EffectPamPaths.POWER_UP_FIRE_IMPACT, EffectPamPaths.POWER_UP_FIRE_IMPACT_OUTRO);
+        fireImpactPamReady = true;
+    }
+
+    private static String fireTileFxClip(FireTileFxPhase phase) {
+        return switch (phase) {
+            case INTRO -> EffectPamPaths.POWER_UP_FIRE_IMPACT_INTRO;
+            case IDLE -> EffectPamPaths.POWER_UP_FIRE_IMPACT_IDLE;
+            case OUTRO -> EffectPamPaths.POWER_UP_FIRE_IMPACT_OUTRO;
+        };
+    }
+
+    private enum FireTileFxPhase {
+        INTRO, IDLE, OUTRO
+    }
+
+    private static final class FireTileFx {
+        FireTileFxPhase phase = FireTileFxPhase.INTRO;
+        float time;
+    }
+
+    private void drawZombossFireballs(Batch batch, GameModel model, float delta) {
+        if (batch == null || model == null || catalog == null || player == null) {
+            return;
+        }
+        ZombieInstance boss = model.findZomboss();
+        if (boss == null) {
+            return;
+        }
+        ZombossBehavior behavior = (ZombossBehavior) boss.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (behavior == null) {
+            return;
+        }
+        PamCatalog.PamEntry entry = catalog.byName("ZOMBOSS_DARK_FIREBALL");
+        if (entry == null) {
+            return;
+        }
+        ClipRef fall = clips.getOrLoad(entry.path(), "fall");
+        if (fall == null) {
+            return;
+        }
+        float scale = AnimScale.PLANT * 0.9f;
+        for (ZombossPendingImpact impact : behavior.getPendingImpacts()) {
+            if (impact == null || impact.isResolved()) {
+                continue;
+            }
+            float[] target = layout.centerOf(impact.getRow(), impact.getCol());
+            float[] origin = layout.centerOf(boss.getGridY(), boss.getGridX());
+            float t = impact.progress01();
+            float x = origin[0] + (target[0] - origin[0]) * t;
+            float y = origin[1] + (target[1] - origin[1]) * t
+                    + (float) Math.sin(t * Math.PI) * layout.cellHeight() * 1.4f;
+            float duration = Math.max(0.05f, fall.duration);
+            float state = t * duration;
+            player.draw(batch, fall, state, x, y, scale, scale, false);
+        }
     }
 
     private TextureRegion ensureCraterRegion() {
@@ -3116,6 +3279,7 @@ public final class LawnEntityRenderer {
             restartOctopusTossClock(zombie, pose);
             restartFishermanClock(zombie, pose);
             restartDarkKingClock(zombie, pose);
+            restartDarkZombossClock(zombie, pose);
             restartWizardSheepClock(zombie, pose);
             spawnHunterSplat(zombie);
         }
@@ -3124,6 +3288,9 @@ public final class LawnEntityRenderer {
         float y = xyTmp[1];
         if (SunshineAnim.isSunshine(zombie)) {
             y += SunshineAnim.drawOffsetY(layout.cellHeight());
+        }
+        if (DarkZombossAnim.isDarkZomboss(zombie)) {
+            y -= layout.cellHeight();
         }
         float modelX = x;
         ThrowImpBehavior.Flight flight = ThrowImpBehavior.flightOf(zombie);
@@ -3163,6 +3330,11 @@ public final class LawnEntityRenderer {
             phase = gait.phaseAt(travel);
             float holdBack = gait.footLockOffsetTiles(phase, footfallFor(gait, ref)) * layout.cellWidth();
             x += holdBack;
+        } else {
+            float zombossPhase = darkZombossClipPhase(zombie, pose, ref);
+            if (zombossPhase >= 0f) {
+                phase = zombossPhase;
+            }
         }
         float standY = y;
         GameModel model = App.getInstance().getCurrentGameModel();
@@ -3827,6 +3999,114 @@ public final class LawnEntityRenderer {
         clock.time = 0f;
     }
 
+    private void restartDarkZombossClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !DarkZombossAnim.isDarkZomboss(zombie)) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!DarkZombossAnim.INTRO_CLIP.equals(clip)
+                && !DarkZombossAnim.STUN_START_CLIP.equals(clip)
+                && !DarkZombossAnim.STUN_END_CLIP.equals(clip)
+                && !"fire_attack".equals(clip)
+                && !"fire_attack_end".equals(clip)
+                && !"fire_bomb".equals(clip)
+                && !"summoning".equals(clip)) {
+            return;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return;
+        }
+        float total = boss.currentPhaseDurationSeconds();
+        float remaining = boss.getPhaseTimer();
+        boolean phaseJustStarted = total > 0f && Math.abs(remaining - total) < 1e-3f;
+        boolean stunStartJustStarted = false;
+        boolean stunEndJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            float elapsed = boss.phaseProgress01() * total;
+            PamCatalog.PamEntry entry = catalog.forZombie(DarkZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, DarkZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, DarkZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.4333f;
+            }
+            if (endDur <= 0f) {
+                endDur = 0.4667f;
+            }
+            stunStartJustStarted = DarkZombossAnim.STUN_START_CLIP.equals(clip) && elapsed < 1e-3f;
+            float endAt = Math.max(startDur, total - endDur);
+            stunEndJustStarted = DarkZombossAnim.STUN_END_CLIP.equals(clip)
+                    && elapsed >= endAt && elapsed < endAt + 1e-3f + 1f / 60f;
+        }
+        boolean match = switch (boss.getPhase()) {
+            case INTRO -> DarkZombossAnim.INTRO_CLIP.equals(clip) && phaseJustStarted;
+            case STUNNED -> (DarkZombossAnim.STUN_START_CLIP.equals(clip) && stunStartJustStarted)
+                    || (DarkZombossAnim.STUN_END_CLIP.equals(clip) && stunEndJustStarted);
+            case ACTION -> phaseJustStarted && (
+                    "fire_attack".equals(clip)
+                            || "fire_bomb".equals(clip)
+                            || "summoning".equals(clip));
+            default -> false;
+        };
+        if (!match) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    private float darkZombossClipPhase(ZombieInstance zombie, AnimPose pose, ClipRef ref) {
+        if (pose == null || ref == null || ref.duration <= 0f || !DarkZombossAnim.isDarkZomboss(zombie)) {
+            return NO_PHASE;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return NO_PHASE;
+        }
+        String clip = pose.clipName();
+        float total = boss.currentPhaseDurationSeconds();
+        float elapsed = boss.phaseProgress01() * total;
+        if (boss.getPhase() == ZombossPhase.INTRO
+                && DarkZombossAnim.INTRO_CLIP.equals(clip)) {
+            return Math.max(0f, Math.min(1f, elapsed / ref.duration));
+        }
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            PamCatalog.PamEntry entry = catalog.forZombie(DarkZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, DarkZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, DarkZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.4333f;
+            }
+            if (endDur <= 0f) {
+                endDur = 0.4667f;
+            }
+            if (DarkZombossAnim.STUN_START_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f, elapsed / startDur));
+            }
+            if (DarkZombossAnim.STUN_END_CLIP.equals(clip)) {
+                float endAt = Math.max(startDur, total - endDur);
+                float intoEnd = elapsed - endAt;
+                return Math.max(0f, Math.min(1f, intoEnd / endDur));
+            }
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.BURN_ROWS) {
+            if ("fire_attack".equals(clip)) {
+                return Math.max(0f, Math.min(1f,
+                        elapsed / DarkZombossBehavior.FIRE_ATTACK_START_SECONDS));
+            }
+            if ("fire_attack_end".equals(clip)) {
+                float endAt = DarkZombossBehavior.burnRowsDurationSeconds()
+                        - DarkZombossBehavior.FIRE_ATTACK_END_SECONDS;
+                float intoEnd = elapsed - endAt;
+                return Math.max(0f, Math.min(1f,
+                        intoEnd / DarkZombossBehavior.FIRE_ATTACK_END_SECONDS));
+            }
+        }
+        return NO_PHASE;
+    }
+
     /** First frame of a new {@code intro}/{@code cast}/{@code reel}: rewind so the next cycle replays. */
     private void restartFishermanClock(ZombieInstance zombie, AnimPose pose) {
         if (pose == null) {
@@ -3992,6 +4272,10 @@ public final class LawnEntityRenderer {
         }
         Point grid = zombie.getGridPosition();
         return grid == null ? -1 : grid.getY();
+    }
+
+    private static boolean drawsAboveLawn(ZombieInstance zombie) {
+        return zombie != null && zombie.hasBehavior(ZombieBehaviorType.ZOMBOSS);
     }
 
     static int clampRow(int row, int rows) {

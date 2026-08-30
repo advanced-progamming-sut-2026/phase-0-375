@@ -396,6 +396,8 @@ public class ZombieSystem implements Tickable {
     /** Special actions and movement modes during which a zombie cannot eat. */
     private boolean isEatingSuppressed(ZombieInstance zombie) {
         if (zombie.getState() == ZombieState.SPECIAL_ACTION) return true;
+        if (zombie.getState() == ZombieState.STUNNED) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.ZOMBOSS)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.FISH)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.BUFF)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;

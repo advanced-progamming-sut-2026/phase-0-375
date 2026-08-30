@@ -294,7 +294,11 @@ public class ZombieLoader {
             Map.entry("ZombotanyPeashooterProps", List.of(ZombieBehaviorType.ZOMBOTANY_PEASHOOTER)),
             Map.entry("ZombotanyJalapenoProps", List.of(ZombieBehaviorType.ZOMBOTANY_JALAPENO)),
             Map.entry("ZombotanySquashProps", List.of(ZombieBehaviorType.ZOMBOTANY_SQUASH)),
-            Map.entry("IZombieSunProps", List.of(ZombieBehaviorType.PRODUCE_SUN)));
+            Map.entry("IZombieSunProps", List.of(ZombieBehaviorType.PRODUCE_SUN)),
+            Map.entry("ZombieDarkZombossProps", List.of(ZombieBehaviorType.ZOMBOSS)),
+            Map.entry("ZombieEgyptZombossProps", List.of(ZombieBehaviorType.ZOMBOSS)),
+            Map.entry("ZombieIceZombossProps", List.of(ZombieBehaviorType.ZOMBOSS)),
+            Map.entry("ZombieBeachZombossProps", List.of(ZombieBehaviorType.ZOMBOSS)));
 
     /**
      * Derives the list of special behaviors for the given objclass via the

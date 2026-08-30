@@ -36,8 +36,11 @@ import view.gui.ui.ResourceBar;
 import view.gui.ui.SeasonWorldMap;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 /**
  * Season Map: drag-pan islands + neon path + orb markers for one chapter.
@@ -252,8 +255,10 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
             return;
         }
 
-        levels = ensureSeasonSlots(levels);
-        int unlockIntroLevelId = consumeUnlockIntroLevelId(levels);
+        SeasonSlots slots = ensureSeasonSlots(levels);
+        levels = slots.levels();
+        Set<Integer> placeholderLevelIds = slots.placeholderIds();
+        int unlockIntroLevelId = consumeUnlockIntroLevelId(levels, placeholderLevelIds);
         map = new SeasonWorldMap(
                 textures,
                 mapArt,
@@ -263,6 +268,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
                 pamClips,
                 levels,
                 unlockIntroLevelId,
+                placeholderLevelIds,
                 this::onNodeTapped);
 
         Group viewport = new Group();
@@ -290,6 +296,9 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
 
         int focusId = levels.get(0).levelId();
         for (LevelSummary s : levels) {
+            if (placeholderLevelIds.contains(s.levelId())) {
+                continue;
+            }
             if (s.unlocked() && !s.completed()) {
                 focusId = s.levelId();
                 break;
@@ -333,10 +342,6 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     }
 
     private void onNodeTapped(int levelId) {
-        if (levelId == SeasonWorldMap.UNIMPLEMENTED_LEVEL_ID) {
-            showToast("This level is not implemented yet.", true);
-            return;
-        }
         CommandResult<List<LevelSummary>> listed = controller.listLevels(chapter);
         if (!listed.isSuccess() || listed.getData() == null) {
             showToast(listed.getMessage(), true);
@@ -350,7 +355,12 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
             }
         }
         if (match == null) {
-            showToast("Level not found.", true);
+            // Padded map stub (chapter has no real level 5 in levels.json yet).
+            if (levelId == SeasonWorldMap.PLACEHOLDER_LEVEL_ID) {
+                showToast("This level is not implemented yet.", true);
+            } else {
+                showToast("Level not found.", true);
+            }
             return;
         }
         if (!match.unlocked()) {
@@ -369,15 +379,16 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
 
     /**
      * Pad the chapter list to {@link SeasonWorldMap#SLOT_COUNT} nodes so the map
-     * always shows the future level-5 platform. Stub levels stay locked-looking
-     * and refuse entry with a toast.
+     * always shows the future level-5 platform. Only chapters missing a real level 5
+     * get a placeholder stub (locked look + “not implemented” on tap).
      */
-    private static List<LevelSummary> ensureSeasonSlots(List<LevelSummary> fromController) {
+    private static SeasonSlots ensureSeasonSlots(List<LevelSummary> fromController) {
         List<LevelSummary> out = new ArrayList<>(fromController);
+        Set<Integer> placeholders = new HashSet<>();
         boolean hasFive = false;
         boolean level4Done = false;
         for (LevelSummary s : out) {
-            if (s.levelId() == SeasonWorldMap.UNIMPLEMENTED_LEVEL_ID) {
+            if (s.levelId() == SeasonWorldMap.PLACEHOLDER_LEVEL_ID) {
                 hasFive = true;
             }
             if (s.levelId() == 4 && s.completed()) {
@@ -387,22 +398,26 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         if (!hasFive && out.size() < SeasonWorldMap.SLOT_COUNT) {
             // Normal unlock rule: available after level 4 is cleared — still not enterable.
             out.add(new LevelSummary(
-                    SeasonWorldMap.UNIMPLEMENTED_LEVEL_ID,
+                    SeasonWorldMap.PLACEHOLDER_LEVEL_ID,
                     LevelType.NORMAL,
                     level4Done,
                     false));
+            placeholders.add(SeasonWorldMap.PLACEHOLDER_LEVEL_ID);
         }
         out.sort((a, b) -> Integer.compare(a.levelId(), b.levelId()));
-        return out;
+        return new SeasonSlots(out, placeholders);
     }
 
     /**
      * First visit to a newly unlocked next-playable node plays {@code unlocked_animation}
-     * once; later visits stay on idle {@code unlocked}. Skips unimplemented stubs.
+     * once; later visits stay on idle {@code unlocked}. Skips padded placeholders.
      */
-    private int consumeUnlockIntroLevelId(List<LevelSummary> levels) {
+    private int consumeUnlockIntroLevelId(List<LevelSummary> levels, Set<Integer> placeholderLevelIds) {
+        Set<Integer> placeholders = placeholderLevelIds != null
+                ? placeholderLevelIds
+                : Collections.emptySet();
         for (LevelSummary s : levels) {
-            if (s.levelId() == SeasonWorldMap.UNIMPLEMENTED_LEVEL_ID) {
+            if (placeholders.contains(s.levelId())) {
                 continue;
             }
             if (!s.unlocked() || s.completed()) {
@@ -419,6 +434,8 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         }
         return -1;
     }
+
+    private record SeasonSlots(List<LevelSummary> levels, Set<Integer> placeholderIds) {}
 
     private void startLevel(int levelId) {
         String chapterArg = chapter.name().toLowerCase(Locale.ROOT);

@@ -18,6 +18,7 @@ import model.game.map.Lane;
 import model.game.map.TideState;
 import model.game.map.WaterBand;
 import model.game.map.terrain.CraterTerrainStrategy;
+import model.game.map.terrain.FireTerrainStrategy;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.game.map.terrain.TerrainStrategy;
 import model.game.systems.TerrainSystem;
@@ -1232,7 +1233,7 @@ public class GameModel implements BehaviorContext {
         }
         List<ZombieInstance> zombies = new ArrayList<>();
         for (ZombieInstance zombie : activeZombies) {
-            if (zombie.getGridPosition().getY() == lane && !zombie.isDead()) {
+            if (zombie != null && !zombie.isDead() && zombie.occupiesLane(lane)) {
                 zombies.add(zombie);
             }
         }
@@ -1458,6 +1459,30 @@ public class GameModel implements BehaviorContext {
         }
         cell.setGroundType(GroundType.CRATER);
         cell.setTerrainStrategy(new CraterTerrainStrategy());
+    }
+
+    /**
+     * Sets a temporary fire tile. Replaces any prior ground
+     * strategy on that cell for {@code durationSeconds}.
+     */
+    public void igniteTile(int row, int col, float durationSeconds) {
+        Cell cell = getCellAt(row, col);
+        if (cell == null) {
+            return;
+        }
+        cell.setGroundType(GroundType.FIRE);
+        cell.setTerrainStrategy(new FireTerrainStrategy(durationSeconds));
+    }
+
+    /** @return the living Zomboss on the field, or {@code null}. */
+    public ZombieInstance findZomboss() {
+        for (ZombieInstance zombie : activeZombies) {
+            if (zombie != null && !zombie.isDead()
+                    && zombie.hasBehavior(model.enums.ZombieBehaviorType.ZOMBOSS)) {
+                return zombie;
+            }
+        }
+        return null;
     }
 
     // --- Terrain helpers ---

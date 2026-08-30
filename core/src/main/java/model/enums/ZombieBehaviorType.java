@@ -22,4 +22,5 @@ public enum ZombieBehaviorType {
     ZOMBOTANY_JALAPENO,   // Zombotany: ignites after a fuse, burning its lane's plants
     ZOMBOTANY_SQUASH,     // Zombotany: squashes the first plant it reaches (mutual kill)
     PRODUCE_SUN,          // Produces sun for the player over time (I, Zombie sun zombies)
+    ZOMBOSS,              // Chapter boss AI (phased HP, lane swap, chapter attacks)
 }

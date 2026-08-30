@@ -2567,5 +2567,35 @@
       "SunProduceBaseAmount": 25,
       "SunProduceGrowthAmount": 5
     }
+  },
+  {
+    "aliases": [
+      "ZombieDarkZomboss"
+    ],
+    "objclass": "ZombieDarkZombossProps",
+    "objdata": {
+      "ArtCenter": {
+        "x": 140,
+        "y": 180
+      },
+      "CanSpawnPlantFood": false,
+      "Cost": 0,
+      "EatDPS": 0,
+      "Hitpoints": 12000,
+      "Size": "large",
+      "Speed": 0,
+      "WavePointCost": 9999,
+      "Weight": 0,
+      "ZombieStats": [
+        {
+          "Type": "toughness",
+          "Value": "toughness5"
+        },
+        {
+          "Type": "speed",
+          "Value": "speed1"
+        }
+      ]
+    }
   }
 ]

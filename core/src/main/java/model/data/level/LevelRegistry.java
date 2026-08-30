@@ -197,6 +197,7 @@ public class LevelRegistry {
         config.setTideLimitColumn(entry.getTideLimitColumn());
         config.setDeadLineColumn(entry.getDeadLineColumn());
         config.setHasNightEffect(entry.isHasNightEffect());
+        config.setZombossDefinition(entry.getZomboss());
         return config;
     }
 
@@ -233,6 +234,7 @@ public class LevelRegistry {
     private static void applyLevelTypeDefaults(GameRules rules, LevelType type, LevelDataEntry entry) {
         switch (type) {
             case CONVEYOR_BELT:
+            case ZOMBOSS:
                 rules.setAllowsChoosingPlants(false); break;
             case LOCKED_PLANTS: {
                 // Family-pick variant still lets the player choose (constrained per

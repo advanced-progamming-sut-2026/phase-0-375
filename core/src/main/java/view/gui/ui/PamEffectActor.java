@@ -1,5 +1,6 @@
 package view.gui.ui;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
@@ -89,12 +90,16 @@ public final class PamEffectActor extends Actor {
         if (duration < 0f) {
             duration = resolveDuration(ref);
         }
-        float oldA = batch.getColor().a;
-        float a = oldA * parentAlpha * getColor().a;
-        batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, a);
+        Color old = batch.getColor();
+        float oldR = old.r;
+        float oldG = old.g;
+        float oldB = old.b;
+        float oldA = old.a;
+        Color actor = getColor();
+        batch.setColor(actor.r, actor.g, actor.b, oldA * parentAlpha * actor.a);
         player.draw(batch, ref, time, getX() + getWidth() * .5f,
             getY() + getHeight() * .5f, scale, scale, looping);
-        batch.setColor(batch.getColor().r, batch.getColor().g, batch.getColor().b, oldA);
+        batch.setColor(oldR, oldG, oldB, oldA);
     }
 
     private float resolveDuration() {

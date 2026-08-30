@@ -220,6 +220,12 @@ public final class PamCatalog {
         if (upper.contains("/EFFECTS/DARK_WIZARD_SHEEPENING/")) {
             return true;
         }
+        if (upper.contains("/EFFECTS/ZOMBOSS_DARK_FIREBALL/")) {
+            return true;
+        }
+        if (upper.contains("/BACKGROUNDS/FIRETILE/")) {
+            return true;
+        }
         if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_ZOMBIE/")
                 && !upper.contains("BEHIND")) {
             return true;

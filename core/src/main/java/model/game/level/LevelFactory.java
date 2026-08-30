@@ -9,6 +9,7 @@ public class LevelFactory {
         if (config == null || config.getLevelType() == null) return null;
         switch (config.getLevelType()) {
             case CONVEYOR_BELT: return new ConveyorBeltLevel(config);
+            case ZOMBOSS: return new ZombossLevel(config);
             case LOCKED_PLANTS: return new LockedPlantsLevel(config);
             case SAVE_OUR_SEEDS: return new SaveOurSeedsLevel(config);
             case TIMED_WAR: return new TimedWarLevel(config);

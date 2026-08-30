@@ -13,6 +13,7 @@ import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.zombie.armor.Armor;
 import model.zombie.behavior.*;
+import model.zombie.behavior.zomboss.*;
 import model.zombie.behavior.zombotany.*;
 import model.zombie.definition.Zombie;
 
@@ -112,8 +113,12 @@ public class ZombieInstance implements Tickable, Placeable {
         return rng.nextFloat() <= glowingChance;
     }
 
-    private static boolean plantFoodDropsAllowed() {
+    private boolean plantFoodDropsAllowed() {
         try {
+            if (isBoss()) {
+                return false;
+            }
+
             GameModel model = App.getInstance().getCurrentGameModel();
             if (model == null || model.getCurrentLevel() == null
                     || model.getCurrentLevel().getConfig() == null
@@ -441,6 +446,53 @@ public class ZombieInstance implements Tickable, Placeable {
         return pushBehavior != null && pushBehavior.isPushing();
     }
 
+    public boolean isBoss() {
+        if (hasBehavior(ZombieBehaviorType.ZOMBOSS)) {
+            return true;
+        }
+        if (definition == null || definition.getName() == null) {
+            return false;
+        }
+        String name = definition.getName().toLowerCase();
+        return name.contains("gargantuar") || name.contains("zomboss");
+    }
+
+    /**
+     * Secondary lawn row for two-row bosses ({@code primary + 1}), or
+     * {@code -1} when this zombie only occupies its primary row.
+     */
+    public int getSecondaryRow() {
+        if (!hasBehavior(ZombieBehaviorType.ZOMBOSS) || gridPosition == null) {
+            return -1;
+        }
+        return gridPosition.getY() + 1;
+    }
+
+    /** @return true if this zombie can be hit by attacks aimed at {@code lane}. */
+    public boolean occupiesLane(int lane) {
+        if (gridPosition == null || isDead()) {
+            return false;
+        }
+        int primary = gridPosition.getY();
+        if (primary == lane) {
+            return true;
+        }
+        int secondary = getSecondaryRow();
+        return secondary >= 0 && secondary == lane;
+    }
+
+    /** Primary row plus optional secondary row for two-row bosses. */
+    public int[] getOccupiedRows() {
+        if (gridPosition == null) {
+            return new int[0];
+        }
+        int secondary = getSecondaryRow();
+        if (secondary < 0) {
+            return new int[]{gridPosition.getY()};
+        }
+        return new int[]{gridPosition.getY(), secondary};
+    }
+
     /** @return true while this zombie is walking away from the house instead of toward it. */
     public boolean isMovingBackward() {
         return movingBackward;
@@ -576,8 +628,26 @@ public class ZombieInstance implements Tickable, Placeable {
             case ZOMBOTANY_JALAPENO: return new ZombotanyJalapenoBehavior();
             case ZOMBOTANY_SQUASH: return new ZombotanySquashBehavior();
             case PRODUCE_SUN: return new ProduceSunBehavior();
+            case ZOMBOSS: return createZombossBehavior();
             default: return null;
         }
+    }
+
+    private ZombieBehavior createZombossBehavior() {
+        String name = definition != null ? definition.getName() : null;
+        if (DarkZombossBehavior.DEFINITION_NAME.equals(name)) {
+            return new DarkZombossBehavior();
+        }
+        if (EgyptZombossBehavior.DEFINITION_NAME.equals(name)) {
+            return new EgyptZombossBehavior();
+        }
+        if (IceZombossBehavior.DEFINITION_NAME.equals(name)) {
+            return new IceZombossBehavior();
+        }
+        if (BeachZombossBehavior.DEFINITION_NAME.equals(name)) {
+            return new BeachZombossBehavior();
+        }
+        return new DarkZombossBehavior();
     }
 
     // --- Getters ---

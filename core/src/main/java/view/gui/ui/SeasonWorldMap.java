@@ -26,7 +26,9 @@ import view.gui.assets.SeasonMapLayout;
 import view.gui.assets.WorldMapArt;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.IntConsumer;
 
 /**
@@ -81,11 +83,11 @@ public final class SeasonWorldMap extends Group {
 
     /**
      * Designed for 5 season slots even when only 4 levels exist in data yet.
-     * Level 5 is a placeholder until it is implemented in {@code levels.json}.
+     * Missing level-5 entries are padded as placeholders until added to {@code levels.json}.
      */
     public static final int SLOT_COUNT = 5;
-    /** Stub level id: locked look + “not implemented” on tap. */
-    public static final int UNIMPLEMENTED_LEVEL_ID = 5;
+    /** Level id used for padded stubs when a chapter has no real level 5 yet. */
+    public static final int PLACEHOLDER_LEVEL_ID = 5;
 
     private static Texture pixel;
     private static Texture circlePixel;
@@ -103,6 +105,21 @@ public final class SeasonWorldMap extends Group {
             List<LevelSummary> levels,
             int unlockIntroLevelId,
             IntConsumer onSelectLevel) {
+        this(textures, art, layout, skin, pamPlayer, pamClips, levels, unlockIntroLevelId,
+                Collections.emptySet(), onSelectLevel);
+    }
+
+    public SeasonWorldMap(
+            TextureBank textures,
+            WorldMapArt art,
+            SeasonMapLayout layout,
+            Skin skin,
+            PamPlayer pamPlayer,
+            PamClipCache pamClips,
+            List<LevelSummary> levels,
+            int unlockIntroLevelId,
+            Set<Integer> placeholderLevelIds,
+            IntConsumer onSelectLevel) {
         setTransform(false);
         setTouchable(Touchable.enabled);
         SeasonMapLayout mapLayout = layout != null ? layout : new EgyptSeasonMapLayout();
@@ -111,6 +128,10 @@ public final class SeasonWorldMap extends Group {
         if (levels == null || levels.isEmpty() || mapLayout.nodeXy == null) {
             return;
         }
+
+        Set<Integer> placeholders = placeholderLevelIds != null
+                ? placeholderLevelIds
+                : Collections.emptySet();
 
         float orbLift = mapLayout.orbLift;
         int count = Math.min(levels.size(), mapLayout.nodeXy.length);
@@ -125,7 +146,7 @@ public final class SeasonWorldMap extends Group {
 
         int nextPlayableId = -1;
         for (LevelSummary s : levels) {
-            if (s.levelId() == UNIMPLEMENTED_LEVEL_ID) {
+            if (placeholders.contains(s.levelId())) {
                 continue;
             }
             if (s.unlocked() && !s.completed()) {
@@ -169,7 +190,7 @@ public final class SeasonWorldMap extends Group {
             float orbCx = cx;
             float orbCy = orbY + ORB_SIZE * 0.45f;
 
-            boolean unimplemented = summary.levelId() == UNIMPLEMENTED_LEVEL_ID;
+            boolean unimplemented = placeholders.contains(summary.levelId());
             if (unimplemented || !summary.unlocked()) {
                 // Stub / locked: same “not opened” look.
                 Group orbSlot = new Group();

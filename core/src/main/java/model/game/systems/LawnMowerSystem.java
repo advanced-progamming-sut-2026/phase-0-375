@@ -82,8 +82,6 @@ public class LawnMowerSystem implements Tickable {
     }
 
     private boolean isBoss(ZombieInstance zombie) {
-        if (zombie.getDefinition() == null) return false;
-        String name = zombie.getDefinition().getName();
-        return name != null && name.toLowerCase().contains("gargantuar");
+        return zombie != null && zombie.isBoss();
     }
 }

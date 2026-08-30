@@ -44,6 +44,7 @@ public class LevelConfig {
     /// Big Wave Beach: max columns (from right) the tide may flood (-1 = static water only)
     private int tideLimitColumn = -1;
     private boolean hasNightEffect;                // for Night Ops (no sun from sky)
+    private String zombossDefinition;              // Definition name for zomboss levels
 
     // --- Getters ---
 
@@ -159,6 +160,10 @@ public class LevelConfig {
         return hasNightEffect;
     }
 
+    public String getZombossDefinition() {
+        return zombossDefinition;
+    }
+
     // --- Setters ---
 
     public void setChapter(Chapter chapter) {
@@ -271,5 +276,9 @@ public class LevelConfig {
 
     public void setHasNightEffect(boolean hasNightEffect) {
         this.hasNightEffect = hasNightEffect;
+    }
+
+    public void setZombossDefinition(String zombossDefinition) {
+        this.zombossDefinition = zombossDefinition;
     }
 }

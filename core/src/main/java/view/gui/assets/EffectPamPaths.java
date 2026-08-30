@@ -82,4 +82,14 @@ public final class EffectPamPaths {
     public static final String CHERRY_BOMB_CLIP = "explosion";
     public static final String BOWLING_BULB_EXPLOSION_CLIP = "explosion";
     public static final String STARFRUIT_HIT_CLIP = "idle";
+
+    public static final String POWER_UP_FIRE_IMPACT =
+            "768/INITIAL/EFFECTS/POWER_UP_FIRE_IMPACT/POWER_UP_FIRE_IMPACT.PAM";
+    public static final String POWER_UP_FIRE_IMPACT_INTRO = "animation";
+    public static final String POWER_UP_FIRE_IMPACT_IDLE = "animation2";
+    public static final String POWER_UP_FIRE_IMPACT_OUTRO = "animation3";
+
+    public static final String NARRATIONICONS_ZOMBOSS =
+            "768/INITIAL/NPC/NARRATIONICONS_ZOMBOSS/NARRATIONICONS_ZOMBOSS.PAM";
+    public static final String NARRATIONICONS_ZOMBOSS_IDLE = "anim_idle";
 }

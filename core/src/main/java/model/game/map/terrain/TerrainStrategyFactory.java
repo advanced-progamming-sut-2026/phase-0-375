@@ -36,6 +36,8 @@ public final class TerrainStrategyFactory {
                 return new NormalTerrainStrategy();
             case CRATER:
                 return new CraterTerrainStrategy();
+            case FIRE:
+                return new FireTerrainStrategy();
             default:
                 return new NormalTerrainStrategy();
         }

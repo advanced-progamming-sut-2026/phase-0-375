@@ -40,6 +40,7 @@ import model.game.level.minigame.vasebreaker.Vase;
 import model.game.level.minigame.vasebreaker.VaseBreakerLevel;
 import model.game.level.special.ConveyorBeltLevel;
 import model.game.level.special.PlantWhatYouGetLevel;
+import model.game.level.special.ZombossLevel;
 import model.game.level.special.SaveOurSeedsLevel;
 import model.game.level.special.ScoreLevel;
 import model.game.score.MyopointTracker;
@@ -83,6 +84,7 @@ import view.gui.ui.SunHud;
 import view.gui.ui.TimedProgressHud;
 import view.gui.ui.WaveAnnounceBanner;
 import view.gui.ui.WaveProgressHud;
+import view.gui.ui.ZombossHpHud;
 import view.gui.ui.WinResultsOverlay;
 import view.gui.ui.ZombiePacketActor;
 
@@ -119,6 +121,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private WaveAnnounceBanner waveAnnounce;
     private WaveProgressHud waveProgress;
     private TimedProgressHud timedProgressHud;
+    private ZombossHpHud zombossHpHud;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private NecromancyTileRenderer necromancyTiles;
@@ -147,6 +150,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private boolean shovelMode;
     private boolean pauseMenuOpen;
     private boolean endSequenceActive;
+    private boolean wasPregame = true;
     private LoseResultsOverlay loseOverlay;
     private WinResultsOverlay winOverlay;
     private MyopointResultsOverlay myopointResultsOverlay;
@@ -394,11 +398,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(topRight);
         hudRoots.add(topRight);
 
-        if (TimedProgressHud.showFor(model) || WaveProgressHud.showFor(model) || BeghouledMatchHud.showFor(model) || MyopointHud.showFor(model)) {
+        if (TimedProgressHud.showFor(model) || WaveProgressHud.showFor(model) || BeghouledMatchHud.showFor(model)
+                || MyopointHud.showFor(model) || ZombossHpHud.showFor(model)) {
             Table topBar = new Table();
             topBar.setFillParent(true);
             topBar.setTouchable(Touchable.childrenOnly);
-            topBar.top().padTop(8f);
+            // Zomboss meter sits below the top edge so the portrait is not clipped.
+            float topPad = ZombossHpHud.showFor(model) ? 28f : 8f;
+            topBar.top().padTop(topPad);
 
             // Left placeholder matching sun bank width (~160f)
             topBar.add().width(160f);
@@ -413,10 +420,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             topBar.add(midLeft).expandX().center();
 
-            // Center area: wave progress or beghouled match HUD (centered on screen)
+            // Center area: zomboss HP, wave progress, or beghouled match HUD
             Table centerHud = new Table();
             centerHud.setTouchable(Touchable.childrenOnly);
-            if (WaveProgressHud.showFor(model)) {
+            if (ZombossHpHud.showFor(model)) {
+                zombossHpHud = new ZombossHpHud(skin, assets.player);
+                centerHud.add(zombossHpHud).center().padTop(8f);
+            } else if (WaveProgressHud.showFor(model)) {
                 waveProgress = new WaveProgressHud(skin, assets.textures);
                 boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
                         && lastStand.isSetupPhase();
@@ -1203,7 +1213,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
-        if (isPregame()) {
+        boolean pregame = isPregame();
+        if (wasPregame && !pregame && model != null
+                && model.getCurrentLevel() instanceof ZombossLevel zombossLevel) {
+            zombossLevel.ensureBossSpawned();
+        }
+        wasPregame = pregame;
+        if (pregame) {
             entityRenderer.tickMowerIntro(delta);
         } else {
             PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
@@ -1242,6 +1258,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (timedProgressHud != null) {
             timedProgressHud.sync(model);
+        }
+        if (zombossHpHud != null) {
+            zombossHpHud.sync(model);
         }
         if (beghouledMatchHud != null) {
             beghouledMatchHud.sync(model);
@@ -1784,6 +1803,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     @Override
     public void dispose() {
         entityOverlay.dispose();
+        if (zombossHpHud != null) {
+            zombossHpHud.dispose();
+            zombossHpHud = null;
+        }
         if (rowColHighlight != null) {
             rowColHighlight.dispose();
         }

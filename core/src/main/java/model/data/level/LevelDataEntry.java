@@ -29,6 +29,7 @@ public class LevelDataEntry {
     private int deadLineColumn = -1;
     private boolean hasNightEffect;
     private List<WaveData> waves;
+    private String zomboss;
 
     public String getChapter() {
         return chapter;
@@ -228,6 +229,14 @@ public class LevelDataEntry {
 
     public void setWaves(List<WaveData> waves) {
         this.waves = waves;
+    }
+
+    public String getZomboss() {
+        return zomboss;
+    }
+
+    public void setZomboss(String zomboss) {
+        this.zomboss = zomboss;
     }
 
     public static class RuleData {

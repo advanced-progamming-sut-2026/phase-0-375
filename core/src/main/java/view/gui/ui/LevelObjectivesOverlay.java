@@ -194,6 +194,9 @@ public final class LevelObjectivesOverlay {
             out.add("Don't let zombies cross the Dead Line");
         } else if (type == LevelType.CONVEYOR_BELT) {
             out.add("Use the plants delivered by the conveyor belt");
+        } else if (type == LevelType.ZOMBOSS) {
+            out.add("Defeat Zomboss using the conveyor belt plants");
+            out.add("Watch the three-segment boss health bar");
         } else if (type == LevelType.NIGHT_OPS) {
             out.add("Survive without sun from the sky");
         } else if (type == LevelType.PLANT_WHAT_YOU_GET) {

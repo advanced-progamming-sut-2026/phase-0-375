@@ -2049,5 +2049,34 @@
         "waveBudget": 10125
       }
     ]
+  },
+  {
+    "chapter": "DARK_AGES",
+    "levelId": 5,
+    "levelType": "ZOMBOSS",
+    "rows": 5,
+    "columns": 9,
+    "hasNightEffect": true,
+    "zomboss": "ZombieDarkZomboss",
+    "rules": {
+      "initialSun": 0,
+      "maxPlantsAllowed": 10,
+      "sunFallsFromSky": false
+    },
+    "waves": [],
+    "conveyorPlants": [
+      "Peashooter",
+      "Wall-nut",
+      "Potato Mine",
+      "Cabbage-pult",
+      "Iceberg Lettuce",
+      "Cherry Bomb",
+      "Fume-shroom",
+      "Puff-shroom",
+      "Cat-tail",
+      "Bonk Choy"
+    ],
+    "conveyorIntervalSeconds": 3.5,
+    "conveyorCapacity": 8
   }
 ]

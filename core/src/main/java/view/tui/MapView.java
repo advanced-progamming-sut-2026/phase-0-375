@@ -255,6 +255,7 @@ final class MapView {
             case NECROMANCY: return 'N';
             case ICE: return '*';
             case CRATER: return 'O';
+            case FIRE: return 'F';
             default: return '.';
         }
     }
