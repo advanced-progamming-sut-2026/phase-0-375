@@ -7,7 +7,7 @@ import view.gui.ui.SeedPacketActor;
 
 /**
  * Spritesheet fallbacks for seed-packet portraits when no {@code IMAGE_UI_PACKETS_*} art exists
- * (e.g. Cat-tail). Shared by collection and shop.
+ * (e.g. Cat-tail). Shared by collection, shop, plant selection, and in-game HUD.
  */
 public final class SheetPacketPortraits {
     private SheetPacketPortraits() {}

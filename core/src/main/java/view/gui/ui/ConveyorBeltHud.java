@@ -15,7 +15,9 @@ import model.app.App;
 import model.enums.GameState;
 import model.game.core.PvZGameLoop;
 import pvz.libpvz.textures.TextureBank;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.PvzAssets;
+import view.gui.assets.SheetPacketPortraits;
 import view.gui.assets.UiRegions;
 
 import java.util.ArrayList;
@@ -74,8 +76,10 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
     }
 
     private final TextureBank textures;
+    private final PvzAssets assets;
     private final Skin skin;
     private final DragCallback dragCallback;
+    private final SpritesheetClipCache sheetClips;
 
     private TextureRegion beltRegion;
     private TextureRegion sideRegion;
@@ -90,9 +94,13 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
     private ConveyorItem lastDraggedItem;
 
     public ConveyorBeltHud(PvzAssets assets, Skin skin, DragCallback dragCallback) {
+        this.assets = assets;
         this.textures = assets != null ? assets.textures : null;
         this.skin = skin;
         this.dragCallback = dragCallback;
+        this.sheetClips = assets != null && assets.root != null
+                ? new SpritesheetClipCache(assets.root)
+                : null;
 
         setSize(TOTAL_WIDTH, TOTAL_HEIGHT);
         setPosition(0f, 0f);
@@ -198,6 +206,7 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
                 String plantName = modelPlants.get(i);
                 SeedPacketActor packet = new SeedPacketActor(
                         textures, skin, plantName, 0, 1, false, false, false);
+                SheetPacketPortraits.applyIfNeeded(packet, plantName, assets, sheetClips);
 
                 ConveyorItem item = new ConveyorItem(
                         plantName, packet, calculateSpawnY(), computeSlotY(i));
@@ -271,7 +280,7 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
         // Continuously scroll the belt track upwards
         beltTrackOffsetY = (beltTrackOffsetY + BELT_SPEED * delta) % TRACK_SEGMENT_H;
     }
-    
+
     private static boolean isGamePaused() {
         PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
         return loop != null && loop.getGameState() == GameState.PAUSED;
@@ -328,6 +337,9 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
         if (fallbackTopTex != null) {
             fallbackTopTex.dispose();
             fallbackTopTex = null;
+        }
+        if (sheetClips != null) {
+            sheetClips.dispose();
         }
     }
 }

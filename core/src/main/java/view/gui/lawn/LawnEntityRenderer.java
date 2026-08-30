@@ -1592,14 +1592,39 @@ public final class LawnEntityRenderer {
     }
 
     public void drawPlantIdle(Batch batch, String plantName, float x, float y, float time, float scale) {
-        ClipRef ref = plantIdleClip(resolveIdlePlantName(plantName));
+        String name = resolveIdlePlantName(plantName);
+        ClipRef ref = plantIdleClip(name);
         if (ref != null) {
             player.draw(batch, ref, time, x, y, scale, scale, true);
+            return;
         }
+        PlantSpritesheetCatalog.ClipSpec spec = plantIdleSheetSpec(name);
+        if (spec == null || sheetClips == null) {
+            return;
+        }
+        SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(spec);
+        if (sheet == null || sheet.animation() == null) {
+            return;
+        }
+        TextureRegion frame = sheet.animation().getKeyFrame(time, true);
+        if (frame == null) {
+            return;
+        }
+        float sheetScale = AnimScale.PLANT_SHEET;
+        float w = frame.getRegionWidth() * sheetScale;
+        float h = frame.getRegionHeight() * sheetScale;
+        batch.draw(frame, x - w * 0.5f, y - h * 0.5f, w, h);
     }
 
     public void preloadPlantIdle(String plantName) {
-        plantIdleClip(resolveIdlePlantName(plantName));
+        String name = resolveIdlePlantName(plantName);
+        if (plantIdleClip(name) != null) {
+            return;
+        }
+        PlantSpritesheetCatalog.ClipSpec spec = plantIdleSheetSpec(name);
+        if (spec != null && sheetClips != null) {
+            sheetClips.getOrLoad(spec);
+        }
     }
 
     public void drawZombieIdle(Batch batch, String zombieName, float x, float y, float time,
@@ -1658,6 +1683,17 @@ public final class LawnEntityRenderer {
         }
         String clip = catalog.resolveClip(entry, "idle", "idle2", "idle1", "loop");
         return clip == null ? null : clips.getOrLoad(entry.path(), clip);
+    }
+
+    private PlantSpritesheetCatalog.ClipSpec plantIdleSheetSpec(String plantName) {
+        if (plantName == null || plantSheets == null) {
+            return null;
+        }
+        PlantSpritesheetCatalog.ClipSpec spec = plantSheets.resolveClip(plantName, "idle", "idle2");
+        if (spec != null) {
+            return spec;
+        }
+        return plantSheets.idleFallback(plantName);
     }
 
     private void drawGraves(Batch batch, GameModel model, float delta, int row) {

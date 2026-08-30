@@ -51,8 +51,10 @@ import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
 import view.gui.anim.AnimScale;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
+import view.gui.assets.SheetPacketPortraits;
 import view.gui.assets.ZombiePacketIds;
 import view.gui.lawn.BrainLaneRenderer;
 import view.gui.assets.AdventureHudRegions;
@@ -142,6 +144,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final boolean scoreMode;
     private final boolean saveOurSeedsMode;
     private ConveyorBeltHud conveyorHud;
+    private SpritesheetClipCache sheetClips;
     private int swapFromCol = -1;
     private int swapFromRow = -1;
     private boolean swapDragging;
@@ -213,6 +216,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         assets.textures.loadSync("UI_SeedPackets_768");
         assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
+        if (assets.root != null) {
+            sheetClips = new SpritesheetClipCache(assets.root);
+        }
 
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_GROUP);
         assets.textures.loadSync(PlantFoodBankHud.ATLAS_PAGE_0);
@@ -590,6 +596,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 : new SeedPacketActor(
                     assets.textures, skin, name, plantCost(name), plantLevel(name),
                     boosted(name), false);
+            applySheetPortrait(packet, name);
             if (vaseBreakerMode) {
                 packet.enableExpiryTimer(skin);
                 if (pendingIndex < pending.size()) {
@@ -679,12 +686,17 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             String from = rule.getFrom();
             SeedPacketActor packet = new SeedPacketActor(
                 assets.textures, skin, from, rule.getCost(), 1, false, false, true);
+            applySheetPortrait(packet, from);
             packet.onClick(() -> tryBeghouledUpgrade(from));
             packetColumn.add(packet)
                 .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
                 .padBottom(6f).row();
         }
         refreshPacketChrome();
+    }
+
+    private void applySheetPortrait(SeedPacketActor packet, String plantName) {
+        SheetPacketPortraits.applyIfNeeded(packet, plantName, assets, sheetClips);
     }
 
     private void tryBeghouledUpgrade(String fromType) {
@@ -1823,6 +1835,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (conveyorHud != null) {
             conveyorHud.dispose();
             conveyorHud = null;
+        }
+        if (sheetClips != null) {
+            sheetClips.dispose();
+            sheetClips = null;
         }
         restoreOsCursor();
         if (hiddenCursor != null) {

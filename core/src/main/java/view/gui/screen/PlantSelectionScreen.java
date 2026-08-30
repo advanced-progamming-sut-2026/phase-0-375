@@ -20,6 +20,8 @@ import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.anim.SpritesheetClipCache;
+import view.gui.assets.SheetPacketPortraits;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.WaterUnderlayerRenderer;
@@ -47,6 +49,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     private Table slotColumn;
     private PlantChooserPanel chooser;
     private ResourceBar resourceBar;
+    private SpritesheetClipCache sheetClips;
     private String inspected;
 
     public PlantSelectionScreen(PvzGdxGame game, Chapter returnChapter) {
@@ -65,6 +68,9 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
                 ? new WaterUnderlayerRenderer(assets, lawnLayout())
                 : null;
         allowsChoosing = plantChoiceAllowed();
+        if (assets != null && assets.root != null) {
+            sheetClips = new SpritesheetClipCache(assets.root);
+        }
         buildHud();
         refreshPackets();
     }
@@ -245,6 +251,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     private SeedPacketActor packet(String name, boolean dimmed, boolean locked) {
         SeedPacketActor packet = new SeedPacketActor(
                 assets.textures, skin, name, plantCost(name), plantLevel(name), boosted(name), locked);
+        SheetPacketPortraits.applyIfNeeded(packet, name, assets, sheetClips);
         packet.setDimmed(dimmed);
         return packet;
     }
@@ -378,6 +385,10 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     public void dispose() {
         if (chooser != null) {
             chooser.dispose();
+        }
+        if (sheetClips != null) {
+            sheetClips.dispose();
+            sheetClips = null;
         }
         super.dispose();
     }

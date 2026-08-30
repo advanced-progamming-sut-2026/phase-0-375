@@ -31,7 +31,7 @@ public final class SeedPacketIds {
         if (plantName == null || plantName.isBlank()) {
             return null;
         }
-        // No packet art shipped for Cat-tail — sheet portrait is applied in CollectionScreen.
+        // No packet art shipped for Cat-tail — sheet portrait is applied at packet call sites.
         if ("Cat-tail".equals(plantName)) {
             return null;
         }

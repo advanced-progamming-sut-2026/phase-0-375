@@ -29,7 +29,9 @@ import pvz.libpvz.pam.PamPlayer;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
+import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.PamCatalog;
+import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
 
 /**
@@ -281,27 +283,49 @@ public final class PlantChooserPanel extends Table implements Disposable {
         private final TextureBank textures;
         private final PamPlayer player;
         private final PamCatalog catalog;
+        private final PlantSpritesheetCatalog sheets;
         private final PamClipCache clips;
+        private final SpritesheetClipCache sheetClips;
         private final RectClipShader clip = new RectClipShader();
         private final Rectangle mask = new Rectangle();
         private final Rectangle cover = new Rectangle();
         private String pamPath;
         private String clipName;
+        private PlantSpritesheetCatalog.ClipSpec sheetSpec;
+        private float sheetOffsetY;
+        private float sheetScaleMul = 1f;
         private float time;
 
         PamPreview(PvzAssets assets, PamClipCache clips) {
             this.textures = assets.textures;
             this.player = assets.player;
             this.catalog = assets.pamCatalog;
+            this.sheets = assets.plantSheets;
             this.clips = clips;
+            this.sheetClips = assets.root != null ? new SpritesheetClipCache(assets.root) : null;
         }
 
         void setPlant(String plantName) {
             pamPath = null;
             clipName = null;
+            sheetSpec = null;
+            sheetOffsetY = 0f;
+            sheetScaleMul = 1f;
             time = 0f;
             if (plantName == null) {
                 return;
+            }
+            if (sheets != null && sheets.hasSheets(plantName)) {
+                sheetSpec = sheets.resolveClip(plantName, "idle", "attack");
+                if (sheetSpec == null) {
+                    sheetSpec = sheets.anyClip(plantName);
+                }
+                if (sheetSpec != null) {
+                    if ("Cat-tail".equalsIgnoreCase(plantName)) {
+                        sheetScaleMul = AnimScale.PLANT;
+                    }
+                    return;
+                }
             }
             PamCatalog.PamEntry entry = catalog.forPlant(plantName);
             if (entry == null) {
@@ -331,7 +355,20 @@ public final class PlantChooserPanel extends Table implements Disposable {
                 batch.draw(bg, getX() + cover.x, getY() + cover.y, cover.width, cover.height);
             }
             batch.setColor(old);
-            if (pamPath != null && clipName != null) {
+            if (sheetSpec != null && sheetClips != null) {
+                SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(sheetSpec);
+                if (sheet != null && sheet.animation() != null) {
+                    TextureRegion frame = sheet.animation().getKeyFrame(time, true);
+                    if (frame != null) {
+                        float scale = 0.55f * sheetScaleMul;
+                        float w = frame.getRegionWidth() * scale;
+                        float h = frame.getRegionHeight() * scale;
+                        float cx = getX() + getWidth() * 0.5f;
+                        float cy = getY() + getHeight() * 0.15f + sheetOffsetY;
+                        batch.draw(frame, cx - w * 0.5f, cy, w, h);
+                    }
+                }
+            } else if (pamPath != null && clipName != null) {
                 ClipRef ref = clips.getOrLoad(pamPath, clipName);
                 if (ref != null) {
                     float scale = AnimScale.PLANT * 0.7f;
@@ -345,6 +382,9 @@ public final class PlantChooserPanel extends Table implements Disposable {
         @Override
         public void dispose() {
             clip.dispose();
+            if (sheetClips != null) {
+                sheetClips.dispose();
+            }
         }
     }
 
