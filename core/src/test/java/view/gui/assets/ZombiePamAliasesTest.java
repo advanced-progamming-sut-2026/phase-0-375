@@ -51,7 +51,7 @@ class ZombiePamAliasesTest {
                 ZombiePamAliases.pamName("ZombieDarkArmor3", Chapter.ANCIENT_EGYPT));
         assertEquals("ZOMBIE_EGYPT_RA",
                 ZombiePamAliases.pamName("ZombieRa", Chapter.DARK_AGES));
-        assertEquals("ZOMBIE_EGYPT_EXPLORER",
+        assertEquals("ZOMBIE_EXPLORER",
                 ZombiePamAliases.pamName("ZombieExplorer", Chapter.ANCIENT_EGYPT));
         assertEquals("ZOMBIE_EGYPT_TOMBRAISER",
                 ZombiePamAliases.pamName("ZombieTombRaiser", Chapter.ANCIENT_EGYPT));

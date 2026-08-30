@@ -66,6 +66,7 @@ import model.zombie.behavior.TransformBehavior;
 import model.zombie.behavior.zombotany.ZombotanyJalapenoBehavior;
 import model.zombie.behavior.zombotany.ZombotanySquashBehavior;
 import model.zombie.behavior.zomboss.DarkZombossBehavior;
+import model.zombie.behavior.zomboss.EgyptZombossBehavior;
 import model.zombie.behavior.zomboss.ZombossAction;
 import model.zombie.behavior.zomboss.ZombossBehavior;
 import model.zombie.behavior.zomboss.ZombossPendingImpact;
@@ -93,6 +94,7 @@ import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
 import view.gui.anim.zombie.DarkZombossAnim;
+import view.gui.anim.zombie.EgyptZombossAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.GargantuarAnim;
 import view.gui.anim.zombie.HunterAnim;
@@ -567,6 +569,7 @@ public final class LawnEntityRenderer {
         drawIceWinds(batch);
         drawOctopi(batch, model, delta);
         drawZombossFireballs(batch, model, delta);
+        drawZombossMissiles(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
         drawLoot(batch, model, delta);
@@ -1385,7 +1388,7 @@ public final class LawnEntityRenderer {
             return;
         }
         ZombieInstance boss = model.findZomboss();
-        if (boss == null) {
+        if (boss == null || !DarkZombossAnim.isDarkZomboss(boss)) {
             return;
         }
         ZombossBehavior behavior = (ZombossBehavior) boss.getBehavior(ZombieBehaviorType.ZOMBOSS);
@@ -1414,6 +1417,52 @@ public final class LawnEntityRenderer {
             float duration = Math.max(0.05f, fall.duration);
             float state = t * duration;
             player.draw(batch, fall, state, x, y, scale, scale, false);
+        }
+    }
+
+    private void drawZombossMissiles(Batch batch, GameModel model, float delta) {
+        if (batch == null || model == null || player == null) {
+            return;
+        }
+        ZombieInstance boss = model.findZomboss();
+        if (boss == null || !EgyptZombossAnim.isEgyptZomboss(boss)) {
+            return;
+        }
+        ZombossBehavior behavior = (ZombossBehavior) boss.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (behavior == null) {
+            return;
+        }
+        if (behavior instanceof EgyptZombossBehavior egypt) {
+            for (int[] tile : egypt.drainExplosionCues()) {
+                if (tile == null || tile.length < 2) {
+                    continue;
+                }
+                float[] xy = layout.centerOf(tile[0], tile[1]);
+                frontEffects.add(new OneShotFx(
+                        EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_EGYPT,
+                        EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_CLIP,
+                        xy[0], xy[1], AnimScale.PLANT, false));
+            }
+        }
+        ClipRef missile = clips.getOrLoad(
+                EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_EGYPT,
+                EffectPamPaths.ZOMBOSS_MISSILE_CLIP);
+        if (missile == null) {
+            return;
+        }
+        float scale = AnimScale.PLANT;
+        float fallHeight = layout.cellHeight() * 3.2f;
+        for (ZombossPendingImpact impact : behavior.getPendingImpacts()) {
+            if (impact == null || impact.isResolved()) {
+                continue;
+            }
+            float[] target = layout.centerOf(impact.getRow(), impact.getCol());
+            float t = impact.progress01();
+            float x = target[0];
+            float y = target[1] + fallHeight * (1f - t);
+            float duration = Math.max(0.05f, missile.duration);
+            float state = (t * impact.getTravelSeconds()) % duration;
+            player.draw(batch, missile, state, x, y, scale, scale, true);
         }
     }
 
@@ -3316,6 +3365,7 @@ public final class LawnEntityRenderer {
             restartFishermanClock(zombie, pose);
             restartDarkKingClock(zombie, pose);
             restartDarkZombossClock(zombie, pose);
+            restartEgyptZombossClock(zombie, pose);
             restartWizardSheepClock(zombie, pose);
             spawnHunterSplat(zombie);
         }
@@ -3325,7 +3375,7 @@ public final class LawnEntityRenderer {
         if (SunshineAnim.isSunshine(zombie)) {
             y += SunshineAnim.drawOffsetY(layout.cellHeight());
         }
-        if (DarkZombossAnim.isDarkZomboss(zombie)) {
+        if (DarkZombossAnim.isDarkZomboss(zombie) || EgyptZombossAnim.isEgyptZomboss(zombie)) {
             y -= layout.cellHeight();
         }
         float modelX = x;
@@ -3368,6 +3418,9 @@ public final class LawnEntityRenderer {
             x += holdBack;
         } else {
             float zombossPhase = darkZombossClipPhase(zombie, pose, ref);
+            if (zombossPhase < 0f) {
+                zombossPhase = egyptZombossClipPhase(zombie, pose, ref);
+            }
             if (zombossPhase >= 0f) {
                 phase = zombossPhase;
             }
@@ -4138,6 +4191,172 @@ public final class LawnEntityRenderer {
                 float intoEnd = elapsed - endAt;
                 return Math.max(0f, Math.min(1f,
                         intoEnd / DarkZombossBehavior.FIRE_ATTACK_END_SECONDS));
+            }
+        }
+        return NO_PHASE;
+    }
+
+    private void restartEgyptZombossClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !EgyptZombossAnim.isEgyptZomboss(zombie)) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (!EgyptZombossAnim.INTRO_CLIP.equals(clip)
+                && !EgyptZombossAnim.STUN_START_CLIP.equals(clip)
+                && !EgyptZombossAnim.STUN_END_CLIP.equals(clip)
+                && !EgyptZombossAnim.MISSILE_START_CLIP.equals(clip)
+                && !EgyptZombossAnim.ROCKET_LAUNCH_CLIP.equals(clip)
+                && !EgyptZombossAnim.WALK_FORWARD_CLIP.equals(clip)
+                && !EgyptZombossAnim.WALK_BACKWARDS_CLIP.equals(clip)
+                && !EgyptZombossAnim.WALK_DOWN_CLIP.equals(clip)
+                && !EgyptZombossAnim.WALK_UP_CLIP.equals(clip)
+                && !EgyptZombossAnim.PORTAL_START_CLIP.equals(clip)
+                && !EgyptZombossAnim.PORTAL_END_CLIP.equals(clip)) {
+            return;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return;
+        }
+        float total = boss.currentPhaseDurationSeconds();
+        float remaining = boss.getPhaseTimer();
+        boolean phaseJustStarted = total > 0f && Math.abs(remaining - total) < 1e-3f;
+        boolean stunStartJustStarted = false;
+        boolean stunEndJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            float elapsed = boss.phaseProgress01() * total;
+            PamCatalog.PamEntry entry = catalog.forZombie(EgyptZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, EgyptZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, EgyptZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.4667f;
+            }
+            if (endDur <= 0f) {
+                endDur = 0.1f;
+            }
+            stunStartJustStarted = EgyptZombossAnim.STUN_START_CLIP.equals(clip) && elapsed < 1e-3f;
+            float endAt = Math.max(startDur, total - endDur);
+            stunEndJustStarted = EgyptZombossAnim.STUN_END_CLIP.equals(clip)
+                    && elapsed >= endAt && elapsed < endAt + 1e-3f + 1f / 60f;
+        }
+        boolean rocketJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.MISSILE
+                && EgyptZombossAnim.ROCKET_LAUNCH_CLIP.equals(clip)) {
+            float elapsed = boss.phaseProgress01() * total;
+            rocketJustStarted = Math.abs(elapsed - EgyptZombossBehavior.MISSILE_START_SECONDS) < 1f / 30f;
+        }
+        boolean portalEndJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.SUMMON
+                && EgyptZombossAnim.PORTAL_END_CLIP.equals(clip)) {
+            float elapsed = boss.phaseProgress01() * total;
+            portalEndJustStarted = Math.abs(elapsed - EgyptZombossBehavior.PORTAL_START_SECONDS) < 1f / 30f;
+        }
+        boolean chargeBackJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.CHARGE
+                && EgyptZombossAnim.WALK_BACKWARDS_CLIP.equals(clip)
+                && boss instanceof EgyptZombossBehavior egypt
+                && !egypt.isChargingForward()) {
+            float elapsed = boss.phaseProgress01() * total;
+            chargeBackJustStarted = Math.abs(elapsed - EgyptZombossBehavior.WALK_SECONDS) < 1f / 30f;
+        }
+        boolean match = switch (boss.getPhase()) {
+            case INTRO -> EgyptZombossAnim.INTRO_CLIP.equals(clip) && phaseJustStarted;
+            case STUNNED -> (EgyptZombossAnim.STUN_START_CLIP.equals(clip) && stunStartJustStarted)
+                    || (EgyptZombossAnim.STUN_END_CLIP.equals(clip) && stunEndJustStarted);
+            case ACTION -> (phaseJustStarted && (
+                    EgyptZombossAnim.MISSILE_START_CLIP.equals(clip)
+                            || EgyptZombossAnim.WALK_FORWARD_CLIP.equals(clip)
+                            || EgyptZombossAnim.WALK_DOWN_CLIP.equals(clip)
+                            || EgyptZombossAnim.WALK_UP_CLIP.equals(clip)
+                            || EgyptZombossAnim.PORTAL_START_CLIP.equals(clip)))
+                    || rocketJustStarted
+                    || portalEndJustStarted
+                    || chargeBackJustStarted;
+            default -> false;
+        };
+        if (!match) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    private float egyptZombossClipPhase(ZombieInstance zombie, AnimPose pose, ClipRef ref) {
+        if (pose == null || ref == null || ref.duration <= 0f || !EgyptZombossAnim.isEgyptZomboss(zombie)) {
+            return NO_PHASE;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return NO_PHASE;
+        }
+        String clip = pose.clipName();
+        float total = boss.currentPhaseDurationSeconds();
+        float elapsed = boss.phaseProgress01() * total;
+        if (boss.getPhase() == ZombossPhase.INTRO
+                && EgyptZombossAnim.INTRO_CLIP.equals(clip)) {
+            return Math.max(0f, Math.min(1f, elapsed / ref.duration));
+        }
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            PamCatalog.PamEntry entry = catalog.forZombie(EgyptZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, EgyptZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, EgyptZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.4667f;
+            }
+            if (endDur <= 0f) {
+                endDur = 0.1f;
+            }
+            if (EgyptZombossAnim.STUN_START_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f, elapsed / startDur));
+            }
+            if (EgyptZombossAnim.STUN_END_CLIP.equals(clip)) {
+                float endAt = Math.max(startDur, total - endDur);
+                float intoEnd = elapsed - endAt;
+                return Math.max(0f, Math.min(1f, intoEnd / endDur));
+            }
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.MISSILE) {
+            if (EgyptZombossAnim.MISSILE_START_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f,
+                        elapsed / EgyptZombossBehavior.MISSILE_START_SECONDS));
+            }
+            if (EgyptZombossAnim.ROCKET_LAUNCH_CLIP.equals(clip)) {
+                float into = elapsed - EgyptZombossBehavior.MISSILE_START_SECONDS;
+                return Math.max(0f, Math.min(1f,
+                        into / EgyptZombossBehavior.ROCKET_LAUNCH_SECONDS));
+            }
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.CHARGE) {
+            if (EgyptZombossAnim.WALK_FORWARD_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f, elapsed / EgyptZombossBehavior.WALK_SECONDS));
+            }
+            if (EgyptZombossAnim.WALK_BACKWARDS_CLIP.equals(clip)) {
+                float into = elapsed - EgyptZombossBehavior.WALK_SECONDS;
+                return Math.max(0f, Math.min(1f, into / EgyptZombossBehavior.WALK_SECONDS));
+            }
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.CHANGE_LANE
+                && (EgyptZombossAnim.WALK_DOWN_CLIP.equals(clip)
+                        || EgyptZombossAnim.WALK_UP_CLIP.equals(clip))) {
+            return Math.max(0f, Math.min(1f, elapsed / Math.max(0.05f, ref.duration)));
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.SUMMON) {
+            if (EgyptZombossAnim.PORTAL_START_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f,
+                        elapsed / EgyptZombossBehavior.PORTAL_START_SECONDS));
+            }
+            if (EgyptZombossAnim.PORTAL_END_CLIP.equals(clip)) {
+                float into = elapsed - EgyptZombossBehavior.PORTAL_START_SECONDS;
+                return Math.max(0f, Math.min(1f,
+                        into / EgyptZombossBehavior.PORTAL_END_SECONDS));
             }
         }
         return NO_PHASE;

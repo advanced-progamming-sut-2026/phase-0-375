@@ -92,4 +92,9 @@ public final class EffectPamPaths {
     public static final String NARRATIONICONS_ZOMBOSS =
             "768/INITIAL/NPC/NARRATIONICONS_ZOMBOSS/NARRATIONICONS_ZOMBOSS.PAM";
     public static final String NARRATIONICONS_ZOMBOSS_IDLE = "anim_idle";
+
+    public static final String ZOMBOSS_MISSILE_EXPLOSION_EGYPT =
+            "768/INITIAL/EFFECTS/ZOMBOSS_MISSILE_EXPLOSION_EGYPT/ZOMBOSS_MISSILE_EXPLOSION_EGYPT.PAM";
+    public static final String ZOMBOSS_MISSILE_CLIP = "missile";
+    public static final String ZOMBOSS_MISSILE_EXPLOSION_CLIP = "missile_explosion";
 }

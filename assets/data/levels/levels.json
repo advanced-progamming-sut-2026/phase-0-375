@@ -515,6 +515,34 @@
     ]
   },
   {
+    "chapter": "ANCIENT_EGYPT",
+    "levelId": 5,
+    "levelType": "ZOMBOSS",
+    "rows": 5,
+    "columns": 9,
+    "zomboss": "ZombieEgyptZomboss",
+    "rules": {
+      "initialSun": 0,
+      "maxPlantsAllowed": 10,
+      "sunFallsFromSky": false
+    },
+    "waves": [],
+    "conveyorPlants": [
+      "Peashooter",
+      "Wall-nut",
+      "Potato Mine",
+      "Cabbage-pult",
+      "Iceberg Lettuce",
+      "Cherry Bomb",
+      "Bonk Choy",
+      "Repeater",
+      "Grave Buster",
+      "Cat-tail"
+    ],
+    "conveyorIntervalSeconds": 3.5,
+    "conveyorCapacity": 8
+  },
+  {
     "chapter": "FROSTBITE_CAVES",
     "levelId": 1,
     "levelType": "NORMAL",

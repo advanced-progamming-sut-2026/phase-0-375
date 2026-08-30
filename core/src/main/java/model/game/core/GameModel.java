@@ -1244,14 +1244,19 @@ public class GameModel implements BehaviorContext {
     public List<ZombieInstance> getZombiesInArea(int centerRow, int centerCol, int rowRadius, int colRadius) {
         List<ZombieInstance> zombies = new ArrayList<>();
         for (ZombieInstance zombie : activeZombies) {
-            if (zombie.isDead()) continue;
+            if (zombie == null || zombie.isDead()) continue;
             Point pos = zombie.getGridPosition();
             if (pos == null) continue;
 
-            int rowDiff = Math.abs(pos.getY() - centerRow);
             int colDiff = Math.abs(pos.getX() - centerCol);
-            if (rowDiff <= rowRadius && colDiff <= colRadius) {
-                zombies.add(zombie);
+            if (colDiff > colRadius) {
+                continue;
+            }
+            for (int occupied : zombie.getOccupiedRows()) {
+                if (Math.abs(occupied - centerRow) <= rowRadius) {
+                    zombies.add(zombie);
+                    break;
+                }
             }
         }
         return zombies;

@@ -88,6 +88,9 @@ public abstract class ZombossBehavior implements ZombieBehavior {
 
     /** Keeps the boss on the rightmost park column. */
     private void parkOnRight(ZombieInstance zombie, BehaviorContext context) {
+        if (!shouldParkOnRight()) {
+            return;
+        }
         int cols = context.getColumnCount();
         if (cols <= 0) {
             return;
@@ -102,6 +105,14 @@ public abstract class ZombossBehavior implements ZombieBehavior {
             zombie.setContinuousX(parkX);
             zombie.setGridX(parkCol);
         }
+    }
+
+    /**
+     * When false, {@link #parkOnRight} is skipped so a charge (or similar)
+     * can move the boss along X.
+     */
+    protected boolean shouldParkOnRight() {
+        return true;
     }
 
     private void checkSegmentBreak(ZombieInstance zombie) {

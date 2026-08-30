@@ -170,7 +170,7 @@ public final class ZombiePamAliases {
         m.put("ZombieDarkArmor3", DARK_BASIC);
         m.put("ZombieIZombieSun", SUNSHINE);
         m.put("ZombieRa", "ZOMBIE_EGYPT_RA");
-        m.put("ZombieExplorer", "ZOMBIE_EGYPT_EXPLORER");
+        m.put("ZombieExplorer", "ZOMBIE_EXPLORER");
         m.put("ZombieTombRaiser", "ZOMBIE_EGYPT_TOMBRAISER");
         m.put("ZombieImp", "ZOMBIE_EGYPT_IMP");
         m.put("ZombieIceAgeDodo", "ZOMBIE_ICEAGE_DODORIDER");
@@ -184,6 +184,7 @@ public final class ZombiePamAliases {
         m.put("ZombieDarkKing", "ZOMBIE_DARK_KING");
         m.put("ZombieDarkImpDragon", "ZOMBIE_DARK_IMP_DRAGON");
         m.put("ZombieDarkZomboss", "ZOMBIE_DARK_ZOMBOSS");
+        m.put("ZombieEgyptZomboss", "ZOMBIE_EGYPT_ZOMBOSS");
         m.put("ZombieModernAllStar", "ZOMBIE_MODERN_ALLSTAR");
         m.put("ZombieLostCityJane", "ZOMBIE_LOSTCITY_JANE");
         m.put("ZombieCrystalSkull", "ZOMBIE_LOSTCITY_CRYSTALSKULL");
