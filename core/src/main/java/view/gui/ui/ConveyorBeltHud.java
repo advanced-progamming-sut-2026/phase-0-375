@@ -11,6 +11,9 @@ import com.badlogic.gdx.scenes.scene2d.Touchable;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.WidgetGroup;
 import com.badlogic.gdx.utils.Disposable;
+import model.app.App;
+import model.enums.GameState;
+import model.game.core.PvZGameLoop;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
@@ -254,6 +257,9 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
     @Override
     public void act(float delta) {
         super.act(delta);
+        if (isGamePaused()) {
+            return;
+        }
 
         for (ConveyorItem item : items) {
             if (!item.dragging && item.currentY < item.targetY) {
@@ -264,6 +270,11 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
 
         // Continuously scroll the belt track upwards
         beltTrackOffsetY = (beltTrackOffsetY + BELT_SPEED * delta) % TRACK_SEGMENT_H;
+    }
+    
+    private static boolean isGamePaused() {
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        return loop != null && loop.getGameState() == GameState.PAUSED;
     }
 
     @Override
