@@ -229,7 +229,9 @@ public class ZombieLoader {
      */
     private Chapter resolveChapter(String objclass, String alias) {
         if (objclass == null) return null;
-        if (objclass.contains("IceAge")) return Chapter.FROSTBITE_CAVES;
+        if (objclass.contains("IceAge") || objclass.contains("IceZomboss")) {
+            return Chapter.FROSTBITE_CAVES;
+        }
         if (objclass.contains("Beach")) return Chapter.BIG_WAVE_BEACH;
         if (objclass.contains("Dark")) return Chapter.DARK_AGES;
         // Explorer and TombRaiser are Egypt-specific

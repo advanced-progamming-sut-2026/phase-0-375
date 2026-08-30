@@ -1008,6 +1008,33 @@
     ]
   },
   {
+    "chapter": "FROSTBITE_CAVES",
+    "levelId": 5,
+    "levelType": "ZOMBOSS",
+    "rows": 5,
+    "columns": 9,
+    "zomboss": "ZombieIceZomboss",
+    "rules": {
+      "initialSun": 0,
+      "maxPlantsAllowed": 10,
+      "sunFallsFromSky": false
+    },
+    "waves": [],
+    "conveyorPlants": [
+      "Peashooter",
+      "Wall-nut",
+      "Potato Mine",
+      "Cabbage-pult",
+      "Cherry Bomb",
+      "Hot Potato",
+      "Fire Peashooter",
+      "Bonk Choy",
+      "Cat-tail"
+    ],
+    "conveyorIntervalSeconds": 3.5,
+    "conveyorCapacity": 8
+  },
+  {
     "chapter": "BIG_WAVE_BEACH",
     "levelId": 1,
     "levelType": "NORMAL",

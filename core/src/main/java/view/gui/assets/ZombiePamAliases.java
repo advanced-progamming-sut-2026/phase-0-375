@@ -185,6 +185,7 @@ public final class ZombiePamAliases {
         m.put("ZombieDarkImpDragon", "ZOMBIE_DARK_IMP_DRAGON");
         m.put("ZombieDarkZomboss", "ZOMBIE_DARK_ZOMBOSS");
         m.put("ZombieEgyptZomboss", "ZOMBIE_EGYPT_ZOMBOSS");
+        m.put("ZombieIceZomboss", "ZOMBIE_ICEAGE_ZOMBOSS");
         m.put("ZombieModernAllStar", "ZOMBIE_MODERN_ALLSTAR");
         m.put("ZombieLostCityJane", "ZOMBIE_LOSTCITY_JANE");
         m.put("ZombieCrystalSkull", "ZOMBIE_LOSTCITY_CRYSTALSKULL");

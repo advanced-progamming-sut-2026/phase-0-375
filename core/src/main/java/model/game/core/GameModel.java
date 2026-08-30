@@ -1479,6 +1479,30 @@ public class GameModel implements BehaviorContext {
         cell.setTerrainStrategy(new FireTerrainStrategy(durationSeconds));
     }
 
+    public void plantFrozenZombieAt(int row, int col, String zombieDefinitionName) {
+        Cell cell = getCellAt(row, col);
+        if (cell == null) {
+            return;
+        }
+        if (cell.getTerrainStrategy() instanceof IceTerrainStrategy) {
+            return;
+        }
+        PlantInstance plant = getPlantAt(row, col);
+        if (plant != null) {
+            destroyPlant(plant);
+        }
+        String name = zombieDefinitionName == null || zombieDefinitionName.isBlank()
+                ? "ZombieDefault"
+                : zombieDefinitionName;
+        ZombieInstance frozen = ZombieFactory.createInstance(name);
+        if (frozen != null) {
+            frozen.setGridPosition(new Point(col, row));
+            frozen.setContinuousPosition(new FloatPoint(col, row));
+        }
+        cell.setGroundType(GroundType.ICE);
+        cell.setTerrainStrategy(new IceTerrainStrategy(frozen));
+    }
+
     /** @return the living Zomboss on the field, or {@code null}. */
     public ZombieInstance findZomboss() {
         for (ZombieInstance zombie : activeZombies) {

@@ -95,6 +95,8 @@ public final class EffectPamPaths {
 
     public static final String ZOMBOSS_MISSILE_EXPLOSION_EGYPT =
             "768/INITIAL/EFFECTS/ZOMBOSS_MISSILE_EXPLOSION_EGYPT/ZOMBOSS_MISSILE_EXPLOSION_EGYPT.PAM";
+    public static final String ZOMBOSS_MISSILE_EXPLOSION_ICEAGE =
+            "768/FULL/EFFECTS/ZOMBOSS_MISSILE_EXPLOSION_ICEAGE/ZOMBOSS_MISSILE_EXPLOSION_ICEAGE.PAM";
     public static final String ZOMBOSS_MISSILE_CLIP = "missile";
     public static final String ZOMBOSS_MISSILE_EXPLOSION_CLIP = "missile_explosion";
 }

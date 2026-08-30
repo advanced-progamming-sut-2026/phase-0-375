@@ -67,6 +67,7 @@ import model.zombie.behavior.zombotany.ZombotanyJalapenoBehavior;
 import model.zombie.behavior.zombotany.ZombotanySquashBehavior;
 import model.zombie.behavior.zomboss.DarkZombossBehavior;
 import model.zombie.behavior.zomboss.EgyptZombossBehavior;
+import model.zombie.behavior.zomboss.IceZombossBehavior;
 import model.zombie.behavior.zomboss.ZombossAction;
 import model.zombie.behavior.zomboss.ZombossBehavior;
 import model.zombie.behavior.zomboss.ZombossPendingImpact;
@@ -95,6 +96,7 @@ import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
 import view.gui.anim.zombie.DarkZombossAnim;
 import view.gui.anim.zombie.EgyptZombossAnim;
+import view.gui.anim.zombie.IceZombossAnim;
 import view.gui.anim.zombie.FishermanAnim;
 import view.gui.anim.zombie.GargantuarAnim;
 import view.gui.anim.zombie.HunterAnim;
@@ -1425,15 +1427,23 @@ public final class LawnEntityRenderer {
             return;
         }
         ZombieInstance boss = model.findZomboss();
-        if (boss == null || !EgyptZombossAnim.isEgyptZomboss(boss)) {
+        if (boss == null) {
+            return;
+        }
+        boolean egypt = EgyptZombossAnim.isEgyptZomboss(boss);
+        boolean ice = IceZombossAnim.isIceZomboss(boss);
+        if (!egypt && !ice) {
             return;
         }
         ZombossBehavior behavior = (ZombossBehavior) boss.getBehavior(ZombieBehaviorType.ZOMBOSS);
         if (behavior == null) {
             return;
         }
-        if (behavior instanceof EgyptZombossBehavior egypt) {
-            for (int[] tile : egypt.drainExplosionCues()) {
+        String missilePam = egypt
+                ? EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_EGYPT
+                : EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_ICEAGE;
+        if (behavior instanceof EgyptZombossBehavior egyptBoss) {
+            for (int[] tile : egyptBoss.drainExplosionCues()) {
                 if (tile == null || tile.length < 2) {
                     continue;
                 }
@@ -1443,10 +1453,19 @@ public final class LawnEntityRenderer {
                         EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_CLIP,
                         xy[0], xy[1], AnimScale.PLANT, false));
             }
+        } else if (behavior instanceof IceZombossBehavior iceBoss) {
+            for (int[] tile : iceBoss.drainExplosionCues()) {
+                if (tile == null || tile.length < 2) {
+                    continue;
+                }
+                float[] xy = layout.centerOf(tile[0], tile[1]);
+                frontEffects.add(new OneShotFx(
+                        EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_ICEAGE,
+                        EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_CLIP,
+                        xy[0], xy[1], AnimScale.PLANT, false));
+            }
         }
-        ClipRef missile = clips.getOrLoad(
-                EffectPamPaths.ZOMBOSS_MISSILE_EXPLOSION_EGYPT,
-                EffectPamPaths.ZOMBOSS_MISSILE_CLIP);
+        ClipRef missile = clips.getOrLoad(missilePam, EffectPamPaths.ZOMBOSS_MISSILE_CLIP);
         if (missile == null) {
             return;
         }
@@ -3366,6 +3385,7 @@ public final class LawnEntityRenderer {
             restartDarkKingClock(zombie, pose);
             restartDarkZombossClock(zombie, pose);
             restartEgyptZombossClock(zombie, pose);
+            restartIceZombossClock(zombie, pose);
             restartWizardSheepClock(zombie, pose);
             spawnHunterSplat(zombie);
         }
@@ -3420,6 +3440,9 @@ public final class LawnEntityRenderer {
             float zombossPhase = darkZombossClipPhase(zombie, pose, ref);
             if (zombossPhase < 0f) {
                 zombossPhase = egyptZombossClipPhase(zombie, pose, ref);
+            }
+            if (zombossPhase < 0f) {
+                zombossPhase = iceZombossClipPhase(zombie, pose, ref);
             }
             if (zombossPhase >= 0f) {
                 phase = zombossPhase;
@@ -4358,6 +4381,78 @@ public final class LawnEntityRenderer {
                 return Math.max(0f, Math.min(1f,
                         into / EgyptZombossBehavior.PORTAL_END_SECONDS));
             }
+        }
+        return NO_PHASE;
+    }
+
+    private void restartIceZombossClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !IceZombossAnim.isIceZomboss(zombie)) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (clip == null) {
+            return;
+        }
+        boolean actionClip = IceZombossAnim.INTRO_CLIP.equals(clip)
+                || IceZombossAnim.SLINGSHOT_CLIP.equals(clip)
+                || clip.startsWith(IceZombossAnim.WIND_CLIP_PREFIX)
+                || clip.startsWith(IceZombossAnim.GLACIER_CLIP_PREFIX);
+        if (!actionClip) {
+            return;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return;
+        }
+        float total = boss.currentPhaseDurationSeconds();
+        float remaining = boss.getPhaseTimer();
+        boolean phaseJustStarted = total > 0f && Math.abs(remaining - total) < 1e-3f;
+        boolean match = switch (boss.getPhase()) {
+            case INTRO -> IceZombossAnim.INTRO_CLIP.equals(clip) && phaseJustStarted;
+            case ACTION -> phaseJustStarted && (
+                    IceZombossAnim.SLINGSHOT_CLIP.equals(clip)
+                            || clip.startsWith(IceZombossAnim.WIND_CLIP_PREFIX)
+                            || clip.startsWith(IceZombossAnim.GLACIER_CLIP_PREFIX));
+            default -> false;
+        };
+        if (!match) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    private float iceZombossClipPhase(ZombieInstance zombie, AnimPose pose, ClipRef ref) {
+        if (pose == null || ref == null || ref.duration <= 0f || !IceZombossAnim.isIceZomboss(zombie)) {
+            return NO_PHASE;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return NO_PHASE;
+        }
+        String clip = pose.clipName();
+        float total = boss.currentPhaseDurationSeconds();
+        float elapsed = boss.phaseProgress01() * total;
+        if (boss.getPhase() == ZombossPhase.INTRO
+                && IceZombossAnim.INTRO_CLIP.equals(clip)) {
+            return Math.max(0f, Math.min(1f, elapsed / ref.duration));
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.ICE_MISSILE
+                && IceZombossAnim.SLINGSHOT_CLIP.equals(clip)) {
+            return Math.max(0f, Math.min(1f,
+                    elapsed / IceZombossBehavior.SLINGSHOT_SECONDS));
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.ICE_WIND
+                && clip != null && clip.startsWith(IceZombossAnim.WIND_CLIP_PREFIX)) {
+            return Math.max(0f, Math.min(1f, elapsed / Math.max(0.05f, ref.duration)));
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.FREEZE_COLUMN
+                && clip != null && clip.startsWith(IceZombossAnim.GLACIER_CLIP_PREFIX)) {
+            return Math.max(0f, Math.min(1f, elapsed / Math.max(0.05f, ref.duration)));
         }
         return NO_PHASE;
     }
