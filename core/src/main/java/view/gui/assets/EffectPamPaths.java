@@ -99,4 +99,10 @@ public final class EffectPamPaths {
             "768/FULL/EFFECTS/ZOMBOSS_MISSILE_EXPLOSION_ICEAGE/ZOMBOSS_MISSILE_EXPLOSION_ICEAGE.PAM";
     public static final String ZOMBOSS_MISSILE_CLIP = "missile";
     public static final String ZOMBOSS_MISSILE_EXPLOSION_CLIP = "missile_explosion";
+
+    public static final String ZOMBOSS_SHARK_PROJECTILE =
+            "768/FULL/EFFECTS/ZOMBOSS_SHARK_PROJECTILE/ZOMBOSS_SHARK_PROJECTILE.PAM";
+    public static final String ZOMBOSS_SHARK_WALK_CLIP = "walk";
+    public static final String ZOMBOSS_SHARK_SUBMERGE_CLIP = "submerge";
+    public static final String ZOMBOSS_SHARK_ATTACK_CLIP = "attack";
 }

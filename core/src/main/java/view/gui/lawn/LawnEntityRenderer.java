@@ -65,6 +65,8 @@ import model.zombie.behavior.ThrowImpBehavior;
 import model.zombie.behavior.TransformBehavior;
 import model.zombie.behavior.zombotany.ZombotanyJalapenoBehavior;
 import model.zombie.behavior.zombotany.ZombotanySquashBehavior;
+import model.zombie.behavior.zomboss.BeachZombossBehavior;
+import model.zombie.behavior.zomboss.BeachZombossPendingShark;
 import model.zombie.behavior.zomboss.DarkZombossBehavior;
 import model.zombie.behavior.zomboss.EgyptZombossBehavior;
 import model.zombie.behavior.zomboss.IceZombossBehavior;
@@ -94,6 +96,7 @@ import view.gui.anim.plant.exclusive.SquashAnim;
 import view.gui.anim.projectile.ProjectileAnimAdapter;
 import view.gui.anim.zombie.BarrelRollerAnim;
 import view.gui.anim.zombie.DarkKingAnim;
+import view.gui.anim.zombie.BeachZombossAnim;
 import view.gui.anim.zombie.DarkZombossAnim;
 import view.gui.anim.zombie.EgyptZombossAnim;
 import view.gui.anim.zombie.IceZombossAnim;
@@ -572,6 +575,7 @@ public final class LawnEntityRenderer {
         drawOctopi(batch, model, delta);
         drawZombossFireballs(batch, model, delta);
         drawZombossMissiles(batch, model, delta);
+        drawZombossSharks(batch, model, delta);
         drawSuns(batch, model, delta);
         drawPlantFood(batch, model, delta);
         drawLoot(batch, model, delta);
@@ -1482,6 +1486,77 @@ public final class LawnEntityRenderer {
             float duration = Math.max(0.05f, missile.duration);
             float state = (t * impact.getTravelSeconds()) % duration;
             player.draw(batch, missile, state, x, y, scale, scale, true);
+        }
+    }
+
+    private void drawZombossSharks(Batch batch, GameModel model, float delta) {
+        if (batch == null || model == null || player == null) {
+            return;
+        }
+        ZombieInstance boss = model.findZomboss();
+        if (boss == null || !BeachZombossAnim.isBeachZomboss(boss)) {
+            return;
+        }
+        ZombossBehavior behavior = (ZombossBehavior) boss.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (!(behavior instanceof BeachZombossBehavior beach)) {
+            return;
+        }
+        String pam = EffectPamPaths.ZOMBOSS_SHARK_PROJECTILE;
+        ClipRef walk = clips.getOrLoad(pam, EffectPamPaths.ZOMBOSS_SHARK_WALK_CLIP);
+        ClipRef submerge = clips.getOrLoad(pam, EffectPamPaths.ZOMBOSS_SHARK_SUBMERGE_CLIP);
+        ClipRef attack = clips.getOrLoad(pam, EffectPamPaths.ZOMBOSS_SHARK_ATTACK_CLIP);
+        if (walk == null && submerge == null && attack == null) {
+            return;
+        }
+        float scale = AnimScale.PLANT * 0.85f;
+        int spawnCol = Math.max(0, model.getColumnCount() - 1);
+        for (BeachZombossPendingShark shark : beach.getPendingSharks()) {
+            if (shark == null || shark.isResolved()) {
+                continue;
+            }
+            float[] target = layout.centerOf(shark.getRow(), shark.getCol());
+            float[] origin = layout.centerOf(shark.getRow(), spawnCol);
+            float x;
+            float y = target[1];
+            ClipRef ref;
+            float state;
+            boolean loop;
+            switch (shark.getPhase()) {
+                case WALK -> {
+                    float t = shark.phaseProgress01();
+                    x = origin[0] + (target[0] - origin[0]) * t;
+                    ref = walk;
+                    state = t * Math.max(0.05f, shark.getWalkSeconds());
+                    loop = true;
+                }
+                case SUBMERGE -> {
+                    x = target[0];
+                    ref = submerge;
+                    state = shark.phaseProgress01() * Math.max(0.05f,
+                            BeachZombossBehavior.SHARK_SUBMERGE_SECONDS);
+                    loop = false;
+                }
+                case ATTACK -> {
+                    x = target[0];
+                    ref = attack;
+                    state = shark.phaseProgress01() * Math.max(0.05f,
+                            BeachZombossBehavior.SHARK_ATTACK_SECONDS);
+                    loop = false;
+                }
+                default -> {
+                    continue;
+                }
+            }
+            if (ref == null) {
+                continue;
+            }
+            float duration = Math.max(0.05f, ref.duration);
+            if (loop) {
+                state = state % duration;
+            } else {
+                state = Math.min(state, duration);
+            }
+            player.draw(batch, ref, state, x, y, scale, scale, loop);
         }
     }
 
@@ -3386,6 +3461,7 @@ public final class LawnEntityRenderer {
             restartDarkZombossClock(zombie, pose);
             restartEgyptZombossClock(zombie, pose);
             restartIceZombossClock(zombie, pose);
+            restartBeachZombossClock(zombie, pose);
             restartWizardSheepClock(zombie, pose);
             spawnHunterSplat(zombie);
         }
@@ -3395,7 +3471,8 @@ public final class LawnEntityRenderer {
         if (SunshineAnim.isSunshine(zombie)) {
             y += SunshineAnim.drawOffsetY(layout.cellHeight());
         }
-        if (DarkZombossAnim.isDarkZomboss(zombie) || EgyptZombossAnim.isEgyptZomboss(zombie)) {
+        if (DarkZombossAnim.isDarkZomboss(zombie) || EgyptZombossAnim.isEgyptZomboss(zombie)
+                || BeachZombossAnim.isBeachZomboss(zombie)) {
             y -= layout.cellHeight();
         }
         float modelX = x;
@@ -3443,6 +3520,9 @@ public final class LawnEntityRenderer {
             }
             if (zombossPhase < 0f) {
                 zombossPhase = iceZombossClipPhase(zombie, pose, ref);
+            }
+            if (zombossPhase < 0f) {
+                zombossPhase = beachZombossClipPhase(zombie, pose, ref);
             }
             if (zombossPhase >= 0f) {
                 phase = zombossPhase;
@@ -4453,6 +4533,158 @@ public final class LawnEntityRenderer {
                 && boss.getCurrentAction() == ZombossAction.FREEZE_COLUMN
                 && clip != null && clip.startsWith(IceZombossAnim.GLACIER_CLIP_PREFIX)) {
             return Math.max(0f, Math.min(1f, elapsed / Math.max(0.05f, ref.duration)));
+        }
+        return NO_PHASE;
+    }
+
+    private void restartBeachZombossClock(ZombieInstance zombie, AnimPose pose) {
+        if (pose == null || !BeachZombossAnim.isBeachZomboss(zombie)) {
+            return;
+        }
+        String clip = pose.clipName();
+        if (clip == null) {
+            return;
+        }
+        boolean actionClip = BeachZombossAnim.INTRO_CLIP.equals(clip)
+                || BeachZombossAnim.STUN_START_CLIP.equals(clip)
+                || BeachZombossAnim.STUN_END_CLIP.equals(clip)
+                || BeachZombossAnim.SPAWN_CLIP.equals(clip)
+                || BeachZombossAnim.SUBMERGE_CLIP.equals(clip)
+                || BeachZombossAnim.EMERGE_CLIP.equals(clip)
+                || BeachZombossAnim.SUCTION_ON_CLIP.equals(clip)
+                || BeachZombossAnim.SUCTION_OFF_CLIP.equals(clip);
+        if (!actionClip) {
+            return;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return;
+        }
+        float total = boss.currentPhaseDurationSeconds();
+        float remaining = boss.getPhaseTimer();
+        boolean phaseJustStarted = total > 0f && Math.abs(remaining - total) < 1e-3f;
+        boolean stunStartJustStarted = false;
+        boolean stunEndJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            float elapsed = boss.phaseProgress01() * total;
+            PamCatalog.PamEntry entry = catalog.forZombie(BeachZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, BeachZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, BeachZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.1333f;
+            }
+            if (endDur <= 0f) {
+                endDur = 1.1f;
+            }
+            stunStartJustStarted = BeachZombossAnim.STUN_START_CLIP.equals(clip) && elapsed < 1e-3f;
+            float endAt = Math.max(startDur, total - endDur);
+            stunEndJustStarted = BeachZombossAnim.STUN_END_CLIP.equals(clip)
+                    && elapsed >= endAt && elapsed < endAt + 1e-3f + 1f / 60f;
+        }
+        boolean emergeJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.CHANGE_LANE
+                && BeachZombossAnim.EMERGE_CLIP.equals(clip)
+                && boss instanceof BeachZombossBehavior) {
+            float elapsed = boss.phaseProgress01() * total;
+            emergeJustStarted = Math.abs(elapsed - BeachZombossBehavior.SUBMERGE_SECONDS) < 1f / 30f;
+        }
+        boolean suctionOffJustStarted = false;
+        if (boss.getPhase() == ZombossPhase.ACTION
+                && boss.getCurrentAction() == ZombossAction.TURBINE
+                && BeachZombossAnim.SUCTION_OFF_CLIP.equals(clip)
+                && boss instanceof BeachZombossBehavior beach) {
+            float elapsed = beach.turbineElapsedSeconds();
+            suctionOffJustStarted = Math.abs(elapsed
+                    - (BeachZombossBehavior.SUCTION_ON_SECONDS
+                    + BeachZombossBehavior.SUCTION_LOOP_SECONDS)) < 1f / 30f;
+        }
+        boolean match = switch (boss.getPhase()) {
+            case INTRO -> BeachZombossAnim.INTRO_CLIP.equals(clip) && phaseJustStarted;
+            case STUNNED -> (BeachZombossAnim.STUN_START_CLIP.equals(clip) && stunStartJustStarted)
+                    || (BeachZombossAnim.STUN_END_CLIP.equals(clip) && stunEndJustStarted);
+            case ACTION -> (phaseJustStarted && (
+                    BeachZombossAnim.SPAWN_CLIP.equals(clip)
+                            || BeachZombossAnim.SUBMERGE_CLIP.equals(clip)
+                            || BeachZombossAnim.SUCTION_ON_CLIP.equals(clip)))
+                    || emergeJustStarted
+                    || suctionOffJustStarted;
+            default -> false;
+        };
+        if (!match) {
+            return;
+        }
+        AnimClock clock = clockFor(zombie);
+        clock.clipKey = "";
+        clock.time = 0f;
+    }
+
+    private float beachZombossClipPhase(ZombieInstance zombie, AnimPose pose, ClipRef ref) {
+        if (pose == null || ref == null || ref.duration <= 0f || !BeachZombossAnim.isBeachZomboss(zombie)) {
+            return NO_PHASE;
+        }
+        ZombossBehavior boss = (ZombossBehavior) zombie.getBehavior(ZombieBehaviorType.ZOMBOSS);
+        if (boss == null) {
+            return NO_PHASE;
+        }
+        String clip = pose.clipName();
+        float total = boss.currentPhaseDurationSeconds();
+        float elapsed = boss.phaseProgress01() * total;
+        if (boss.getPhase() == ZombossPhase.INTRO
+                && BeachZombossAnim.INTRO_CLIP.equals(clip)) {
+            return Math.max(0f, Math.min(1f, elapsed / ref.duration));
+        }
+        if (boss.getPhase() == ZombossPhase.STUNNED) {
+            PamCatalog.PamEntry entry = catalog.forZombie(BeachZombossAnim.DEFINITION_NAME);
+            float startDur = PamCatalog.clipDurationSeconds(entry, BeachZombossAnim.STUN_START_CLIP);
+            float endDur = PamCatalog.clipDurationSeconds(entry, BeachZombossAnim.STUN_END_CLIP);
+            if (startDur <= 0f) {
+                startDur = 0.1333f;
+            }
+            if (endDur <= 0f) {
+                endDur = 1.1f;
+            }
+            if (BeachZombossAnim.STUN_START_CLIP.equals(clip)) {
+                return Math.max(0f, Math.min(1f, elapsed / startDur));
+            }
+            if (BeachZombossAnim.STUN_END_CLIP.equals(clip)) {
+                float endAt = Math.max(startDur, total - endDur);
+                float intoEnd = elapsed - endAt;
+                return Math.max(0f, Math.min(1f, intoEnd / endDur));
+            }
+        }
+        if (boss.getPhase() == ZombossPhase.ACTION && boss instanceof BeachZombossBehavior beach) {
+            ZombossAction action = boss.getCurrentAction();
+            if (action == ZombossAction.SUMMON || action == ZombossAction.BABY_SHARK) {
+                if (BeachZombossAnim.SPAWN_CLIP.equals(clip)) {
+                    return Math.max(0f, Math.min(1f,
+                            elapsed / BeachZombossBehavior.SPAWN_SECONDS));
+                }
+            }
+            if (action == ZombossAction.CHANGE_LANE) {
+                if (BeachZombossAnim.SUBMERGE_CLIP.equals(clip)) {
+                    return Math.max(0f, Math.min(1f,
+                            elapsed / BeachZombossBehavior.SUBMERGE_SECONDS));
+                }
+                if (BeachZombossAnim.EMERGE_CLIP.equals(clip)) {
+                    float into = elapsed - BeachZombossBehavior.SUBMERGE_SECONDS;
+                    return Math.max(0f, Math.min(1f,
+                            into / BeachZombossBehavior.EMERGE_SECONDS));
+                }
+            }
+            if (action == ZombossAction.TURBINE) {
+                float turbineElapsed = beach.turbineElapsedSeconds();
+                if (BeachZombossAnim.SUCTION_ON_CLIP.equals(clip)) {
+                    return Math.max(0f, Math.min(1f,
+                            turbineElapsed / BeachZombossBehavior.SUCTION_ON_SECONDS));
+                }
+                if (BeachZombossAnim.SUCTION_OFF_CLIP.equals(clip)) {
+                    float into = turbineElapsed - BeachZombossBehavior.SUCTION_ON_SECONDS
+                            - BeachZombossBehavior.SUCTION_LOOP_SECONDS;
+                    return Math.max(0f, Math.min(1f,
+                            into / BeachZombossBehavior.SUCTION_OFF_SECONDS));
+                }
+            }
         }
         return NO_PHASE;
     }

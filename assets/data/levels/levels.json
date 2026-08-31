@@ -1609,6 +1609,49 @@
     ]
   },
   {
+    "chapter": "BIG_WAVE_BEACH",
+    "levelId": 5,
+    "levelType": "ZOMBOSS",
+    "rows": 5,
+    "columns": 9,
+    "zomboss": "ZombieBeachZomboss",
+    "rules": {
+      "initialSun": 0,
+      "maxPlantsAllowed": 10,
+      "sunFallsFromSky": false
+    },
+    "waterTiles": [
+      { "x": 8, "y": 0 },
+      { "x": 8, "y": 1 },
+      { "x": 8, "y": 2 },
+      { "x": 8, "y": 3 },
+      { "x": 8, "y": 4 },
+      { "x": 7, "y": 0 },
+      { "x": 7, "y": 1 },
+      { "x": 7, "y": 2 },
+      { "x": 7, "y": 3 },
+      { "x": 7, "y": 4 },
+      { "x": 6, "y": 1 },
+      { "x": 6, "y": 2 },
+      { "x": 6, "y": 3 }
+    ],
+    "tideLimitColumn": 5,
+    "waves": [],
+    "conveyorPlants": [
+      "Peashooter",
+      "Wall-nut",
+      "Potato Mine",
+      "Cabbage-pult",
+      "Cherry Bomb",
+      "Lily Pad",
+      "Tangle Kelp",
+      "Cat-tail",
+      "Bonk Choy"
+    ],
+    "conveyorIntervalSeconds": 3.5,
+    "conveyorCapacity": 8
+  },
+  {
     "chapter": "DARK_AGES",
     "levelId": 1,
     "levelType": "NORMAL",

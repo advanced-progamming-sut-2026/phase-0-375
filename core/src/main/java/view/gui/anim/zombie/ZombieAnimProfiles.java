@@ -37,6 +37,7 @@ public final class ZombieAnimProfiles {
         DarkZombossAnim.register(overrides);
         EgyptZombossAnim.register(overrides);
         IceZombossAnim.register(overrides);
+        BeachZombossAnim.register(overrides);
         ZombotanyAnim.register(overrides);
     }
 }

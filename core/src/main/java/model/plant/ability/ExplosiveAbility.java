@@ -4,6 +4,7 @@ import model.enums.PlantCategory;
 import model.enums.PlantSpecialTag;
 import model.enums.PlantState;
 import model.enums.PlantTags;
+import model.enums.ZombieBehaviorType;
 import model.game.map.FloatPoint;
 import model.game.map.terrain.IceTerrainStrategy;
 import model.plant.PlantFactory;
@@ -339,7 +340,11 @@ public class ExplosiveAbility implements PlantAbility {
         }
 
         // Default: same-tile trigger. Flying zombies pass over without setting them off.
-        return grounded(context.getZombiesInArea(row, col, 0, 0));
+        List<ZombieInstance> onTile = grounded(context.getZombiesInArea(row, col, 0, 0));
+        if (isTangleKelp(def)) {
+            onTile.removeIf(this::isZomboss);
+        }
+        return onTile;
     }
 
     private static List<ZombieInstance> grounded(List<ZombieInstance> zombies) {
@@ -631,7 +636,7 @@ public class ExplosiveAbility implements PlantAbility {
         List<ZombieInstance> zombiesInLane = context.getZombiesInLane(row);
         for (ZombieInstance zombie : zombiesInLane) {
             if (grabbed >= maxTargets) break;
-            if (zombie == null || zombie.isDead()) continue;
+            if (zombie == null || zombie.isDead() || isZomboss(zombie)) continue;
             int zombieCol = zombie.getGridPosition() != null ? zombie.getGridPosition().getX() : 0;
             if (Math.abs(zombieCol - col) > 4) continue;
             context.damageZombie(zombie, damage);
@@ -646,7 +651,9 @@ public class ExplosiveAbility implements PlantAbility {
         List<ZombieInstance> inWater = new ArrayList<>();
         for (int lane = 0; lane < context.getRowCount(); lane++) {
             for (ZombieInstance zombie : context.getZombiesInLane(lane)) {
-                if (zombie == null || zombie.isDead() || zombie.isFlying()) continue;
+                if (zombie == null || zombie.isDead() || zombie.isFlying() || isZomboss(zombie)) {
+                    continue;
+                }
                 int zRow = zombie.getGridPosition() != null ? zombie.getGridPosition().getY() : lane;
                 int zCol = zombie.getGridPosition() != null ? zombie.getGridPosition().getX() : 0;
                 if (context.isWaterTile(zRow, zCol)) {
@@ -700,6 +707,10 @@ public class ExplosiveAbility implements PlantAbility {
 
     private boolean isTangleKelp(Plant def) {
         return named(def, "Tangle Kelp");
+    }
+
+    private boolean isZomboss(ZombieInstance zombie) {
+        return zombie != null && zombie.hasBehavior(ZombieBehaviorType.ZOMBOSS);
     }
 
     /** Sums up every upgrade value with the given special tag. */

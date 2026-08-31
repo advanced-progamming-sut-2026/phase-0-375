@@ -47,6 +47,7 @@ public abstract class ZombossBehavior implements ZombieBehavior {
         ensureSetup(zombie);
         parkOnRight(zombie, context);
         tickPendingImpacts(zombie, context, deltaTime);
+        tickChapterProjectiles(zombie, context, deltaTime);
 
         if (zombie.getCurrentHP() <= 0) {
             enterDying(zombie);
@@ -309,6 +310,15 @@ public abstract class ZombossBehavior implements ZombieBehavior {
     /** Called when a pending lobbed attack lands. */
     protected void onImpact(ZombieInstance zombie, BehaviorContext context,
                             ZombossPendingImpact impact) {
+        // subclass
+    }
+
+    /**
+     * Tick chapter-specific projectiles that should keep moving even after the
+     * ACTION phase ends.
+     */
+    protected void tickChapterProjectiles(ZombieInstance zombie, BehaviorContext context,
+                                          float deltaTime) {
         // subclass
     }
 
