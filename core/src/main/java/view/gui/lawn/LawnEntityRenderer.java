@@ -861,23 +861,15 @@ public final class LawnEntityRenderer {
                                        float bodyX, float bodyY, float bodyTime, float bodyScale) {
         Rectangle skull = null;
         if (bodyRef != null) {
-            for (String part : new String[]{
-                    "zombie_egypt_skull", "zombie_skull", "particle_head"}) {
+            for (String part : ZombotanyAnim.SKULL_PARTS) {
                 skull = partAt(bodyRef, bodyTime, part);
                 if (skull != null) {
                     break;
                 }
             }
         }
-        float hx = bodyX + ZombotanyAnim.HEAD_OFFSET_X * bodyScale;
-        float hy = bodyY + layout.cellHeight() * 0.28f;
-        if (skull != null) {
-            float localCx = (skull.x + skull.width * 0.5f) * bodyScale;
-            float localCy = (skull.y + skull.height * ZombotanyAnim.NECK_ANCHOR) * bodyScale;
-            hx = bodyX + (flipX ? -localCx : localCx) + ZombotanyAnim.HEAD_OFFSET_X * bodyScale;
-            hy = bodyY - localCy + ZombotanyAnim.HEAD_OFFSET_Y * bodyScale;
-        }
-        return new float[]{hx, hy};
+        float fallbackY = layout.cellHeight() * 0.28f;
+        return ZombotanyAnim.headWorldCenter(skull, flipX, bodyX, bodyY, bodyScale, fallbackY);
     }
 
     private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {

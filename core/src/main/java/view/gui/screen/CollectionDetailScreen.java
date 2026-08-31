@@ -25,6 +25,7 @@ import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.zombie.SunshineAnim;
 import view.gui.anim.zombie.ZombieAnimAdapter;
+import view.gui.anim.zombie.ZombotanyAnim;
 import view.gui.assets.AlmanacArt;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PlantSpritesheetCatalog;
@@ -240,6 +241,8 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         private String clipName;
         private PlantSpritesheetCatalog.ClipSpec sheetSpec;
         private Map<String, Boolean> visibility;
+        private String plantPamPath;
+        private String plantClipName;
         private float sheetOffsetY;
         private float sheetScaleMul = 1f;
         private float time;
@@ -257,6 +260,8 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             clipName = null;
             sheetSpec = null;
             visibility = null;
+            plantPamPath = null;
+            plantClipName = null;
             sheetOffsetY = 0f;
             sheetScaleMul = 1f;
             time = 0f;
@@ -288,6 +293,8 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             clipName = null;
             sheetSpec = null;
             visibility = null;
+            plantPamPath = null;
+            plantClipName = null;
             sheetOffsetY = 0f;
             sheetScaleMul = 1f;
             time = 0f;
@@ -311,6 +318,15 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             pamPath = entry.path();
             clipName = catalog.resolveClip(entry, "idle", "walk", "idle2", "loop");
             visibility = ZombieAnimAdapter.almanacArmorVisibility(name, entry);
+            if (ZombotanyAnim.isPlantHeadName(name)) {
+                visibility = ZombotanyAnim.headHiddenVisibility(visibility);
+                String plantName = ZombotanyAnim.plantDefinitionName(name);
+                PamCatalog.PamEntry plant = plantName == null ? null : catalog.forPlant(plantName);
+                if (plant != null) {
+                    plantPamPath = plant.path();
+                    plantClipName = catalog.resolveClip(plant, "idle", "idle2", "idle1", "loop");
+                }
+            }
         }
 
         void clearEntity() {
@@ -318,6 +334,8 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             clipName = null;
             sheetSpec = null;
             visibility = null;
+            plantPamPath = null;
+            plantClipName = null;
             sheetOffsetY = 0f;
             sheetScaleMul = 1f;
         }
@@ -352,11 +370,35 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
             if (ref == null) {
                 return;
             }
+            float bodyScale = 0.7f;
             if (visibility != null) {
-                player.draw(batch, ref, time, cx, cy, 0.7f, 0.7f, true, visibility);
+                player.draw(batch, ref, time, cx, cy, bodyScale, bodyScale, true, visibility);
             } else {
-                player.draw(batch, ref, time, cx, cy, 0.7f, 0.7f, true);
+                player.draw(batch, ref, time, cx, cy, bodyScale, bodyScale, true);
             }
+            drawZombotanyPlantHead(batch, ref, cx, cy, bodyScale);
+        }
+
+        private void drawZombotanyPlantHead(Batch batch, ClipRef bodyRef, float bodyX, float bodyY,
+                                            float bodyScale) {
+            if (plantPamPath == null || plantClipName == null) {
+                return;
+            }
+            ClipRef plantRef = clips.getOrLoad(plantPamPath, plantClipName);
+            if (plantRef == null) {
+                return;
+            }
+            com.badlogic.gdx.math.Rectangle skull = null;
+            for (String part : ZombotanyAnim.SKULL_PARTS) {
+                skull = player.partBounds(bodyRef, time, part);
+                if (skull != null) {
+                    break;
+                }
+            }
+            float[] xy = ZombotanyAnim.headWorldCenter(
+                    skull, false, bodyX, bodyY, bodyScale, getHeight() * 0.2f);
+            float headScale = bodyScale * ZombotanyAnim.HEAD_SCALE;
+            player.draw(batch, plantRef, time, xy[0], xy[1], -headScale, headScale, true);
         }
     }
 }

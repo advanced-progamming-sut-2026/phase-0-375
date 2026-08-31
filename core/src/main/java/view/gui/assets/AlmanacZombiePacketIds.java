@@ -47,6 +47,10 @@ public final class AlmanacZombiePacketIds {
         m.put("ZombieArmor1", "MUMMY_ARMOR1");
         m.put("ZombieArmor2", "MUMMY_ARMOR2");
         m.put("ZombieArmor4", "MUMMY_ARMOR4");
+        m.put("ZombotanyPeashooter", "PIRATE_ARMOR4");
+        m.put("ZombotanyWallnut", "PIRATE_ARMOR4");
+        m.put("ZombotanyJalapeno", "PIRATE_ARMOR4");
+        m.put("ZombotanySquash", "PIRATE_ARMOR4");
         m.put("ZombieDarkArmor3", "DARK_ARMOR3");
         m.put("ZombieGargantuar", "EGYPT_GARGANTUAR");
         m.put("ZombieImp", "EGYPT_IMP");
@@ -72,6 +76,10 @@ public final class AlmanacZombiePacketIds {
         m.put("ZombieArcade", "EIGHTIES_ARCADE");
         m.put("ZombieBarrelRoller", "BARRELROLLER");
         m.put("ZombiePirateImp", "PIRATE_IMP");
+        m.put("ZombieEgyptZomboss", "ZOMBOSSMECH_EGYPT");
+        m.put("ZombieIceZomboss", "ZOMBOSSMECH_ICEAGE");
+        m.put("ZombieBeachZomboss", "ZOMBOSSMECH_BEACH");
+        m.put("ZombieDarkZomboss", "ZOMBOSSMECH_DARK");
         // Sheet-only zombies (e.g. ZombieIZombieSun) fall back to spritesheet portraits.
         return m;
     }

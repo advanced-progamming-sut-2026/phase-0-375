@@ -33,6 +33,10 @@ public final class ZombotanyAnim {
     public static final float HEAD_OFFSET_Y = 15f;
     public static final float HEAD_OFFSET_X = 25f;
 
+    /** Skull parts used to pin the plant head (prefer first that has bounds). */
+    public static final String[] SKULL_PARTS = {
+            "zombie_egypt_skull", "zombie_skull", "particle_head"};
+
     private static final String[] WALLNUT_BODY = {"idle", "damage", "damage2", "damage3"};
 
     /** Head bits to strip from the basic zombie body. */
@@ -90,6 +94,20 @@ public final class ZombotanyAnim {
 
     public static Map<String, Boolean> headHiddenVisibility(Map<String, Boolean> base) {
         return PamVisibility.hideAlso(base, HEAD_PARTS);
+    }
+
+    public static float[] headWorldCenter(com.badlogic.gdx.math.Rectangle skull, boolean flipX,
+                                          float bodyX, float bodyY, float bodyScale,
+                                          float fallbackOffsetY) {
+        float hx = bodyX + HEAD_OFFSET_X * bodyScale;
+        float hy = bodyY + fallbackOffsetY;
+        if (skull != null) {
+            float localCx = (skull.x + skull.width * 0.5f) * bodyScale;
+            float localCy = (skull.y + skull.height * NECK_ANCHOR) * bodyScale;
+            hx = bodyX + (flipX ? -localCx : localCx) + HEAD_OFFSET_X * bodyScale;
+            hy = bodyY - localCy + HEAD_OFFSET_Y * bodyScale;
+        }
+        return new float[]{hx, hy};
     }
 
     /**
