@@ -28,6 +28,8 @@ import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SeasonMapLayout;
 import view.gui.assets.WorldMapArt;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.debug.DecoLayoutDebugger;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.EdgeFadeOverlay;
@@ -183,6 +185,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         if (edgeFade == null) {
             edgeFade = new EdgeFadeOverlay(EDGE_FADE_H);
         }
+        GameAudio.get().play(MusicTracks.WORLD_MAP);
         super.show();
     }
 

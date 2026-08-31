@@ -50,6 +50,7 @@ import model.item.Sun;
 import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameplayMusic;
 import view.gui.anim.AnimScale;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
@@ -157,6 +158,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private LoseResultsOverlay loseOverlay;
     private WinResultsOverlay winOverlay;
     private MyopointResultsOverlay myopointResultsOverlay;
+    private final GameplayMusic gameplayMusic = new GameplayMusic();
     private final List<Actor> hudRoots = new ArrayList<>();
     private ImageButton shovelButton;
     private ImageButton pauseButton;
@@ -183,6 +185,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         iZombieMode = currentLevel() instanceof IZombieLevel;
         scoreMode = currentLevel() instanceof ScoreLevel;
         saveOurSeedsMode = currentLevel() instanceof SaveOurSeedsLevel || ProtectTileRenderer.isProtectLevel(currentLevel());
+        gameplayMusic.reset();
         protectTileRenderer = new ProtectTileRenderer(assets.textures);
         if (saveOurSeedsMode) {
             protectTileRenderer.ensureLoaded();
@@ -1217,10 +1220,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             if (winOverlay != null && entityRenderer.isWinFadeDone()) {
                 winOverlay.play();
+                gameplayMusic.playChapterRewardOnce(currentChapter());
             }
             if (myopointResultsOverlay != null
                 && (entityRenderer.isLoseFadeDone() || entityRenderer.isWinFadeDone())) {
                 myopointResultsOverlay.play();
+                if (entityRenderer.isWinFadeDone()) {
+                    gameplayMusic.playChapterRewardOnce(currentChapter());
+                }
             }
             return;
         }
@@ -1247,10 +1254,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             entityRenderer.tickEndLevel(delta);
             if (winOverlay != null && entityRenderer.isWinFadeDone()) {
                 winOverlay.play();
+                gameplayMusic.playChapterRewardOnce(currentChapter());
             }
             if (myopointResultsOverlay != null
                 && (entityRenderer.isLoseFadeDone() || entityRenderer.isWinFadeDone())) {
                 myopointResultsOverlay.play();
+                if (entityRenderer.isWinFadeDone()) {
+                    gameplayMusic.playChapterRewardOnce(currentChapter());
+                }
             }
             return;
         }
@@ -1260,11 +1271,12 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 waveAnnounce.show(waveText);
             }
         }
+        boolean inLastStandSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
+                && lastStand.isSetupPhase();
+        gameplayMusic.sync(model, currentChapter(), inLastStandSetup);
         if (waveProgress != null) {
-            boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
-                    && lastStand.isSetupPhase();
-            waveProgress.setVisible(!inSetup);
-            if (!inSetup) {
+            waveProgress.setVisible(!inLastStandSetup);
+            if (!inLastStandSetup) {
                 waveProgress.sync(model);
             }
         }
@@ -1329,6 +1341,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startLoseSequence() {
+        gameplayMusic.playDefeat(currentChapter());
         flushPendingLoot();
         endSequenceActive = true;
         clearArmedModes();
@@ -1350,6 +1363,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startWinSequence() {
+        gameplayMusic.playVictory(currentChapter());
         flushPendingLoot();
         endSequenceActive = true;
         clearArmedModes();
@@ -1516,6 +1530,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                     if (lootRewardPopup != null) {
                         lootRewardPopup.show(loot);
                     }
+                    gameplayMusic.playLootSting(loot);
                 });
         }
     }

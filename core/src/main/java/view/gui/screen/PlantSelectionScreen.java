@@ -22,6 +22,8 @@ import model.user.User;
 import view.gui.PvzGdxGame;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.SheetPacketPortraits;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.lawn.LawnBackgroundRenderer;
 import view.gui.lawn.LawnLayout;
 import view.gui.lawn.WaterUnderlayerRenderer;
@@ -71,6 +73,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         if (assets != null && assets.root != null) {
             sheetClips = new SpritesheetClipCache(assets.root);
         }
+        GameAudio.get().play(MusicTracks.chooseSeeds(chapter));
         buildHud();
         refreshPackets();
     }

@@ -28,6 +28,8 @@ import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
 import view.gui.assets.UiRegions;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.SkinFonts;
 import view.gui.ui.UiMotion;
@@ -80,6 +82,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
     public void show() {
         game.ensureAssets();
         art.ensureLoaded(game.assets.textures);
+        GameAudio.get().play(MusicTracks.TITLE);
         super.show();
     }
 

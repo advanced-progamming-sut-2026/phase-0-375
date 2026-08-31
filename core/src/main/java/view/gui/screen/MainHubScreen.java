@@ -27,6 +27,8 @@ import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.ui.ModalCard;
 import view.gui.ui.SkinFonts;
 import view.gui.ui.NewsOverlay;
@@ -69,6 +71,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
     public void show() {
         game.ensureAssets();
         art.ensureLoaded(game.assets.textures);
+        GameAudio.get().play(MusicTracks.HUB);
         super.show();
     }
 

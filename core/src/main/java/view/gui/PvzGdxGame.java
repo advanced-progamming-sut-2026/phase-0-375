@@ -75,6 +75,7 @@ public class PvzGdxGame extends Game {
             skin = null;
         }
         SkinFonts.disposeDynamicFonts();
+        GameAudio.get().dispose();
         super.dispose();
     }
 }

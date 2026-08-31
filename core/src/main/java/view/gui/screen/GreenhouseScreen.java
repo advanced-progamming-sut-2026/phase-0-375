@@ -26,6 +26,8 @@ import view.gui.assets.PvzAssets;
 import view.gui.assets.ShopArt;
 import view.gui.assets.ZenGardenArt;
 import view.gui.assets.ZenGardenLayout;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.anim.PamClipCache;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.PotSlotActor;
@@ -71,6 +73,7 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
         App.getInstance().setCurrentMenu(MenuType.GREENHOUSE);
         Greenhouse.getInstance(App.getInstance().getCurrentUser());
         cover = new ZenGardenLayout.CoverTransform(UI_WIDTH, UI_HEIGHT);
+        GameAudio.get().play(MusicTracks.ZEN_GARDEN);
         super.show();
     }
 

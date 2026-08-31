@@ -24,6 +24,8 @@ import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.ChapterIslandArt;
 import view.gui.assets.PvzAssets;
+import view.gui.audio.GameAudio;
+import view.gui.audio.MusicTracks;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.ChapterCarousel;
 import view.gui.ui.EdgeFadeOverlay;
@@ -70,6 +72,7 @@ public final class AdventureScreen extends AbstractMenuScreen {
         if (edgeFade == null) {
             edgeFade = new EdgeFadeOverlay(EDGE_FADE_H);
         }
+        GameAudio.get().play(MusicTracks.WORLD_MAP);
         super.show();
     }
 

@@ -1,20 +1,28 @@
 package view.gui.audio;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.files.FileHandle;
 import model.app.App;
 import model.user.User;
 
+import java.util.EnumMap;
+import java.util.Map;
+
 /**
  * Applies music/SFX volumes from the logged-in user's settings.
- * Sounds and music tracks register here so volume changes take effect live.
+ * Loads BGM from {@code assets/music/} via {@link MusicTracks} (missing files = silent).
  */
 public final class GameAudio {
     private static final GameAudio INSTANCE = new GameAudio();
+    private static final String[] EXTENSIONS = {".ogg", ".mp3", ".wav"};
 
     private float musicVolume = 1f;
     private float sfxVolume = 1f;
     private Music currentMusic;
+    private MusicTracks currentTrack;
+    private final Map<MusicTracks, Music> cache = new EnumMap<>(MusicTracks.class);
 
     private GameAudio() {}
 
@@ -53,12 +61,36 @@ public final class GameAudio {
         sfxVolume = clamp01(volume);
     }
 
+    /** Plays a catalog track (looping). No-op if the file is missing. */
+    public void play(MusicTracks track) {
+        play(track, true);
+    }
+
+    public void play(MusicTracks track, boolean looping) {
+        if (track == null) {
+            stopMusic();
+            return;
+        }
+        if (track == currentTrack && currentMusic != null && currentMusic.isPlaying()) {
+            currentMusic.setLooping(looping);
+            currentMusic.setVolume(musicVolume);
+            return;
+        }
+        Music music = obtain(track);
+        if (music == null) {
+            return;
+        }
+        playMusic(music, looping);
+        currentTrack = track;
+    }
+
     public void playMusic(Music music, boolean looping) {
         if (currentMusic != null && currentMusic != music) {
             currentMusic.stop();
         }
         currentMusic = music;
         if (music == null) {
+            currentTrack = null;
             return;
         }
         music.setLooping(looping);
@@ -73,6 +105,11 @@ public final class GameAudio {
             currentMusic.stop();
             currentMusic = null;
         }
+        currentTrack = null;
+    }
+
+    public MusicTracks currentTrack() {
+        return currentTrack;
     }
 
     public long playSound(Sound sound) {
@@ -80,6 +117,62 @@ public final class GameAudio {
             return -1L;
         }
         return sound.play(sfxVolume);
+    }
+
+    /** Disposes cached {@link Music} instances (call on app exit). */
+    public void dispose() {
+        stopMusic();
+        for (Music music : cache.values()) {
+            if (music != null) {
+                music.dispose();
+            }
+        }
+        cache.clear();
+    }
+
+    private Music obtain(MusicTracks track) {
+        Music cached = cache.get(track);
+        if (cached != null) {
+            return cached;
+        }
+        FileHandle file = resolveMusicFile(track.relativePath);
+        if (file == null) {
+            Gdx.app.debug("GameAudio", "Missing music: " + track.relativePath);
+            return null;
+        }
+        try {
+            Music music = Gdx.audio.newMusic(file);
+            cache.put(track, music);
+            return music;
+        } catch (Exception e) {
+            Gdx.app.error("GameAudio", "Failed to load " + file.path(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Resolves {@code assets/music/<relative>.(ogg|mp3|wav)}, trying {@code assets/} prefix
+     * and bare working-dir paths (same pattern as other GUI media).
+     */
+    static FileHandle resolveMusicFile(String relativeWithoutExt) {
+        if (relativeWithoutExt == null || relativeWithoutExt.isBlank()) {
+            return null;
+        }
+        String base = relativeWithoutExt.replace('\\', '/');
+        while (base.startsWith("/")) {
+            base = base.substring(1);
+        }
+        for (String ext : EXTENSIONS) {
+            FileHandle local = Gdx.files.local("assets/music/" + base + ext);
+            if (local.exists()) {
+                return local;
+            }
+            FileHandle bare = Gdx.files.local("music/" + base + ext);
+            if (bare.exists()) {
+                return bare;
+            }
+        }
+        return null;
     }
 
     private static float clamp01(float value) {
