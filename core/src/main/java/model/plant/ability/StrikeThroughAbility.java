@@ -130,6 +130,13 @@ public class StrikeThroughAbility implements PlantAbility {
                 return true;
             }
         }
+        for (PlantInstance ally : context.getPlantsInLane(row)) {
+            if (ally == null || !ally.isFrozen() || ally.getPosition() == null) continue;
+            float dx = ally.getPosition().getX() - plantX;
+            if (dx > 0f && dx <= range) {
+                return true;
+            }
+        }
         return false;
     }
 

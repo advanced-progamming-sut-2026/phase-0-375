@@ -386,6 +386,11 @@ public class ShooterAbility implements PlantAbility {
             float dx = zombie.getContinuousX() - plantX;
             if (Math.abs(dx) <= 1.5f) return true;
         }
+        for (PlantInstance ally : context.getPlantsInLane(targetRow)) {
+            if (ally == null || !ally.isFrozen() || ally.getPosition() == null) continue;
+            float dx = ally.getPosition().getX() - plantX;
+            if (Math.abs(dx) <= 1.5f) return true;
+        }
         return false;
     }
 

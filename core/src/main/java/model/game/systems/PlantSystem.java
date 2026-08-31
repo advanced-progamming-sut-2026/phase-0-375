@@ -172,7 +172,16 @@ public class PlantSystem implements Tickable {
 
         @Override
         public boolean hasZombieInLane(int lane) {
-            return !gameModel.getZombiesInLane(lane).isEmpty();
+            if (!gameModel.getZombiesInLane(lane).isEmpty()) {
+                return true;
+            }
+            // Bowling Bulb also rolls into ice/octopus coatings on allies.
+            for (PlantInstance plant : gameModel.getPlantsInLane(lane)) {
+                if (plant != null && plant.isFrozen()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
@@ -186,6 +195,13 @@ public class PlantSystem implements Tickable {
                 if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
                 if (zombie.isHypnotized()) continue;
                 float dx = zombie.getContinuousX() - plantX;
+                if (direction > 0 && dx > 0f && dx <= maxRange) return true;
+                if (direction < 0 && dx < 0f && -dx <= maxRange) return true;
+            }
+            // Ice / octopus coatings block direct shots and must be shot off.
+            for (PlantInstance plant : gameModel.getPlantsInLane(row)) {
+                if (plant == null || !plant.isFrozen() || plant.getPosition() == null) continue;
+                float dx = plant.getPosition().getX() - plantX;
                 if (direction > 0 && dx > 0f && dx <= maxRange) return true;
                 if (direction < 0 && dx < 0f && -dx <= maxRange) return true;
             }
@@ -206,6 +222,7 @@ public class PlantSystem implements Tickable {
             float y = startRow + dy;
             while (x >= 0 && x < maxCols && y >= 0 && y < maxRows) {
                 int row = Math.round(y);
+                int col = Math.round(x);
                 if (row >= 0 && row < maxRows) {
                     for (ZombieInstance zombie : gameModel.getZombiesInLane(row)) {
                         if (zombie == null || zombie.isDead() || zombie.getContinuousPosition() == null) continue;
@@ -214,6 +231,12 @@ public class PlantSystem implements Tickable {
                         float zdy = zombie.getContinuousY() - startRow;
                         if (dx > 0 && zdx > 0 || dx < 0 && zdx < 0) {
                             if (Math.abs(zdy - (zdx / dx) * dy) < 1.0f) return true;
+                        }
+                    }
+                    if (col >= 0 && col < maxCols) {
+                        PlantInstance plant = gameModel.getPlantAt(row, col);
+                        if (plant != null && plant.isFrozen()) {
+                            return true;
                         }
                     }
                 }

@@ -33,7 +33,15 @@ final class GameModelAbilityContext implements PlantAbilityContext {
         return gameModel.getZombiesInArea(row, col, rowRadius, colRadius);
     }
     @Override public boolean hasZombieInLane(int lane) {
-        return !gameModel.getZombiesInLane(lane).isEmpty();
+        if (!gameModel.getZombiesInLane(lane).isEmpty()) {
+            return true;
+        }
+        for (PlantInstance plant : gameModel.getPlantsInLane(lane)) {
+            if (plant != null && plant.isFrozen()) {
+                return true;
+            }
+        }
+        return false;
     }
     @Override public boolean hasAdjacentZombie(int row, int col) {
         for (int rowDist = -1; rowDist <= 1; rowDist++) {

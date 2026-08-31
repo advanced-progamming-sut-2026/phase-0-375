@@ -49,23 +49,27 @@ public interface PlantAbilityContext {
      */
     List<ZombieInstance> getZombiesInArea(int row, int col, int rowRadius, int colRadius);
 
-    /** @return true if at least one alive zombie is in the given lane. */
+    /**
+     * @return true if at least one alive zombie or a frozen / octopus-coated plant
+     *         is in the given lane.
+     */
     boolean hasZombieInLane(int lane);
 
     /** @return true if at least one alive zombie is adjacent to the given cell. */
     boolean hasAdjacentZombie(int row, int col);
 
     /**
-     * @return true if there is a zombie or grave strictly ahead of {@code (row, plantCol)}
-     *         in the given {@code direction} (+1 = right, -1 = left) within {@code row}.
+     * @return true if there is a zombie, grave, or frozen/octopus-coated plant strictly
+     *         ahead of {@code (row, plantX)} in the given {@code direction}
+     *         (+1 = right, -1 = left) within {@code row}.
      */
     default boolean hasZombieOrGraveAhead(int row, float plantX, int direction) {
         return false;
     }
 
     /**
-     * @return true if there is a zombie or grave ahead within {@code maxRange}
-     *         grid units of {@code plantX}.
+     * @return true if there is a zombie, grave, or frozen/octopus-coated plant ahead
+     *         within {@code maxRange} grid units of {@code plantX}.
      */
     default boolean hasZombieOrGraveAheadInRange(int row, float plantX, int direction, float maxRange) {
         if (maxRange <= 0f) {
@@ -75,8 +79,9 @@ public interface PlantAbilityContext {
     }
 
     /**
-     * @return true if there is a zombie anywhere along the diagonal path starting at
-     *         {@code (row, plantX)} moving in {@code (dx, dy)} direction.
+     * @return true if there is a zombie or frozen/octopus-coated plant anywhere along
+     *         the diagonal path starting at {@code (row, plantX)} moving in
+     *         {@code (dx, dy)} direction.
      *         Used by Rotobaga and Starfruit to check diagonal shots.
      */
     default boolean hasZombieAlongDiagonal(int startRow, float startX, int dx, float dy, int maxRows, int maxCols) {

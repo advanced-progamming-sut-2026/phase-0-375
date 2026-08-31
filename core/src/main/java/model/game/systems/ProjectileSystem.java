@@ -164,6 +164,12 @@ public class ProjectileSystem implements Tickable {
             if (Math.round(zombie.getContinuousX()) != tile) continue;
             handleZombieHit(cloud, zombie);
         }
+
+        // Fume also chips ice / octopus coatings on frozen plants in range.
+        PlantInstance plant = gameModel.getPlantAt(lane, tile);
+        if (plant != null && plant.isFrozen()) {
+            plant.damageIce(cloud.getDamage());
+        }
     }
 
     /** Applies damage and on-hit effects once a projectile reaches a zombie. */
