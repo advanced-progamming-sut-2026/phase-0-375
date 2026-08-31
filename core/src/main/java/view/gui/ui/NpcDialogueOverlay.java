@@ -1,6 +1,7 @@
 package view.gui.ui;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -55,6 +56,7 @@ public final class NpcDialogueOverlay extends Table {
 
     private final Skin skin;
     private final TextureBank textures;
+    private final FileHandle assetsRoot;
     private final List<NpcDialogueData.NpcEntry> npcs;
     private final Runnable onComplete;
     private final List<Texture> ownedTextures = new ArrayList<>();
@@ -67,10 +69,11 @@ public final class NpcDialogueOverlay extends Table {
     private float restY;
     private float offY;
 
-    public NpcDialogueOverlay(Skin skin, TextureBank textures,
+    public NpcDialogueOverlay(Skin skin, TextureBank textures, FileHandle assetsRoot,
                               List<NpcDialogueData.NpcEntry> npcs, Runnable onComplete) {
         this.skin = skin;
         this.textures = textures;
+        this.assetsRoot = assetsRoot;
         this.npcs = npcs;
         this.onComplete = onComplete;
 
@@ -244,7 +247,12 @@ public final class NpcDialogueOverlay extends Table {
 
     private Image loadNpcImage(String imagePath) {
         try {
-            Texture texture = new Texture(Gdx.files.internal(imagePath));
+            FileHandle file = resolveNpcImage(imagePath);
+            if (file == null || !file.exists()) {
+                Gdx.app.error("NpcDialogueOverlay", "Missing NPC image: " + imagePath);
+                return null;
+            }
+            Texture texture = new Texture(file);
             texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
             ownedTextures.add(texture);
             return new Image(new TextureRegionDrawable(new TextureRegion(texture)));
@@ -252,6 +260,24 @@ public final class NpcDialogueOverlay extends Table {
             Gdx.app.error("NpcDialogueOverlay", "Failed to load NPC image: " + imagePath, e);
             return null;
         }
+    }
+
+    private FileHandle resolveNpcImage(String imagePath) {
+        if (imagePath == null || imagePath.isBlank()) {
+            return null;
+        }
+        if (assetsRoot != null) {
+            FileHandle fromRoot = assetsRoot.child(imagePath);
+            if (fromRoot.exists()) {
+                return fromRoot;
+            }
+        }
+        FileHandle local = Gdx.files.local("assets/" + imagePath);
+        if (local.exists()) {
+            return local;
+        }
+        FileHandle bare = Gdx.files.local(imagePath);
+        return bare.exists() ? bare : local;
     }
 
     private BitmapFont resolveFont(String name) {

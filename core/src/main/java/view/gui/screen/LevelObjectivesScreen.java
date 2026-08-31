@@ -58,7 +58,7 @@ public final class LevelObjectivesScreen extends AbstractGameplayScreen {
             if (dialogueData != null && dialogueData.getNpcs() != null && !dialogueData.getNpcs().isEmpty()) {
                 // Show NPC dialogue first, then objectives
                 NpcDialogueOverlay npcOverlay = new NpcDialogueOverlay(
-                    skin, assets.textures, dialogueData.getNpcs(), this::showObjectives);
+                    skin, assets.textures, assets.root, dialogueData.getNpcs(), this::showObjectives);
                 uiStage.addActor(npcOverlay);
             } else {
                 // No NPC dialogue, show objectives directly

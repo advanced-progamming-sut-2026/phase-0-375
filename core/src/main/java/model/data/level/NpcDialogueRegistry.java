@@ -28,16 +28,18 @@ public final class NpcDialogueRegistry {
         if (loaded) {
             return;
         }
-        
+
         try {
-            FileHandle file = Gdx.files.internal("data/levels/npcs.json");
-            if (file.exists()) {
+            FileHandle file = resolveNpcsFile();
+            if (file != null && file.exists()) {
                 ObjectMapper mapper = new ObjectMapper();
                 Map<String, NpcDialogueData> data = mapper.readValue(
-                    file.readString(), 
+                    file.readString(),
                     mapper.getTypeFactory().constructMapType(HashMap.class, String.class, NpcDialogueData.class)
                 );
                 dialogues.putAll(data);
+            } else {
+                Gdx.app.error("NpcDialogueRegistry", "Missing NPC dialogues file (tried assets/data/levels/npcs.json)");
             }
             loaded = true;
         } catch (Exception e) {
@@ -46,11 +48,24 @@ public final class NpcDialogueRegistry {
         }
     }
 
+    private static FileHandle resolveNpcsFile() {
+        FileHandle local = Gdx.files.local("assets/data/levels/npcs.json");
+        if (local.exists()) {
+            return local;
+        }
+        FileHandle classpath = Gdx.files.classpath("assets/data/levels/npcs.json");
+        if (classpath.exists()) {
+            return classpath;
+        }
+        FileHandle internal = Gdx.files.internal("assets/data/levels/npcs.json");
+        return internal.exists() ? internal : local;
+    }
+
     public NpcDialogueData getDialogue(String chapter, int levelId) {
         if (!loaded) {
             load();
         }
-        
+
         String key = chapter + "_" + levelId;
         return dialogues.get(key);
     }
@@ -59,7 +74,7 @@ public final class NpcDialogueRegistry {
         if (!loaded) {
             load();
         }
-        
+
         String key = chapter + "_" + levelId;
         return dialogues.containsKey(key);
     }
