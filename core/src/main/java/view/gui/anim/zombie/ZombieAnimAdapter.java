@@ -70,13 +70,17 @@ public final class ZombieAnimAdapter {
         }
         AnimPose custom = overrides.tryResolve(zombie, entry, role);
         if (custom != null) {
-            return withButterVisibility(zombie, custom);
+            return withButterVisibility(zombie, ZombotanyAnim.isPlantHead(zombie)
+                    ? ZombotanyAnim.withHeadHidden(custom) : custom);
         }
         String clip = catalog.resolveClip(entry, preferredClips(role));
         if (clip == null) {
             return withButterVisibility(zombie, sheetPose(zombie, role));
         }
         Map<String, Boolean> vis = armorVisibility(zombie, entry);
+        if (ZombotanyAnim.isPlantHead(zombie)) {
+            vis = ZombotanyAnim.headHiddenVisibility(vis);
+        }
         AnimPose pose;
         if (role == ZombieAnimRole.DIE) {
             pose = AnimPose.once(entry.path(), clip, role, vis);

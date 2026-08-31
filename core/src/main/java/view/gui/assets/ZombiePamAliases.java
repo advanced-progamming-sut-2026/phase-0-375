@@ -23,7 +23,8 @@ public final class ZombiePamAliases {
     public static final String SUNSHINE = "ZOMBIE_SUNSHINE";
 
     private static final Set<String> BIOME_BASIC_BODIES = Set.of(
-            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4");
+            "ZombieDefault", "ZombieArmor1", "ZombieArmor2", "ZombieArmor4",
+            "ZombotanyPeashooter", "ZombotanyWallnut", "ZombotanyJalapeno", "ZombotanySquash");
 
     private static final Map<String, String> BY_NAME = createByName();
 
@@ -196,10 +197,6 @@ public final class ZombiePamAliases {
         m.put("ZombieArcade", "ZOMBIE_80S_ARCADE");
         m.put("ZombieBarrelRoller", "ZOMBIE_PIRATE_BARREL_PUSHER");
         m.put("ZombiePirateImp", "ZOMBIE_PIRATE_IMP");
-        m.put("ZombotanyPeashooter", "PEASHOOTER");
-        m.put("ZombotanyWallnut", "WALLNUT");
-        m.put("ZombotanyJalapeno", "JALAPENO");
-        m.put("ZombotanySquash", "SQUASH");
         return Collections.unmodifiableMap(m);
     }
 }

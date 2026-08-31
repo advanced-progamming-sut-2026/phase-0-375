@@ -18,6 +18,8 @@ public class ZombotanyPeashooterBehavior extends ZombotanyAbilityBehavior {
     public static final float ATTACK_DURATION = 0.6f;
     public static final float FIRE_FRACTION = 0.4f;
     public static final float PELLET_VELOCITY = 1f;
+    public static final float PELLET_X_OFFSET = -0.4f;
+    public static final float PELLET_Y_OFFSET = -0.48f;
 
     private float shotTimer;
     private float attackElapsed;
@@ -74,8 +76,8 @@ public class ZombotanyPeashooterBehavior extends ZombotanyAbilityBehavior {
         int damage = source != null && source.getDamage() > 0
                 ? source.getDamage()
                 : definitionDamage("Peashooter", DEFAULT_PEA_DAMAGE);
-        float x = zombie.getContinuousX() - 0.2f;
-        float y = zombie.getContinuousY() - 0.15f;
+        float x = zombie.getContinuousX() + PELLET_X_OFFSET;
+        float y = zombie.getContinuousY() + PELLET_Y_OFFSET;
         int row = zombie.getGridY();
         Pellet pea = new Pellet(damage, new FloatPoint(x, y), row, PELLET_VELOCITY);
         pea.reflect();

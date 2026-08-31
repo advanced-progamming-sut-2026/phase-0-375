@@ -280,6 +280,8 @@ public final class LawnEntityRenderer {
     private TextureRegion flowerPotRegion;
 
     private final IdentityHashMap<Object, AnimClock> clocks = new IdentityHashMap<>();
+    /** Stable clock identity for Zombotany plant-head overlays (separate from the body clock). */
+    private final IdentityHashMap<ZombieInstance, Object> zombotanyHeadClocks = new IdentityHashMap<>();
     private final IdentityHashMap<ClipRef, ZombieFootfallCurve> footfalls = new IdentityHashMap<>();
     /** Left-edge canvas X of the pushing hand, one sample per push-clip frame. */
     private final IdentityHashMap<ClipRef, float[]> arcadePushHandX = new IdentityHashMap<>();
@@ -590,6 +592,7 @@ public final class LawnEntityRenderer {
 
         pruneVaseAge(model);
         clocks.keySet().removeIf(key -> !seenThisFrame.contains(key));
+        zombotanyHeadClocks.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie));
         beghouledMotion.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         explosionSpawned.keySet().removeIf(plant -> !seenThisFrame.contains(plant));
         jalapenoFireSpawned.keySet().removeIf(zombie -> !seenThisFrame.contains(zombie));
@@ -766,12 +769,11 @@ public final class LawnEntityRenderer {
                 || squash.getSmashTargetGridX() < 0 || squash.getSmashTargetGridY() < 0) {
             return;
         }
-        PamCatalog.PamEntry entry = catalog == null ? null
-                : catalog.forZombie(zombie.getDefinition().getName(), chapter);
+        PamCatalog.PamEntry entry = ZombotanyAnim.squashPlantEntry(catalog, zombie);
         float[] to = layout.centerOf(squash.getSmashTargetGridY(), squash.getSmashTargetGridX());
         float dx = to[0] - xy[0];
         float dy = to[1] - xy[1];
-        float travel = SquashAnim.leapTravelFraction(squash.getAttackElapsed(), entry, true);
+        float travel = ZombotanyAnim.squashLeapTravel(zombie, entry);
         if (travel > 0f) {
             xy[0] += dx * travel;
             xy[1] += dy * travel;
@@ -779,8 +781,7 @@ public final class LawnEntityRenderer {
         float travelTiles = layout.cellWidth() > 0f
                 ? (float) Math.sqrt(dx * dx + dy * dy) / layout.cellWidth()
                 : 1f;
-        xy[1] += SquashAnim.leapVisualHeightCells(squash.getAttackElapsed(), entry, travelTiles, true)
-                * layout.cellHeight();
+        xy[1] += ZombotanyAnim.squashLeapHeight(zombie, entry, travelTiles) * layout.cellHeight();
     }
 
     private void maybeSpawnZombotanyJalapenoFire(ZombieInstance zombie) {
@@ -798,6 +799,85 @@ public final class LawnEntityRenderer {
         Point pos = new Point(0, zombie.getGridY());
         float[] xy = layout.centerOf(zombie.getGridY(), Math.max(0, zombie.getGridX()));
         spawnExplosionSpecs(ExplosivePlantFx.specsForName("Jalapeno"), pos, xy[0], xy[1]);
+    }
+
+    private void drawZombotanyPlantHead(Batch batch, ZombieInstance zombie, AnimPose bodyPose,
+                                        float bodyX, float bodyY, float bodyTime, float delta,
+                                        float flash, float glow, float chill) {
+        if (catalog == null || bodyPose == null || bodyPose.isSpritesheet()) {
+            return;
+        }
+        String plantName = ZombotanyAnim.plantDefinitionName(zombie);
+        PamCatalog.PamEntry plant = plantName == null ? null : catalog.forPlant(plantName);
+        AnimPose headPose = ZombotanyAnim.plantHeadPose(zombie, plant);
+        if (headPose == null) {
+            return;
+        }
+        if (bodyPose.flipX()) {
+            headPose = headPose.withFlipX(false);
+        }
+        float bodyScale = AnimScale.ZOMBIE * bodyPose.scale();
+        float[] headXy = zombotanyHeadWorld(bodyPose, bodyX, bodyY, bodyTime, bodyScale);
+        Object clockKey = zombotanyHeadClocks.computeIfAbsent(zombie, z -> new Object());
+        seenThisFrame.add(zombie);
+        drawPose(batch, clockKey, headPose, headXy[0], headXy[1], AnimScale.PLANT, NO_PHASE,
+                flash, delta, headPose.cacheKey(), glow, chill, 0f);
+    }
+
+    /** Almanac / idle preview: plant head on a basic zombie body. */
+    private void drawZombotanyPlantHeadIdle(Batch batch, String zombieName, Chapter chapter,
+                                            PamCatalog.PamEntry bodyEntry, ClipRef bodyRef,
+                                            float time, float x, float y) {
+        if (catalog == null || bodyEntry == null || bodyRef == null) {
+            return;
+        }
+        String plantName = ZombotanyAnim.plantDefinitionName(zombieName);
+        PamCatalog.PamEntry plant = plantName == null ? null : catalog.forPlant(plantName);
+        if (plant == null) {
+            return;
+        }
+        String clip = catalog.resolveClip(plant, "idle", "idle2", "idle1", "loop");
+        if (clip == null) {
+            return;
+        }
+        ClipRef headRef = clips.getOrLoad(plant.path(), clip);
+        if (headRef == null) {
+            return;
+        }
+        float bodyScale = AnimScale.ZOMBIE;
+        float[] headXy = zombotanyHeadWorld(bodyEntry.path(), bodyRef, false, x, y, time, bodyScale);
+        float headScale = AnimScale.PLANT * ZombotanyAnim.HEAD_SCALE;
+        player.draw(batch, headRef, time, headXy[0], headXy[1], -headScale, headScale, true);
+    }
+
+    private float[] zombotanyHeadWorld(AnimPose bodyPose, float bodyX, float bodyY,
+                                       float bodyTime, float bodyScale) {
+        ClipRef bodyRef = clips.getOrLoad(bodyPose.pamPath(), bodyPose.clipName());
+        return zombotanyHeadWorld(bodyPose.pamPath(), bodyRef, bodyPose.flipX(),
+                bodyX, bodyY, bodyTime, bodyScale);
+    }
+
+    private float[] zombotanyHeadWorld(String pam, ClipRef bodyRef, boolean flipX,
+                                       float bodyX, float bodyY, float bodyTime, float bodyScale) {
+        Rectangle skull = null;
+        if (bodyRef != null) {
+            for (String part : new String[]{
+                    "zombie_egypt_skull", "zombie_skull", "particle_head"}) {
+                skull = partAt(bodyRef, bodyTime, part);
+                if (skull != null) {
+                    break;
+                }
+            }
+        }
+        float hx = bodyX + ZombotanyAnim.HEAD_OFFSET_X * bodyScale;
+        float hy = bodyY + layout.cellHeight() * 0.28f;
+        if (skull != null) {
+            float localCx = (skull.x + skull.width * 0.5f) * bodyScale;
+            float localCy = (skull.y + skull.height * ZombotanyAnim.NECK_ANCHOR) * bodyScale;
+            hx = bodyX + (flipX ? -localCx : localCx) + ZombotanyAnim.HEAD_OFFSET_X * bodyScale;
+            hy = bodyY - localCy + ZombotanyAnim.HEAD_OFFSET_Y * bodyScale;
+        }
+        return new float[]{hx, hy};
     }
 
     private void maybeSpawnPlantExplosion(PlantInstance plant, IdentityHashMap<PlantInstance, float[]> deathBlastNow) {
@@ -1785,12 +1865,17 @@ public final class LawnEntityRenderer {
         }
         ClipRef ref = clips.getOrLoad(entry.path(), clip);
         if (ref != null) {
-            float sx = ZombotanyAnim.isPlantHeadName(zombieName) ? -AnimScale.ZOMBIE : AnimScale.ZOMBIE;
             Map<String, Boolean> visibility = ZombieAnimAdapter.almanacArmorVisibility(zombieName, entry);
+            if (ZombotanyAnim.isPlantHeadName(zombieName)) {
+                visibility = ZombotanyAnim.headHiddenVisibility(visibility);
+            }
             if (visibility != null) {
-                player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true, visibility);
+                player.draw(batch, ref, time, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, true, visibility);
             } else {
-                player.draw(batch, ref, time, x, y, sx, AnimScale.ZOMBIE, true);
+                player.draw(batch, ref, time, x, y, AnimScale.ZOMBIE, AnimScale.ZOMBIE, true);
+            }
+            if (ZombotanyAnim.isPlantHeadName(zombieName)) {
+                drawZombotanyPlantHeadIdle(batch, zombieName, chapter, entry, ref, time, x, y);
             }
         }
     }
@@ -1806,6 +1891,16 @@ public final class LawnEntityRenderer {
         String clip = catalog.resolveClip(entry, "idle", "walk", "idle2", "idle1");
         if (clip != null) {
             clips.getOrLoad(entry.path(), clip);
+        }
+        if (ZombotanyAnim.isPlantHeadName(zombieName)) {
+            String plantName = ZombotanyAnim.plantDefinitionName(zombieName);
+            PamCatalog.PamEntry plant = plantName == null ? null : catalog.forPlant(plantName);
+            if (plant != null) {
+                String plantClip = catalog.resolveClip(plant, "idle", "attack", "jump_up_left", "jump_up_right");
+                if (plantClip != null) {
+                    clips.getOrLoad(plant.path(), plantClip);
+                }
+            }
         }
     }
 
@@ -2907,9 +3002,12 @@ public final class LawnEntityRenderer {
         AnimPose pose = AnimPose.looping(entry.path(), clip, ZombieAnimRole.IDLE,
             ZombieAnimAdapter.armorVisibility(zombie, entry));
         if (ZombotanyAnim.isPlantHead(zombie)) {
-            pose = pose.flipped();
+            pose = ZombotanyAnim.withHeadHidden(pose);
         }
-        drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, 0f, pose.cacheKey(), 0f, 1.0f);
+        float time = drawPose(batch, zombie, pose, x, y, AnimScale.ZOMBIE, NO_PHASE, 0f, 0f, pose.cacheKey(), 0f, 1.0f);
+        if (ZombotanyAnim.isPlantHead(zombie)) {
+            drawZombotanyPlantHead(batch, zombie, pose, x, y, time, 0f, 0f, 0f, 0f);
+        }
     }
 
     private static void collectIcedOccupants(GameModel model, Set<ZombieInstance> into) {
@@ -3591,8 +3689,12 @@ public final class LawnEntityRenderer {
             danger = 0f;
         }
         float animDelta = zombie.isFrozen() ? 0f : delta;
+        float flash = tickHitFlash(zombie, delta);
         float time = drawPose(batch, zombie, pose, x, y, baseScale, phase,
-            tickHitFlash(zombie, delta), animDelta, pose.cacheKey(), glow, chill, danger);
+            flash, animDelta, pose.cacheKey(), glow, chill, danger);
+        if (ZombotanyAnim.isPlantHead(zombie)) {
+            drawZombotanyPlantHead(batch, zombie, pose, x, y, time, animDelta, flash, glow, chill);
+        }
         if (zombie.isFrozen()) {
             drawZombieFreezeChill(batch, zombie, x, y, tickHitFlash(zombie, delta), delta);
         }
@@ -5418,19 +5520,6 @@ public final class LawnEntityRenderer {
             }
             DeathFx fx = new DeathFx(fade, snap.x, snap.y, false);
             fx.holdSeconds = 0.4f;
-            deathFx.add(fx);
-            return;
-        }
-        // Plant-head PAMs have no die clip — falling back to idle would leave them
-        // bobbing on the lawn for a full idle cycle. Fade the last pose instead.
-        if (ZombotanyAnim.isPlantHead(zombie)) {
-            AnimPose fade = AnimPose.once(
-                snap.pose.pamPath(), snap.pose.clipName(), ZombieAnimRole.DIE, snap.pose.visibility());
-            if (snap.pose.flipX()) {
-                fade = fade.flipped();
-            }
-            DeathFx fx = new DeathFx(fade, snap.x, snap.y, false);
-            fx.holdSeconds = 0f;
             deathFx.add(fx);
             return;
         }
