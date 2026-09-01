@@ -211,6 +211,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private ReactionBubbleWidget remoteReactionBubble;
     private PamClipCache reactionPamClips;
     private Consumer<ReactionPacket> reactionPacketHandler;
+    private boolean multiplayerForfeitSent;
     private Cursor hiddenCursor;
     private TextureRegion plantfoodCursorRegion;
     private TextureRegion shovelCursorRegion;
@@ -1346,13 +1347,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void exitToLevels() {
-        if (multiplayerMode && multiplayerClient != null && multiplayerClient.isConnected()) {
-            GameModel model = App.getInstance().getCurrentGameModel();
-            if (model != null && model.getState() == GameState.RUNNING) {
-                String name = multiplayerUser != null ? multiplayerUser.getUsername() : "Player";
-                multiplayerClient.sendPacket(new ReactionPacket(name, ReactionType.SURRENDER, "I yield"));
-            }
-        }
+        forfeitMultiplayerMatchIfActive();
         flushPendingLoot();
         Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
@@ -1382,6 +1377,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void saveAndExit() {
+        if (multiplayerMode) {
+            exitToLevels();
+            return;
+        }
         try {
             GameSaveService.getInstance().saveCurrentGame();
         } catch (Exception e) {
@@ -2420,8 +2419,46 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return name != null && boosts != null && Boolean.TRUE.equals(boosts.get(name));
     }
 
+    /** True until the server (or local overlay) has already closed the match. */
+    private boolean multiplayerMatchStillActive() {
+        if (!multiplayerMode) {
+            return false;
+        }
+        if (multiplayerClient != null) {
+            GameStateSnapshotPacket snap = multiplayerClient.getLatestSnapshot();
+            if (snap != null && snap.isGameOver()) {
+                return false;
+            }
+        }
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            GameState state = model.getState();
+            if (state == GameState.WON || state == GameState.LOST) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Tells the server this player left so the room is closed and neither
+     * player stays marked in-match. No-op if the match already ended.
+     */
+    private void forfeitMultiplayerMatchIfActive() {
+        if (multiplayerForfeitSent || !multiplayerMatchStillActive()) {
+            return;
+        }
+        if (multiplayerClient == null || !multiplayerClient.isConnected()) {
+            return;
+        }
+        multiplayerForfeitSent = true;
+        String name = multiplayerUser != null ? multiplayerUser.getUsername() : "Player";
+        multiplayerClient.sendPacket(new ReactionPacket(name, ReactionType.SURRENDER, "I yield"));
+    }
+
     @Override
     public void hide() {
+        forfeitMultiplayerMatchIfActive();
         if (multiplayerClient != null && reactionPacketHandler != null) {
             multiplayerClient.unregisterHandler(ReactionPacket.class, reactionPacketHandler);
             reactionPacketHandler = null;
