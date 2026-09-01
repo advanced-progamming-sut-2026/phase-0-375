@@ -78,54 +78,9 @@ public final class GameStateSnapshotApplier {
         Set<String> seen = new HashSet<>();
         if (snap.getPlants() != null) {
             for (PlantSnapshotDto dto : snap.getPlants()) {
-                if (dto == null || dto.getId() == null || dto.getPlantName() == null) {
-                    continue;
-                }
-                seen.add(dto.getId());
-                PlantInstance plant = plantsById.get(dto.getId());
-                if (plant == null
-                        || plant.getDefinition() == null
-                        || !dto.getPlantName().equals(plant.getDefinition().getName())) {
-                    if (plant != null) {
-                        model.removePlantFromBoard(plant);
-                    }
-                    plant = PlantFactory.createInstance(dto.getPlantName());
-                    if (plant == null) {
-                        continue;
-                    }
-                    if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
-                        clearCellMain(model, dto.getRow(), dto.getCol());
-                        if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
-                            continue;
-                        }
-                    }
-                    plantsById.put(dto.getId(), plant);
-                    lastPlantStates.put(dto.getId(), PlantState.IDLE);
-                } else {
-                    Point pos = plant.getPosition();
-                    if (pos == null || pos.getX() != dto.getCol() || pos.getY() != dto.getRow()) {
-                        model.removePlantFromBoard(plant);
-                        if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
-                            clearCellMain(model, dto.getRow(), dto.getCol());
-                            model.placePlant(plant, dto.getRow(), dto.getCol());
-                        }
-                    }
-                }
-                plant.setCurrentHP(dto.getCurrentHP());
-                PlantState prev = lastPlantStates.getOrDefault(dto.getId(), plant.getState());
-                PlantState next = parsePlantState(dto.getState());
-                if (next == PlantState.ATTACKING && prev != PlantState.ATTACKING && !plant.hasActiveAction()) {
-                    pendingPresentationAttacks.add(plant);
-                }
-                if (next != null) {
-                    lastPlantStates.put(dto.getId(), next);
-                    if (!plant.hasActiveAction()) {
-                        plant.setState(next);
-                    }
-                }
+                upsertPlant(model, dto, seen);
             }
         }
-
         Iterator<Map.Entry<String, PlantInstance>> it = plantsById.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<String, PlantInstance> e = it.next();
@@ -133,6 +88,74 @@ public final class GameStateSnapshotApplier {
                 model.removePlantFromBoard(e.getValue());
                 lastPlantStates.remove(e.getKey());
                 it.remove();
+            }
+        }
+    }
+
+    private void upsertPlant(GameModel model, PlantSnapshotDto dto, Set<String> seen) {
+        if (dto == null || dto.getId() == null || dto.getPlantName() == null) {
+            return;
+        }
+        seen.add(dto.getId());
+        PlantInstance plant = plantsById.get(dto.getId());
+        if (needsRebuild(plant, dto)) {
+            plant = rebuildPlant(model, dto, plant);
+            if (plant == null) {
+                return;
+            }
+        } else {
+            relocatePlant(model, plant, dto);
+        }
+        applyPlantSnapshot(plant, dto);
+    }
+
+    private static boolean needsRebuild(PlantInstance plant, PlantSnapshotDto dto) {
+        return plant == null
+                || plant.getDefinition() == null
+                || !dto.getPlantName().equals(plant.getDefinition().getName());
+    }
+
+    private PlantInstance rebuildPlant(GameModel model, PlantSnapshotDto dto, PlantInstance plant) {
+        if (plant != null) {
+            model.removePlantFromBoard(plant);
+        }
+        plant = PlantFactory.createInstance(dto.getPlantName());
+        if (plant == null) {
+            return null;
+        }
+        if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
+            clearCellMain(model, dto.getRow(), dto.getCol());
+            if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
+                return null;
+            }
+        }
+        plantsById.put(dto.getId(), plant);
+        lastPlantStates.put(dto.getId(), PlantState.IDLE);
+        return plant;
+    }
+
+    private static void relocatePlant(GameModel model, PlantInstance plant, PlantSnapshotDto dto) {
+        Point pos = plant.getPosition();
+        if (pos == null || pos.getX() != dto.getCol() || pos.getY() != dto.getRow()) {
+            model.removePlantFromBoard(plant);
+            if (!model.placePlant(plant, dto.getRow(), dto.getCol())) {
+                clearCellMain(model, dto.getRow(), dto.getCol());
+                model.placePlant(plant, dto.getRow(), dto.getCol());
+            }
+        }
+    }
+
+    private void applyPlantSnapshot(PlantInstance plant, PlantSnapshotDto dto) {
+        plant.setCurrentHP(dto.getCurrentHP());
+        PlantState prev = lastPlantStates.getOrDefault(dto.getId(), plant.getState());
+        PlantState next = parsePlantState(dto.getState());
+        if (next == PlantState.ATTACKING && prev != PlantState.ATTACKING && !plant.hasActiveAction()) {
+            pendingPresentationAttacks.add(plant);
+        }
+        if (next != null) {
+            lastPlantStates.put(dto.getId(), next);
+            if (!plant.hasActiveAction()) {
+                plant.setState(next);
             }
         }
     }

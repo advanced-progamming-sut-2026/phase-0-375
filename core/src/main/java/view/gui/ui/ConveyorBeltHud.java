@@ -116,20 +116,30 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
             topRegion = textures.region(UiRegions.CONVEYOR_TOP);
         }
         if (beltRegion == null) {
-            fallbackBeltTex = loadFallbackTexture(assets, "conveyor_belt.png", 127, 18, new Color(0.25f, 0.25f, 0.25f, 1f));
-            if (fallbackBeltTex != null) beltRegion = new TextureRegion(fallbackBeltTex);
+            fallbackBeltTex = loadFallbackTexture(
+                    assets, "conveyor_belt.png", 127, 18, new Color(0.25f, 0.25f, 0.25f, 1f));
+            if (fallbackBeltTex != null) {
+                beltRegion = new TextureRegion(fallbackBeltTex);
+            }
         }
         if (sideRegion == null) {
-            fallbackSideTex = loadFallbackTexture(assets, "conveyor_side.png", 13, 768, new Color(0.35f, 0.35f, 0.35f, 1f));
-            if (fallbackSideTex != null) sideRegion = new TextureRegion(fallbackSideTex);
+            fallbackSideTex = loadFallbackTexture(
+                    assets, "conveyor_side.png", 13, 768, new Color(0.35f, 0.35f, 0.35f, 1f));
+            if (fallbackSideTex != null) {
+                sideRegion = new TextureRegion(fallbackSideTex);
+            }
         }
         if (topRegion == null) {
-            fallbackTopTex = loadFallbackTexture(assets, "conveyor_top.png", 127, 10, new Color(0.15f, 0.15f, 0.15f, 1f));
-            if (fallbackTopTex != null) topRegion = new TextureRegion(fallbackTopTex);
+            fallbackTopTex = loadFallbackTexture(
+                    assets, "conveyor_top.png", 127, 10, new Color(0.15f, 0.15f, 0.15f, 1f));
+            if (fallbackTopTex != null) {
+                topRegion = new TextureRegion(fallbackTopTex);
+            }
         }
     }
 
-    private static Texture loadFallbackTexture(PvzAssets assets, String fileName, int fallbackW, int fallbackH, Color fallbackColor) {
+    private static Texture loadFallbackTexture(
+            PvzAssets assets, String fileName, int fallbackW, int fallbackH, Color fallbackColor) {
         FileHandle handle = resolveFile(assets, fileName);
         if (handle != null && handle.exists()) {
             try {
@@ -174,82 +184,87 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
         if (modelPlants == null) {
             modelPlants = List.of();
         }
+        removeExcessItems(modelPlants);
+        addArrivingItems(modelPlants);
+        for (int i = 0; i < items.size(); i++) {
+            items.get(i).targetY = computeSlotY(i);
+        }
+    }
 
-        // 1. Check if cards were removed (e.g. planted)
+    private void removeExcessItems(List<String> modelPlants) {
         while (items.size() > modelPlants.size()) {
-            ConveyorItem toRemove = null;
-            if (lastDraggedItem != null && items.contains(lastDraggedItem)) {
-                // If the last dragged item matches one of the removed items
-                toRemove = lastDraggedItem;
-                lastDraggedItem = null;
-            } else {
-                // Find first item that differs or remove the first item
-                for (int i = 0; i < items.size(); i++) {
-                    if (i >= modelPlants.size() || !items.get(i).plantName.equals(modelPlants.get(i))) {
-                        toRemove = items.get(i);
-                        break;
-                    }
-                }
-                if (toRemove == null && !items.isEmpty()) {
-                    toRemove = items.get(0);
-                }
-            }
+            ConveyorItem toRemove = nextRemoval(modelPlants);
             if (toRemove != null) {
                 toRemove.actor.remove();
                 items.remove(toRemove);
+            } else {
+                break;
             }
         }
+    }
 
-        // 2. Check if new cards were added (delivered from bottom)
-        if (items.size() < modelPlants.size()) {
-            for (int i = items.size(); i < modelPlants.size(); i++) {
-                String plantName = modelPlants.get(i);
-                SeedPacketActor packet = new SeedPacketActor(
-                        textures, skin, plantName, 0, 1, false, false, false);
-                SheetPacketPortraits.applyIfNeeded(packet, plantName, assets, sheetClips);
-
-                ConveyorItem item = new ConveyorItem(
-                        plantName, packet, calculateSpawnY(), computeSlotY(i));
-
-                packet.onDragPlant(new SeedPacketActor.DragPlant() {
-                    @Override
-                    public void dragStart(SeedPacketActor actor) {
-                        item.dragging = true;
-                        lastDraggedItem = item;
-                        if (dragCallback != null) {
-                            dragCallback.onDragStart(actor, item.plantName);
-                        }
-                    }
-
-                    @Override
-                    public void drag(SeedPacketActor actor, float stageX, float stageY) {
-                        if (dragCallback != null) {
-                            dragCallback.onDrag(actor, item.plantName, stageX, stageY);
-                        }
-                    }
-
-                    @Override
-                    public void dragEnd(SeedPacketActor actor, float stageX, float stageY) {
-                        item.dragging = false;
-                        if (dragCallback != null) {
-                            dragCallback.onDragEnd(actor, item.plantName, stageX, stageY);
-                        }
-                        // Reset visual local position if still attached
-                        actor.setPosition(PACKET_X, item.currentY);
-                    }
-                });
-
-                packet.setPosition(PACKET_X, item.currentY);
-                items.add(item);
-                addActor(packet);
-            }
+    private ConveyorItem nextRemoval(List<String> modelPlants) {
+        if (lastDraggedItem != null && items.contains(lastDraggedItem)) {
+            ConveyorItem dragged = lastDraggedItem;
+            lastDraggedItem = null;
+            return dragged;
         }
-
-        // 3. Recalculate target slots for all current items
         for (int i = 0; i < items.size(); i++) {
-            ConveyorItem item = items.get(i);
-            item.targetY = computeSlotY(i);
+            if (i >= modelPlants.size() || !items.get(i).plantName.equals(modelPlants.get(i))) {
+                return items.get(i);
+            }
         }
+        return items.isEmpty() ? null : items.get(0);
+    }
+
+    private void addArrivingItems(List<String> modelPlants) {
+        if (items.size() >= modelPlants.size()) {
+            return;
+        }
+        for (int i = items.size(); i < modelPlants.size(); i++) {
+            addConveyorPacket(modelPlants.get(i), i);
+        }
+    }
+
+    private void addConveyorPacket(String plantName, int slotIndex) {
+        SeedPacketActor packet = new SeedPacketActor(
+                textures, skin, plantName, 0, 1, false, false, false);
+        SheetPacketPortraits.applyIfNeeded(packet, plantName, assets, sheetClips);
+        ConveyorItem item = new ConveyorItem(
+                plantName, packet, calculateSpawnY(), computeSlotY(slotIndex));
+        packet.onDragPlant(conveyorDrag(item));
+        packet.setPosition(PACKET_X, item.currentY);
+        items.add(item);
+        addActor(packet);
+    }
+
+    private SeedPacketActor.DragPlant conveyorDrag(ConveyorItem item) {
+        return new SeedPacketActor.DragPlant() {
+            @Override
+            public void dragStart(SeedPacketActor actor) {
+                item.dragging = true;
+                lastDraggedItem = item;
+                if (dragCallback != null) {
+                    dragCallback.onDragStart(actor, item.plantName);
+                }
+            }
+
+            @Override
+            public void drag(SeedPacketActor actor, float stageX, float stageY) {
+                if (dragCallback != null) {
+                    dragCallback.onDrag(actor, item.plantName, stageX, stageY);
+                }
+            }
+
+            @Override
+            public void dragEnd(SeedPacketActor actor, float stageX, float stageY) {
+                item.dragging = false;
+                if (dragCallback != null) {
+                    dragCallback.onDragEnd(actor, item.plantName, stageX, stageY);
+                }
+                actor.setPosition(PACKET_X, item.currentY);
+            }
+        };
     }
 
     private float calculateSpawnY() {

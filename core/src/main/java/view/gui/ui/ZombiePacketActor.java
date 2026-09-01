@@ -45,68 +45,66 @@ public final class ZombiePacketActor extends WidgetGroup {
         chrome = image(textures, ZombiePacketIds.READY);
         chrome.setFillParent(true);
         addActor(chrome);
-
         portrait = image(textures, portraitId);
         layoutPortrait(portrait);
         addActor(portrait);
-
         float textW = PACKET_WIDTH * 0.55f;
         float textX = PACKET_WIDTH * 0.40f;
         addActor(packetLabel(skin, String.valueOf(Math.max(0, sunCost)), 1.5f,
                 textX, 4f, textW, 16f));
-
         select = image(textures, ZombiePacketIds.SELECT);
         select.setFillParent(true);
         select.setVisible(false);
         select.setTouchable(Touchable.disabled);
         addActor(select);
+        addListener(new PacketInput());
+    }
 
-        addListener(new InputListener() {
-            @Override
-            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
-                if (pointer == -1 && zombieName != null) {
-                    hovered = true;
-                    refreshSelect();
-                }
-            }
-
-            @Override
-            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
-                if (pointer == -1) {
-                    hovered = false;
-                    refreshSelect();
-                }
-            }
-
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (dragZombie == null || dimmed || zombieName == null) {
-                    return dragZombie != null;
-                }
-                dragging = true;
+    private final class PacketInput extends InputListener {
+        @Override
+        public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
+            if (pointer == -1 && zombieName != null) {
+                hovered = true;
                 refreshSelect();
-                event.stop();
-                dragZombie.dragStart(ZombiePacketActor.this);
-                return true;
             }
+        }
 
-            @Override
-            public void touchDragged(InputEvent event, float x, float y, int pointer) {
-                if (dragging && dragZombie != null) {
-                    dragZombie.drag(ZombiePacketActor.this, event.getStageX(), event.getStageY());
-                }
-            }
-
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                if (!dragging || dragZombie == null) {
-                    return;
-                }
-                dragging = false;
+        @Override
+        public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
+            if (pointer == -1) {
+                hovered = false;
                 refreshSelect();
-                dragZombie.dragEnd(ZombiePacketActor.this, event.getStageX(), event.getStageY());
             }
-        });
+        }
+
+        @Override
+        public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+            if (dragZombie == null || dimmed || zombieName == null) {
+                return dragZombie != null;
+            }
+            dragging = true;
+            refreshSelect();
+            event.stop();
+            dragZombie.dragStart(ZombiePacketActor.this);
+            return true;
+        }
+
+        @Override
+        public void touchDragged(InputEvent event, float x, float y, int pointer) {
+            if (dragging && dragZombie != null) {
+                dragZombie.drag(ZombiePacketActor.this, event.getStageX(), event.getStageY());
+            }
+        }
+
+        @Override
+        public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+            if (!dragging || dragZombie == null) {
+                return;
+            }
+            dragging = false;
+            refreshSelect();
+            dragZombie.dragEnd(ZombiePacketActor.this, event.getStageX(), event.getStageY());
+        }
     }
 
     /** Drag a roster zombie onto the lawn to place it. */

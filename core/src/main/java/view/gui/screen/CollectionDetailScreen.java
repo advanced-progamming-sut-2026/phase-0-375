@@ -81,39 +81,40 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         t.loadSync(AlmanacArt.ATLAS_SEED_PACKETS);
         t.loadSync("ATLASIMAGE_ATLAS_UI_SEEDPACKETS_768_00");
         t.loadSync(ShopArt.ATLAS_STORE);
+        addResourceBar(t);
+        stage.addActor(detailRoot(buildCard(t)));
+        AtlasImageButton close = new AtlasImageButton(
+                t.region(ShopArt.CLOSE), t.region(ShopArt.CLOSE_DOWN), CLOSE_SIZE, this::goBack);
+        close.setPosition(UI_WIDTH - EDGE - CLOSE_SIZE, UI_HEIGHT - EDGE - CLOSE_SIZE - 8f);
+        stage.addActor(close);
+        close.toFront();
+        fillContent();
+    }
 
+    private void addResourceBar(TextureBank t) {
         Table top = new Table();
         top.setFillParent(true);
         top.top().right();
         resources = new ResourceBar(skin, t);
         top.add(resources).pad(EDGE);
         stage.addActor(top);
+        top.toFront();
+    }
 
+    private Table buildCard(TextureBank t) {
         Table card = new Table();
-        TextureRegion stat = t.region(AlmanacArt.STAT_BG);
-        if (stat != null) {
-            card.setBackground(new TextureRegionDrawable(stat));
-        } else {
-            TextureRegion fallback = t.region(AlmanacArt.PLANT_CARD);
-            if (fallback != null) {
-                card.setBackground(new TextureRegionDrawable(fallback));
-            }
-        }
+        applyCardBackground(card, t);
         card.pad(28f);
-
         title = new Label(entryName, skin, "big");
         title.setColor(Color.WHITE);
         title.setAlignment(Align.center);
         card.add(title).growX().padBottom(12f).row();
-
         preview = new IdlePreview(game.assets, clips, sheetClips);
         card.add(preview).size(260f, 260f).padBottom(10f).row();
-
         seedLabel = new Label("", skin, "medium");
         seedLabel.setColor(Color.WHITE);
         seedLabel.setAlignment(Align.center);
         card.add(seedLabel).growX().padBottom(8f).row();
-
         body = new Label("", skin, "secondary");
         body.setColor(Color.WHITE);
         body.setWrap(true);
@@ -122,47 +123,52 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         card.add(scroll).grow().padBottom(14f).row();
+        card.add(actionButtons()).center();
+        return card;
+    }
 
+    private void applyCardBackground(Table card, TextureBank t) {
+        TextureRegion stat = t.region(AlmanacArt.STAT_BG);
+        if (stat != null) {
+            card.setBackground(new TextureRegionDrawable(stat));
+            return;
+        }
+        TextureRegion fallback = t.region(AlmanacArt.PLANT_CARD);
+        if (fallback != null) {
+            card.setBackground(new TextureRegionDrawable(fallback));
+        }
+    }
+
+    private Table actionButtons() {
         Table actions = new Table();
         upgradeBtn = new TextButton("Upgrade", skin, "purple");
-        upgradeBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.upgradePlant(entryName);
-                showPurchaseResult(r);
-                if (r.isSuccess()) {
-                    resources.refresh();
-                    fillContent();
-                }
-            }
-        });
+        upgradeBtn.addListener(purchaseListener(() -> controller.upgradePlant(entryName)));
         buyBtn = new TextButton("Buy (" + controller.purchaseCostCoins() + ")", skin, "brown");
-        buyBtn.addListener(new ChangeListener() {
-            @Override public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.purchasePlant(entryName);
-                showPurchaseResult(r);
-                if (r.isSuccess()) {
-                    resources.refresh();
-                    fillContent();
-                }
-            }
-        });
+        buyBtn.addListener(purchaseListener(() -> controller.purchasePlant(entryName)));
         actions.add(upgradeBtn).width(200f).height(56f).padRight(12f);
         actions.add(buyBtn).width(220f).height(56f);
-        card.add(actions).center();
+        return actions;
+    }
 
+    private ChangeListener purchaseListener(java.util.function.Supplier<CommandResult<Void>> action) {
+        return new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> r = action.get();
+                showPurchaseResult(r);
+                if (r.isSuccess()) {
+                    resources.refresh();
+                    fillContent();
+                }
+            }
+        };
+    }
+
+    private Table detailRoot(Table card) {
         Table root = new Table();
         root.setFillParent(true);
         root.add(card).width(CARD_W).height(CARD_H);
-        stage.addActor(root);
-
-        AtlasImageButton close = new AtlasImageButton(
-            t.region(ShopArt.CLOSE), t.region(ShopArt.CLOSE_DOWN), CLOSE_SIZE, this::goBack);
-        close.setPosition(UI_WIDTH - EDGE - CLOSE_SIZE, UI_HEIGHT - EDGE - CLOSE_SIZE - 8f);
-        stage.addActor(close);
-        top.toFront();
-        close.toFront();
-
-        fillContent();
+        return root;
     }
 
     private void fillContent() {

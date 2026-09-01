@@ -359,7 +359,8 @@ public class GameMenuController extends AppMenuController {
         return users;
     }
 
-    private static User toLeaderboardUser(model.network.packet.user.LeaderboardResponsePacket.LeaderboardEntryDto entry) {
+    private static User toLeaderboardUser(
+            model.network.packet.user.LeaderboardResponsePacket.LeaderboardEntryDto entry) {
         User u = new User();
         u.setUsername(entry.getUsername());
         u.setNickname(entry.getNickname());
@@ -407,7 +408,6 @@ public class GameMenuController extends AppMenuController {
     }
 
     public CommandResult<Void> cheatAdd(int n, String type) {
-        User user = App.getInstance().getCurrentUser();
         if (type.equalsIgnoreCase("coin")) {
             model.user.persistance.UserSync.addCoins(n);
         } else if (type.equalsIgnoreCase("diamond")) {

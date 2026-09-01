@@ -74,13 +74,19 @@ public class GameStateSnapshotPacket extends Packet {
     public void setPlants(List<PlantSnapshotDto> plants) { this.plants = plants != null ? plants : new ArrayList<>(); }
 
     public List<ZombieSnapshotDto> getZombies() { return zombies; }
-    public void setZombies(List<ZombieSnapshotDto> zombies) { this.zombies = zombies != null ? zombies : new ArrayList<>(); }
+    public void setZombies(List<ZombieSnapshotDto> zombies) {
+        this.zombies = zombies != null ? zombies : new ArrayList<>();
+    }
 
     public List<ProjectileSnapshotDto> getProjectiles() { return projectiles; }
-    public void setProjectiles(List<ProjectileSnapshotDto> projectiles) { this.projectiles = projectiles != null ? projectiles : new ArrayList<>(); }
+    public void setProjectiles(List<ProjectileSnapshotDto> projectiles) {
+        this.projectiles = projectiles != null ? projectiles : new ArrayList<>();
+    }
 
     public List<Integer> getBreachedRows() { return breachedRows; }
-    public void setBreachedRows(List<Integer> breachedRows) { this.breachedRows = breachedRows != null ? breachedRows : new ArrayList<>(); }
+    public void setBreachedRows(List<Integer> breachedRows) {
+        this.breachedRows = breachedRows != null ? breachedRows : new ArrayList<>();
+    }
 
     public List<SunSnapshotDto> getSuns() { return suns; }
     public void setSuns(List<SunSnapshotDto> suns) { this.suns = suns != null ? suns : new ArrayList<>(); }

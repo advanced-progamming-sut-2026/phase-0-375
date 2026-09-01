@@ -61,59 +61,57 @@ public final class ShopChosenPlantPicker {
     public static Table open(Stage stage, Skin skin, TextureBank textures, PvzAssets assets,
                              Collection<String> plants, Consumer<String> onPick) {
         GameAudio.get().playOverlayOpen();
-        Table overlay = new Table();
-        overlay.setFillParent(true);
-        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
-        overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
-        overlay.setTouchable(Touchable.enabled);
-
+        Table overlay = dimOverlay();
         SpritesheetClipCache sheetClips = assets != null && assets.root != null
                 ? new SpritesheetClipCache(assets.root)
                 : null;
         overlay.setUserObject(sheetClips);
-
         BorderedTable card = new BorderedTable();
         Label heading = new Label("Choose a plant", skin, "big");
         heading.setColor(Color.BLACK);
         heading.setAlignment(Align.center);
         card.add(heading).padBottom(12f).row();
-
         Label hint = new Label("10 seed packets for the plant you pick", skin, "secondary");
         hint.setColor(Color.WHITE);
         hint.setAlignment(Align.center);
         card.add(hint).padBottom(16f).row();
+        fillPlantGrid(card, overlay, skin, textures, assets, sheetClips, plants, onPick);
+        overlay.add(card).width(MODAL_W).pad(24f);
+        overlay.getColor().a = 0f;
+        overlay.addAction(Actions.fadeIn(FADE_IN));
+        stage.addActor(overlay);
+        return overlay;
+    }
 
+    private static Table dimOverlay() {
+        Table overlay = new Table();
+        overlay.setFillParent(true);
+        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
+        overlay.setBackground(new TextureRegionDrawable(whitePixel())
+                .tint(new Color(0f, 0f, 0f, 0.55f)));
+        overlay.setTouchable(Touchable.enabled);
+        return overlay;
+    }
+
+    private static void fillPlantGrid(BorderedTable card, Table overlay, Skin skin,
+                                      TextureBank textures, PvzAssets assets,
+                                      SpritesheetClipCache sheetClips, Collection<String> plants,
+                                      Consumer<String> onPick) {
         Table grid = new Table();
         List<String> sorted = new ArrayList<>(plants);
         sorted.sort(Comparator.comparing(String::toLowerCase));
-
         if (sorted.isEmpty()) {
             Label empty = new Label("No unlocked plants yet.", skin, "medium");
             empty.setColor(Color.LIGHT_GRAY);
             card.add(empty).padBottom(16f).row();
         } else {
-            int col = 0;
-            for (String plantName : sorted) {
-                Actor tile = packetTile(textures, skin, assets, sheetClips, plantName, name ->
-                        dismiss(overlay, () -> {
-                            if (onPick != null) {
-                                onPick.accept(name);
-                            }
-                        }));
-                grid.add(tile).size(PACKET_W + 8f, PACKET_H + 8f).pad(6f);
-                col++;
-                if (col >= GRID_COLS) {
-                    grid.row();
-                    col = 0;
-                }
-            }
+            addPlantTiles(grid, overlay, skin, textures, assets, sheetClips, sorted, onPick);
             ScrollPane scroll = new ScrollPane(grid, skin);
             scroll.setFadeScrollBars(false);
             scroll.setScrollingDisabled(true, false);
             scroll.setOverscroll(false, false);
             card.add(scroll).width(MODAL_W - 80f).height(GRID_H).padBottom(16f).row();
         }
-
         TextButton close = new TextButton("Cancel", skin, "brown");
         close.addListener(new ChangeListener() {
             @Override
@@ -122,12 +120,26 @@ public final class ShopChosenPlantPicker {
             }
         });
         card.add(close).width(180f).height(56f);
+    }
 
-        overlay.add(card).width(MODAL_W).pad(24f);
-        overlay.getColor().a = 0f;
-        overlay.addAction(Actions.fadeIn(FADE_IN));
-        stage.addActor(overlay);
-        return overlay;
+    private static void addPlantTiles(Table grid, Table overlay, Skin skin, TextureBank textures,
+                                      PvzAssets assets, SpritesheetClipCache sheetClips,
+                                      List<String> sorted, Consumer<String> onPick) {
+        int col = 0;
+        for (String plantName : sorted) {
+            Actor tile = packetTile(textures, skin, assets, sheetClips, plantName, name ->
+                    dismiss(overlay, () -> {
+                        if (onPick != null) {
+                            onPick.accept(name);
+                        }
+                    }));
+            grid.add(tile).size(PACKET_W + 8f, PACKET_H + 8f).pad(6f);
+            col++;
+            if (col >= GRID_COLS) {
+                grid.row();
+                col = 0;
+            }
+        }
     }
 
     private static void dismiss(Table overlay, Runnable after) {

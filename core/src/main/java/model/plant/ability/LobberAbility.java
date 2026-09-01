@@ -123,61 +123,55 @@ public class LobberAbility implements PlantAbility {
         butter = false;
         int volley = (int) def.getPlantFoodValue();
         if (volley <= 0) return;
-
         if (def.getPlantFoodType() == PlantFoodType.PROJECTILE_BURST) {
-            int row = plant.getPosition().getY();
-            FloatPoint origin = context.plantProjectileOriginOrCell(plant);
-            Projectile.Element element = inferElement(def, plant);
-            float splashRadius = inferSplashRadius(def, plant);
-            int damage = inferDamage(def, plant);
-
-            List<ZombieInstance> allZombies = new ArrayList<>();
-            for (int i = 0; i < context.getRowCount(); i++) {
-                allZombies.addAll(context.getZombiesInLane(i));
-            }
-
-            List<Integer> targetZombiesIndex = new ArrayList<>();
-
-            for (int i = 0; i < 3 && i < allZombies.size(); i++) {
-                int randomZombieIndex;
-                while (targetZombiesIndex.contains(randomZombieIndex = RNG.nextInt(allZombies.size())));
-                targetZombiesIndex.add(randomZombieIndex);
-                ZombieInstance target = allZombies.get(randomZombieIndex);
-
-                FloatPoint shotOrigin = new FloatPoint(origin.getX() + i * 0.2f, origin.getY());
-                Splash splash = new Splash(
-                        damage * 2,
-                        shotOrigin,
-                        row,
-                        LOB_VELOCITY * 1.2f,
-                        element,
-                        +1,
-                        Math.max(1.0f, splashRadius)
-                );
-                aimLob(splash, shotOrigin, target, context.getColumnCount());
-                context.spawnProjectile(splash, splash.getX(), splash.getY());
-            }
+            fireBurstVolley(plant, context, def);
+        } else if (def.getPlantFoodType() == PlantFoodType.MAP_WIDE_FREEZE) {
+            fireMapWideFreeze(plant, context, def);
         }
+    }
 
-        else if (def.getPlantFoodType() == PlantFoodType.MAP_WIDE_FREEZE) {
-            int row = plant.getPosition().getY();
-            FloatPoint origin = context.plantProjectileOriginOrCell(plant);
-            float splashRadius = inferSplashRadius(def, plant);
-            for (int i = 0; i < context.getRowCount(); i++) {
-                for (ZombieInstance zombie : context.getZombiesInLane(i)) {
-                    int direction = (zombie.getGridX() < plant.getPosition().getX()) ? -1 : +1;
-                    Splash splash = new Splash(
-                            inferDamage(def, plant),
-                            new FloatPoint(origin.getX(), origin.getY()),
-                            row,
-                            LOB_VELOCITY,
-                            Projectile.Element.BUTTER,
-                            direction,
-                            Math.max(1.0f, splashRadius)
-                    );
-                    aimLob(splash, origin, zombie, context.getColumnCount());
-                    context.spawnProjectile(splash, splash.getX(), splash.getY());
-                }
+    private void fireBurstVolley(PlantInstance plant, PlantAbilityContext context, Plant def) {
+        int row = plant.getPosition().getY();
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        Projectile.Element element = inferElement(def, plant);
+        float splashRadius = inferSplashRadius(def, plant);
+        int damage = inferDamage(def, plant);
+        List<ZombieInstance> allZombies = allZombies(context);
+        List<Integer> targetZombiesIndex = new ArrayList<>();
+        for (int i = 0; i < 3 && i < allZombies.size(); i++) {
+            int randomZombieIndex;
+            while (targetZombiesIndex.contains(randomZombieIndex = RNG.nextInt(allZombies.size())));
+            targetZombiesIndex.add(randomZombieIndex);
+            ZombieInstance target = allZombies.get(randomZombieIndex);
+            FloatPoint shotOrigin = new FloatPoint(origin.getX() + i * 0.2f, origin.getY());
+            Splash splash = new Splash(damage * 2, shotOrigin, row, LOB_VELOCITY * 1.2f,
+                    element, +1, Math.max(1.0f, splashRadius));
+            aimLob(splash, shotOrigin, target, context.getColumnCount());
+            context.spawnProjectile(splash, splash.getX(), splash.getY());
+        }
+    }
+
+    private static List<ZombieInstance> allZombies(PlantAbilityContext context) {
+        List<ZombieInstance> allZombies = new ArrayList<>();
+        for (int i = 0; i < context.getRowCount(); i++) {
+            allZombies.addAll(context.getZombiesInLane(i));
+        }
+        return allZombies;
+    }
+
+    private void fireMapWideFreeze(PlantInstance plant, PlantAbilityContext context, Plant def) {
+        int row = plant.getPosition().getY();
+        FloatPoint origin = context.plantProjectileOriginOrCell(plant);
+        float splashRadius = inferSplashRadius(def, plant);
+        for (int i = 0; i < context.getRowCount(); i++) {
+            for (ZombieInstance zombie : context.getZombiesInLane(i)) {
+                int direction = (zombie.getGridX() < plant.getPosition().getX()) ? -1 : +1;
+                Splash splash = new Splash(inferDamage(def, plant),
+                        new FloatPoint(origin.getX(), origin.getY()),
+                        row, LOB_VELOCITY, Projectile.Element.BUTTER, direction,
+                        Math.max(1.0f, splashRadius));
+                aimLob(splash, origin, zombie, context.getColumnCount());
+                context.spawnProjectile(splash, splash.getX(), splash.getY());
             }
         }
     }

@@ -208,38 +208,43 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         CommandResult<List<LevelSummary>> result = controller.listLevels(chapter);
         List<LevelSummary> levels = result.isSuccess() ? result.getData() : null;
         if (!result.isSuccess() || levels == null || levels.isEmpty()) {
-            showToast(result.getMessage() != null ? result.getMessage() : "No levels found.", true);
-            Label empty = new Label("No levels to show", skin, "big");
-            empty.setColor(1f, 1f, 1f, 1f);
-            empty.setAlignment(Align.center);
-            empty.setSize(UI_WIDTH, UI_HEIGHT);
-            stage.addActor(empty);
+            showEmptyMap(result);
             return;
         }
-
         SeasonSlots slots = ensureSeasonSlots(levels);
         levels = slots.levels();
         Set<Integer> placeholderLevelIds = slots.placeholderIds();
         int unlockIntroLevelId = consumeUnlockIntroLevelId(levels, placeholderLevelIds);
         map = new SeasonWorldMap(
-                textures,
-                mapArt,
-                SeasonMapLayout.forChapter(chapter),
-                skin,
-                game.assets != null ? game.assets.player : null,
-                pamClips,
-                levels,
-                unlockIntroLevelId,
-                placeholderLevelIds,
-                this::onNodeTapped);
+                textures, mapArt, SeasonMapLayout.forChapter(chapter), skin,
+                game.assets != null ? game.assets.player : null, pamClips, levels,
+                unlockIntroLevelId, placeholderLevelIds, this::onNodeTapped);
+        stage.addActor(mapViewport());
+        focusMapOnNextLevel(levels, placeholderLevelIds);
+    }
 
+    private void showEmptyMap(CommandResult<List<LevelSummary>> result) {
+        showToast(result.getMessage() != null ? result.getMessage() : "No levels found.", true);
+        Label empty = new Label("No levels to show", skin, "big");
+        empty.setColor(1f, 1f, 1f, 1f);
+        empty.setAlignment(Align.center);
+        empty.setSize(UI_WIDTH, UI_HEIGHT);
+        stage.addActor(empty);
+    }
+
+    private Group mapViewport() {
         Group viewport = new Group();
         viewport.setSize(UI_WIDTH, UI_HEIGHT);
         viewport.setPosition(0f, 0f);
         viewport.setTouchable(Touchable.childrenOnly);
         viewport.addActor(map);
         map.setTouchable(Touchable.enabled);
-        map.addListener(new DragListener() {
+        map.addListener(mapDragListener());
+        return viewport;
+    }
+
+    private DragListener mapDragListener() {
+        return new DragListener() {
             {
                 setTapSquareSize(8f);
             }
@@ -252,9 +257,10 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
                 }
                 map.setX(MathUtils.clamp(map.getX() + getDeltaX(), minX, 0f));
             }
-        });
-        stage.addActor(viewport);
+        };
+    }
 
+    private void focusMapOnNextLevel(List<LevelSummary> levels, Set<Integer> placeholderLevelIds) {
         int focusId = levels.get(0).levelId();
         for (LevelSummary s : levels) {
             if (placeholderLevelIds.contains(s.levelId())) {

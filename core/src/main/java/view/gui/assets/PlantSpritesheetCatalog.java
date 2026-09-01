@@ -154,16 +154,36 @@ public final class PlantSpritesheetCatalog {
         if (assetPath == null || assetPath.isBlank() || root == null) {
             return null;
         }
+        String normalized = stripImagesPrefix(assetPath);
+        PathBits bits = parsePathBits(normalized);
+        if (bits == null || bits.dirRel.isBlank()) {
+            return null;
+        }
+        FolderMeta folder = folderForRelativeDir(bits.dirRel);
+        if (folder == null) {
+            return null;
+        }
+        return pickClip(folder, preferred, bits.fileStem);
+    }
+
+    private static String stripImagesPrefix(String assetPath) {
         String normalized = assetPath.replace('\\', '/').trim();
         while (normalized.startsWith("/")) {
             normalized = normalized.substring(1);
         }
         String upper = normalized.toUpperCase(Locale.ROOT);
         if (upper.startsWith("IMAGES/")) {
-            normalized = normalized.substring("IMAGES/".length());
-        } else if (upper.startsWith("IMAGES\\")) {
-            normalized = normalized.substring("IMAGES\\".length());
+            return normalized.substring("IMAGES/".length());
         }
+        if (upper.startsWith("IMAGES\\")) {
+            return normalized.substring("IMAGES\\".length());
+        }
+        return normalized;
+    }
+
+    private record PathBits(String dirRel, String fileStem) {}
+
+    private static PathBits parsePathBits(String normalized) {
         String dirRel;
         String fileStem = null;
         String lower = normalized.toLowerCase(Locale.ROOT);
@@ -173,15 +193,13 @@ public final class PlantSpritesheetCatalog {
             String file = slash < 0 ? normalized : normalized.substring(slash + 1);
             fileStem = file.substring(0, file.length() - 4);
         } else {
-            dirRel = normalized.endsWith("/") ? normalized.substring(0, normalized.length() - 1) : normalized;
+            dirRel = normalized.endsWith("/")
+                    ? normalized.substring(0, normalized.length() - 1) : normalized;
         }
-        if (dirRel.isBlank()) {
-            return null;
-        }
-        FolderMeta folder = folderForRelativeDir(dirRel);
-        if (folder == null) {
-            return null;
-        }
+        return new PathBits(dirRel, fileStem);
+    }
+
+    private ClipSpec pickClip(FolderMeta folder, String[] preferred, String fileStem) {
         if (preferred != null) {
             for (String want : preferred) {
                 if (want == null || want.isBlank()) {

@@ -58,32 +58,59 @@ public final class LevelObjectivesOverlay {
     /** Creates the overlay and returns it ready to add to uiStage. */
     public static Table create(Skin skin, LevelConfig config, Runnable onContinue) {
         List<String> objectives = objectivesFor(App.getInstance().getCurrentGameModel(), config);
+        Table overlay = dimOverlay();
+        Table outer = outerFrame(skin);
+        Table card = innerCard(skin);
+        card.add(headerTable(skin)).height(HEADER_HEIGHT).growX().row();
+        card.add(objectivesBody(skin, objectives)).grow().row();
+        outer.add(card).pad(32f, 40f, 36f, 40f).minWidth(480f);
+        Table wrap = new Table();
+        wrap.add(outer).row();
+        wrap.add(continueButton(skin, overlay, onContinue)).width(BTN_W).height(BTN_H)
+                .padTop(-BTN_H * 0.5f);
+        overlay.add(wrap).pad(40f);
+        return overlay;
+    }
 
+    private static Table dimOverlay() {
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setTouchable(Touchable.enabled);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
+        return overlay;
+    }
 
+    private static Table outerFrame(Skin skin) {
         Table outer = new Table();
         Drawable outerBg = UiDrawables.tenPatch(skin, "image_ui_if_bundle_reward1_bg");
         if (outerBg != null) {
             outer.setBackground(outerBg);
         } else {
-            outer.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0.55f, 0.35f, 0.12f, 1f)));
+            outer.setBackground(new TextureRegionDrawable(whitePixel())
+                    .tint(new Color(0.55f, 0.35f, 0.12f, 1f)));
         }
+        return outer;
+    }
 
+    private static Table innerCard(Skin skin) {
         Table card = new Table();
         Drawable cardBg = UiDrawables.tenPatch(skin, "image_ui_cards_store_store_bundle_card");
         if (cardBg != null) {
             card.setBackground(cardBg);
         } else {
-            card.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0.96f, 0.92f, 0.78f, 1f)));
+            card.setBackground(new TextureRegionDrawable(whitePixel())
+                    .tint(new Color(0.96f, 0.92f, 0.78f, 1f)));
         }
+        return card;
+    }
 
+    private static Table headerTable(Skin skin) {
         Table header = new Table();
         header.add(titleLabel(skin)).expand().center();
-        card.add(header).height(HEADER_HEIGHT).growX().row();
+        return header;
+    }
 
+    private static Table objectivesBody(Skin skin, List<String> objectives) {
         Table body = new Table();
         body.pad(12f, 28f, 28f, 28f);
         body.defaults().left().growX();
@@ -95,10 +122,10 @@ public final class LevelObjectivesOverlay {
             cb.getLabel().setColor(OBJECTIVE_COLOR);
             body.add(cb).padBottom(10f).row();
         }
-        card.add(body).grow().row();
+        return body;
+    }
 
-        outer.add(card).pad(32f, 40f, 36f, 40f).minWidth(480f);
-
+    private static TextButton continueButton(Skin skin, Table overlay, Runnable onContinue) {
         TextButton continueBtn = new TextButton("CONTINUE", skin, "purple");
         continueBtn.addListener(new ChangeListener() {
             @Override
@@ -109,14 +136,7 @@ public final class LevelObjectivesOverlay {
                 }
             }
         });
-
-        // Button centered on the outer frame's bottom edge (half over, half below).
-        Table wrap = new Table();
-        wrap.add(outer).row();
-        wrap.add(continueBtn).width(BTN_W).height(BTN_H).padTop(-BTN_H * 0.5f);
-
-        overlay.add(wrap).pad(40f);
-        return overlay;
+        return continueBtn;
     }
 
     private static Actor titleLabel(Skin skin) {
@@ -145,6 +165,14 @@ public final class LevelObjectivesOverlay {
     }
 
     public static List<String> objectivesFor(GameModel model, LevelConfig config) {
+        List<String> minigame = minigameObjectives(model);
+        if (minigame != null) {
+            return minigame;
+        }
+        return campaignObjectives(config);
+    }
+
+    private static List<String> minigameObjectives(GameModel model) {
         List<String> scoreGame = scoreGameObjectives(model);
         if (scoreGame != null) {
             return scoreGame;
@@ -165,10 +193,10 @@ public final class LevelObjectivesOverlay {
         if (iZombie != null) {
             return iZombie;
         }
-        List<String> zombotany = zombotanyObjectives(model);
-        if (zombotany != null) {
-            return zombotany;
-        }
+        return zombotanyObjectives(model);
+    }
+
+    private static List<String> campaignObjectives(LevelConfig config) {
         List<String> out = new ArrayList<>();
         if (config == null) {
             out.add("Survive the zombie attack!");
@@ -176,15 +204,16 @@ public final class LevelObjectivesOverlay {
         }
         LevelType type = config.getLevelType();
         GameRules rules = config.getRules();
+        addTypedObjectives(out, type, rules);
+        if (out.isEmpty()) {
+            out.add("Survive the zombie attack!");
+        }
+        return out;
+    }
 
+    private static void addTypedObjectives(List<String> out, LevelType type, GameRules rules) {
         if (type == LevelType.TIMED_WAR && rules != null) {
-            int kills = rules.getTimedWarTargetKills();
-            float lapse = rules.getTimedWarDecayInterval();
-            if (kills > 0 && lapse > 0) {
-                out.add("Defeat " + kills + " zombies in " + (int) lapse + " seconds");
-            } else if (kills > 0) {
-                out.add("Defeat " + kills + " zombies");
-            }
+            addTimedWarObjectives(out, rules);
         } else if (type == LevelType.LOVE_YOUR_PLANTS && rules != null && rules.getMaxPlantDeaths() >= 0) {
             out.add("Lose no more than " + rules.getMaxPlantDeaths() + " plant" +
                     (rules.getMaxPlantDeaths() == 1 ? "" : "s"));
@@ -204,11 +233,16 @@ public final class LevelObjectivesOverlay {
         } else if (type == LevelType.LOCKED_PLANTS) {
             out.add("Defeat all zombies with the given plants");
         }
+    }
 
-        if (out.isEmpty()) {
-            out.add("Survive the zombie attack!");
+    private static void addTimedWarObjectives(List<String> out, GameRules rules) {
+        int kills = rules.getTimedWarTargetKills();
+        float lapse = rules.getTimedWarDecayInterval();
+        if (kills > 0 && lapse > 0) {
+            out.add("Defeat " + kills + " zombies in " + (int) lapse + " seconds");
+        } else if (kills > 0) {
+            out.add("Defeat " + kills + " zombies");
         }
-        return out;
     }
 
     private static List<String> scoreGameObjectives(GameModel model) {
@@ -313,18 +347,6 @@ public final class LevelObjectivesOverlay {
                 "Survive waves of plant-headed zombies",
                 "Peashooter zombies fire peas at your plants",
                 "Don't let zombies reach your house");
-    }
-
-    private static String formatTime(float seconds) {
-        int s = Math.round(seconds);
-        if (s < 60) {
-            return s + " second" + (s == 1 ? "" : "s");
-        }
-        int m = s / 60;
-        int rem = s % 60;
-        return rem == 0
-            ? m + " minute" + (m == 1 ? "" : "s")
-            : m + "m " + rem + "s";
     }
 
     private static Texture whitePixel() {

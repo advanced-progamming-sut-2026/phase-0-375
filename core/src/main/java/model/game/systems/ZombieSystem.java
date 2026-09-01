@@ -324,56 +324,35 @@ public class ZombieSystem implements Tickable {
      * that holds a live plant, and is not in a special-action, it eats.
      */
     private void handleEating(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
-        boolean hypnotized = zombie.isHypnotized();
-
+        if (holdHouseOrBrainChew(zombie, deltaTime)) {
+            return;
+        }
         int row = zombie.getGridY();
         int col = zombie.getGridX();
-
-        if (zombie == gameModel.getBreachingZombie()) {
-            // House breach: stay on eat clip with no plant target.
-            if (!zombie.isEating()) {
-                zombie.setState(ZombieState.EATING);
-            }
-            return;
-        }
-
-        if (brainChewElapsed.containsKey(zombie) || (isIZombieMode()
-                && zombie.getContinuousX() <= HOUSE_CHEW_X
-                && !gameModel.getBreachedRows().contains(row))) {
-            tickBrainChew(zombie, deltaTime);
-            return;
-        }
-
         if (row < 0 || col < 0
                 || row >= context.getRowCount()
                 || col >= context.getColumnCount()) {
             return;
         }
-
         syncFlyBehavior(zombie, context.getPlantAt(row, col));
-
-        if (!hypnotized && isEatingSuppressed(zombie)) {
+        if (!zombie.isHypnotized() && isEatingSuppressed(zombie)) {
             if (zombie.isEating()) {
                 zombie.stopEating();
             }
             return;
         }
-
-        if (fightOpposingZombieIfAny(zombie, context, row, deltaTime)) return;
-
+        if (fightOpposingZombieIfAny(zombie, context, row, deltaTime)) {
+            return;
+        }
         if (zombie.getCombatTargetZombie() != null) {
             zombie.stopEating();
         }
-
-        if (hypnotized) {
-            // Hypnotized zombies never eat plants. Leave EATING only while biting
-            // an opposing zombie (handled above); clear any stale plant chew.
+        if (zombie.isHypnotized()) {
             if (zombie.isEating() && zombie.getCombatTargetZombie() == null) {
                 zombie.stopEating();
             }
             return;
         }
-
         int eatCol = resolveEatColumn(zombie, context, row);
         if (eatCol < 0 || eatCol >= context.getColumnCount()) {
             if (zombie.isEating()) {
@@ -382,6 +361,23 @@ public class ZombieSystem implements Tickable {
             return;
         }
         eatPlantAt(zombie, context, row, eatCol, deltaTime);
+    }
+
+    private boolean holdHouseOrBrainChew(ZombieInstance zombie, float deltaTime) {
+        int row = zombie.getGridY();
+        if (zombie == gameModel.getBreachingZombie()) {
+            if (!zombie.isEating()) {
+                zombie.setState(ZombieState.EATING);
+            }
+            return true;
+        }
+        if (brainChewElapsed.containsKey(zombie) || (isIZombieMode()
+                && zombie.getContinuousX() <= HOUSE_CHEW_X
+                && !gameModel.getBreachedRows().contains(row))) {
+            tickBrainChew(zombie, deltaTime);
+            return true;
+        }
+        return false;
     }
 
     /** Keeps {@link FlyBehavior} in sync with the plant under the zombie. */

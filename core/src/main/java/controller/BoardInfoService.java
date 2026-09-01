@@ -303,55 +303,62 @@ final class BoardInfoService {
     public CommandResult<String> showTileStatus(int x, int y) {
         CommandResult<Void> guard = guardGameRunning();
         if (guard != null) return retypeError(guard);
-
         GameModel model = requireGame();
         GameMap map = model.getMap();
-        if (!inBounds(map, x, y)) { return errorTyped("Position (" + x + ", " + y + ") is out of bounds."); }
-        Cell cell = map.getCell(x, y);
+        if (!inBounds(map, x, y)) {
+            return errorTyped("Position (" + x + ", " + y + ") is out of bounds.");
+        }
         StringBuilder sb = new StringBuilder();
         sb.append("── Tile (").append(x).append(", ").append(y).append(") ──\n");
+        Cell cell = map.getCell(x, y);
         if (cell == null) {
             sb.append("  (cell not initialized)");
         } else {
-            List<PlantInstance> plants = cell.getAllPlants();
-            if (plants.isEmpty()) {
-                sb.append("  Plants: (none)\n");
-            } else {
-                sb.append("  Plants (").append(plants.size()).append("):\n");
-                for (PlantInstance plant : plants) {
-                    Plant def = plant.getDefinition();
-                    sb.append("    [").append(plant.getLayer()).append("] ")
-                            .append(def.getName())
-                            .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP());
-                    if (plant.hasArmor()) {
-                        sb.append(" armor=").append(plant.getArmorHP()).append("/").append(plant.getArmorMaxHP());
-                    }
-                    sb.append(" level=").append(plant.getLevel())
-                            .append(" state=").append(plant.getState());
-                    if (plant.getStackCount() > 1) {
-                        sb.append(" stack=").append(plant.getStackCount())
-                                .append("/").append(plant.getStackLimit());
-                    }
-                    sb.append('\n');
-                }
-            }
-            // Zombies on this tile
-            List<ZombieInstance> here = new ArrayList<>();
-            for (ZombieInstance z : model.getZombies()) {
-                var gp = z.getGridPosition();
-                if (gp != null && gp.getX() == x && gp.getY() == y) {
-                    here.add(z);
-                }
-            }
-            sb.append("  Zombies: ").append(here.size()).append('\n');
-            for (ZombieInstance z : here) {
-                sb.append("    - ").append(z.getDefinition().getName())
-                        .append(" hp=").append(z.getCurrentHP())
-                        .append(" state=").append(z.getState())
-                        .append('\n');
-            }
+            appendTilePlants(sb, cell);
+            appendTileZombies(sb, model, x, y);
         }
         return CommandResult.successWithData(sb.toString(), sb.toString());
+    }
+
+    private static void appendTilePlants(StringBuilder sb, Cell cell) {
+        List<PlantInstance> plants = cell.getAllPlants();
+        if (plants.isEmpty()) {
+            sb.append("  Plants: (none)\n");
+            return;
+        }
+        sb.append("  Plants (").append(plants.size()).append("):\n");
+        for (PlantInstance plant : plants) {
+            Plant def = plant.getDefinition();
+            sb.append("    [").append(plant.getLayer()).append("] ")
+                    .append(def.getName())
+                    .append(" hp=").append(plant.getCurrentHP()).append("/").append(def.getBaseHP());
+            if (plant.hasArmor()) {
+                sb.append(" armor=").append(plant.getArmorHP()).append("/").append(plant.getArmorMaxHP());
+            }
+            sb.append(" level=").append(plant.getLevel()).append(" state=").append(plant.getState());
+            if (plant.getStackCount() > 1) {
+                sb.append(" stack=").append(plant.getStackCount())
+                        .append("/").append(plant.getStackLimit());
+            }
+            sb.append('\n');
+        }
+    }
+
+    private static void appendTileZombies(StringBuilder sb, GameModel model, int x, int y) {
+        List<ZombieInstance> here = new ArrayList<>();
+        for (ZombieInstance z : model.getZombies()) {
+            var gp = z.getGridPosition();
+            if (gp != null && gp.getX() == x && gp.getY() == y) {
+                here.add(z);
+            }
+        }
+        sb.append("  Zombies: ").append(here.size()).append('\n');
+        for (ZombieInstance z : here) {
+            sb.append("    - ").append(z.getDefinition().getName())
+                    .append(" hp=").append(z.getCurrentHP())
+                    .append(" state=").append(z.getState())
+                    .append('\n');
+        }
     }
 
     /**

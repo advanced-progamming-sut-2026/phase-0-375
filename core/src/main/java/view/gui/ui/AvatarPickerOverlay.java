@@ -46,22 +46,40 @@ public final class AvatarPickerOverlay {
     public static Table create(Skin skin, TextureBank textures, int currentAvatarId,
                                BiConsumer<String, Boolean> toast, IntConsumer onSaved) {
         GameAudio.get().playOverlayOpen();
-
-        Table overlay = new Table();
-        overlay.setFillParent(true);
-        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
-        overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(DIM));
-        overlay.setTouchable(Touchable.enabled);
-
+        Table overlay = dimOverlay();
         int[] selected = {AvatarArt.normalize(currentAvatarId)};
         TextureRegion selectedRing = AvatarArt.region(textures, AvatarArt.SELECTED);
-
         BorderedTable card = new BorderedTable();
         card.pad(24f);
         Label title = new Label("Choose avatar", skin, "big");
         title.setColor(CollectionEntryOverlay.INK);
         card.add(title).padBottom(14f).row();
+        card.add(avatarGrid(textures, selectedRing, selected)).padBottom(16f).row();
+        Table actions = new Table();
+        TextButton save = styledButton(skin, "Save", "green", 0.9f);
+        TextButton cancel = styledButton(skin, "Cancel", "brown", 0.9f);
+        actions.add(save).width(160f).height(50f).padRight(12f);
+        actions.add(cancel).width(160f).height(50f);
+        card.add(actions);
+        Runnable closer = () -> dismiss(overlay, null);
+        overlay.setUserObject(closer);
+        bindPickerActions(save, cancel, closer, overlay, selected, toast, onSaved);
+        overlay.add(card).width(560f).pad(40f);
+        fadeIn(overlay);
+        UiMotion.fadeSlideIn(card, 0.3f);
+        return overlay;
+    }
 
+    private static Table dimOverlay() {
+        Table overlay = new Table();
+        overlay.setFillParent(true);
+        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
+        overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(DIM));
+        overlay.setTouchable(Touchable.enabled);
+        return overlay;
+    }
+
+    private static Table avatarGrid(TextureBank textures, TextureRegion selectedRing, int[] selected) {
         Table grid = new Table();
         grid.defaults().pad(4f);
         java.util.List<StackSlot> slots = new java.util.ArrayList<>();
@@ -85,18 +103,12 @@ public final class AvatarPickerOverlay {
                 grid.row();
             }
         }
-        card.add(grid).padBottom(16f).row();
+        return grid;
+    }
 
-        Table actions = new Table();
-        TextButton save = styledButton(skin, "Save", "green", 0.9f);
-        TextButton cancel = styledButton(skin, "Cancel", "brown", 0.9f);
-        actions.add(save).width(160f).height(50f).padRight(12f);
-        actions.add(cancel).width(160f).height(50f);
-        card.add(actions);
-
-        Runnable closer = () -> dismiss(overlay, null);
-        overlay.setUserObject(closer);
-
+    private static void bindPickerActions(TextButton save, TextButton cancel, Runnable closer,
+                                          Table overlay, int[] selected,
+                                          BiConsumer<String, Boolean> toast, IntConsumer onSaved) {
         cancel.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -114,11 +126,6 @@ public final class AvatarPickerOverlay {
                 }
             }
         });
-
-        overlay.add(card).width(560f).pad(40f);
-        fadeIn(overlay);
-        UiMotion.fadeSlideIn(card, 0.3f);
-        return overlay;
     }
 
     private static TextButton styledButton(Skin skin, String text, String style, float scale) {

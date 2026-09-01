@@ -199,70 +199,7 @@ public final class PamCatalog {
 
     private static boolean isGameplayPam(String path) {
         String upper = path.toUpperCase(Locale.ROOT);
-        if (upper.contains("/EFFECTS/80S_ARCADE_CABINET/") && !upper.contains("BREAK")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/ZOMBIE_") && upper.contains("_ASH/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/CRYSTALSKULL_BEAM/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/ZOMBIE_PROSPECTOR_BLAST_OFF/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/ZOMBIE_HUNTER_SNOWBALL_SPLAT/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/ZOMBIE_OCTOPUS_PROJECTILE/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/DARK_WIZARD_SHEEPENING/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/ZOMBOSS_DARK_FIREBALL/")) {
-            return true;
-        }
-        if (upper.contains("/BACKGROUNDS/FIRETILE/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_ZOMBIE/")
-                && !upper.contains("BEHIND")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PLANT/")
-                && !upper.contains("BEHIND")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/FROSTBITE_CHILL_PLANT/")
-                && !upper.contains("BEHIND")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/SUN/") || upper.contains("SUN_BOMB") || upper.contains("SUNBOMB")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/PLANTFOOD_PICKUP/")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/COIN_")) {
-            return true;
-        }
-        if (upper.contains("/EFFECTS/MOWER_SPAWN/")) {
-            return true;
-        }
-        if (upper.contains("/MOWERS/")) {
-            return true;
-        }
-        if (upper.contains("/GRAVESTONES/")) {
-            return true;
-        }
-        if (upper.contains("/BACKGROUNDS/WAVE_UPPERLAYER/")) {
-            return true;
-        }
-        if (upper.contains("/BACKGROUNDS/WATER_") && upper.contains("_RIPPLE/")) {
+        if (isAllowedEffectPam(upper)) {
             return true;
         }
         if (upper.contains("/EFFECTS/")) {
@@ -274,6 +211,44 @@ public final class PamCatalog {
         return upper.contains("/PLANT/")
                 || upper.contains("/ZOMBIE/")
                 || upper.contains("/VASEBREAKER/");
+    }
+
+    private static boolean isAllowedEffectPam(String upper) {
+        if (upper.contains("/EFFECTS/80S_ARCADE_CABINET/") && !upper.contains("BREAK")) {
+            return true;
+        }
+        if (upper.contains("/EFFECTS/ZOMBIE_") && upper.contains("_ASH/")) {
+            return true;
+        }
+        return containsAny(upper,
+                "/EFFECTS/CRYSTALSKULL_BEAM/",
+                "/EFFECTS/ZOMBIE_PROSPECTOR_BLAST_OFF/",
+                "/EFFECTS/ZOMBIE_HUNTER_SNOWBALL_SPLAT/",
+                "/EFFECTS/ZOMBIE_OCTOPUS_PROJECTILE/",
+                "/EFFECTS/DARK_WIZARD_SHEEPENING/",
+                "/EFFECTS/ZOMBOSS_DARK_FIREBALL/",
+                "/BACKGROUNDS/FIRETILE/",
+                "/EFFECTS/FROSTBITE_ICE_BLOCK_PARTICLES/",
+                "/EFFECTS/PLANTFOOD_PICKUP/",
+                "/EFFECTS/COIN_",
+                "/EFFECTS/MOWER_SPAWN/",
+                "/MOWERS/",
+                "/GRAVESTONES/",
+                "/BACKGROUNDS/WAVE_UPPERLAYER/")
+                || (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_ZOMBIE/") && !upper.contains("BEHIND"))
+                || (upper.contains("/EFFECTS/FROSTBITE_ICE_BLOCK_PLANT/") && !upper.contains("BEHIND"))
+                || (upper.contains("/EFFECTS/FROSTBITE_CHILL_PLANT/") && !upper.contains("BEHIND"))
+                || (upper.contains("/EFFECTS/SUN/") || upper.contains("SUN_BOMB") || upper.contains("SUNBOMB"))
+                || (upper.contains("/BACKGROUNDS/WATER_") && upper.contains("_RIPPLE/"));
+    }
+
+    private static boolean containsAny(String upper, String... needles) {
+        for (String needle : needles) {
+            if (upper.contains(needle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Catalog entry by animations.json {@code name}, or {@code null}. */

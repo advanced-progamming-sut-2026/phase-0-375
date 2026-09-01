@@ -45,32 +45,46 @@ public final class LevelEnterOverlay {
             textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADED_768_01");
         }
         GameAudio.get().playOverlayOpen();
+        Table overlay = dimOverlay();
+        Runnable closer = () -> dismiss(overlay, null);
+        overlay.setUserObject(closer);
+        BorderedTable card = enterCard(skin, overlay, seasonName, levelId, onPlay);
+        Table closeLayer = closeLayer(skin, textures, closer);
+        Stack root = new Stack();
+        root.add(card);
+        root.add(closeLayer);
+        overlay.add(root).width(560f).pad(24f);
+        overlay.getColor().a = 0f;
+        overlay.addAction(Actions.fadeIn(FADE_IN));
+        stage.addActor(overlay);
+        return overlay;
+    }
 
+    private static Table dimOverlay() {
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
-        overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
+        overlay.setBackground(new TextureRegionDrawable(whitePixel())
+                .tint(new Color(0f, 0f, 0f, 0.55f)));
         overlay.setTouchable(Touchable.enabled);
+        return overlay;
+    }
 
-        Runnable closer = () -> dismiss(overlay, null);
-        overlay.setUserObject(closer);
-
+    private static BorderedTable enterCard(Skin skin, Table overlay, String seasonName,
+                                           int levelId, Runnable onPlay) {
         BorderedTable card = new BorderedTable();
         card.pad(28f, 32f, 24f, 32f);
-
         String season = seasonName != null && !seasonName.isBlank() ? seasonName : "Season";
         Label title = new Label(season + " — Level " + levelId, skin, "big");
         title.setColor(Color.BLACK);
         title.setAlignment(Align.center);
         title.setWrap(true);
         card.add(title).growX().center().padTop(8f).padBottom(12f).padLeft(48f).padRight(48f).row();
-
         Label body = new Label("Do you want to enter this level?", skin, "medium");
         body.setColor(Color.BLACK);
         body.setWrap(true);
         body.setAlignment(Align.center);
         card.add(body).width(420f).padBottom(28f).row();
-
         TextButton play = new TextButton("Play", skin, "purple");
         SkinFonts.scaleButton(play, skin, "purple", 1.25f);
         play.addListener(new ChangeListener() {
@@ -80,8 +94,10 @@ public final class LevelEnterOverlay {
             }
         });
         card.add(play).width(220f).height(64f).padBottom(4f);
+        return card;
+    }
 
-        // Close sits in a layer ABOVE the BorderedTable so the frame does not cover it.
+    private static Table closeLayer(Skin skin, TextureBank textures, Runnable closer) {
         Table closeLayer = new Table();
         closeLayer.setFillParent(true);
         closeLayer.setTouchable(Touchable.childrenOnly);
@@ -101,20 +117,10 @@ public final class LevelEnterOverlay {
             });
             closeBtn = fallback;
         }
-        // +X right / +Y up from top-right (padRight/Top invert for Table alignment).
         closeLayer.add(closeBtn).size(CLOSE_SIZE)
                 .padRight(-CLOSE_SHIFT_X)
                 .padTop(-CLOSE_SHIFT_Y);
-
-        Stack root = new Stack();
-        root.add(card);
-        root.add(closeLayer);
-
-        overlay.add(root).width(560f).pad(24f);
-        overlay.getColor().a = 0f;
-        overlay.addAction(Actions.fadeIn(FADE_IN));
-        stage.addActor(overlay);
-        return overlay;
+        return closeLayer;
     }
 
     private static void dismiss(Table overlay, Runnable after) {

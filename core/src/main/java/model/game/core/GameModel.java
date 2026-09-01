@@ -65,10 +65,14 @@ public class GameModel implements BehaviorContext {
     private GameState gameState;
     private Chapter chapter;
 
-    /** Per-plant-type seed packet cooldowns (seconds remaining). Empty = all seeds ready. */
-    private final Map<String, Float> seedCooldowns = new HashMap<>();
-    /** Set by `cheat remove-cooldown` — disables seed cooldowns for the rest of the level. */
-    private boolean seedCooldownsDisabled = false;
+    private final SeedCooldownBank seedCooldowns = new SeedCooldownBank();
+    private final LootWallet loot = new LootWallet();
+    private final HouseBreachTracker breach = new HouseBreachTracker();
+    private final LawnEntityRoster entities = new LawnEntityRoster();
+    private final LawnPresentationFx fx = new LawnPresentationFx();
+    private final GameBoardCombat combat;
+    private final GameZombieSpawns spawns;
+
     /** Couch-play I, Zombie: plant-side sun is separate from {@link #getSunAmount()} (zombie bank). */
     private boolean couchPlay;
     private int plantSun;
@@ -79,34 +83,16 @@ public class GameModel implements BehaviorContext {
     private EndGameCondition endGameCondition;
 
     private GameMap gameMap;
-    private List<ZombieInstance> activeZombies;
-    private List<Projectile> activeProjectiles;
-    private final List<Projectile> projectileHitCues;
-    private List<Sun> activeSuns;
-    private List<PlantFoodPickup> activePlantFood;
-    private List<LootPickup> activeLootPickups;
-    private List<LootDrop> pendingLootDrops;
-    private List<Pushable> orphanedPushables;
 
     private EventBus eventBus;
     private Consumer<GameEvent> gameEventListener;
     private List<String> selectedPlants;       // plant types chosen for this level
-    private String imitaterCopyTarget; // Plant Imitater should morph into; last non-Imitater the player picked or planted
+    // Plant Imitater morph target; last non-Imitater plant the player picked or planted.
+    private String imitaterCopyTarget;
 
     /** Continuous X past the lawn left edge where a breacher stands and chews. */
     public static final float HOUSE_CHEW_X = -0.9f;
 
-    // End-game bookkeeping (read by EndGameCondition implementations)
-    private boolean houseBreached;
-    private final Set<Integer> breachedRows = new HashSet<>();
-    /** Zombie that walked into the house (lose spotlight); null for non-breach losses. */
-    private ZombieInstance breachingZombie;
-    /** Continuous X of the most recent zombie death. */
-    private float lastZombieDeathX = Float.NaN;
-    /** Row of the most recent zombie death. */
-    private float lastZombieDeathY = Float.NaN;
-    private int zombiesKilled;
-    private int plantsLost;
     private float elapsedSeconds;
 
     // Optional scorer attached by the daily Myopoint score level
@@ -121,25 +107,13 @@ public class GameModel implements BehaviorContext {
     // Per-level stats used for quest tracking (extracted component)
     private final LevelQuestStats questStats = new LevelQuestStats();
 
-    /** Center-screen stings (wave / necromancy / low tide); GUI drains FIFO. */
-    private final ArrayDeque<String> pendingAnnouncements = new ArrayDeque<>();
+    LevelQuestStats questStats() {
+        return questStats;
+    }
 
-    /** Egypt sandstorms in flight; each lands its zombie at touchdown. */
-    private final List<SandstormSpawn> pendingSandstorms = new ArrayList<>();
-    /** Read-only view of {@link #pendingSandstorms} for the renderer. */
-    private final List<SandstormSpawn> sandstormsView =
-            Collections.unmodifiableList(pendingSandstorms);
-
-    /** Frostbite Caves ice winds sweeping hit lanes; presentation-only. */
-    private final List<IceWindGust> iceWinds = new ArrayList<>();
-    /** Read-only view of {@link #iceWinds} for the renderer. */
-    private final List<IceWindGust> iceWindsView =
-            Collections.unmodifiableList(iceWinds);
-
-    // Loot economy (diamonds / coins / flower pots dropped by zombie kills)
-    private int diamondCount;
-    private int coinCount;
-    private int flowerPotCount;
+    HouseBreachTracker breach() {
+        return breach;
+    }
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
@@ -156,14 +130,8 @@ public class GameModel implements BehaviorContext {
         this.chapter = levelConfig.getChapter();
         this.endGameCondition = levelConfig.getEndGameCondition();
 
-        this.activeZombies = new ArrayList<>();
-        this.activeProjectiles = new ArrayList<>();
-        this.projectileHitCues = new ArrayList<>();
-        this.activeSuns = new ArrayList<>();
-        this.activePlantFood = new ArrayList<>();
-        this.activeLootPickups = new ArrayList<>();
-        this.pendingLootDrops = new ArrayList<>();
-        this.orphanedPushables = new ArrayList<>();
+        this.combat = new GameBoardCombat(this, entities);
+        this.spawns = new GameZombieSpawns(this, entities);
 
         this.gameMap = new GameMap(levelConfig.getRows(), levelConfig.getColumns());
 
@@ -260,42 +228,32 @@ public class GameModel implements BehaviorContext {
     // Seed packet cooldowns
 
     public boolean isSeedReady(String plantName) {
-        if (seedCooldownsDisabled) return true;
-        Float remaining = seedCooldowns.get(plantName);
-        return remaining == null || remaining <= 0f;
+        return seedCooldowns.isReady(plantName);
     }
 
     public float getSeedCooldown(String plantName) {
-        if (seedCooldownsDisabled) return 0f;
-        Float remaining = seedCooldowns.get(plantName);
-        return remaining == null ? 0f : remaining;
+        return seedCooldowns.remaining(plantName);
     }
 
     public void startSeedRecharge(String plantName, float seconds) {
-        if (seedCooldownsDisabled || seconds <= 0f) return;
-        seedCooldowns.put(plantName, seconds);
+        seedCooldowns.start(plantName, seconds);
     }
 
     public void disableSeedCooldowns() {
-        seedCooldownsDisabled = true;
-        seedCooldowns.clear();
+        seedCooldowns.disable();
     }
 
     public boolean areSeedCooldownsDisabled() {
-        return seedCooldownsDisabled;
+        return seedCooldowns.isDisabled();
     }
 
     public Map<String, Float> getSeedCooldownsSnapshot() {
-        return new HashMap<>(seedCooldowns);
+        return seedCooldowns.snapshot();
     }
 
     /** Restores seed cooldowns from a mid-level save. */
     public void restoreSeedCooldowns(Map<String, Float> cooldowns, boolean disabled) {
-        seedCooldowns.clear();
-        if (cooldowns != null) {
-            seedCooldowns.putAll(cooldowns);
-        }
-        seedCooldownsDisabled = disabled;
+        seedCooldowns.restore(cooldowns, disabled);
     }
 
     /** Overwrites sun / plant-food balances from a mid-level save. */
@@ -315,63 +273,25 @@ public class GameModel implements BehaviorContext {
         this.currentTick = Math.max(0L, tick);
         this.elapsedSeconds = Math.max(0f, elapsed);
         this.difficultyLevel = Math.max(1, difficulty);
-        this.houseBreached = breached;
-        this.breachedRows.clear();
-        if (breachedLaneRows != null) {
-            this.breachedRows.addAll(breachedLaneRows);
-        }
-        this.zombiesKilled = Math.max(0, killed);
-        this.plantsLost = Math.max(0, lost);
-        this.diamondCount = Math.max(0, diamonds);
-        this.coinCount = Math.max(0, coins);
-        this.flowerPotCount = Math.max(0, pots);
+        this.breach.restore(breached, breachedLaneRows, killed, lost);
+        this.loot.restore(diamonds, coins, pots);
     }
 
     /** Clears plants/graves/zombies/projectiles/pickups before applying a save. */
     public void clearBoardForRestore() {
-        activeZombies.clear();
-        activeProjectiles.clear();
-        projectileHitCues.clear();
-        activeSuns.clear();
-        activePlantFood.clear();
-        activeLootPickups.clear();
-        pendingLootDrops.clear();
-        orphanedPushables.clear();
-        pendingSandstorms.clear();
-        iceWinds.clear();
-        pendingAnnouncements.clear();
-        breachingZombie = null;
-        for (int row = 0; row < gameMap.getRows(); row++) {
-            for (int col = 0; col < gameMap.getCols(); col++) {
-                gameMap.getCell(col, row).clearDynamics();
-            }
-        }
+        entities.clearBoard(gameMap);
+        fx.clear();
+        breach.setBreachingZombie(null);
     }
 
     /** Places a plant without spending sun or updating quest placement stats. */
     public boolean restorePlant(PlantInstance plant, int row, int col) {
-        if (plant == null || row < 0 || col < 0
-                || row >= gameMap.getRows() || col >= gameMap.getCols()) {
-            return false;
-        }
-        Cell cell = gameMap.getCell(col, row);
-        plant.setPosition(new Point(col, row));
-        return cell.addPlaceable(plant);
+        return entities.restorePlant(gameMap, plant, row, col);
     }
 
     /** Re-adds a zombie that was already constructed from a save. */
     public void restoreZombie(ZombieInstance instance) {
-        if (instance == null) {
-            return;
-        }
-        activeZombies.add(instance);
-        Point grid = instance.getGridPosition();
-        if (grid != null) {
-            int col = Math.max(0, Math.min(grid.getX(), gameMap.getCols() - 1));
-            int row = Math.max(0, Math.min(grid.getY(), gameMap.getRows() - 1));
-            instance.setGridPosition(new Point(col, row));
-            gameMap.addZombie(instance, col, row);
-        }
+        entities.restoreZombie(gameMap, instance);
     }
 
     public Level getCurrentLevel() { return currentLevel; }
@@ -399,26 +319,24 @@ public class GameModel implements BehaviorContext {
     }
 
     public List<ZombieInstance> getZombies() {
-        return activeZombies;
+        return entities.zombies;
     }
 
     public List<ZombieInstance> getActiveZombies() {
-        return activeZombies;
+        return entities.zombies;
     }
 
     public List<Projectile> getProjectiles() {
-        return activeProjectiles;
+        return entities.projectiles;
     }
 
     public List<Projectile> getActiveProjectiles() {
-        return activeProjectiles;
+        return entities.projectiles;
     }
 
     /** Records a projectile impact for one-shot splat / hit PAM playback. */
     public void recordProjectileHit(Projectile projectile) {
-        if (projectile != null) {
-            projectileHitCues.add(projectile);
-        }
+        fx.recordProjectileHit(projectile);
     }
 
     /**
@@ -426,36 +344,21 @@ public class GameModel implements BehaviorContext {
      * each frame; empty when nothing hit.
      */
     public List<Projectile> drainProjectileHits() {
-        if (projectileHitCues.isEmpty()) {
-            return List.of();
-        }
-        List<Projectile> drained = new ArrayList<>(projectileHitCues);
-        projectileHitCues.clear();
-        return drained;
+        return fx.drainProjectileHits();
     }
 
     /** Drops cues the view never consumed (TUI, skipped frames). */
     public void discardUnreadProjectileHits() {
-        projectileHitCues.clear();
+        fx.discardUnreadProjectileHits();
     }
 
-    private final List<Point> radioactiveSunExplosionCues = new ArrayList<>();
-
     public void recordRadioactiveSunExplosion(int col, int row) {
-        radioactiveSunExplosionCues.add(new Point(col, row));
+        fx.recordRadioactiveSunExplosion(col, row);
     }
 
     public List<Point> drainRadioactiveSunExplosions() {
-        if (radioactiveSunExplosionCues.isEmpty()) {
-            return List.of();
-        }
-        List<Point> drained = new ArrayList<>(radioactiveSunExplosionCues);
-        radioactiveSunExplosionCues.clear();
-        return drained;
+        return fx.drainRadioactiveSunExplosions();
     }
-
-    /** Slide-tile activations since the last drain, as {@code (col, row)} points. */
-    private final List<Point> slideStartCues = new ArrayList<>();
 
     /** A slide waiting for its zombie to reach the slide tile's middle. */
     public static final class ArmedSlide {
@@ -477,56 +380,27 @@ public class GameModel implements BehaviorContext {
         public int getToRow() { return toRow; }
     }
 
-    /** Armed slides keyed by their zombie. */
-    private final Map<ZombieInstance, ArmedSlide> armedSlides = new HashMap<>();
-
-    /** Slides still gliding between lanes; presentation-only. */
-    private final List<LaneSlide> laneSlides = new ArrayList<>();
-    /** Read-only view of {@link #laneSlides} for the renderer. */
-    private final List<LaneSlide> laneSlidesView =
-            Collections.unmodifiableList(laneSlides);
-
-    /** Low-tide ambushes still surfacing; presentation-only. */
-    private final List<WaterEmerge> waterEmerges = new ArrayList<>();
-    /** Read-only view of {@link #waterEmerges} for the renderer. */
-    private final List<WaterEmerge> waterEmergesView =
-            Collections.unmodifiableList(waterEmerges);
-
     /**
      * Marks a freshly spawned ambush zombie as surfacing from the shallow
      * water; the view plays the Snorkel-style mask + ripple while it rises.
      */
     public void beginWaterEmerge(ZombieInstance zombie) {
-        if (zombie != null) {
-            waterEmerges.add(new WaterEmerge(zombie));
-        }
+        fx.beginWaterEmerge(zombie);
     }
 
     /** In-flight water emergences (read-only) for the view layer. */
     public List<WaterEmerge> getWaterEmerges() {
-        return waterEmergesView;
+        return fx.waterEmerges();
     }
 
     /** True while a low-tide ambush zombie is still surfacing. */
     public boolean isWaterEmerging(ZombieInstance zombie) {
-        if (zombie == null || waterEmerges.isEmpty()) {
-            return false;
-        }
-        for (WaterEmerge emerge : waterEmerges) {
-            if (emerge.getZombie() == zombie) {
-                return true;
-            }
-        }
-        return false;
+        return fx.isWaterEmerging(zombie);
     }
 
     @Override
     public void armLaneSlide(ZombieInstance zombie, Cell slideTile, int toRow) {
-        if (zombie == null || slideTile == null) {
-            return;
-        }
-        armedSlides.put(zombie,
-                new ArmedSlide(slideTile.getColumn(), slideTile.getRow(), toRow));
+        fx.armLaneSlide(zombie, slideTile, toRow);
     }
 
     /**
@@ -537,22 +411,7 @@ public class GameModel implements BehaviorContext {
      * @return true exactly when the slide fired this tick
      */
     public boolean tickArmedSlide(ZombieInstance zombie, float continuousX) {
-        if (zombie == null || zombie.isMovingBackward()) {
-            return false;
-        }
-        ArmedSlide armed = armedSlides.get(zombie);
-        if (armed == null || continuousX > armed.getTileColumn()) {
-            return false;
-        }
-        armedSlides.remove(zombie);
-        // Logical relocation happens here; the LaneSlide record below only
-        // drives the visual glide between the two lanes.
-        moveZombieToLane(zombie, armed.getToRow());
-        if (armed.getFromRow() != armed.getToRow()) {
-            laneSlides.add(new LaneSlide(zombie, armed.getFromRow(), armed.getToRow()));
-        }
-        slideStartCues.add(new Point(armed.getTileColumn(), armed.getFromRow()));
-        return true;
+        return fx.tickArmedSlide(this, zombie, continuousX);
     }
 
     /**
@@ -561,22 +420,17 @@ public class GameModel implements BehaviorContext {
      * when nothing slid.
      */
     public List<Point> drainSlideStarts() {
-        if (slideStartCues.isEmpty()) {
-            return List.of();
-        }
-        List<Point> drained = new ArrayList<>(slideStartCues);
-        slideStartCues.clear();
-        return drained;
+        return fx.drainSlideStarts();
     }
 
     /** Drops cues the view never consumed (TUI, skipped frames). */
     public void discardUnreadSlideStarts() {
-        slideStartCues.clear();
+        fx.discardUnreadSlideStarts();
     }
 
     /** In-flight slide glides (read-only) for the view layer. */
     public List<LaneSlide> getLaneSlides() {
-        return laneSlidesView;
+        return fx.laneSlides();
     }
 
     /**
@@ -617,15 +471,15 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public List<Sun> getActiveSuns() {
-        return activeSuns;
+        return entities.suns;
     }
 
     public List<PlantFoodPickup> getActivePlantFood() {
-        return activePlantFood;
+        return entities.plantFood;
     }
 
     public List<LootPickup> getActiveLootPickups() {
-        return activeLootPickups;
+        return entities.lootPickups;
     }
 
     public boolean isNightLevel() {
@@ -633,40 +487,22 @@ public class GameModel implements BehaviorContext {
     }
 
     public void addDiamonds(int amount) {
-        if (amount > 0) {
-            diamondCount += amount;
-            model.user.persistance.UserSync.addGems(amount);
-        }
+        loot.addDiamonds(amount);
     }
 
     public void addCoins(int amount) {
-        if (amount > 0) {
-            coinCount += amount;
-            model.user.persistance.UserSync.addCoins(amount);
-        }
+        loot.addCoins(amount);
     }
 
     public void addFlowerPots(int amount) {
-        if (amount > 0) {
-            flowerPotCount += amount;
-            User user = App.getInstance().getCurrentUser();
-            if (user != null && App.getInstance().getUserRepository() != null) {
-                // Unlock next pots on the server one-by-one (x,y from greenhouse layout).
-                for (int i = 0; i < amount; i++) {
-                    int potIndex = user.getUnlockedPots() + i;
-                    int x = potIndex % 4;
-                    int y = potIndex / 4;
-                    App.getInstance().getUserRepository().unlockGreenhousePot(user.getUsername(), x, y);
-                }
-            }
-        }
+        loot.addFlowerPots(amount);
     }
 
-    public int getDiamondCount() { return diamondCount; }
+    public int getDiamondCount() { return loot.diamonds(); }
 
-    public int getCoinCount() { return coinCount; }
+    public int getCoinCount() { return loot.coins(); }
 
-    public int getFlowerPotCount() { return flowerPotCount; }
+    public int getFlowerPotCount() { return loot.flowerPots(); }
 
     /**
      * @return true if the cell at {@code (row, col)} is a water tile.
@@ -686,30 +522,7 @@ public class GameModel implements BehaviorContext {
      *         occupied, or the cell's terrain strategy rejects the plant
      */
     public boolean placePlant(PlantInstance plant, int row, int col) {
-        if (plant == null) return false;
-        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
-            return false;
-        }
-        Cell cell = gameMap.getCell(col, row);
-        PlacableLayer targetLayer = plant.getLayer();
-        if (cell.getPlaceable(targetLayer) != null) {
-            return false;
-        }
-        if (targetLayer == PlacableLayer.MAIN) {
-            TerrainStrategy terrain = cell.getTerrainStrategy();
-            if (terrain != null && !terrain.canPlant(plant.getDefinition(), cell)) {
-                return false;
-            }
-        }
-        plant.setPosition(new Point(col, row));
-        boolean added = cell.addPlaceable(plant);
-        if (added) {
-            questStats.onPlantPlaced(this, plant.getDefinition(), row, col);
-        }
-        if (added && eventBus != null) {
-            eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_PLACED));
-        }
-        return added;
+        return combat.placePlant(plant, row, col);
     }
 
     @Override
@@ -737,39 +550,11 @@ public class GameModel implements BehaviorContext {
 
     /** Records a zombie type as seen for the collection; saves only on first sighting. */
     public void recordZombieSeen(String zombieName) {
-        questStats.onZombieSpawned(elapsedSeconds);
-        User user = App.getInstance().getCurrentUser();
-        if (user == null || zombieName == null) {
-            return;
-        }
-        Set<String> seen = user.getUnlockedZombies();
-        if (seen == null) {
-            seen = new HashSet<>();
-            user.setUnlockedZombies(seen);
-        }
-        if (seen.add(zombieName)) {
-            user.rememberNewsPublishDate(NewsFactory.zombieNewsId(zombieName));
-            if (App.getInstance().getUserRepository() != null) {
-                App.getInstance().getUserRepository().unlockZombie(user.getUsername(), zombieName);
-            }
-        }
+        spawns.recordZombieSeen(zombieName);
     }
 
     public void spawnZombie(Zombie zombie, int lane) {
-        ZombieInstance instance = ZombieFactory.createInstance(zombie);
-        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
-        recordZombieSeen(zombie.getName());
-        instance.setContinuousPosition(new FloatPoint(gameMap.getCols(), lane));
-        instance.setGridPosition(new Point(gameMap.getCols(), lane));
-        activeZombies.add(instance);
-        gameMap.addZombie(instance, gameMap.getCols(), lane);
-        if (myopointTracker != null) {
-            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
-        }
-        if (waveManager != null) {
-            waveManager.onWaveZombieSpawned(instance);
-        }
-        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
+        spawns.spawnZombie(zombie, lane);
     }
 
     /**
@@ -780,25 +565,7 @@ public class GameModel implements BehaviorContext {
      *         the outro fade
      */
     public ZombieInstance spawnZombieWithTornado(Zombie zombie, int lane, int columnsAhead) {
-        ZombieInstance instance = ZombieFactory.createInstance(zombie);
-        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
-        recordZombieSeen(zombie.getName());
-        int col = tornadoColumn(gameMap.getCols(), columnsAhead);
-        instance.setContinuousPosition(new FloatPoint(col, lane));
-        instance.setGridPosition(new Point(col, lane));
-        activeZombies.add(instance);
-        gameMap.addZombie(instance, col, lane);
-        if (myopointTracker != null) {
-            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
-        }
-        if (waveManager != null) {
-            waveManager.onWaveZombieSpawned(instance);
-        }
-        App.logToShell("[Sandstorm] A " + zombie.getName()
-                + " is carried in by a sandstorm and lands " + columnsAhead
-                + " column(s) ahead in lane " + (lane + 1) + "!");
-        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
-        return instance;
+        return spawns.spawnZombieWithTornado(zombie, lane, columnsAhead);
     }
 
     /** Touchdown column for a storm entry landing inside the right edge. */
@@ -813,12 +580,12 @@ public class GameModel implements BehaviorContext {
      * storm touches down.
      */
     public void queueSandstormSpawn(Zombie zombie, int lane, int columnsAhead) {
-        pendingSandstorms.add(new SandstormSpawn(this, zombie, lane, columnsAhead));
+        fx.queueSandstormSpawn(this, zombie, lane, columnsAhead);
     }
 
     /** In-flight sandstorms (read-only) for the view layer. */
     public List<SandstormSpawn> getSandstorms() {
-        return sandstormsView;
+        return fx.sandstorms();
     }
 
     /**
@@ -826,14 +593,12 @@ public class GameModel implements BehaviorContext {
      * (the frost damage itself is applied by the chapter effects system).
      */
     public void queueIceWindGust(int lane) {
-        if (lane >= 0) {
-            iceWinds.add(new IceWindGust(lane));
-        }
+        fx.queueIceWindGust(lane);
     }
 
     /** Active ice winds (read-only) for the view layer. */
     public List<IceWindGust> getIceWinds() {
-        return iceWindsView;
+        return fx.iceWinds();
     }
 
     /** Hook invoked by the wave manager when a new wave begins. */
@@ -858,74 +623,40 @@ public class GameModel implements BehaviorContext {
 
     /** Queue a center-screen sting (wave / necromancy / low tide). */
     public void enqueueAnnouncement(String text) {
-        if (text == null || text.isBlank()) {
-            return;
-        }
-        pendingAnnouncements.addLast(text);
+        fx.enqueueAnnouncement(text);
     }
 
     /** Next pending sting, or {@code null} if the queue is empty. */
     public String consumeWaveAnnouncement() {
-        return pendingAnnouncements.pollFirst();
+        return fx.consumeAnnouncement();
     }
 
     @Override
     public ZombieInstance spawnZombieAt(String zombieDefinitionName, int row, int col) {
-        ZombieInstance instance = ZombieFactory.createInstance(zombieDefinitionName);
-        if (instance == null) {
-            return null;
-        }
-        instance.setCurrentHP(Math.max(1, (int) (instance.getCurrentHP() * difficultyBoost())));
-        recordZombieSeen(instance.getDefinition() != null
-                ? instance.getDefinition().getName() : zombieDefinitionName);
-
-        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
-        int clampedCol = Math.max(0, Math.min(col, gameMap.getCols() - 1));
-
-        instance.setGridPosition(new Point(clampedCol, clampedRow));
-        instance.setContinuousPosition(new FloatPoint(clampedCol, clampedRow));
-        instance.setState(ZombieState.SPAWNING);
-
-        activeZombies.add(instance);
-        gameMap.addZombie(instance, clampedCol, clampedRow);
-        if (myopointTracker != null) {
-            myopointTracker.onZombieSpawned(instance, elapsedSeconds);
-        }
-        eventBus.dispatch(new GameEvent(GameEvent.Type.ZOMBIE_SPAWNED));
-
-        return instance;
+        return spawns.spawnZombieAt(zombieDefinitionName, row, col);
     }
 
     public void removeZombie(ZombieInstance zombie) {
-        activeZombies.remove(zombie);
-        gameMap.removeZombie(zombie);
-        if (waveManager != null) {
-            waveManager.onZombieRemoved(zombie);
-        }
+        spawns.removeZombie(zombie);
     }
 
     @Override
     public void orphanPushable(Pushable pushable) {
-        if (pushable == null || pushable.isDestroyed()) {
-            return;
-        }
-        if (!orphanedPushables.contains(pushable)) {
-            orphanedPushables.add(pushable);
-        }
+        entities.orphanPushable(pushable);
     }
 
     @Override
     public List<Pushable> getOrphanedPushables() {
-        return orphanedPushables;
+        return entities.orphanedPushables;
     }
 
     @Override
     public void removeOrphanedPushable(Pushable pushable) {
-        orphanedPushables.remove(pushable);
+        entities.orphanedPushables.remove(pushable);
     }
 
     public void spawnProjectile(Projectile projectile, int x, int y) {
-        activeProjectiles.add(projectile);
+        entities.projectiles.add(projectile);
         gameMap.addProjectile(projectile, x, y);
         eventBus.dispatch(new GameEvent(GameEvent.Type.PROJECTILE_FIRED));
     }
@@ -941,16 +672,16 @@ public class GameModel implements BehaviorContext {
     @Override
     public void removeProjectile(Projectile projectile) {
         if (projectile == null) return;
-        activeProjectiles.remove(projectile);
+        entities.projectiles.remove(projectile);
         gameMap.removeProjectile(projectile);
     }
 
     public void spawnSun(Sun sun) {
-        activeSuns.add(sun);
+        entities.suns.add(sun);
     }
 
     public void collectSun(Sun sun) {
-        activeSuns.remove(sun);
+        entities.suns.remove(sun);
         if (couchPlay) {
             addPlantSun(sun.getValue());
         } else {
@@ -961,7 +692,7 @@ public class GameModel implements BehaviorContext {
 
     public void spawnPlantFood(PlantFoodPickup pickup) {
         if (pickup != null) {
-            activePlantFood.add(pickup);
+            entities.plantFood.add(pickup);
         }
     }
 
@@ -969,19 +700,19 @@ public class GameModel implements BehaviorContext {
         if (pickup == null) {
             return;
         }
-        activePlantFood.remove(pickup);
+        entities.plantFood.remove(pickup);
         resources.addPlantFood();
     }
 
     public void spawnLootPickup(LootPickup pickup) {
         if (pickup != null) {
-            activeLootPickups.add(pickup);
+            entities.lootPickups.add(pickup);
         }
     }
 
     public void removeLootPickup(LootPickup pickup) {
         if (pickup != null) {
-            activeLootPickups.remove(pickup);
+            entities.lootPickups.remove(pickup);
         }
     }
 
@@ -1003,72 +734,8 @@ public class GameModel implements BehaviorContext {
         if (chapterEffects != null) {
             chapterEffects.tick(deltaTime);
         }
-        tickSandstorms(deltaTime);
-        tickIceWinds(deltaTime);
-        tickLaneSlides(deltaTime);
-        tickWaterEmerges(deltaTime);
-        if (!seedCooldowns.isEmpty()) {
-            Iterator<Map.Entry<String, Float>> it = seedCooldowns.entrySet().iterator();
-            while (it.hasNext()) {
-                Map.Entry<String, Float> e = it.next();
-                float remaining = e.getValue() - deltaTime;
-                if (remaining <= 0f) it.remove();
-                else e.setValue(remaining);
-            }
-        }
-    }
-
-    /** Advances in-flight sandstorms, spawning each zombie at touchdown. */
-    private void tickSandstorms(float deltaTime) {
-        if (pendingSandstorms.isEmpty()) {
-            return;
-        }
-        Iterator<SandstormSpawn> iterator = pendingSandstorms.iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next().tick(deltaTime)) {
-                iterator.remove();
-            }
-        }
-    }
-
-    /** Expires finished ice-wind gusts. */
-    private void tickIceWinds(float deltaTime) {
-        if (iceWinds.isEmpty()) {
-            return;
-        }
-        Iterator<IceWindGust> iterator = iceWinds.iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next().tick(deltaTime)) {
-                iterator.remove();
-            }
-        }
-    }
-
-    /** Expires finished lane glides and drops arms of dead zombies. */
-    private void tickLaneSlides(float deltaTime) {
-        armedSlides.keySet().removeIf(ZombieInstance::isDead);
-        if (laneSlides.isEmpty()) {
-            return;
-        }
-        Iterator<LaneSlide> iterator = laneSlides.iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next().tick(deltaTime)) {
-                iterator.remove();
-            }
-        }
-    }
-
-    /** Expires finished water emergences (and ones whose zombie is gone). */
-    private void tickWaterEmerges(float deltaTime) {
-        if (waterEmerges.isEmpty()) {
-            return;
-        }
-        Iterator<WaterEmerge> iterator = waterEmerges.iterator();
-        while (iterator.hasNext()) {
-            if (iterator.next().tick(deltaTime)) {
-                iterator.remove();
-            }
-        }
+        fx.tick(deltaTime);
+        seedCooldowns.tick(deltaTime);
     }
 
     public void setGameState(GameState gameState) {
@@ -1081,17 +748,16 @@ public class GameModel implements BehaviorContext {
 
     /** True once a zombie has walked into the player's house. */
     public boolean isHouseBreached() {
-        return houseBreached;
+        return breach.isHouseBreached();
     }
 
     public void markHouseBreached() {
-        this.houseBreached = true;
+        breach.markHouseBreached();
     }
 
     /** Marks a breach in a specific lane. In I, Zombie this is an eaten brain. */
     public void markHouseBreached(int row) {
-        this.houseBreached = true;
-        this.breachedRows.add(row);
+        breach.markHouseBreached(row);
     }
 
     /**
@@ -1099,7 +765,7 @@ public class GameModel implements BehaviorContext {
      * Does not pin a breaching zombie (those walk off the left afterward).
      */
     public void markBrainEaten(int row) {
-        this.breachedRows.add(row);
+        breach.markBrainEaten(row);
     }
 
     /**
@@ -1107,81 +773,58 @@ public class GameModel implements BehaviorContext {
      * Leaves continuous X where it is (past the lawn edge into the house).
      */
     public void applyHouseBreach(ZombieInstance zombie, int row) {
-        markHouseBreached(row);
-        setBreachingZombie(zombie);
-        if (zombie != null) {
-            if (zombie.getContinuousPosition() == null) {
-                zombie.setContinuousPosition(new FloatPoint(HOUSE_CHEW_X, row));
-            }
-            zombie.setState(ZombieState.EATING);
-        }
+        breach.applyHouseBreach(zombie, row);
     }
 
     /** Rows whose lane end has been breached at least once. */
     public Set<Integer> getBreachedRows() {
-        return breachedRows;
+        return breach.breachedRows();
     }
 
     /** Authoritative breach list from a networked snapshot. */
     public void syncBreachedRows(java.util.Collection<Integer> rows) {
-        breachedRows.clear();
-        if (rows != null) {
-            breachedRows.addAll(rows);
-        }
+        breach.syncBreachedRows(rows);
     }
 
     /** Replaces falling/collectible sun tokens for display sync. */
     public void replaceActiveSuns(List<Sun> suns) {
-        activeSuns.clear();
-        if (suns != null) {
-            activeSuns.addAll(suns);
-        }
+        entities.replaceSuns(suns);
     }
 
     /** Plant-side seed packet cooldowns from the authoritative server. */
     public void syncSeedCooldowns(java.util.Map<String, Float> cooldowns) {
-        seedCooldowns.clear();
-        if (cooldowns == null) {
-            return;
-        }
-        for (java.util.Map.Entry<String, Float> entry : cooldowns.entrySet()) {
-            if (entry.getKey() == null || entry.getValue() == null || entry.getValue() <= 0f) {
-                continue;
-            }
-            seedCooldowns.put(entry.getKey(), entry.getValue());
-        }
+        seedCooldowns.syncFromNetwork(cooldowns);
     }
 
     /** Zombie chewing at the house after a breach, or {@code null}. */
     public ZombieInstance getBreachingZombie() {
-        return breachingZombie;
+        return breach.breachingZombie();
     }
 
     public void setBreachingZombie(ZombieInstance zombie) {
-        this.breachingZombie = zombie;
+        breach.setBreachingZombie(zombie);
     }
 
     /** Continuous column of the last kill, or {@link Float#NaN} if none yet. */
     public float getLastZombieDeathX() {
-        return lastZombieDeathX;
+        return breach.lastDeathX();
     }
 
     /** Lane row of the last kill, or {@link Float#NaN} if none yet. */
     public float getLastZombieDeathY() {
-        return lastZombieDeathY;
+        return breach.lastDeathY();
     }
 
     public void recordLastZombieDeath(float continuousX, float row) {
-        this.lastZombieDeathX = continuousX;
-        this.lastZombieDeathY = row;
+        breach.recordLastDeath(continuousX, row);
     }
 
     public int getZombiesKilled() {
-        return zombiesKilled;
+        return breach.zombiesKilled();
     }
 
     public void incrementZombiesKilled() {
-        zombiesKilled++;
+        breach.incrementZombiesKilled();
     }
 
     /** Notifies the optional Myopoint scorer that a zombie has just died. */
@@ -1193,7 +836,7 @@ public class GameModel implements BehaviorContext {
 
     /** Records a kill with timing/position details for quest tracking. */
     public void recordZombieKilled(ZombieInstance zombie) {
-        zombiesKilled++;
+        breach.incrementZombiesKilled();
         questStats.onZombieKilled(zombie, elapsedSeconds, gameMap);
     }
 
@@ -1232,7 +875,7 @@ public class GameModel implements BehaviorContext {
 
     /** Number of plants that have died this level. */
     public int getPlantsLost() {
-        return plantsLost;
+        return breach.plantsLost();
     }
 
     /** Seconds of simulated time since the level started. */
@@ -1240,25 +883,12 @@ public class GameModel implements BehaviorContext {
         return elapsedSeconds;
     }
 
-    public void queueLootDrop(LootDrop loot) {
-        if (loot != null) {
-            pendingLootDrops.add(loot);
-            if (eventBus != null) {
-                eventBus.dispatch(new GameEvent(GameEvent.Type.LOOT_DROPPED));
-            }
-        }
+    public void queueLootDrop(LootDrop lootDrop) {
+        entities.queueLootDrop(lootDrop, this);
     }
 
     public void processLootDrops() {
-        if (pendingLootDrops.isEmpty()) return;
-        Iterator<LootDrop> iterator = pendingLootDrops.iterator();
-        while (iterator.hasNext()) {
-            LootDrop drop = iterator.next();
-            if (drop != null) {
-                drop.apply(this);
-            }
-            iterator.remove();
-        }
+        entities.processLootDrops(this);
     }
 
     public List<String> getSelectedPlants() {
@@ -1290,175 +920,68 @@ public class GameModel implements BehaviorContext {
     }
 
     public int getZombieCount() {
-        return activeZombies.size();
+        return entities.zombies.size();
     }
 
     // --- BehaviorContext implementation ---
 
     @Override
     public void removeSun(Sun sun) {
-        activeSuns.remove(sun);
+        entities.suns.remove(sun);
     }
 
     @Override
     public PlantInstance getPlantAt(int row, int col) {
-        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
-            return null;
-        }
-        return gameMap.getCell(col, row).getTopmostPlant();
+        return combat.getPlantAt(row, col);
     }
 
     public List<PlantInstance> getAllPlantsAt(int row, int col) {
-        if (row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
-            return Collections.emptyList();
-        }
-        return gameMap.getCell(col, row).getAllPlants();
+        return combat.getAllPlantsAt(row, col);
     }
 
     @Override
     public List<PlantInstance> getPlantsInLane(int lane) {
-        if (lane < 0 || lane >= gameMap.getRows()) {
-            return Collections.emptyList();
-        }
-        List<PlantInstance> plants = new ArrayList<>();
-        for (int col = 0; col < gameMap.getCols(); col++) {
-            plants.addAll(gameMap.getCell(col, lane).getAllPlants());
-        }
-        return plants;
+        return combat.getPlantsInLane(lane);
     }
 
     @Override
     public List<PlantInstance> getAllPlants() {
-        List<PlantInstance> plants = new ArrayList<>();
-        for (int row = 0; row < gameMap.getRows(); row++) {
-            for (int col = 0; col < gameMap.getCols(); col++) {
-                plants.addAll(gameMap.getCell(col, row).getAllPlants());
-            }
-        }
-        return plants;
+        return combat.getAllPlants();
     }
 
     @Override
     public void damagePlant(PlantInstance plant, int damage) {
-        if (plant == null || damage <= 0) return;
-
-        boolean wasAlive = plant.getCurrentHP() > 0;
-        plant.takeDamage(damage);
-        if (wasAlive && plant.getCurrentHP() == 0) {
-            plantsLost++;
-            hypnotiseHypnoShroomEaters(plant);
-        }
+        combat.damagePlant(plant, damage);
     }
 
     @Override
     public boolean movePlant(PlantInstance plant, int row, int col) {
-        if (plant == null || row < 0 || col < 0 || row >= gameMap.getRows() || col >= gameMap.getCols()) {
-            return false;
-        }
-
-        Point currentPos = plant.getPosition();
-        if (currentPos == null) {
-            return false;
-        }
-
-        Cell destinationCell = gameMap.getCell(col, row);
-        if (destinationCell.getPlaceable(plant.getLayer()) != null) {
-            return false;
-        }
-
-        Cell sourceCell = gameMap.getCell(currentPos.getX(), currentPos.getY());
-        sourceCell.removePlaceable(plant);
-        destinationCell.addPlaceable(plant);
-        plant.setPosition(new Point(col, row));
-        questStats.markRowColumnPlanted(row, col);
-        return true;
+        return combat.movePlant(plant, row, col);
     }
 
     @Override
     public void destroyPlant(PlantInstance plant) {
-        if (plant == null) return;
-
-        if (plant.getCurrentHP() > 0) {
-            plantsLost++;
-        }
-        hypnotiseHypnoShroomEaters(plant);
-        plant.setCurrentHP(0);
-        eventBus.dispatch(new GameEvent(GameEvent.Type.PLANT_DESTROYED));
+        combat.destroyPlant(plant);
     }
-
-    /**
-     * Hypno-shroom: the zombie that finished eating (or is standing on)
-     * this plant joins the player's side.
-     */
-    private void hypnotiseHypnoShroomEaters(PlantInstance plant) {
-        if (plant == null || !plant.isHypnoShroom() || activeZombies == null) {
-            return;
-        }
-        Point pos = plant.getPosition();
-        for (ZombieInstance zombie : activeZombies) {
-            if (zombie == null || zombie.isDead()) continue;
-            if (zombie.getEatingTarget() == plant) {
-                zombie.hypnotise();
-                continue;
-            }
-            if (pos != null
-                    && zombie.getGridY() == pos.getY()
-                    && zombie.getGridX() == pos.getX()
-                    && zombie.isEating()) {
-                zombie.hypnotise();
-            }
-        }
-    }
-
 
     @Override
     public List<ZombieInstance> getZombiesInLane(int lane) {
-        if (lane < 0 || lane >= gameMap.getRows()) {
-            return Collections.emptyList();
-        }
-        List<ZombieInstance> zombies = new ArrayList<>();
-        for (ZombieInstance zombie : activeZombies) {
-            if (zombie != null && !zombie.isDead() && zombie.occupiesLane(lane)) {
-                zombies.add(zombie);
-            }
-        }
-        return zombies;
+        return combat.getZombiesInLane(lane);
     }
 
     @Override
     public List<ZombieInstance> getZombiesInArea(int centerRow, int centerCol, int rowRadius, int colRadius) {
-        List<ZombieInstance> zombies = new ArrayList<>();
-        for (ZombieInstance zombie : activeZombies) {
-            if (zombie == null || zombie.isDead()) continue;
-            Point pos = zombie.getGridPosition();
-            if (pos == null) continue;
-
-            int colDiff = Math.abs(pos.getX() - centerCol);
-            if (colDiff > colRadius) {
-                continue;
-            }
-            for (int occupied : zombie.getOccupiedRows()) {
-                if (Math.abs(occupied - centerRow) <= rowRadius) {
-                    zombies.add(zombie);
-                    break;
-                }
-            }
-        }
-        return zombies;
+        return combat.getZombiesInArea(centerRow, centerCol, rowRadius, colRadius);
     }
 
     @Override
     public void damageZombie(ZombieInstance zombie, int damage) {
-        damageZombie(zombie, damage, null); // no source = non-plant damage
+        combat.damageZombie(zombie, damage, null);
     }
 
     /** Damage with kill attribution; null source marks non-plant damage (mower, zombies, cheats). */
     public void damageZombie(ZombieInstance zombie, int damage, Plant source) {
-        if (zombie == null || damage <= 0) return;
-
-        if (source != null) zombie.recordPlantDamage(source);
-        else zombie.recordNonPlantDamage();
-        zombie.takeDamage(damage);
+        combat.damageZombie(zombie, damage, source);
     }
 
     /** Attribution only, for damage applied outside damageZombie (fire/poison paths). */
@@ -1468,29 +991,7 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public boolean moveZombieToLane(ZombieInstance zombie, int newRow) {
-        if (zombie == null) return false;
-        if (newRow < 0 || newRow >= gameMap.getRows()) return false;
-
-        Point pos = zombie.getGridPosition();
-        if (pos == null) return false;
-        int oldRow = pos.getY();
-        int col = pos.getX();
-        if (oldRow == newRow) return true;
-
-        // Update grid registration
-        Cell oldCell = gameMap.getCell(col, oldRow);
-        if (oldCell != null) {
-            oldCell.removeZombie(zombie);
-        }
-        Cell newCell = gameMap.getCell(col, newRow);
-        if (newCell != null) {
-            newCell.addZombie(zombie);
-        }
-
-        // Update the zombie's own position
-        zombie.setGridPosition(new Point(col, newRow));
-        zombie.setContinuousPosition(new FloatPoint(zombie.getContinuousX(), newRow));
-        return true;
+        return combat.moveZombieToLane(zombie, newRow);
     }
 
     /**
@@ -1499,55 +1000,12 @@ public class GameModel implements BehaviorContext {
      * it is killed instantly.
      */
     public void pushZombieBack(ZombieInstance zombie, float tiles) {
-        if (zombie == null || zombie.isDead() || tiles <= 0) return;
-
-        FloatPoint pos = zombie.getContinuousPosition();
-        if (pos == null) return;
-
-        float newX = pos.getX() + tiles;
-
-        // Pushed off the right edge - kill the zombie instantly.
-        if (newX >= gameMap.getCols()) {
-            zombie.setCurrentHP(0);
-            zombie.setState(ZombieState.DEAD);
-            return;
-        }
-
-        zombie.setContinuousX(newX);
-
-        // Update grid column if the zombie crossed a tile boundary.
-        int newGridX = (int) Math.floor(newX);
-        Point gridPos = zombie.getGridPosition();
-        if (gridPos != null && newGridX != gridPos.getX()) {
-            int row = gridPos.getY();
-            int oldCol = gridPos.getX();
-
-            Cell oldCell = gameMap.getCell(oldCol, row);
-            if (oldCell != null) {
-                oldCell.removeZombie(zombie);
-            }
-            if (newGridX >= 0 && newGridX < gameMap.getCols()) {
-                Cell newCell = gameMap.getCell(newGridX, row);
-                if (newCell != null) {
-                    newCell.addZombie(zombie);
-                }
-            }
-            zombie.setGridX(newGridX);
-        }
+        combat.pushZombieBack(zombie, tiles);
     }
 
     @Override
     public List<Projectile> getProjectilesInLane(int lane) {
-        if (lane < 0 || lane >= gameMap.getRows()) {
-            return Collections.emptyList();
-        }
-        List<Projectile> inLane = new ArrayList<>();
-        for (Projectile projectile : activeProjectiles) {
-            if (projectile != null && projectile.getRow() == lane) {
-                inLane.add(projectile);
-            }
-        }
-        return inLane;
+        return combat.getProjectilesInLane(lane);
     }
 
     @Override
@@ -1570,85 +1028,40 @@ public class GameModel implements BehaviorContext {
 
     @Override
     public boolean spawnGraveAt(int row, int col) {
-        return spawnGraveAt(row, col, GraveType.PLAIN, null);
+        return combat.spawnGraveAt(row, col, GraveType.PLAIN, null);
     }
 
     @Override
     public boolean spawnGraveAt(int row, int col, ZombieInstance raiser) {
-        return spawnGraveAt(row, col, GraveType.PLAIN, raiser);
+        return combat.spawnGraveAt(row, col, GraveType.PLAIN, raiser);
     }
 
     public boolean spawnGraveAt(int row, int col, GraveType type) {
-        return spawnGraveAt(row, col, type, null);
+        return combat.spawnGraveAt(row, col, type, null);
     }
 
     public boolean spawnGraveAt(int row, int col, GraveType type, ZombieInstance raiser) {
-        Cell cell = getCellAt(row, col);
-        if (cell == null) {
-            return false;
-        }
-        if (cell.getPlaceable(PlacableLayer.GROUND) != null) {
-            return false;
-        }
-        if (!cell.getAllPlants().isEmpty()) {
-            return false;
-        }
-        Grave grave = new Grave(Grave.DEFAULT_HP, type);
-        grave.setRaiser(raiser);
-        boolean placed = cell.addPlaceable(grave);
-        if (placed) {
-            eventBus.dispatch(new GameEvent(GameEvent.Type.GRAVE_SPAWNED));
-            App.logToShell("[Grave] A " + (type == GraveType.PLAIN ? "plain" :
-                    type == GraveType.SUN ? "sun" : "plant-food")
-                    + " grave surfaced at (" + col + ", " + row + ").");
-        }
-        return placed;
+        return combat.spawnGraveAt(row, col, type, raiser);
     }
 
     @Override
     public int countGravesRaisedBy(ZombieInstance raiser) {
-        if (raiser == null || gameMap == null) {
-            return 0;
-        }
-        int n = 0;
-        int rows = gameMap.getRows();
-        int cols = gameMap.getCols();
-        for (int row = 0; row < rows; row++) {
-            for (int col = 0; col < cols; col++) {
-                Grave grave = getGraveAt(row, col);
-                if (grave != null && grave.getRaiser() == raiser && !grave.isDestroyed()) {
-                    n++;
-                }
-            }
-        }
-        return n;
+        return combat.countGravesRaisedBy(raiser);
     }
 
     public Grave getGraveAt(int row, int col) {
-        Cell cell = getCellAt(row, col);
-        if (cell == null) return null;
-        Placeable p = cell.getPlaceable(PlacableLayer.GROUND);
-        return (p instanceof Grave) ? (Grave) p : null;
+        return combat.getGraveAt(row, col);
     }
 
     public boolean removeGraveAt(int row, int col) {
-        Grave grave = getGraveAt(row, col);
-        if (grave == null) return false;
-        Cell cell = getCellAt(row, col);
-        cell.removePlaceable(grave);
-        return true;
+        return combat.removeGraveAt(row, col);
     }
 
     /**
      * Turns the cell into an unplantable crater.
      */
     public void createCraterAt(int row, int col) {
-        Cell cell = getCellAt(row, col);
-        if (cell == null) {
-            return;
-        }
-        cell.setGroundType(GroundType.CRATER);
-        cell.setTerrainStrategy(new CraterTerrainStrategy());
+        combat.createCraterAt(row, col);
     }
 
     /**
@@ -1656,59 +1069,23 @@ public class GameModel implements BehaviorContext {
      * strategy on that cell for {@code durationSeconds}.
      */
     public void igniteTile(int row, int col, float durationSeconds) {
-        Cell cell = getCellAt(row, col);
-        if (cell == null) {
-            return;
-        }
-        cell.setGroundType(GroundType.FIRE);
-        cell.setTerrainStrategy(new FireTerrainStrategy(durationSeconds));
+        combat.igniteTile(row, col, durationSeconds);
     }
 
     public void plantFrozenZombieAt(int row, int col, String zombieDefinitionName) {
-        Cell cell = getCellAt(row, col);
-        if (cell == null) {
-            return;
-        }
-        if (cell.getTerrainStrategy() instanceof IceTerrainStrategy) {
-            return;
-        }
-        PlantInstance plant = getPlantAt(row, col);
-        if (plant != null) {
-            destroyPlant(plant);
-        }
-        String name = zombieDefinitionName == null || zombieDefinitionName.isBlank()
-                ? "ZombieDefault"
-                : zombieDefinitionName;
-        ZombieInstance frozen = ZombieFactory.createInstance(name);
-        if (frozen != null) {
-            frozen.setGridPosition(new Point(col, row));
-            frozen.setContinuousPosition(new FloatPoint(col, row));
-        }
-        cell.setGroundType(GroundType.ICE);
-        cell.setTerrainStrategy(new IceTerrainStrategy(frozen));
+        combat.plantFrozenZombieAt(row, col, zombieDefinitionName);
     }
 
     /** @return the living Zomboss on the field, or {@code null}. */
     public ZombieInstance findZomboss() {
-        for (ZombieInstance zombie : activeZombies) {
-            if (zombie != null && !zombie.isDead()
-                    && zombie.hasBehavior(model.enums.ZombieBehaviorType.ZOMBOSS)) {
-                return zombie;
-            }
-        }
-        return null;
+        return combat.findZomboss();
     }
 
     // --- Terrain helpers ---
 
     /** Applies damage to an ice-terrain block at the given cell. */
     public void damageIceAt(int row, int col, int damage) {
-        if (damage <= 0) return;
-        Cell cell = getCellAt(row, col);
-        if (cell == null) return;
-        if (cell.getTerrainStrategy() instanceof IceTerrainStrategy) {
-            ((IceTerrainStrategy) cell.getTerrainStrategy()).takeDamage(damage);
-        }
+        combat.damageIceAt(row, col, damage);
     }
 
     /**
@@ -1716,12 +1093,7 @@ public class GameModel implements BehaviorContext {
      * centred on ({@code row}, {@code col}) with the given half-extents.
      */
     public void damageIceInArea(int row, int col, int rowRadius, int colRadius, int damage) {
-        if (damage <= 0) return;
-        for (int rowDist = -rowRadius; rowDist <= rowRadius; rowDist++) {
-            for (int colDist = -colRadius; colDist <= colRadius; colDist++) {
-                damageIceAt(row + rowDist, col + colDist, damage);
-            }
-        }
+        combat.damageIceInArea(row, col, rowRadius, colRadius, damage);
     }
 
     /**
@@ -1730,29 +1102,12 @@ public class GameModel implements BehaviorContext {
      * releases a zombie that was frozen inside at level-load time.
      */
     public void addExistingZombie(ZombieInstance zombie, int row, int col) {
-        if (zombie == null) return;
-        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
-        int clampedCol = Math.max(0, Math.min(col, gameMap.getCols() - 1));
-        zombie.setGridPosition(new Point(clampedCol, clampedRow));
-        if (zombie.getContinuousPosition() == null) {
-            zombie.setContinuousPosition(new FloatPoint(clampedCol, clampedRow));
-        }
-        if (!activeZombies.contains(zombie)) {
-            activeZombies.add(zombie);
-        }
-        Cell cell = gameMap.getCell(clampedCol, clampedRow);
-        if (cell != null && !cell.getZombies().contains(zombie)) {
-            cell.addZombie(zombie);
-        }
+        combat.addExistingZombie(zombie, row, col);
     }
 
     /** Removes a plant from the board immediately (no death FX bookkeeping). */
     public void removePlantFromBoard(PlantInstance plant) {
-        if (plant == null || plant.getPosition() == null || gameMap == null) return;
-        Cell cell = gameMap.getCell(plant.getPosition().getX(), plant.getPosition().getY());
-        if (cell != null) {
-            cell.removePlaceable(plant);
-        }
+        combat.removePlantFromBoard(plant);
     }
 
     /**
@@ -1762,38 +1117,6 @@ public class GameModel implements BehaviorContext {
      * poses stay off-grid and must not call {@link GameMap#getCell}.
      */
     public void syncZombieWorldPose(ZombieInstance zombie, int row, float continuousX, float continuousY) {
-        if (zombie == null || gameMap == null) return;
-        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
-        float y = continuousY;
-        if (Float.isNaN(y)) {
-            y = clampedRow;
-        }
-        zombie.setContinuousPosition(new FloatPoint(continuousX, y));
-
-        int newCol = (int) Math.floor(continuousX);
-        Point grid = zombie.getGridPosition();
-        int oldCol = grid != null ? grid.getX() : newCol;
-        int oldRow = grid != null ? grid.getY() : clampedRow;
-        if (oldCol != newCol || oldRow != clampedRow) {
-            if (inMapBounds(oldCol, oldRow)) {
-                Cell oldCell = gameMap.getCell(oldCol, oldRow);
-                if (oldCell != null) {
-                    oldCell.removeZombie(zombie);
-                }
-            }
-            if (inMapBounds(newCol, clampedRow)) {
-                Cell newCell = gameMap.getCell(newCol, clampedRow);
-                if (newCell != null) {
-                    newCell.addZombie(zombie);
-                }
-            }
-            zombie.setGridPosition(new Point(newCol, clampedRow));
-        } else if (grid == null) {
-            zombie.setGridPosition(new Point(newCol, clampedRow));
-        }
-    }
-
-    private boolean inMapBounds(int col, int row) {
-        return col >= 0 && row >= 0 && col < gameMap.getCols() && row < gameMap.getRows();
+        combat.syncZombieWorldPose(zombie, row, continuousX, continuousY);
     }
 }

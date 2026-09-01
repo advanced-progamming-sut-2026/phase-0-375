@@ -45,7 +45,9 @@ public class RegisterRequestPacket extends Packet {
     public void setGender(String gender) { this.gender = gender; }
 
     public int getSecurityQuestionNumber() { return securityQuestionNumber; }
-    public void setSecurityQuestionNumber(int securityQuestionNumber) { this.securityQuestionNumber = securityQuestionNumber; }
+    public void setSecurityQuestionNumber(int securityQuestionNumber) {
+        this.securityQuestionNumber = securityQuestionNumber;
+    }
 
     public String getSecurityAnswer() { return securityAnswer; }
     public void setSecurityAnswer(String securityAnswer) { this.securityAnswer = securityAnswer; }

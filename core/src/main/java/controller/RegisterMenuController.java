@@ -79,7 +79,8 @@ public class RegisterMenuController extends AppMenuController {
             return CommandResult.error("Cannot register: no response from server.");
         }
         if (!resp.isSuccess()) {
-            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Registration validation failed.");
+            return CommandResult.error(
+                    resp.getMessage() != null ? resp.getMessage() : "Registration validation failed.");
         }
 
         this.pendingUsername = validatePacket.getUsername();

@@ -34,48 +34,62 @@ public class FishBehavior implements ZombieBehavior {
         if (zombie == null || context == null || zombie.isDead()) {
             return;
         }
-
-        if (phase == FishPhase.INTRO) {
-            zombie.setState(ZombieState.SPAWNING);
-            phaseTimer += deltaTime;
-            if (phaseTimer >= INTRO_DURATION) {
-                phase = FishPhase.IDLE;
-                phaseTimer = 0f;
-                holdStation(zombie);
-            }
+        if (tickIntro(zombie, deltaTime)) {
             return;
         }
-
         holdStation(zombie);
-
-        if (phase == FishPhase.CASTING) {
-            phaseTimer += deltaTime;
-            if (!plantHooked && phaseTimer >= CAST_DURATION) {
-                plantHooked = true;
-                castHook(zombie, context);
-            }
-            if (phaseTimer >= CAST_DURATION + DELAY_BEFORE_REELING) {
-                phase = FishPhase.REELING;
-                phaseTimer = 0f;
-            }
+        if (tickCasting(zombie, context, deltaTime) || tickReeling(deltaTime)) {
             return;
         }
+        beginCastIfReady(zombie, context, deltaTime);
+    }
 
-        if (phase == FishPhase.REELING) {
-            phaseTimer += deltaTime;
-            if (phaseTimer >= REEL_DURATION) {
-                phase = FishPhase.IDLE;
-                phaseTimer = 0f;
-                castTimer = 0f;
-            }
-            return;
+    private boolean tickIntro(ZombieInstance zombie, float deltaTime) {
+        if (phase != FishPhase.INTRO) {
+            return false;
         }
+        zombie.setState(ZombieState.SPAWNING);
+        phaseTimer += deltaTime;
+        if (phaseTimer >= INTRO_DURATION) {
+            phase = FishPhase.IDLE;
+            phaseTimer = 0f;
+            holdStation(zombie);
+        }
+        return true;
+    }
 
+    private boolean tickCasting(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
+        if (phase != FishPhase.CASTING) {
+            return false;
+        }
+        phaseTimer += deltaTime;
+        if (!plantHooked && phaseTimer >= CAST_DURATION) {
+            plantHooked = true;
+            castHook(zombie, context);
+        }
+        if (phaseTimer >= CAST_DURATION + DELAY_BEFORE_REELING) {
+            phase = FishPhase.REELING;
+            phaseTimer = 0f;
+        }
+        return true;
+    }
+
+    private boolean tickReeling(float deltaTime) {
+        if (phase != FishPhase.REELING) {
+            return false;
+        }
+        phaseTimer += deltaTime;
+        if (phaseTimer >= REEL_DURATION) {
+            phase = FishPhase.IDLE;
+            phaseTimer = 0f;
+            castTimer = 0f;
+        }
+        return true;
+    }
+
+    private void beginCastIfReady(ZombieInstance zombie, BehaviorContext context, float deltaTime) {
         castTimer += deltaTime;
-        if (castTimer < delayBetween(zombie)) {
-            return;
-        }
-        if (findNearestPlantInLane(zombie, context) == null) {
+        if (castTimer < delayBetween(zombie) || findNearestPlantInLane(zombie, context) == null) {
             return;
         }
         castTimer = 0f;

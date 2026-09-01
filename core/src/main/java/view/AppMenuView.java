@@ -42,56 +42,71 @@ public class AppMenuView {
 
     public void run() {
         while (running) {
-            // Show the unread-news badge once when the user enters Main.
-            MenuType current = App.getInstance().getCurrentMenu();
-            if (current == MenuType.MAIN && previousMenu != MenuType.MAIN) {
-                mainMenuView().showNewsBadgeIfAny();
-            }
-            previousMenu = current;
-
+            showNewsBadgeIfEnteringMain();
             String rawCommand = readCommandLine();
-            if (rawCommand == null) break; // EOF or Ctrl-C
-            String command = rawCommand.trim();
-            // In TUI mode an empty submit just repaints; plain mode keeps
-            // the original "Empty command." behavior of each menu view.
-            try {
-                if (TuiShell.getActive() != null && command.isEmpty()) continue;
-            } catch (Exception e) {
-                System.out.println(e);
+            if (rawCommand == null) {
+                break;
             }
-
-            // Phase 1: universal commands (work in any menu)
-            if (CommonCommand.MENU_ENTER.matches(command)) {
-                String menuName = CommonCommand.MENU_ENTER.getParameter("menuName");
-                handleMenuEnter(menuName);
-                continue;
-            } else if (CommonCommand.MENU_EXIT.matches(command)) {
-                handleMenuExit();
-                continue;
-            } else if (CommonCommand.MENU_SHOW_CURRENT.matches(command)) {
-                handleMenuShowCurrent();
+            if (skipEmptyTuiCommand(rawCommand.trim())) {
                 continue;
             }
-
-            // Phase 2: delegate to current menu's specific handler
-            current = App.getInstance().getCurrentMenu();
-            switch (current) {
-                case MAIN -> mainMenuView().processInput(command);
-                case REGISTER -> registerMenuView().processInput(command);
-                case LOGIN -> loginMenuView().processInput(command);
-                case GAME -> gameMenuView().processInput(command);
-                case IN_GAME -> gameplayMenuView().processInput(command);
-                case NEWS -> newsMenuView().processInput(command);
-                case SHOP -> shopMenuView().processInput(command);
-                case PROFILE -> profileMenuView().processInput(command);
-                case SETTINGS -> settingsMenuView().processInput(command);
-                case COLLECTION -> collectionMenuView().processInput(command);
-                case PLANT_SELECTION -> plantSelectionMenuView().processInput(command);
-                case GREENHOUSE -> greenhouseMenuView().processInput(command);
-                case TRAVEL_LOG -> travelLogMenuVIew().processInput(command);
+            if (handleUniversalCommand(rawCommand.trim())) {
+                continue;
             }
+            dispatchCurrentMenu(rawCommand.trim());
         }
         scanner.close();
+    }
+
+    private void showNewsBadgeIfEnteringMain() {
+        MenuType current = App.getInstance().getCurrentMenu();
+        if (current == MenuType.MAIN && previousMenu != MenuType.MAIN) {
+            mainMenuView().showNewsBadgeIfAny();
+        }
+        previousMenu = current;
+    }
+
+    private boolean skipEmptyTuiCommand(String command) {
+        try {
+            return TuiShell.getActive() != null && command.isEmpty();
+        } catch (Exception e) {
+            System.out.println(e);
+            return false;
+        }
+    }
+
+    private boolean handleUniversalCommand(String command) {
+        if (CommonCommand.MENU_ENTER.matches(command)) {
+            handleMenuEnter(CommonCommand.MENU_ENTER.getParameter("menuName"));
+            return true;
+        }
+        if (CommonCommand.MENU_EXIT.matches(command)) {
+            handleMenuExit();
+            return true;
+        }
+        if (CommonCommand.MENU_SHOW_CURRENT.matches(command)) {
+            handleMenuShowCurrent();
+            return true;
+        }
+        return false;
+    }
+
+    private void dispatchCurrentMenu(String command) {
+        switch (App.getInstance().getCurrentMenu()) {
+            case MAIN -> mainMenuView().processInput(command);
+            case REGISTER -> registerMenuView().processInput(command);
+            case LOGIN -> loginMenuView().processInput(command);
+            case GAME -> gameMenuView().processInput(command);
+            case IN_GAME -> gameplayMenuView().processInput(command);
+            case NEWS -> newsMenuView().processInput(command);
+            case SHOP -> shopMenuView().processInput(command);
+            case PROFILE -> profileMenuView().processInput(command);
+            case SETTINGS -> settingsMenuView().processInput(command);
+            case COLLECTION -> collectionMenuView().processInput(command);
+            case PLANT_SELECTION -> plantSelectionMenuView().processInput(command);
+            case GREENHOUSE -> greenhouseMenuView().processInput(command);
+            case TRAVEL_LOG -> travelLogMenuVIew().processInput(command);
+        }
     }
 
     /**

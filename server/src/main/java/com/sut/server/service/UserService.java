@@ -2,10 +2,7 @@ package com.sut.server.service;
 
 import com.sut.server.net.ClientConnectionHandler;
 import com.sut.server.net.PacketRouter;
-import model.enums.Chapter;
-import model.enums.PurchaseResult;
 import model.network.enums.LeaderboardCategory;
-import model.network.enums.UserCommand;
 import model.network.packet.user.LeaderboardRequestPacket;
 import model.network.packet.user.LeaderboardResponsePacket;
 import model.network.packet.user.PasswordChangeRequestPacket;
@@ -19,7 +16,6 @@ import model.network.packet.user.ProfileUpdateResponsePacket;
 import model.network.packet.user.UserCommandRequestPacket;
 import model.network.packet.user.UserCommandResponsePacket;
 import model.network.util.UserSanitizer;
-import model.shop.Shop;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
@@ -43,6 +39,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AuthService authService;
     private final DailyOfferService dailyOfferService;
+    private final UserCommandApplier commandApplier;
 
     public UserService(UserRepository userRepository) {
         this(userRepository, null, null);
@@ -56,6 +53,7 @@ public class UserService {
         this.userRepository = Objects.requireNonNull(userRepository);
         this.authService = authService;
         this.dailyOfferService = dailyOfferService != null ? dailyOfferService : new DailyOfferService();
+        this.commandApplier = new UserCommandApplier(this.userRepository, this.dailyOfferService);
     }
 
     public void registerRoutes(PacketRouter router) {
@@ -97,54 +95,18 @@ public class UserService {
         if (packet == null) {
             return new ProfileUpdateResponsePacket(false, "Invalid request.", null);
         }
-
-        String oldUsername = user.getUsername();
-        String newUsername = packet.getUsername() != null ? packet.getUsername().trim() : null;
-        String newNickname = packet.getNickname() != null ? packet.getNickname().trim() : null;
-        String newEmail = packet.getEmail() != null ? packet.getEmail().trim() : null;
-
-        if (newUsername != null && !newUsername.isEmpty() && !newUsername.equals(oldUsername)) {
-            if (!USERNAME_PATTERN.matcher(newUsername).matches()) {
-                return new ProfileUpdateResponsePacket(false,
-                        "Invalid username. Only letters, numbers, and hyphens allowed.", null);
-            }
-            if (userRepository.existsByUsername(newUsername)) {
-                return new ProfileUpdateResponsePacket(false,
-                        "Username '" + newUsername + "' is already taken.", null);
-            }
-            // Delete under the old key before renaming the object.
-            userRepository.delete(user);
-            user.setUsername(newUsername);
-            if (connection != null) {
-                connection.setUsername(newUsername);
-            }
-            if (authService != null) {
-                authService.renameSession(oldUsername, newUsername, connection);
-            }
+        ProfileUpdateResponsePacket usernameErr = applyUsernameChange(user, connection, packet);
+        if (usernameErr != null) {
+            return usernameErr;
         }
-
-        if (newNickname != null && !newNickname.isEmpty()) {
-            if (newNickname.length() < 3 || newNickname.length() > 30) {
-                return new ProfileUpdateResponsePacket(false,
-                        "Nickname must be between 3 and 30 characters.", null);
-            }
-            user.setNickname(newNickname);
+        ProfileUpdateResponsePacket nickErr = applyNicknameChange(user, packet);
+        if (nickErr != null) {
+            return nickErr;
         }
-
-        if (newEmail != null && !newEmail.isEmpty()
-                && !newEmail.equalsIgnoreCase(user.getEmail() != null ? user.getEmail() : "")) {
-            String emailErr = validateEmailFormat(newEmail);
-            if (emailErr != null) {
-                return new ProfileUpdateResponsePacket(false, emailErr, null);
-            }
-            if (userRepository.existsByEmail(newEmail)) {
-                return new ProfileUpdateResponsePacket(false,
-                        "Email '" + newEmail + "' is already in use.", null);
-            }
-            user.setEmail(newEmail);
+        ProfileUpdateResponsePacket emailErr = applyEmailChange(user, packet);
+        if (emailErr != null) {
+            return emailErr;
         }
-
-        // Re-save (covers nickname/email and renamed username).
         userRepository.save(user);
         userRepository.flush();
         return new ProfileUpdateResponsePacket(true, "Profile updated.", UserSanitizer.sanitize(user));
@@ -221,9 +183,10 @@ public class UserService {
 
         String username = user.getUsername();
         try {
-            String err = applyCommand(username, packet);
+            String err = commandApplier.apply(username, packet);
             if (err != null) {
-                return UserCommandResponsePacket.fail(reqId, err.contains("INSUFFICIENT") ? "INSUFFICIENT_FUNDS" : "REJECTED", err);
+                String code = err.contains("INSUFFICIENT") ? "INSUFFICIENT_FUNDS" : "REJECTED";
+                return UserCommandResponsePacket.fail(reqId, code, err);
             }
             userRepository.flush();
             User fresh = userRepository.findByUsername(username).orElse(user);
@@ -232,7 +195,8 @@ public class UserService {
             }
             return UserCommandResponsePacket.ok(reqId, "OK", enrichDailyOffer(UserSanitizer.sanitize(fresh)));
         } catch (Exception e) {
-            return UserCommandResponsePacket.fail(reqId, "ERROR", e.getMessage() != null ? e.getMessage() : "Command failed.");
+            String msg = e.getMessage() != null ? e.getMessage() : "Command failed.";
+            return UserCommandResponsePacket.fail(reqId, "ERROR", msg);
         }
     }
 
@@ -270,123 +234,60 @@ public class UserService {
         return new LeaderboardResponsePacket(true, "OK", category, entries);
     }
 
-    private String applyCommand(String username, UserCommandRequestPacket packet) {
-        UserCommand cmd = packet.getCommand();
-        return switch (cmd) {
-            case ADD_COINS -> {
-                userRepository.addCoins(username, packet.argInt("amount", 0));
-                yield null;
-            }
-            case SPEND_COINS -> userRepository.spendCoins(username, packet.argInt("amount", 0))
-                    ? null : "INSUFFICIENT_FUNDS: not enough coins.";
-            case ADD_GEMS -> {
-                userRepository.addGems(username, packet.argInt("amount", 0));
-                yield null;
-            }
-            case SPEND_GEMS -> userRepository.spendGems(username, packet.argInt("amount", 0))
-                    ? null : "INSUFFICIENT_FUNDS: not enough gems.";
-            case UNLOCK_PLANT -> {
-                userRepository.unlockPlant(username, packet.arg("plantName"));
-                yield null;
-            }
-            case UNLOCK_ZOMBIE -> {
-                userRepository.unlockZombie(username, packet.arg("zombieName"));
-                yield null;
-            }
-            case UNLOCK_MINI_GAME -> {
-                userRepository.unlockMiniGame(username, packet.arg("miniGameId"));
-                yield null;
-            }
-            case UPDATE_CHAPTER_PROGRESS -> {
-                Chapter chapter = parseChapter(packet.arg("chapter"));
-                if (chapter == null) yield "Invalid chapter.";
-                userRepository.updateChapterProgress(username, chapter, packet.argInt("level", 0));
-                yield null;
-            }
-            case UPDATE_HIGHEST_MYOPOINT -> {
-                userRepository.updateHighestMyopoint(username, packet.argInt("myopoint", 0));
-                yield null;
-            }
-            case INCREMENT_GAMES_PLAYED -> {
-                userRepository.incrementGamesPlayed(username);
-                yield null;
-            }
-            case UPDATE_DIFFICULTY -> {
-                userRepository.updateDifficulty(username, packet.argInt("difficultyLevel", 3));
-                yield null;
-            }
-            case ADD_SEED_PACKETS -> {
-                userRepository.addSeedPackets(username, packet.arg("plantName"), packet.argInt("count", 0));
-                yield null;
-            }
-            case SPEND_SEED_PACKETS -> userRepository.spendSeedPackets(username, packet.arg("plantName"), packet.argInt("count", 0))
-                    ? null : "INSUFFICIENT_FUNDS: not enough seed packets.";
-            case ADD_PLANT_FOOD -> userRepository.addPlantFood(username) ? null : "Plant food at capacity.";
-            case USE_PLANT_FOOD -> userRepository.usePlantFood(username) ? null : "No plant food available.";
-            case STORE_PLANT_BOOST -> {
-                userRepository.storePlantBoost(username, packet.arg("plantName"));
-                yield null;
-            }
-            case CONSUME_PLANT_BOOST -> userRepository.consumePlantBoost(username, packet.arg("plantName"))
-                    ? null : "No plant boost available.";
-            case UNLOCK_GREENHOUSE_POT -> {
-                userRepository.unlockGreenhousePot(username, packet.argInt("x", 0), packet.argInt("y", 0));
-                yield null;
-            }
-            case PLANT_IN_GREENHOUSE -> {
-                userRepository.plantInGreenhouse(username, packet.argInt("x", 0), packet.argInt("y", 0),
-                        packet.arg("plantName"), packet.argLong("timestamp", System.currentTimeMillis()));
-                yield null;
-            }
-            case HARVEST_GREENHOUSE -> {
-                userRepository.harvestGreenhousePlant(username, packet.argInt("x", 0), packet.argInt("y", 0));
-                yield null;
-            }
-            case MARK_NEWS_READ -> {
-                userRepository.markNewsAsRead(username, packet.arg("newsId"));
-                yield null;
-            }
-            case COMPLETE_QUEST -> {
-                userRepository.completeQuest(username, packet.arg("questId"), packet.argBool("isDaily", false));
-                yield null;
-            }
-            case PURCHASE_DAILY_DEAL -> {
-                userRepository.purchaseDailyDeal(username, packet.arg("dealId"));
-                yield null;
-            }
-            case SET_SETTINGS -> applySettings(username, packet);
-            case GET_DAILY_OFFER -> null;
-            case SET_QUEST_PROGRESS -> applyQuestProgress(username, packet);
-            case PURCHASE_SHOP_ITEM -> applyShopPurchase(username, packet);
-            case SET_PLANT_LEVEL -> applyPlantLevel(username, packet);
-        };
-    }
-
-    private String applyPlantLevel(String username, UserCommandRequestPacket packet) {
-        Optional<User> opt = userRepository.findByUsername(username);
-        if (opt.isEmpty()) return "User not found.";
-        User u = opt.get();
-        String plantName = packet.arg("plantName");
-        if (plantName == null || plantName.isBlank()) return "Missing plantName.";
-        if (u.getPlantLevels() == null) {
-            u.setPlantLevels(new HashMap<>());
+    private ProfileUpdateResponsePacket applyUsernameChange(
+            User user, ClientConnectionHandler connection, ProfileUpdateRequestPacket packet) {
+        String oldUsername = user.getUsername();
+        String newUsername = packet.getUsername() != null ? packet.getUsername().trim() : null;
+        if (newUsername == null || newUsername.isEmpty() || newUsername.equals(oldUsername)) {
+            return null;
         }
-        u.getPlantLevels().put(plantName, packet.argInt("level", 1));
-        userRepository.save(u);
+        if (!USERNAME_PATTERN.matcher(newUsername).matches()) {
+            return new ProfileUpdateResponsePacket(false,
+                    "Invalid username. Only letters, numbers, and hyphens allowed.", null);
+        }
+        if (userRepository.existsByUsername(newUsername)) {
+            return new ProfileUpdateResponsePacket(false,
+                    "Username '" + newUsername + "' is already taken.", null);
+        }
+        userRepository.delete(user);
+        user.setUsername(newUsername);
+        if (connection != null) {
+            connection.setUsername(newUsername);
+        }
+        if (authService != null) {
+            authService.renameSession(oldUsername, newUsername, connection);
+        }
         return null;
     }
 
-    private String applySettings(String username, UserCommandRequestPacket packet) {
-        Optional<User> opt = userRepository.findByUsername(username);
-        if (opt.isEmpty()) return "User not found.";
-        User u = opt.get();
-        if (packet.arg("difficultyLevel") != null) u.setDifficultyLevel(packet.argInt("difficultyLevel", u.getDifficultyLevel()));
-        if (packet.arg("gameSpeed") != null) u.setGameSpeed(packet.argInt("gameSpeed", u.getGameSpeed()));
-        if (packet.arg("showLawnGrid") != null) u.setShowLawnGrid(packet.argBool("showLawnGrid", u.isShowLawnGrid()));
-        if (packet.arg("debugMode") != null) u.setDebugMode(packet.argBool("debugMode", u.isDebugMode()));
-        if (packet.arg("musicVolume") != null) u.setMusicVolume(packet.argFloat("musicVolume", u.getMusicVolume()));
-        if (packet.arg("sfxVolume") != null) u.setSfxVolume(packet.argFloat("sfxVolume", u.getSfxVolume()));
-        userRepository.save(u);
+    private ProfileUpdateResponsePacket applyNicknameChange(User user, ProfileUpdateRequestPacket packet) {
+        String newNickname = packet.getNickname() != null ? packet.getNickname().trim() : null;
+        if (newNickname == null || newNickname.isEmpty()) {
+            return null;
+        }
+        if (newNickname.length() < 3 || newNickname.length() > 30) {
+            return new ProfileUpdateResponsePacket(false,
+                    "Nickname must be between 3 and 30 characters.", null);
+        }
+        user.setNickname(newNickname);
+        return null;
+    }
+
+    private ProfileUpdateResponsePacket applyEmailChange(User user, ProfileUpdateRequestPacket packet) {
+        String newEmail = packet.getEmail() != null ? packet.getEmail().trim() : null;
+        String current = user.getEmail() != null ? user.getEmail() : "";
+        if (newEmail == null || newEmail.isEmpty() || newEmail.equalsIgnoreCase(current)) {
+            return null;
+        }
+        String emailErr = validateEmailFormat(newEmail);
+        if (emailErr != null) {
+            return new ProfileUpdateResponsePacket(false, emailErr, null);
+        }
+        if (userRepository.existsByEmail(newEmail)) {
+            return new ProfileUpdateResponsePacket(false,
+                    "Email '" + newEmail + "' is already in use.", null);
+        }
+        user.setEmail(newEmail);
         return null;
     }
 
@@ -400,43 +301,6 @@ public class UserService {
         return user;
     }
 
-    private String applyQuestProgress(String username, UserCommandRequestPacket packet) {
-        Optional<User> opt = userRepository.findByUsername(username);
-        if (opt.isEmpty()) return "User not found.";
-        User u = opt.get();
-        Map<String, Integer> progress = u.getQuestProgress();
-        if (progress == null) {
-            progress = new HashMap<>();
-            u.setQuestProgress(progress);
-        }
-        String questId = packet.arg("questId");
-        if (questId == null) return "Missing questId.";
-        progress.put(questId, packet.argInt("value", 0));
-        if (packet.arg("dailyQuestRefreshDate") != null) {
-            u.setDailyQuestRefreshDate(packet.arg("dailyQuestRefreshDate"));
-        }
-        userRepository.save(u);
-        return null;
-    }
-
-    private String applyShopPurchase(String username, UserCommandRequestPacket packet) {
-        Optional<User> opt = userRepository.findByUsername(username);
-        if (opt.isEmpty()) return "User not found.";
-        User u = opt.get();
-        DailyOfferService.Snapshot offer = dailyOfferService.getToday();
-        Shop shop = Shop.getInstance(u);
-        shop.refreshDailyOffer(offer.plant(), offer.date());
-        int itemId = packet.argInt("itemId", -1);
-        int count = packet.argInt("count", 1);
-        String plantType = packet.arg("plantType");
-        PurchaseResult result = shop.buy(itemId, count, plantType);
-        if (result != PurchaseResult.SUCCESS) {
-            return "Shop purchase failed: " + result.name();
-        }
-        userRepository.save(u);
-        return null;
-    }
-
     private User requireUser(ClientConnectionHandler connection) {
         if (connection == null || connection.getUsername() == null) {
             return null;
@@ -445,20 +309,6 @@ public class UserService {
             return connection.getUserProfile();
         }
         return userRepository.findByUsername(connection.getUsername()).orElse(null);
-    }
-
-    private static Chapter parseChapter(String name) {
-        if (name == null || name.isBlank()) return null;
-        try {
-            return Chapter.valueOf(name.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private static int sumChapterProgress(User u) {
-        if (u.getChapterProgress() == null) return 0;
-        return u.getChapterProgress().values().stream().mapToInt(Integer::intValue).sum();
     }
 
     private static String validatePasswordComplexity(String pw) {

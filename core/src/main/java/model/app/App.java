@@ -188,18 +188,27 @@ public class App {
         if (client == null || !client.isConnected() || currentUser == null) {
             return;
         }
-        String token = sessionToken;
-        if (token == null || token.isBlank()) {
-            var file = localSessionStore.load();
-            if (file.isEmpty()) {
-                return;
-            }
-            token = file.get().token;
-        }
+        String token = loadSessionToken();
         if (token == null || token.isBlank()) {
             return;
         }
+        LoginResponsePacket resp = sendSessionResume(client, token);
+        if (resp == null || !resp.isSuccess() || resp.getUserProfile() == null) {
+            return;
+        }
+        applyResumedUser(client, resp, token);
+    }
 
+    private String loadSessionToken() {
+        String token = sessionToken;
+        if (token != null && !token.isBlank()) {
+            return token;
+        }
+        var file = localSessionStore.load();
+        return file.isEmpty() ? null : file.get().token;
+    }
+
+    private LoginResponsePacket sendSessionResume(NetworkClient client, String token) {
         AtomicReference<LoginResponsePacket> responseRef = new AtomicReference<>(null);
         Consumer<LoginResponsePacket> handler = responseRef::set;
         boolean prevAutoPost = client.isAutoPostToGdx();
@@ -207,29 +216,33 @@ public class App {
         client.registerHandler(LoginResponsePacket.class, handler);
         try {
             if (!client.sendPacket(new SessionResumeRequestPacket(token))) {
-                return;
+                return null;
             }
-            long deadline = System.currentTimeMillis() + 3000;
-            while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
-                client.pollEvents();
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+            pollLogin(client, responseRef, 3000);
+            return responseRef.get();
         } catch (Exception ignored) {
-            return;
+            return null;
         } finally {
             client.unregisterHandler(LoginResponsePacket.class, handler);
             client.setAutoPostToGdx(prevAutoPost);
         }
+    }
 
-        LoginResponsePacket resp = responseRef.get();
-        if (resp == null || !resp.isSuccess() || resp.getUserProfile() == null) {
-            return;
+    private static void pollLogin(NetworkClient client,
+                                  AtomicReference<LoginResponsePacket> responseRef, long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
+            client.pollEvents();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
+    }
+
+    private void applyResumedUser(NetworkClient client, LoginResponsePacket resp, String token) {
         User serverUser = resp.getUserProfile();
         serverUser.setStayLoggedIn(true);
         setCurrentUser(serverUser);
@@ -238,71 +251,27 @@ public class App {
         setUserRepository(new model.user.persistance.RemoteUserRepository(client));
     }
 
-    /**
-     * Resumes a stay-logged-in session from the local token file (or in-memory token).
-     * Clears the local file on failure so the user is not stuck in a bad loop.
-     */
     public boolean reconnectStayLoggedInSession() {
-        String token = sessionToken;
-        if (token == null || token.isBlank()) {
-            var file = localSessionStore.load();
-            if (file.isEmpty()) {
-                return false;
-            }
-            token = file.get().token;
-        }
+        String token = loadSessionToken();
         if (isConnected() && currentUser != null) {
             return true;
         }
-
         NetworkClient client;
         try {
             client = ensureConnected();
         } catch (Exception e) {
             return false;
         }
-        if (client == null || !client.isConnected()) {
+        if (client == null || !client.isConnected() || token == null || token.isBlank()) {
             return false;
         }
-
-        AtomicReference<LoginResponsePacket> responseRef = new AtomicReference<>(null);
-        Consumer<LoginResponsePacket> handler = responseRef::set;
-        boolean prevAutoPost = client.isAutoPostToGdx();
-        client.setAutoPostToGdx(false);
-        client.registerHandler(LoginResponsePacket.class, handler);
-        try {
-            boolean sent = client.sendPacket(new SessionResumeRequestPacket(token));
-            if (!sent) {
-                return false;
-            }
-            long deadline = System.currentTimeMillis() + 3000;
-            while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
-                client.pollEvents();
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        } finally {
-            client.unregisterHandler(LoginResponsePacket.class, handler);
-            client.setAutoPostToGdx(prevAutoPost);
-        }
-
-        LoginResponsePacket resp = responseRef.get();
+        LoginResponsePacket resp = sendSessionResume(client, token);
         if (resp == null || !resp.isSuccess() || resp.getUserProfile() == null) {
             clearStayLoggedInToken();
             disconnectNetwork();
             return false;
         }
-
-        User serverUser = resp.getUserProfile();
-        serverUser.setStayLoggedIn(true);
-        setCurrentUser(serverUser);
-        String resumed = resp.getSessionToken() != null ? resp.getSessionToken() : token;
-        applyStayLoggedInToken(serverUser.getUsername(), resumed);
-        setUserRepository(new model.user.persistance.RemoteUserRepository(client));
+        applyResumedUser(client, resp, token);
         return true;
     }
 

@@ -11,7 +11,9 @@ import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Touchable;
-import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ProgressBar;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
@@ -20,7 +22,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
 import controller.CollectionMenuController;
@@ -39,14 +40,11 @@ import view.gui.audio.GameAudio;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.AlmanacArt;
-import view.gui.assets.AlmanacZombiePacketIds;
-import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SeedPacketIds;
 import view.gui.assets.SheetPacketPortraits;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
-import view.gui.anim.zombie.SunshineAnim;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.EdgeFadeOverlay;
@@ -146,8 +144,8 @@ public final class CollectionScreen extends AbstractMenuScreen {
     private static final float TAB_GAP = 10f;
 
     /** Native 768 almanac tab slot (ACTIVE is 80×106; DOWN is 80×80). */
-    private static final float TAB_SLOT_W = 80f;
-    private static final float TAB_SLOT_H = 106f;
+    private static final float TAB_SLOT_W = CollectionTabMarker.SLOT_W;
+    private static final float TAB_SLOT_H = CollectionTabMarker.SLOT_H;
     /** Added to default tab anchor (+X right, +Y up). */
     private static final float TAB_SHIFT_X = 40f;
     private static final float TAB_SHIFT_Y = 58f;
@@ -192,8 +190,8 @@ public final class CollectionScreen extends AbstractMenuScreen {
     private Table filterRow;
     private SelectBox<String> familyBox;
     private final Array<TextButton> statusButtons = new Array<>();
-    private TabMarker plantsTab;
-    private TabMarker zombiesTab;
+    private CollectionTabMarker plantsTab;
+    private CollectionTabMarker zombiesTab;
     private final ArrayList<String> visiblePlantNames = new ArrayList<>();
     private final ArrayList<String> visibleZombieNames = new ArrayList<>();
 
@@ -226,7 +224,20 @@ public final class CollectionScreen extends AbstractMenuScreen {
     protected void buildUi() {
         App.getInstance().setCurrentMenu(MenuType.COLLECTION);
         textures = game.assets.textures;
-        TextureBank t = textures;
+        loadAlmanacAtlases(textures);
+        float visibleH = UI_HEIGHT - TOP_RESERVE;
+        Table top = addResourceBar();
+        stage.addActor(buildBoardPanel(visibleH));
+        addTabs(visibleH);
+        AtlasImageButton close = addCloseButton();
+        top.toFront();
+        close.toFront();
+        plantsTab.toFront();
+        zombiesTab.toFront();
+        refreshGrid();
+    }
+
+    private void loadAlmanacAtlases(TextureBank t) {
         t.loadSync(AlmanacArt.ATLAS);
         t.loadSync(AlmanacArt.ATLAS_IMAGE);
         t.loadSync(AlmanacArt.ATLAS_SEED_PACKETS);
@@ -239,73 +250,66 @@ public final class CollectionScreen extends AbstractMenuScreen {
         t.loadSync(ShopArt.ATLAS_STORE);
         t.loadSync(AlmanacArt.ATLAS_STAT_ICONS);
         t.loadSync(AlmanacArt.ATLAS_GRADIENTS);
+    }
 
-        // Visible board height; panel itself is larger so L/R/bottom borders hang off-screen.
-        float visibleH = UI_HEIGHT - TOP_RESERVE;
-        float panelW = UI_WIDTH + FRAME_BLEED * 2f;
-        float panelH = visibleH + FRAME_BLEED;
-        float panelX = -FRAME_BLEED;
-        float panelY = -FRAME_BLEED;
-
+    private Table addResourceBar() {
         Table top = new Table();
         top.setFillParent(true);
         top.setTouchable(Touchable.childrenOnly);
         top.top().right();
-        resources = new ResourceBar(skin, t);
+        resources = new ResourceBar(skin, textures);
         top.add(resources).pad(EDGE);
         stage.addActor(top);
+        return top;
+    }
 
+    private Group buildBoardPanel(float visibleH) {
+        float panelW = UI_WIDTH + FRAME_BLEED * 2f;
+        float panelH = visibleH + FRAME_BLEED;
         Group panel = new Group();
         panel.setSize(panelW, panelH);
-        panel.setPosition(panelX, panelY);
-
+        panel.setPosition(-FRAME_BLEED, -FRAME_BLEED);
         BorderedTable frame = new BorderedTable();
         frame.setBounds(0f, 0f, panelW, panelH);
         panel.addActor(frame);
-
-        float innerW = panelW - FRAME * 2f;
-        float innerH = panelH - FRAME * 2f;
         boardGradient = verticalGradient(GRAD_TOP, GRAD_BOTTOM, 8);
-        // Only round the top corners (the ones that stay on-screen).
         RoundedRegionImage inside = new RoundedRegionImage(
-            new TextureRegion(boardGradient), CORNER, true, true, false, false);
-        inside.setBounds(FRAME, FRAME, innerW, innerH);
+                new TextureRegion(boardGradient), CORNER, true, true, false, false);
+        inside.setBounds(FRAME, FRAME, panelW - FRAME * 2f, panelH - FRAME * 2f);
         inside.setTouchable(Touchable.disabled);
         panel.addActor(inside);
+        panel.addActor(boardContent(visibleH));
+        return panel;
+    }
 
+    private Table boardContent(float visibleH) {
         Table content = new Table();
         content.pad(12f, 16f, 12f, 16f);
-
-        // Grid + status must exist before filterBar(): setChecked/SelectBox fire
-        // ChangeEvents that call refreshGrid during construction.
         grid = new Table();
         statusLabel = new Label("", skin, "medium");
         statusLabel.setColor(PLANT_META_INK);
         statusLabel.setAlignment(Align.right);
-
         filterRow = filterBar();
         content.add(filterRow).growX().height(FILTER_ROW_H).padBottom(8f).row();
-
         ScrollPane scroll = new ScrollPane(grid, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         content.add(scroll).grow().padBottom(8f).row();
         content.add(statusLabel).growX().right();
-
-        // Content fills the on-screen rect; top FRAME strip stays free for the brown rim.
         content.setBounds(FRAME_BLEED, FRAME_BLEED, UI_WIDTH, visibleH - FRAME);
-        panel.addActor(content);
-        stage.addActor(panel);
+        return content;
+    }
 
-        plantsTab = new TabMarker(
-            t.region(AlmanacArt.TAB_PLANT_ICON),
-            PLANT_ICON_W, PLANT_ICON_H, PLANT_ICON_X, PLANT_ICON_Y,
-            () -> setTab(Tab.PLANTS));
-        zombiesTab = new TabMarker(
-            t.region(AlmanacArt.TAB_ZOMBIE_ICON),
-            ZOMBIE_ICON_W, ZOMBIE_ICON_H, ZOMBIE_ICON_X, ZOMBIE_ICON_Y,
-            () -> setTab(Tab.ZOMBIES));
-        // Default: sit on the visible top rim; nudge with TAB_SHIFT_*.
+    private void addTabs(float visibleH) {
+        TextureBank t = textures;
+        plantsTab = new CollectionTabMarker(
+                t.region(AlmanacArt.TAB_PLANT_ICON),
+                PLANT_ICON_W, PLANT_ICON_H, PLANT_ICON_X, PLANT_ICON_Y,
+                () -> setTab(Tab.PLANTS));
+        zombiesTab = new CollectionTabMarker(
+                t.region(AlmanacArt.TAB_ZOMBIE_ICON),
+                ZOMBIE_ICON_W, ZOMBIE_ICON_H, ZOMBIE_ICON_X, ZOMBIE_ICON_Y,
+                () -> setTab(Tab.ZOMBIES));
         float tabX = EDGE + TAB_SHIFT_X;
         float tabY = visibleH - TAB_SLOT_H + 18f + TAB_SHIFT_Y;
         plantsTab.setPosition(tabX, tabY);
@@ -313,20 +317,17 @@ public final class CollectionScreen extends AbstractMenuScreen {
         stage.addActor(plantsTab);
         stage.addActor(zombiesTab);
         refreshTabs();
+    }
 
+    private AtlasImageButton addCloseButton() {
         AtlasImageButton close = new AtlasImageButton(
-            t.region(ShopArt.CLOSE), t.region(ShopArt.CLOSE_DOWN), CLOSE_SIZE, this::goBack);
+                textures.region(ShopArt.CLOSE), textures.region(ShopArt.CLOSE_DOWN),
+                CLOSE_SIZE, this::goBack);
         close.setPosition(
-            UI_WIDTH - EDGE - CLOSE_SIZE + CLOSE_SHIFT_X,
-            UI_HEIGHT - EDGE - CLOSE_SIZE + CLOSE_SHIFT_Y);
+                UI_WIDTH - EDGE - CLOSE_SIZE + CLOSE_SHIFT_X,
+                UI_HEIGHT - EDGE - CLOSE_SIZE + CLOSE_SHIFT_Y);
         stage.addActor(close);
-
-        top.toFront();
-        close.toFront();
-        plantsTab.toFront();
-        zombiesTab.toFront();
-
-        refreshGrid();
+        return close;
     }
 
     private Table filterBar() {
@@ -462,7 +463,6 @@ public final class CollectionScreen extends AbstractMenuScreen {
     }
 
     private void refreshPlantGrid(Collection col) {
-        TextureBank t = textures;
         List<Plant> plants = new ArrayList<>(col.getAllPlants());
         plants.sort(Comparator.comparing(Plant::getName, String.CASE_INSENSITIVE_ORDER));
         User user = App.getInstance().getCurrentUser();
@@ -477,61 +477,8 @@ public final class CollectionScreen extends AbstractMenuScreen {
             if (!passesFilter(col, user, plant)) {
                 continue;
             }
-            String name = plant.getName();
-            visiblePlantNames.add(name);
-            boolean owned = col.ownsPlant(name);
-            int level = col.getPlantLevel(name);
-            int have = seedCount(user, name);
-            int need = owned ? col.getUpgradeSeedCost(name) : 0;
-
-            Table cell = new Table();
-            cell.top();
-            SeedPacketActor packet = new SeedPacketActor(
-                t, skin, name, plant.getCost(), Math.max(1, level), false, !owned, false);
-            packet.onClick(() -> openPlantDetail(name));
-            applySheetPortraitIfNeeded(packet, name);
-            // Scale via wrapper so Table layout does not fight setScale.
-            Group packetSlot = new Group();
-            packetSlot.setSize(PACKET_W, PACKET_H);
-            packet.setTransform(true);
-            packet.setScale(PACKET_SCALE);
-            packetSlot.addActor(packet);
-            cell.add(packetSlot).size(PACKET_W, PACKET_H).row();
-
-            // secondary style is DarkBrown — override fontColor via PLANT_META_INK.
-            Label nameLabel = metaLabel(name, "secondary");
-            nameLabel.setAlignment(Align.center);
-            nameLabel.setWrap(true);
-            cell.add(nameLabel).width(PACKET_W + 8f).height(28f).padTop(2f).row();
-
-            Table meta = new Table();
-            meta.top();
-            if (!owned) {
-                Label locked = metaLabel("LOCKED", "secondary");
-                locked.setAlignment(Align.center);
-                meta.add(locked).width(PACKET_W + 4f).expandY().center();
-            } else {
-                boolean maxed = level >= Collection.MAX_PLANT_LEVEL;
-                Label levelLabel = metaLabel(
-                    maxed ? ("Lv " + level + "  MAX") : ("Lv " + level), "secondary");
-                levelLabel.setAlignment(Align.center);
-                meta.add(levelLabel).width(PACKET_W + 4f).row();
-
-                if (!maxed && need > 0) {
-                    meta.add(seedProgressBar(have, need))
-                        .width(PACKET_W)
-                        .height(SEED_BAR_H * SEED_BAR_SCALE)
-                        .padTop(SEED_BAR_PAD_TOP)
-                        .row();
-
-                    Label seedCountLabel = metaLabel(have + " / " + need, "secondary");
-                    seedCountLabel.setAlignment(Align.center);
-                    meta.add(seedCountLabel).width(PACKET_W + 4f).padTop(1f);
-                }
-            }
-            cell.add(meta).width(PACKET_W + 8f).height(PLANT_META_H).top();
-            // top() keeps packet art on one horizontal line across the row.
-            grid.add(cell).pad(5f).top();
+            visiblePlantNames.add(plant.getName());
+            grid.add(plantCell(col, user, plant)).pad(5f).top();
             shown++;
             colIndex++;
             if (colIndex >= GRID_COLS) {
@@ -547,8 +494,60 @@ public final class CollectionScreen extends AbstractMenuScreen {
         statusLabel.setText("Plants Collected: " + ownedCount + " of " + plants.size());
     }
 
+    private Table plantCell(Collection col, User user, Plant plant) {
+        String name = plant.getName();
+        boolean owned = col.ownsPlant(name);
+        int level = col.getPlantLevel(name);
+        int have = seedCount(user, name);
+        int need = owned ? col.getUpgradeSeedCost(name) : 0;
+        Table cell = new Table();
+        cell.top();
+        SeedPacketActor packet = new SeedPacketActor(
+                textures, skin, name, plant.getCost(), Math.max(1, level), false, !owned, false);
+        packet.onClick(() -> openPlantDetail(name));
+        applySheetPortraitIfNeeded(packet, name);
+        Group packetSlot = new Group();
+        packetSlot.setSize(PACKET_W, PACKET_H);
+        packet.setTransform(true);
+        packet.setScale(PACKET_SCALE);
+        packetSlot.addActor(packet);
+        cell.add(packetSlot).size(PACKET_W, PACKET_H).row();
+        Label nameLabel = metaLabel(name, "secondary");
+        nameLabel.setAlignment(Align.center);
+        nameLabel.setWrap(true);
+        cell.add(nameLabel).width(PACKET_W + 8f).height(28f).padTop(2f).row();
+        cell.add(plantMeta(owned, level, have, need)).width(PACKET_W + 8f).height(PLANT_META_H).top();
+        return cell;
+    }
+
+    private Table plantMeta(boolean owned, int level, int have, int need) {
+        Table meta = new Table();
+        meta.top();
+        if (!owned) {
+            Label locked = metaLabel("LOCKED", "secondary");
+            locked.setAlignment(Align.center);
+            meta.add(locked).width(PACKET_W + 4f).expandY().center();
+            return meta;
+        }
+        boolean maxed = level >= Collection.MAX_PLANT_LEVEL;
+        Label levelLabel = metaLabel(
+                maxed ? ("Lv " + level + "  MAX") : ("Lv " + level), "secondary");
+        levelLabel.setAlignment(Align.center);
+        meta.add(levelLabel).width(PACKET_W + 4f).row();
+        if (!maxed && need > 0) {
+            meta.add(seedProgressBar(have, need))
+                    .width(PACKET_W)
+                    .height(SEED_BAR_H * SEED_BAR_SCALE)
+                    .padTop(SEED_BAR_PAD_TOP)
+                    .row();
+            Label seedCountLabel = metaLabel(have + " / " + need, "secondary");
+            seedCountLabel.setAlignment(Align.center);
+            meta.add(seedCountLabel).width(PACKET_W + 4f).padTop(1f);
+        }
+        return meta;
+    }
+
     private void refreshZombieGrid(Collection col) {
-        TextureBank t = textures;
         visibleZombieNames.clear();
         List<Zombie> zombies = new ArrayList<>(col.getAllZombies());
         zombies.sort(Comparator.comparing(Zombie::getName, String.CASE_INSENSITIVE_ORDER));
@@ -561,39 +560,9 @@ public final class CollectionScreen extends AbstractMenuScreen {
             if (seen) {
                 discovered++;
             }
-            Table cell = new Table();
-            cell.setTouchable(Touchable.enabled);
-            ZombieAlmanacPacket packet = new ZombieAlmanacPacket(t, ZOMBIE_PACKET_W, ZOMBIE_PACKET_H)
-                .show(name, seen);
-            if (seen) {
-                applyZombieSheetPortraitIfNeeded(packet, name);
-            }
-            cell.add(packet).size(ZOMBIE_PACKET_W, ZOMBIE_PACKET_H).row();
-            Label meta = metaLabel(seen ? shortName(name) : "???", "secondary");
-            meta.setAlignment(Align.center);
-            cell.add(meta).width(ZOMBIE_PACKET_W + 4f).padTop(2f);
-            cell.addListener(new InputListener() {
-                @Override
-                public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                    packet.setPressed(true);
-                    return true;
-                }
-
-                @Override
-                public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                    packet.setPressed(false);
-                    if (x >= 0f && x <= cell.getWidth() && y >= 0f && y <= cell.getHeight()) {
-                        openZombieDetail(name);
-                    }
-                }
-
-                @Override
-                public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
-                    packet.setPressed(false);
-                }
-            });
-            grid.add(cell).padLeft(ZOMBIE_CELL_PAD).padRight(ZOMBIE_CELL_PAD)
-                .padTop(ZOMBIE_ROW_PAD).padBottom(ZOMBIE_ROW_PAD);
+            grid.add(zombieCell(name, seen))
+                    .padLeft(ZOMBIE_CELL_PAD).padRight(ZOMBIE_CELL_PAD)
+                    .padTop(ZOMBIE_ROW_PAD).padBottom(ZOMBIE_ROW_PAD);
             colIndex++;
             if (colIndex >= ZOMBIE_GRID_COLS) {
                 grid.row();
@@ -601,6 +570,45 @@ public final class CollectionScreen extends AbstractMenuScreen {
             }
         }
         statusLabel.setText("Zombies Discovered: " + discovered + " of " + zombies.size());
+    }
+
+    private Table zombieCell(String name, boolean seen) {
+        Table cell = new Table();
+        cell.setTouchable(Touchable.enabled);
+        ZombieAlmanacPacket packet = new ZombieAlmanacPacket(textures, ZOMBIE_PACKET_W, ZOMBIE_PACKET_H)
+                .show(name, seen);
+        if (seen) {
+            CollectionZombiePortraits.applyIfNeeded(packet, name, textures, game.assets, sheetClips);
+        }
+        cell.add(packet).size(ZOMBIE_PACKET_W, ZOMBIE_PACKET_H).row();
+        Label meta = metaLabel(seen ? shortName(name) : "???", "secondary");
+        meta.setAlignment(Align.center);
+        cell.add(meta).width(ZOMBIE_PACKET_W + 4f).padTop(2f);
+        cell.addListener(zombiePressListener(cell, packet, name));
+        return cell;
+    }
+
+    private InputListener zombiePressListener(Table cell, ZombieAlmanacPacket packet, String name) {
+        return new InputListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                packet.setPressed(true);
+                return true;
+            }
+
+            @Override
+            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                packet.setPressed(false);
+                if (x >= 0f && x <= cell.getWidth() && y >= 0f && y <= cell.getHeight()) {
+                    openZombieDetail(name);
+                }
+            }
+
+            @Override
+            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
+                packet.setPressed(false);
+            }
+        };
     }
 
     private void openPlantDetail(String name) {
@@ -677,46 +685,6 @@ public final class CollectionScreen extends AbstractMenuScreen {
 
     private void applySheetPortraitIfNeeded(SeedPacketActor packet, String plantName) {
         SheetPacketPortraits.applyIfNeeded(packet, plantName, game.assets, sheetClips);
-    }
-
-    private void applyZombieSheetPortraitIfNeeded(ZombieAlmanacPacket packet, String zombieName) {
-        if (packet == null || zombieName == null || textures == null) {
-            return;
-        }
-        String atlasId = AlmanacZombiePacketIds.portraitId(zombieName);
-        if (atlasId != null && textures.region(atlasId) != null) {
-            return;
-        }
-        PvzAssets assets = game.assets;
-        if (assets == null || assets.plantSheets == null || sheetClips == null) {
-            return;
-        }
-        PlantSpritesheetCatalog.ClipSpec spec = assets.plantSheets.idleFallback(zombieName);
-        if (spec == null) {
-            return;
-        }
-        SpritesheetClipCache.SheetAnim sheet = sheetClips.getOrLoad(spec);
-        if (sheet == null || sheet.animation() == null) {
-            return;
-        }
-        TextureRegion frame = sheet.animation().getKeyFrame(0f);
-        if (SunshineAnim.isSunshineName(zombieName)) {
-            TextureRegion upright = SunshineAnim.packetPortraitFrame(sheet.animation());
-            if (upright != null) {
-                frame = upright;
-            }
-        }
-        if (frame == null) {
-            return;
-        }
-        if (SunshineAnim.isSunshineName(zombieName)) {
-            packet.setPortraitOverride(frame,
-                    CollectionEntryOverlay.SUNSHINE_PACKET_PORTRAIT_SCALE,
-                    CollectionEntryOverlay.SUNSHINE_PACKET_PORTRAIT_OFFSET_X,
-                    CollectionEntryOverlay.SUNSHINE_PACKET_PORTRAIT_OFFSET_Y);
-        } else {
-            packet.setPortraitOverride(frame);
-        }
     }
 
     private static int seedCount(User user, String plant) {
@@ -799,43 +767,4 @@ public final class CollectionScreen extends AbstractMenuScreen {
         super.dispose();
     }
 
-    /**
-     * Fixed-size tab slot. Face is top-aligned so ACTIVE (pointed) vs DOWN (flat)
-     * never shifts the marker; icon sits on the colored fill.
-     */
-    private static final class TabMarker extends Group {
-        private final Image face = new Image();
-        private final Image icon = new Image();
-
-        TabMarker(TextureRegion iconRegion, float iconW, float iconH,
-                  float iconX, float iconY, Runnable action) {
-            setSize(TAB_SLOT_W, TAB_SLOT_H);
-            face.setTouchable(Touchable.disabled);
-            icon.setTouchable(Touchable.disabled);
-            addActor(face);
-            if (iconRegion != null) {
-                icon.setDrawable(new TextureRegionDrawable(iconRegion));
-                icon.setSize(iconW, iconH);
-                icon.setPosition(iconX, iconY);
-                addActor(icon);
-            }
-            addListener(new ClickListener() {
-                @Override public void clicked(InputEvent event, float x, float y) {
-                    if (action != null) {
-                        action.run();
-                    }
-                }
-            });
-        }
-
-        void setFace(TextureRegion region) {
-            if (region == null) {
-                return;
-            }
-            face.setDrawable(new TextureRegionDrawable(region));
-            face.setSize(region.getRegionWidth(), region.getRegionHeight());
-            // Top-align inside the fixed slot so height changes only grow downward.
-            face.setPosition(0f, TAB_SLOT_H - face.getHeight());
-        }
-    }
 }

@@ -37,12 +37,11 @@ public class InviteReceivedOverlay extends Table {
     private static Texture whitePixelTex;
 
     private final PvzGdxGame game;
-    private final Skin skin;
     private final NetworkClient networkClient;
     private final InviteReceivedPacket invitePacket;
     private final Runnable onDismissCallback;
 
-    private final Label timerLabel;
+    private Label timerLabel;
     private float remainingSeconds;
     private boolean decisionMade = false;
     private boolean accepted = false;
@@ -58,28 +57,28 @@ public class InviteReceivedOverlay extends Table {
             Runnable onDismissCallback
     ) {
         this.game = game;
-        this.skin = skin;
         this.networkClient = networkClient;
         this.invitePacket = invitePacket;
         this.onDismissCallback = onDismissCallback;
         this.remainingSeconds = invitePacket != null && invitePacket.getTimeoutSeconds() > 0
                 ? invitePacket.getTimeoutSeconds() : 10.0f;
-
         setFillParent(true);
         setName(AbstractMenuScreen.OVERLAY_NAME);
         setBackground(new TextureRegionDrawable(getWhitePixel()).tint(new Color(0f, 0f, 0f, 0.65f)));
+        setUserObject((Runnable) () -> triggerDecline(InviteDecision.DECLINE));
+        add(buildCard(skin)).width(540f).pad(20f);
+        setupNetworkListeners();
+        getColor().a = 0f;
+        addAction(Actions.fadeIn(FADE_IN));
+    }
 
-        Runnable closer = () -> triggerDecline(InviteDecision.DECLINE);
-        setUserObject(closer);
-
+    private BorderedTable buildCard(Skin skin) {
         BorderedTable card = new BorderedTable();
         card.pad(24f);
-
         Label title = new Label("GAME INVITE RECEIVED!", skin, "big");
         title.setColor(Color.BLACK);
         title.setAlignment(Align.center);
         card.add(title).colspan(2).padBottom(14f).row();
-
         String inviter = (invitePacket != null && invitePacket.getInviterUsername() != null)
                 ? invitePacket.getInviterUsername() : "A player";
         Label body = new Label(inviter + " invites you to a 1v1 I, Zombie match!", skin, "medium");
@@ -87,12 +86,16 @@ public class InviteReceivedOverlay extends Table {
         body.setWrap(true);
         body.setAlignment(Align.center);
         card.add(body).colspan(2).width(460f).padBottom(16f).row();
-
-        timerLabel = new Label("Auto-decline in: " + (int) Math.ceil(remainingSeconds) + "s", skin, "secondary");
+        timerLabel = new Label("Auto-decline in: " + (int) Math.ceil(remainingSeconds) + "s",
+                skin, "secondary");
         timerLabel.setColor(new Color(0.85f, 0.35f, 0.1f, 1f));
         timerLabel.setAlignment(Align.center);
         card.add(timerLabel).colspan(2).padBottom(20f).row();
+        card.add(actionButtons(skin)).colspan(2).row();
+        return card;
+    }
 
+    private Table actionButtons(Skin skin) {
         Table actions = new Table();
         TextButton declineBtn = new TextButton("DECLINE", skin, "brown");
         declineBtn.addListener(new ChangeListener() {
@@ -102,7 +105,6 @@ public class InviteReceivedOverlay extends Table {
             }
         });
         actions.add(declineBtn).width(160f).height(52f).padRight(16f);
-
         TextButton acceptBtn = new TextButton("ACCEPT", skin, "green");
         acceptBtn.addListener(new ChangeListener() {
             @Override
@@ -111,14 +113,7 @@ public class InviteReceivedOverlay extends Table {
             }
         });
         actions.add(acceptBtn).width(160f).height(52f);
-        card.add(actions).colspan(2).row();
-
-        add(card).width(540f).pad(20f);
-
-        setupNetworkListeners();
-
-        getColor().a = 0f;
-        addAction(Actions.fadeIn(FADE_IN));
+        return actions;
     }
 
     private void setupNetworkListeners() {

@@ -163,8 +163,4 @@ public final class TideState {
     private static long key(int row, int col) {
         return ((long) row << 32) | (col & 0xFFFFFFFFL);
     }
-
-    private static int colOf(long key) {
-        return (int) key;
-    }
 }

@@ -33,6 +33,14 @@ public final class ZombieFootfallCurve {
         if (player == null || clip == null || trackParts == null || trackParts.length == 0) {
             return LINEAR;
         }
+        float[] x = sampleTrackCenters(player, clip, trackParts);
+        if (x == null) {
+            return LINEAR;
+        }
+        return fromCenters(x);
+    }
+
+    private static float[] sampleTrackCenters(PamPlayer player, ClipRef clip, String[] trackParts) {
         Rectangle[][] byPart = new Rectangle[trackParts.length][];
         int frames = 0;
         for (int p = 0; p < trackParts.length; p++) {
@@ -40,9 +48,8 @@ public final class ZombieFootfallCurve {
             frames = Math.max(frames, byPart[p].length);
         }
         if (frames < 2) {
-            return LINEAR;
+            return null;
         }
-
         float[] x = new float[frames];
         for (int i = 0; i < frames; i++) {
             float min = Float.MAX_VALUE;
@@ -56,14 +63,15 @@ public final class ZombieFootfallCurve {
                 max = Math.max(max, r.x + r.width);
             }
             if (min > max) {
-                return LINEAR;
+                return null;
             }
             x[i] = (min + max) * 0.5f;
         }
+        return x;
+    }
 
-        // The swatch spends most of the cycle planted and snaps back through the air, so the
-        // direction it moves in on more frames is the stance. Air frames go backwards and clamp
-        // to zero, which also keeps progress from ever running backwards.
+    private static ZombieFootfallCurve fromCenters(float[] x) {
+        int frames = x.length;
         float[] step = new float[frames];
         int forward = 0;
         int backward = 0;
@@ -76,7 +84,6 @@ public final class ZombieFootfallCurve {
             }
         }
         float stance = forward >= backward ? 1f : -1f;
-
         float[] progress = new float[frames + 1];
         for (int i = 0; i < frames; i++) {
             progress[i + 1] = progress[i] + Math.max(0f, stance * step[i]);

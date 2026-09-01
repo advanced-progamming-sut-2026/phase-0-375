@@ -21,7 +21,6 @@ public final class ZombieAlmanacPacket extends Stack {
     private final Image baseReady;
     private final Image baseSelected;
     private final Image portrait;
-    private boolean portraitOverride;
 
     public ZombieAlmanacPacket(TextureBank textures, float width, float height) {
         this.textures = textures;
@@ -40,7 +39,6 @@ public final class ZombieAlmanacPacket extends Stack {
     }
 
     public ZombieAlmanacPacket show(String zombieName, boolean discovered) {
-        portraitOverride = false;
         portrait.setFillParent(true);
         portrait.setScaling(Scaling.fit);
         if (!discovered) {
@@ -85,7 +83,6 @@ public final class ZombieAlmanacPacket extends Stack {
                 (packetW - pw) * 0.5f + offsetX,
                 Math.max(2f, (packetH - ph) * 0.5f) + offsetY);
         portrait.setVisible(true);
-        portraitOverride = true;
     }
 
     /** Swaps READY / SELECTED background while pointer is held. */

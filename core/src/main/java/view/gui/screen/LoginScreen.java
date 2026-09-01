@@ -28,7 +28,6 @@ import view.gui.audio.GameAudio;
 import view.gui.audio.MusicTracks;
 import view.gui.ui.CollectionEntryOverlay;
 import view.gui.ui.ModalCard;
-import view.gui.ui.SkinFonts;
 import view.gui.ui.UiMotion;
 
 /**
@@ -48,12 +47,6 @@ public final class LoginScreen extends AbstractMenuScreen {
     private TextField password;
     private CheckBox stayLoggedIn;
 
-    // Forgot-password modal state
-    private int resetStep; // 0 idle, 1 answer, 2 new password
-    private Label resetPrompt;
-    private TextField resetField;
-    private TextButton resetAction;
-
     public LoginScreen(PvzGdxGame game) {
         super(game);
     }
@@ -69,16 +62,32 @@ public final class LoginScreen extends AbstractMenuScreen {
     @Override
     protected void buildUi() {
         App.getInstance().setCurrentMenu(MenuType.LOGIN);
-
         addBackground();
         addLogo();
+        BorderedTable card = loginCard();
+        Table root = new Table();
+        root.setFillParent(true);
+        root.add(card).width(520f).padTop(40f);
+        stage.addActor(root);
+    }
 
+    private BorderedTable loginCard() {
         BorderedTable card = new BorderedTable();
         card.pad(44f, 48f, 44f, 48f);
         Label title = new Label("Login", skin, "big");
         title.setColor(CollectionEntryOverlay.INK);
         card.add(title).padBottom(18f).row();
+        addCredentialFields(card);
+        card.add(actionButton("Login", "purple", this::submitLogin))
+                .width(260f).height(52f).padBottom(8f).row();
+        card.add(actionButton("Forgot password", "brown", this::openForgotModal))
+                .width(260f).height(48f).padBottom(8f).row();
+        card.add(actionButton("Create account", "brown", this::goRegister))
+                .width(260f).height(48f);
+        return card;
+    }
 
+    private void addCredentialFields(BorderedTable card) {
         username = new TextField("", skin);
         username.setMessageText("Username");
         password = new TextField("", skin);
@@ -87,49 +96,29 @@ public final class LoginScreen extends AbstractMenuScreen {
         password.setPasswordCharacter('*');
         stayLoggedIn = new CheckBox(" Stay logged in", skin);
         stayLoggedIn.getLabel().setColor(CollectionEntryOverlay.MUTED);
-
         card.add(username).width(360f).height(40f).padBottom(10f).row();
         card.add(password).width(360f).height(40f).padBottom(10f).row();
         card.add(stayLoggedIn).left().padBottom(16f).row();
+    }
 
-        TextButton login = new TextButton("Login", skin, "purple");
-        UiMotion.bindPressScale(login);
-        login.addListener(new ChangeListener() {
+    private TextButton actionButton(String text, String style, Runnable action) {
+        TextButton button = new TextButton(text, skin, style);
+        UiMotion.bindPressScale(button);
+        button.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                submitLogin();
+                action.run();
             }
         });
-        card.add(login).width(260f).height(52f).padBottom(8f).row();
+        return button;
+    }
 
-        TextButton forgot = new TextButton("Forgot password", skin, "brown");
-        UiMotion.bindPressScale(forgot);
-        forgot.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                openForgotModal();
-            }
-        });
-        card.add(forgot).width(260f).height(48f).padBottom(8f).row();
-
-        TextButton toRegister = new TextButton("Create account", skin, "brown");
-        UiMotion.bindPressScale(toRegister);
-        toRegister.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                CommandResult<Void> r = controller.menuExit();
-                showToast(r.getMessage(), !r.isSuccess());
-                if (r.isSuccess()) {
-                    game.setScreen(new RegisterScreen(game));
-                }
-            }
-        });
-        card.add(toRegister).width(260f).height(48f);
-
-        Table root = new Table();
-        root.setFillParent(true);
-        root.add(card).width(520f).padTop(40f);
-        stage.addActor(root);
+    private void goRegister() {
+        CommandResult<Void> r = controller.menuExit();
+        showToast(r.getMessage(), !r.isSuccess());
+        if (r.isSuccess()) {
+            game.setScreen(new RegisterScreen(game));
+        }
     }
 
     private void addBackground() {
@@ -208,95 +197,9 @@ public final class LoginScreen extends AbstractMenuScreen {
     }
 
     private void openForgotModal() {
-        resetStep = 0;
-        Table body = new Table();
-        TextField userField = new TextField(username.getText(), skin);
-        userField.setMessageText("Username");
-        TextField emailField = new TextField("", skin);
-        emailField.setMessageText("Email");
-        Label questionHeading = new Label("Security question:", skin, "medium");
-        questionHeading.setColor(CollectionEntryOverlay.MUTED);
-        resetPrompt = new Label("Enter username and email to begin reset.", skin);
-        resetPrompt.setWrap(true);
-        resetPrompt.setColor(CollectionEntryOverlay.INK);
-        resetField = new TextField("", skin);
-        resetAction = new TextButton("Continue", skin, "purple");
-
-        Runnable showIdentityStep = () -> {
-            body.clearChildren();
-            SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1f);
-            body.add(resetPrompt).width(400f).left().padBottom(12f).row();
-            body.add(userField).width(400f).height(48f).padBottom(8f).row();
-            body.add(emailField).width(400f).height(48f).padBottom(8f).row();
-            body.add(resetAction).width(220f).height(56f);
-            body.invalidateHierarchy();
-        };
-        Runnable showAnswerStep = () -> {
-            body.clearChildren();
-            body.add(questionHeading).width(400f).left().padBottom(6f).row();
-            body.add(resetPrompt).width(400f).left().padBottom(14f).row();
-            body.add(resetField).width(400f).height(48f).padBottom(12f).row();
-            body.add(resetAction).width(220f).height(56f);
-            body.invalidateHierarchy();
-        };
-        Runnable showPasswordStep = () -> {
-            body.clearChildren();
-            body.add(resetPrompt).width(400f).left().padBottom(14f).row();
-            body.add(resetField).width(400f).height(48f).padBottom(12f).row();
-            body.add(resetAction).width(220f).height(56f);
-            body.invalidateHierarchy();
-        };
-
-        showIdentityStep.run();
-
-        Table overlay = ModalCard.create(skin, "Forgot password", body, () -> resetStep = 0);
-
-        resetAction.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                if (resetStep == 0) {
-                    CommandResult<Void> r = controller.forgetPassword(
-                            userField.getText(), emailField.getText());
-                    showToast(r.getMessage(), !r.isSuccess());
-                    if (!r.isSuccess()) {
-                        return;
-                    }
-                    resetStep = 1;
-                    resetPrompt.setText(r.getMessage());
-                    SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1.28f);
-                    resetField.setPasswordMode(false);
-                    resetField.setText("");
-                    resetField.setMessageText("Your answer");
-                    resetAction.setText("Submit answer");
-                    showAnswerStep.run();
-                } else if (resetStep == 1) {
-                    CommandResult<Void> r = controller.answer(resetField.getText());
-                    showToast(r.getMessage(), !r.isSuccess());
-                    if (!r.isSuccess()) {
-                        overlay.remove();
-                        resetStep = 0;
-                        return;
-                    }
-                    resetStep = 2;
-                    resetPrompt.setText(r.getMessage());
-                    SkinFonts.scaleLabel(resetPrompt, skin, "secondary", 1f);
-                    resetField.setText("");
-                    resetField.setPasswordMode(true);
-                    resetField.setPasswordCharacter('*');
-                    resetField.setMessageText("New password");
-                    resetAction.setText("Update password");
-                    showPasswordStep.run();
-                } else {
-                    CommandResult<Void> r = controller.resetPassword(resetField.getText());
-                    showToast(r.getMessage(), !r.isSuccess());
-                    if (r.isSuccess()) {
-                        overlay.remove();
-                        resetStep = 0;
-                    }
-                }
-            }
-        });
-
+        LoginForgotFlow flow = new LoginForgotFlow(skin, controller, username.getText());
+        Table overlay = ModalCard.create(skin, "Forgot password", flow.body(), flow::reset);
+        flow.actionButton().addListener(flow.listener(overlay, this::showToast));
         stage.addActor(overlay);
         toast.toFront();
     }

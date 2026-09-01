@@ -48,10 +48,14 @@ public final class SkinFonts {
         return switch (name) {
             case "big", "FBUSV8C5EI_1" -> new FontSpec("skin/FBUSV8C5EI.TTF", 40, 0f, null);
             case "big_outline", "FBUSV8C5EI_1_outline" -> new FontSpec("skin/FBUSV8C5EI.TTF", 40, 3f, Color.BLACK);
-            case "medium", "FBUSV8C5EI_2", "bundle_reward_multiplier" -> new FontSpec("skin/FBUSV8C5EI.TTF", 24, 0f, null);
-            case "medium_outline", "FBUSV8C5EI_2_outline" -> new FontSpec("skin/FBUSV8C5EI.TTF", 30, 2f, Color.BLACK);
-            case "secondary", "default", "FBUSV8C6EI_3" -> new FontSpec("skin/FBUSV8C5EI.TTF", 16, 0f, null);
-            case "HOUSE_OF_TERROR", "brown", "purple", "green", "green_small" -> new FontSpec("skin/HOUSE OF TERROR.TTF", 22, 0f, null);
+            case "medium", "FBUSV8C5EI_2", "bundle_reward_multiplier" ->
+                    new FontSpec("skin/FBUSV8C5EI.TTF", 24, 0f, null);
+            case "medium_outline", "FBUSV8C5EI_2_outline" ->
+                    new FontSpec("skin/FBUSV8C5EI.TTF", 30, 2f, Color.BLACK);
+            case "secondary", "default", "FBUSV8C6EI_3" ->
+                    new FontSpec("skin/FBUSV8C5EI.TTF", 16, 0f, null);
+            case "HOUSE_OF_TERROR", "brown", "purple", "green", "green_small" ->
+                    new FontSpec("skin/HOUSE OF TERROR.TTF", 22, 0f, null);
             case "BRIANNETOD" -> new FontSpec("skin/BRIANNETOD.TTF", 16, 0f, null);
             case "ASHLEYSCRIPTMTSTD" -> new FontSpec("skin/ASHLEYSCRIPTMTSTD.TTF", 16, 0f, null);
             case "AVENIRNEXTLTPRO-DEMICN" -> new FontSpec("skin/AVENIRNEXTLTPRO-DEMICN.TTF", 16, 0f, null);
@@ -64,7 +68,8 @@ public final class SkinFonts {
         if (size <= 0) {
             size = 16;
         }
-        String key = ttfPath + "_" + size + "_" + borderWidth + "_" + (borderColor != null ? borderColor.toIntBits() : 0);
+        String key = ttfPath + "_" + size + "_" + borderWidth + "_"
+                + (borderColor != null ? borderColor.toIntBits() : 0);
         synchronized (DYNAMIC_FONTS) {
             BitmapFont cached = DYNAMIC_FONTS.get(key);
             if (cached != null) {
@@ -85,8 +90,9 @@ public final class SkinFonts {
                         p.borderColor = borderColor != null ? borderColor : Color.BLACK;
                         p.borderStraight = false;
                     }
-                    p.characters = FreeTypeFontGenerator.DEFAULT_CHARS +
-                        "¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ•⌘‘’“”–—…™";
+                    p.characters = FreeTypeFontGenerator.DEFAULT_CHARS
+                            + "¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"
+                            + "àáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ•⌘‘’“”–—…™";
                     BitmapFont font = gen.generateFont(p);
                     gen.dispose();
                     font.setUseIntegerPositions(false);
@@ -134,10 +140,12 @@ public final class SkinFonts {
             return;
         }
         BitmapFont font = getScaled(skin, styleName != null ? styleName : "HOUSE_OF_TERROR", scale);
-        TextButton.TextButtonStyle baseStyle = skin != null && styleName != null && skin.has(styleName, TextButton.TextButtonStyle.class)
+        TextButton.TextButtonStyle baseStyle = skin != null && styleName != null
+                && skin.has(styleName, TextButton.TextButtonStyle.class)
             ? skin.get(styleName, TextButton.TextButtonStyle.class)
             : button.getStyle();
-        TextButton.TextButtonStyle newStyle = baseStyle != null ? new TextButton.TextButtonStyle(baseStyle) : new TextButton.TextButtonStyle();
+        TextButton.TextButtonStyle newStyle = baseStyle != null
+                ? new TextButton.TextButtonStyle(baseStyle) : new TextButton.TextButtonStyle();
         newStyle.font = font;
         button.setStyle(newStyle);
         button.getLabel().setFontScale(1f);
@@ -148,10 +156,12 @@ public final class SkinFonts {
             return;
         }
         BitmapFont font = getScaled(skin, styleName != null ? styleName : "default", scale);
-        CheckBox.CheckBoxStyle baseStyle = skin != null && styleName != null && skin.has(styleName, CheckBox.CheckBoxStyle.class)
+        CheckBox.CheckBoxStyle baseStyle = skin != null && styleName != null
+                && skin.has(styleName, CheckBox.CheckBoxStyle.class)
             ? skin.get(styleName, CheckBox.CheckBoxStyle.class)
             : checkBox.getStyle();
-        CheckBox.CheckBoxStyle newStyle = baseStyle != null ? new CheckBox.CheckBoxStyle(baseStyle) : new CheckBox.CheckBoxStyle();
+        CheckBox.CheckBoxStyle newStyle = baseStyle != null
+                ? new CheckBox.CheckBoxStyle(baseStyle) : new CheckBox.CheckBoxStyle();
         newStyle.font = font;
         checkBox.setStyle(newStyle);
         checkBox.getLabel().setFontScale(1f);

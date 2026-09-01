@@ -83,7 +83,8 @@ public class ShooterAbility implements PlantAbility {
             return context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
                 || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount())
                 || context.hasZombieAlongDiagonal(row, plantX, -1, +1f, context.getRowCount(), context.getColumnCount())
-                || context.hasZombieAlongDiagonal(row, plantX, -1, -1f, context.getRowCount(), context.getColumnCount());
+                || context.hasZombieAlongDiagonal(
+                        row, plantX, -1, -1f, context.getRowCount(), context.getColumnCount());
         }
         if (isStarfruit(def)) {
             return context.hasZombieOrGraveAhead(row, plantX, -1)
@@ -91,7 +92,8 @@ public class ShooterAbility implements PlantAbility {
                 || hasZombieInAdjacentLane(context, row, plantX, +1)
                 || hasZombieInAdjacentLane(context, row, plantX, -1)
                 || context.hasZombieAlongDiagonal(row, plantX, +1, +1f, context.getRowCount(), context.getColumnCount())
-                || context.hasZombieAlongDiagonal(row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount());
+                || context.hasZombieAlongDiagonal(
+                        row, plantX, +1, -1f, context.getRowCount(), context.getColumnCount());
         }
         if (isSplitPea(def)) {
             return context.hasZombieOrGraveAhead(row, plantX, +1)

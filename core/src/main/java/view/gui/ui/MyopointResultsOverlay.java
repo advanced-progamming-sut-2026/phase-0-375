@@ -44,34 +44,46 @@ public final class MyopointResultsOverlay extends Table {
         setFillParent(true);
         setTouchable(Touchable.childrenOnly);
         center();
-
         MyopointTracker tracker = level.getTracker();
         BitmapFont big = SkinFonts.outlined(skin, "big");
         BitmapFont medium = SkinFonts.outlined(skin, "medium");
+        card = buildCard(skin, level, won, tracker, big, medium);
+        buttons = buildButtons(skin, onRetry, onExit);
+        Table stack = new Table();
+        stack.add(card).width(ROW_W).padBottom(28f).row();
+        stack.add(buttons).width(ROW_W);
+        add(stack);
+        card.getColor().a = 0f;
+        card.setTransform(true);
+        card.setScale(0.85f);
+    }
 
-        Label title = new Label(won ? "YOU SURVIVED!" : "RUN OVER",
-            new Label.LabelStyle(big, won ? TITLE_WIN : TITLE_LOSE));
-        title.setAlignment(Align.center);
-
-        BitmapFont scoreFont = SkinFonts.outlined(SkinFonts.getScaled(skin, "big", 1.35f));
-        Label score = new Label(String.valueOf(tracker.getTotalPoints()),
-            new Label.LabelStyle(scoreFont, Color.WHITE));
-        score.setAlignment(Align.center);
-
-        Label scoreCaption = new Label("Myopoints",
-            new Label.LabelStyle(medium, BODY));
-        scoreCaption.setAlignment(Align.center);
-
-        card = new Table();
+    private static Table buildCard(Skin skin, ScoreLevel level, boolean won,
+                                   MyopointTracker tracker, BitmapFont big, BitmapFont medium) {
+        Table card = new Table();
         Drawable cardBg = UiDrawables.tenPatch(skin, "image_ui_cards_store_store_bundle_card");
         if (cardBg != null) {
             card.setBackground(cardBg);
         }
         card.pad(28f, 36f, 24f, 36f);
+        Label title = new Label(won ? "YOU SURVIVED!" : "RUN OVER",
+            new Label.LabelStyle(big, won ? TITLE_WIN : TITLE_LOSE));
+        title.setAlignment(Align.center);
+        BitmapFont scoreFont = SkinFonts.outlined(SkinFonts.getScaled(skin, "big", 1.35f));
+        Label score = new Label(String.valueOf(tracker.getTotalPoints()),
+            new Label.LabelStyle(scoreFont, Color.WHITE));
+        score.setAlignment(Align.center);
+        Label scoreCaption = new Label("Myopoints", new Label.LabelStyle(medium, BODY));
+        scoreCaption.setAlignment(Align.center);
         card.add(title).growX().padBottom(10f).row();
         card.add(score).growX().padBottom(2f).row();
         card.add(scoreCaption).growX().padBottom(16f).row();
+        card.add(breakdownTable(tracker, medium)).growX().padBottom(12f).row();
+        addBestRow(card, level, medium);
+        return card;
+    }
 
+    private static Table breakdownTable(MyopointTracker tracker, BitmapFont medium) {
         Table breakdown = new Table();
         breakdown.defaults().left().padBottom(4f);
         for (Map.Entry<String, Integer> entry : tracker.getBreakdown().entrySet()) {
@@ -82,11 +94,12 @@ public final class MyopointResultsOverlay extends Table {
             breakdown.add(key).growX();
             breakdown.add(val).width(80f).right().row();
         }
-        card.add(breakdown).growX().padBottom(12f).row();
+        return breakdown;
+    }
 
+    private static void addBestRow(Table card, ScoreLevel level, BitmapFont medium) {
         if (level.isNewPersonalBest()) {
-            Label best = new Label("New personal best!",
-                new Label.LabelStyle(medium, BEST));
+            Label best = new Label("New personal best!", new Label.LabelStyle(medium, BEST));
             best.setAlignment(Align.center);
             card.add(best).growX().padBottom(8f).row();
         } else if (level.getPreviousPersonalBest() > 0) {
@@ -95,25 +108,19 @@ public final class MyopointResultsOverlay extends Table {
             best.setAlignment(Align.center);
             card.add(best).growX().padBottom(8f).row();
         }
+    }
 
+    private static Table buildButtons(Skin skin, Runnable onRetry, Runnable onExit) {
         TextButton retry = new TextButton("RETRY", skin, "purple");
         TextButton exit = new TextButton("EXIT", skin, "brown");
         retry.addListener(change(onRetry));
         exit.addListener(change(onExit));
-        buttons = new Table();
+        Table buttons = new Table();
         buttons.add(retry).width(BTN_W).height(BTN_H).padRight(BTN_GAP);
         buttons.add(exit).width(BTN_W).height(BTN_H);
         buttons.getColor().a = 0f;
         buttons.setTouchable(Touchable.disabled);
-
-        Table stack = new Table();
-        stack.add(card).width(ROW_W).padBottom(28f).row();
-        stack.add(buttons).width(ROW_W);
-        add(stack);
-
-        card.getColor().a = 0f;
-        card.setTransform(true);
-        card.setScale(0.85f);
+        return buttons;
     }
 
     /** Call once the world black fade has finished. */

@@ -102,9 +102,9 @@ public final class ProfileOverlay {
         private final Runnable onResourceBarRefresh;
         private final BorderedTable card;
         private final TextButton back;
-        private final AvatarPortrait avatarPortrait;
-        private final Label headerNickname;
-        private final Label headerUsername;
+        private AvatarPortrait avatarPortrait;
+        private Label headerNickname;
+        private Label headerUsername;
 
         private Table overlayRef;
         private Label usernameValue;
@@ -123,31 +123,36 @@ public final class ProfileOverlay {
             this.controller = controller;
             this.toast = toast;
             this.onResourceBarRefresh = onResourceBarRefresh;
-
             card = new BorderedTable();
             card.pad(CARD_PAD);
             Label title = new Label("Profile", skin, "big");
             title.setColor(INK);
             card.add(title).padBottom(16f).row();
+            card.add(buildHeader()).growX().left().padBottom(18f).row();
+            card.add(buildInfo()).growX().padBottom(18f).row();
+            card.add(buildEdits()).padBottom(16f).row();
+            back = styledButton("Back", "brown", BACK_BTN_FONT_SCALE);
+            card.add(back).width(BACK_BTN_W).height(BACK_BTN_H);
+        }
 
+        private Table buildHeader() {
             avatarPortrait = new AvatarPortrait(textures, 1, AVATAR_SIZE, true);
             headerNickname = new Label("—", skin, "medium");
             headerNickname.setColor(INK);
             headerUsername = new Label("—", skin, "secondary");
             headerUsername.setColor(MUTED);
-
             Table header = new Table();
             header.add(avatarPortrait).size(AVATAR_SIZE, AVATAR_SIZE).padRight(16f);
-
             Table names = new Table();
             names.add(headerNickname).left().row();
             names.add(headerUsername).left().padTop(4f);
             header.add(names).left().expandX().padRight(12f).top();
-
             TextButton changeAvatar = editButton("Change avatar", this::openAvatarPicker);
             header.add(changeAvatar).width(AVATAR_BTN_W).height(EDIT_BTN_H).right().center();
-            card.add(header).growX().left().padBottom(18f).row();
+            return header;
+        }
 
+        private Table buildInfo() {
             Table info = new Table();
             info.pad(INFO_PAD);
             usernameValue = addInfoRow(info, "Username");
@@ -158,8 +163,10 @@ public final class ProfileOverlay {
             gemsValue = addInfoRow(info, "Gems");
             levelsValue = addInfoRow(info, "Levels completed");
             myopointValue = addInfoRow(info, "Highest myopoint");
-            card.add(info).growX().padBottom(18f).row();
+            return info;
+        }
 
+        private Table buildEdits() {
             Table edits = new Table();
             edits.defaults().pad(5f);
             edits.add(editButton("Change username", this::openChangeUsername))
@@ -170,10 +177,7 @@ public final class ProfileOverlay {
                     .width(EDIT_BTN_W).height(EDIT_BTN_H);
             edits.add(editButton("Change password", this::openChangePassword))
                     .width(EDIT_BTN_W).height(EDIT_BTN_H);
-            card.add(edits).padBottom(16f).row();
-
-            back = styledButton("Back", "brown", BACK_BTN_FONT_SCALE);
-            card.add(back).width(BACK_BTN_W).height(BACK_BTN_H);
+            return edits;
         }
 
         void bindStage(Table overlay) {

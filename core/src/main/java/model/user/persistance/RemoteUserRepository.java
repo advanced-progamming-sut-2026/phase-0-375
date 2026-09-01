@@ -30,11 +30,6 @@ public class RemoteUserRepository implements UserRepository {
         this.client = client;
     }
 
-    private String currentUsername() {
-        User u = App.getInstance().getCurrentUser();
-        return u != null ? u.getUsername() : null;
-    }
-
     private boolean execute(UserCommand command, Map<String, String> args) {
         if (client == null || !client.isConnected()) {
             return false;

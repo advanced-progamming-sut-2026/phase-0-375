@@ -27,10 +27,28 @@ allprojects {
 
 configure(subprojects) {
   apply plugin: 'java-library'
+  apply plugin: 'checkstyle'
+  apply plugin: 'pmd'
   java {
     toolchain {
       languageVersion = JavaLanguageVersion.of(25)
     }
+  }
+
+  checkstyle {
+    toolVersion = '13.7.0'
+    configFile = rootProject.file('config/checkstyle/checkstyle.xml')
+    ignoreFailures = true
+    maxWarnings = Integer.MAX_VALUE
+    maxErrors = Integer.MAX_VALUE
+  }
+
+  pmd {
+    toolVersion = '7.20.0'
+    consoleOutput = true
+    ignoreFailures = true
+    ruleSetFiles = files(rootProject.file('config/pmd/pmd.xml'))
+    ruleSets = []
   }
 
   // From https://lyze.dev/2021/04/29/libGDX-Internal-Assets-List/

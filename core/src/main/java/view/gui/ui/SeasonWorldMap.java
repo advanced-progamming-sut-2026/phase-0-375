@@ -124,17 +124,12 @@ public final class SeasonWorldMap extends Group {
         setTouchable(Touchable.enabled);
         SeasonMapLayout mapLayout = layout != null ? layout : new EgyptSeasonMapLayout();
         setSize(mapLayout.mapWidth, mapLayout.mapHeight);
-
         if (levels == null || levels.isEmpty() || mapLayout.nodeXy == null) {
             return;
         }
-
         Set<Integer> placeholders = placeholderLevelIds != null
                 ? placeholderLevelIds
                 : Collections.emptySet();
-
-        float orbLift = mapLayout.orbLift;
-        int count = Math.min(levels.size(), mapLayout.nodeXy.length);
         Group pathLayer = new Group();
         Group islandLayer = new Group();
         Group markerLayer = new Group();
@@ -143,110 +138,165 @@ public final class SeasonWorldMap extends Group {
         addActor(islandLayer);
         addActor(pathLayer);
         addActor(markerLayer);
+        int nextPlayableId = nextPlayableId(levels, placeholders);
+        int count = Math.min(levels.size(), mapLayout.nodeXy.length);
+        for (int i = 0; i < count; i++) {
+            addNode(i, textures, art, mapLayout, skin, pamPlayer, pamClips, levels.get(i),
+                    placeholders, nextPlayableId, unlockIntroLevelId, islandLayer, markerLayer,
+                    onSelectLevel);
+        }
+        addPathSegments(pathLayer, textures, mapLayout.orbLift);
+    }
 
-        int nextPlayableId = -1;
+    private static int nextPlayableId(List<LevelSummary> levels, Set<Integer> placeholders) {
         for (LevelSummary s : levels) {
             if (placeholders.contains(s.levelId())) {
                 continue;
             }
             if (s.unlocked() && !s.completed()) {
-                nextPlayableId = s.levelId();
-                break;
+                return s.levelId();
             }
         }
+        return -1;
+    }
 
-        for (int i = 0; i < count; i++) {
-            LevelSummary summary = levels.get(i);
-            float cx = mapLayout.nodeXy[i][0];
-            float cy = mapLayout.nodeXy[i][1];
-            nodeCenters.add(new Vector2(cx, cy));
-            nodeLevelIds.add(summary.levelId());
+    private void addNode(
+            int i,
+            TextureBank textures,
+            WorldMapArt art,
+            SeasonMapLayout mapLayout,
+            Skin skin,
+            PamPlayer pamPlayer,
+            PamClipCache pamClips,
+            LevelSummary summary,
+            Set<Integer> placeholders,
+            int nextPlayableId,
+            int unlockIntroLevelId,
+            Group islandLayer,
+            Group markerLayer,
+            IntConsumer onSelectLevel) {
+        float cx = mapLayout.nodeXy[i][0];
+        float cy = mapLayout.nodeXy[i][1];
+        nodeCenters.add(new Vector2(cx, cy));
+        nodeLevelIds.add(summary.levelId());
+        float pw = mapLayout.platformW(i);
+        float ph = mapLayout.platformH(i);
+        float platformX = cx + mapLayout.platformOffsetX(i) - pw * 0.5f;
+        float platformY = cy + mapLayout.platformOffsetY(i) - ph * 0.55f;
+        addPlatform(islandLayer, textures, art, pamPlayer, pamClips, summary, pw, ph,
+                platformX, platformY);
+        float orbX = cx - ORB_SIZE * 0.5f;
+        float orbY = cy + mapLayout.orbLift;
+        float orbCx = cx;
+        float orbCy = orbY + ORB_SIZE * 0.45f;
+        addOrbMarker(markerLayer, textures, pamPlayer, pamClips, summary, placeholders,
+                nextPlayableId, unlockIntroLevelId, orbCx, orbCy);
+        addLevelNumber(markerLayer, skin, summary.levelId(), orbX, orbY);
+        addNodeHit(markerLayer, onSelectLevel, summary.levelId(), platformX, platformY, pw, ph,
+                orbX, orbY, orbCx, orbCy);
+    }
 
-            float pw = mapLayout.platformW(i);
-            float ph = mapLayout.platformH(i);
-            WorldMapArt.PlatformArt platformArt = art.platformArt(summary.levelId());
-            float pox = mapLayout.platformOffsetX(i);
-            float poy = mapLayout.platformOffsetY(i);
-            float platformX = cx + pox - pw * 0.5f;
-            float platformY = cy + poy - ph * 0.55f;
-
-            Actor platform = null;
-            if (platformArt.hasPam() && pamPlayer != null && pamClips != null) {
-                platform = animatedPlatform(pamPlayer, pamClips, platformArt, pw, ph);
-            }
-            if (platform == null) {
-                Image image = regionImage(textures, platformArt.staticId(), pw, ph);
-                if (image == null) {
-                    image = solid(pw, ph, new Color(0.72f, 0.58f, 0.38f, 1f));
-                }
-                platform = image;
-            }
-            platform.setPosition(platformX, platformY);
-            platform.setTouchable(Touchable.disabled);
-            islandLayer.addActor(platform);
-
-            float orbX = cx - ORB_SIZE * 0.5f;
-            float orbY = cy + orbLift;
-            float orbCx = cx;
-            float orbCy = orbY + ORB_SIZE * 0.45f;
-
-            boolean unimplemented = placeholders.contains(summary.levelId());
-            if (unimplemented || !summary.unlocked()) {
-                // Stub / locked: same “not opened” look.
-                Group orbSlot = new Group();
-                orbSlot.setTouchable(Touchable.disabled);
-                markerLayer.addActor(orbSlot);
-                addLockedMarker(orbSlot, textures, pamPlayer, pamClips, orbCx, orbCy);
-            } else if (summary.completed()) {
-                addBlueMarker(markerLayer, textures, orbCx, orbCy);
-            } else if (pamPlayer != null && pamClips != null) {
-                boolean playUnlock = summary.levelId() == nextPlayableId
-                        && summary.levelId() == unlockIntroLevelId;
-                Group orbSlot = new Group();
-                orbSlot.setTouchable(Touchable.disabled);
-                markerLayer.addActor(orbSlot);
-                addGreenMarker(orbSlot, pamPlayer, pamClips, orbCx, orbCy, playUnlock);
-            }
-
-            Label number = new Label(String.valueOf(summary.levelId()), skin, "big");
-            number.setAlignment(Align.center);
-            number.setColor(Color.WHITE);
-            number.setSize(ORB_SIZE, ORB_SIZE);
-            number.setPosition(orbX, orbY);
-            number.setTouchable(Touchable.disabled);
-            markerLayer.addActor(number);
-
-            Group hit = new Group();
-            float pad = 24f;
-            float platLeft = platformX;
-            float platRight = platformX + pw;
-            float platBottom = platformY;
-            float platTop = platformY + ph;
-            float orbLeft = orbX;
-            float orbRight = orbX + ORB_SIZE;
-            float orbBottom = orbY;
-            float orbTop = orbY + ORB_SIZE;
-            float hitLeft = Math.min(platLeft, orbLeft) - pad;
-            float hitRight = Math.max(platRight, orbRight) + pad;
-            float hitBottom = Math.min(platBottom, orbBottom) - pad;
-            float hitTop = Math.max(platTop, orbTop) + pad;
-            hit.setSize(hitRight - hitLeft, hitTop - hitBottom);
-            hit.setPosition(hitLeft, hitBottom);
-            final int levelId = summary.levelId();
-            final float fxCx = orbCx;
-            final float fxCy = orbCy;
-            hit.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    playNodeClickFx(markerLayer, fxCx, fxCy);
-                    if (onSelectLevel != null) {
-                        onSelectLevel.accept(levelId);
-                    }
-                }
-            });
-            markerLayer.addActor(hit);
+    private static void addPlatform(
+            Group islandLayer,
+            TextureBank textures,
+            WorldMapArt art,
+            PamPlayer pamPlayer,
+            PamClipCache pamClips,
+            LevelSummary summary,
+            float pw,
+            float ph,
+            float platformX,
+            float platformY) {
+        WorldMapArt.PlatformArt platformArt = art.platformArt(summary.levelId());
+        Actor platform = null;
+        if (platformArt.hasPam() && pamPlayer != null && pamClips != null) {
+            platform = animatedPlatform(pamPlayer, pamClips, platformArt, pw, ph);
         }
+        if (platform == null) {
+            Image image = regionImage(textures, platformArt.staticId(), pw, ph);
+            if (image == null) {
+                image = solid(pw, ph, new Color(0.72f, 0.58f, 0.38f, 1f));
+            }
+            platform = image;
+        }
+        platform.setPosition(platformX, platformY);
+        platform.setTouchable(Touchable.disabled);
+        islandLayer.addActor(platform);
+    }
 
+    private static void addOrbMarker(
+            Group markerLayer,
+            TextureBank textures,
+            PamPlayer pamPlayer,
+            PamClipCache pamClips,
+            LevelSummary summary,
+            Set<Integer> placeholders,
+            int nextPlayableId,
+            int unlockIntroLevelId,
+            float orbCx,
+            float orbCy) {
+        boolean unimplemented = placeholders.contains(summary.levelId());
+        if (unimplemented || !summary.unlocked()) {
+            Group orbSlot = new Group();
+            orbSlot.setTouchable(Touchable.disabled);
+            markerLayer.addActor(orbSlot);
+            addLockedMarker(orbSlot, textures, pamPlayer, pamClips, orbCx, orbCy);
+        } else if (summary.completed()) {
+            addBlueMarker(markerLayer, textures, orbCx, orbCy);
+        } else if (pamPlayer != null && pamClips != null) {
+            boolean playUnlock = summary.levelId() == nextPlayableId
+                    && summary.levelId() == unlockIntroLevelId;
+            Group orbSlot = new Group();
+            orbSlot.setTouchable(Touchable.disabled);
+            markerLayer.addActor(orbSlot);
+            addGreenMarker(orbSlot, pamPlayer, pamClips, orbCx, orbCy, playUnlock);
+        }
+    }
+
+    private static void addLevelNumber(Group markerLayer, Skin skin, int levelId,
+                                       float orbX, float orbY) {
+        Label number = new Label(String.valueOf(levelId), skin, "big");
+        number.setAlignment(Align.center);
+        number.setColor(Color.WHITE);
+        number.setSize(ORB_SIZE, ORB_SIZE);
+        number.setPosition(orbX, orbY);
+        number.setTouchable(Touchable.disabled);
+        markerLayer.addActor(number);
+    }
+
+    private static void addNodeHit(
+            Group markerLayer,
+            IntConsumer onSelectLevel,
+            int levelId,
+            float platformX,
+            float platformY,
+            float pw,
+            float ph,
+            float orbX,
+            float orbY,
+            float orbCx,
+            float orbCy) {
+        float pad = 24f;
+        float hitLeft = Math.min(platformX, orbX) - pad;
+        float hitRight = Math.max(platformX + pw, orbX + ORB_SIZE) + pad;
+        float hitBottom = Math.min(platformY, orbY) - pad;
+        float hitTop = Math.max(platformY + ph, orbY + ORB_SIZE) + pad;
+        Group hit = new Group();
+        hit.setSize(hitRight - hitLeft, hitTop - hitBottom);
+        hit.setPosition(hitLeft, hitBottom);
+        hit.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                playNodeClickFx(markerLayer, orbCx, orbCy);
+                if (onSelectLevel != null) {
+                    onSelectLevel.accept(levelId);
+                }
+            }
+        });
+        markerLayer.addActor(hit);
+    }
+
+    private void addPathSegments(Group pathLayer, TextureBank textures, float orbLift) {
         for (int i = 0; i < nodeCenters.size() - 1; i++) {
             Vector2 a = nodeCenters.get(i);
             Vector2 b = nodeCenters.get(i + 1);

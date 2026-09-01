@@ -125,74 +125,87 @@ public final class NewsOverlay {
         applyInnerBackground(content, skin);
         content.defaults().left().growX();
         content.pad(16f, 18f, 16f, 18f);
-
         ScrollPane scroll = new ScrollPane(content, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
-
-        List<NewsItem> raw = controller.showAll().getData();
-        List<NewsItem> allNews = raw == null ? new ArrayList<>() : new ArrayList<>(raw);
+        List<NewsItem> allNews = sortedNews(controller);
         if (allNews.isEmpty()) {
-            Label empty = new Label(
-                    "No news yet. Unlock plants, encounter zombies, or unlock new levels "
-                            + "to start generating news.",
-                    skin, "medium_outline");
-            empty.setColor(NEWS_COLOR);
-            empty.setWrap(true);
-            content.add(empty).growX().pad(12f);
+            addEmptyNews(content, skin);
             return scroll;
         }
+        addNewsItems(content, skin, controller, scroll, allNews);
+        return scroll;
+    }
 
+    private static List<NewsItem> sortedNews(NewsMenuController controller) {
+        List<NewsItem> raw = controller.showAll().getData();
+        List<NewsItem> allNews = raw == null ? new ArrayList<>() : new ArrayList<>(raw);
         allNews.sort(Comparator
                 .comparing(NewsItem::getPublishDate)
                 .reversed()
                 .thenComparing((one, two) -> Boolean.compare(
                         controller.isRead(one.getId()), controller.isRead(two.getId()))));
+        return allNews;
+    }
 
+    private static void addEmptyNews(Table content, Skin skin) {
+        Label empty = new Label(
+                "No news yet. Unlock plants, encounter zombies, or unlock new levels "
+                        + "to start generating news.",
+                skin, "medium_outline");
+        empty.setColor(NEWS_COLOR);
+        empty.setWrap(true);
+        content.add(empty).growX().pad(12f);
+    }
+
+    private static void addNewsItems(Table content, Skin skin, NewsMenuController controller,
+                                     ScrollPane scroll, List<NewsItem> allNews) {
         LocalDate currentDate = null;
         for (NewsItem newsItem : allNews) {
             if (!newsItem.getPublishDate().equals(currentDate)) {
                 currentDate = newsItem.getPublishDate();
-                String formattedDate = newsItem.getPublishDate().format(DATE_FORMATTER);
-                Label dateLabel = new Label(formattedDate, skin, "big");
+                Label dateLabel = new Label(newsItem.getPublishDate().format(DATE_FORMATTER),
+                        skin, "big");
                 dateLabel.setColor(DATE_COLOR);
                 dateLabel.setWrap(true);
                 content.add(dateLabel).padTop(8f).padBottom(12f).row();
             }
-
-            boolean isRead = controller.isRead(newsItem.getId());
-            String tag = isRead ? "" : "[NEW] ";
-
-            Table itemContainer = new Table();
-            itemContainer.defaults().left().growX();
-
-            Label itemTitle = new Label(tag + newsItem.getTitle(), skin, "big");
-            itemTitle.setColor(NEWS_COLOR);
-            itemTitle.setWrap(true);
-            itemContainer.add(itemTitle).padBottom(8f).row();
-
-            Label itemBody = new Label(newsItem.getBody(), skin, "big");
-            itemBody.setColor(NEWS_COLOR);
-            itemBody.setWrap(true);
-            itemContainer.add(itemBody).row();
-
-            content.add(itemContainer).padBottom(22f).row();
-
-            if (!isRead) {
-                itemContainer.addAction(new Action() {
-                    @Override
-                    public boolean act(float delta) {
-                        if (isVisibleInScrollPane(itemContainer, scroll)) {
-                            controller.markAsRead(newsItem.getId());
-                            return true;
-                        }
-                        return false;
-                    }
-                });
-            }
+            content.add(newsItemRow(skin, controller, scroll, newsItem)).padBottom(22f).row();
         }
+    }
 
-        return scroll;
+    private static Table newsItemRow(Skin skin, NewsMenuController controller,
+                                     ScrollPane scroll, NewsItem newsItem) {
+        boolean isRead = controller.isRead(newsItem.getId());
+        String tag = isRead ? "" : "[NEW] ";
+        Table itemContainer = new Table();
+        itemContainer.defaults().left().growX();
+        Label itemTitle = new Label(tag + newsItem.getTitle(), skin, "big");
+        itemTitle.setColor(NEWS_COLOR);
+        itemTitle.setWrap(true);
+        itemContainer.add(itemTitle).padBottom(8f).row();
+        Label itemBody = new Label(newsItem.getBody(), skin, "big");
+        itemBody.setColor(NEWS_COLOR);
+        itemBody.setWrap(true);
+        itemContainer.add(itemBody).row();
+        if (!isRead) {
+            itemContainer.addAction(markReadWhenVisible(controller, scroll, newsItem, itemContainer));
+        }
+        return itemContainer;
+    }
+
+    private static Action markReadWhenVisible(NewsMenuController controller, ScrollPane scroll,
+                                              NewsItem newsItem, Table itemContainer) {
+        return new Action() {
+            @Override
+            public boolean act(float delta) {
+                if (isVisibleInScrollPane(itemContainer, scroll)) {
+                    controller.markAsRead(newsItem.getId());
+                    return true;
+                }
+                return false;
+            }
+        };
     }
 
     private static void applyInnerBackground(Table content, Skin skin) {

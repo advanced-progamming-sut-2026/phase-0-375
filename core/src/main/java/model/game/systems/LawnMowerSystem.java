@@ -7,7 +7,6 @@ import model.game.core.Tickable;
 import model.game.map.Lane;
 import model.game.map.LawnMower;
 import model.zombie.instance.ZombieInstance;
-import model.app.App;
 
 import java.util.List;
 
@@ -65,20 +64,6 @@ public class LawnMowerSystem implements Tickable {
                 mower.recordSweepKill(zombie);
             }
         }
-    }
-
-    private void notifyMowerKills(int row, LawnMower mower) {
-        List<ZombieInstance> kills = mower.getSweepKills();
-        StringBuilder sb = new StringBuilder();
-        sb.append("The lawn mower in the row ").append(row + 1)
-                .append("is triggered and killed these zombies:");
-        for (ZombieInstance z : kills) {
-            String type = (z.getDefinition() != null) ? z.getDefinition().getName() : "Unknown";
-            int x = z.getGridPosition() != null ? z.getGridX() : -1;
-            int y = z.getGridPosition() != null ? z.getGridY() : -1;
-            sb.append("\n  ").append(type).append(" at (").append(x).append(", ").append(y).append(")");
-        }
-        App.logToShell(sb.toString());
     }
 
     private boolean isBoss(ZombieInstance zombie) {

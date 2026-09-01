@@ -12,17 +12,13 @@ import model.network.packet.auth.RegisterValidateRequestPacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.network.packet.system.ErrorMessagePacket;
 import model.network.util.UserSanitizer;
-import model.news.NewsFactory;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -56,10 +52,14 @@ public class AuthService {
         this(userRepository, true, sessionTokenStore);
     }
 
-    public AuthService(UserRepository userRepository, boolean kickOnDuplicateLogin, SessionTokenStore sessionTokenStore) {
+    public AuthService(
+            UserRepository userRepository,
+            boolean kickOnDuplicateLogin,
+            SessionTokenStore sessionTokenStore) {
         this.userRepository = Objects.requireNonNull(userRepository, "UserRepository cannot be null");
         this.kickOnDuplicateLogin = kickOnDuplicateLogin;
-        this.sessionTokenStore = Objects.requireNonNull(sessionTokenStore, "SessionTokenStore cannot be null");
+        this.sessionTokenStore = Objects.requireNonNull(
+                sessionTokenStore, "SessionTokenStore cannot be null");
     }
 
     private static SessionTokenStore sessionStoreBesideUsers(UserRepository userRepository) {
@@ -146,63 +146,25 @@ public class AuthService {
         String passwordHash = SHA256_HEX_PATTERN.matcher(rawOrHash).matches()
                 ? rawOrHash.toLowerCase()
                 : PasswordHasher.hash(rawOrHash);
-        String nickname = packet.getNickname().trim();
-        String email = packet.getEmail().trim();
-        String gender = packet.getGender().trim().toLowerCase();
-
-        // 6. Validate Security Question & Answer
         int qNum = packet.getSecurityQuestionNumber();
         if (qNum < 1 || qNum > 5) {
             return new RegisterResponsePacket(false, "Question number must be 1-5.");
         }
-        String securityAnswer = packet.getSecurityAnswer() != null ? packet.getSecurityAnswer().trim() : "";
+        String securityAnswer = packet.getSecurityAnswer() != null
+                ? packet.getSecurityAnswer().trim() : "";
         if (securityAnswer.isEmpty()) {
             return new RegisterResponsePacket(false, "Answer cannot be empty.");
         }
 
-        // 7. Construct and initialize authoritative User model
-        User user = new User();
-        user.setUsername(username);
-        user.setPasswordHash(passwordHash);
-        user.setNickname(nickname);
-        user.setEmail(email);
-        user.setGender(gender);
-        user.setSecurityQuestionNumber(qNum);
-        user.setSecurityAnswer(securityAnswer);
-
-        user.setCoins(0);
-        user.setGems(0);
-        user.setDifficultyLevel(3);
-        user.setGameSpeed(1);
-        user.setShowLawnGrid(false);
-        user.setDebugMode(false);
-        user.setMusicVolume(1.0f);
-        user.setSfxVolume(1.0f);
-        user.setGamesPlayed(0);
-        user.setPlantFoodCount(0);
-        user.setUnlockedPots(4);
-
-        user.setChapterProgress(new HashMap<>());
-        user.setUnlockedPlants(new HashSet<>(User.STARTER_PLANTS));
-        user.setUnlockedZombies(new HashSet<>());
-        user.setUnlockedMiniGames(new HashSet<>());
-        user.setUnlockedLevels(new HashSet<>());
-        user.setSeedPackets(new HashMap<>());
-        user.setPlantLevels(new HashMap<>());
-        user.setPlantBoosts(new HashMap<>());
-        user.setGreenhousePots(new HashMap<>());
-        user.setGreenhousePlantTimestamps(new HashMap<>());
-        user.setReadNews(new ArrayList<>());
-        user.setNewsPublishDates(new HashMap<>());
-        for (String plant : User.STARTER_PLANTS) {
-            user.rememberNewsPublishDate(NewsFactory.plantNewsId(plant));
-        }
-        user.setQuestStatus(new HashMap<>());
-        user.setQuestProgress(new HashMap<>());
-        user.setPurchasedDailyDeals(new HashMap<>());
-
+        User user = AuthUserFactory.create(
+                username,
+                passwordHash,
+                packet.getNickname().trim(),
+                packet.getEmail().trim(),
+                packet.getGender().trim().toLowerCase(),
+                qNum,
+                securityAnswer);
         userRepository.save(user);
-
         return new RegisterResponsePacket(true, "Registration successful.");
     }
 
@@ -227,28 +189,16 @@ public class AuthService {
         }
 
         User user = userOpt.get();
-        boolean passwordValid = (user.getPasswordHash() != null && user.getPasswordHash().equalsIgnoreCase(passwordInput))
-                || (user.getPasswordHash() != null && user.getPasswordHash().equalsIgnoreCase(PasswordHasher.hash(passwordInput)));
-
-        if (!passwordValid) {
+        if (!passwordMatches(user, passwordInput)) {
             return new LoginResponsePacket(false, "Invalid username or password.", null);
         }
 
         String normUser = username.toLowerCase();
-
-        // Check for active existing session
-        ClientConnectionHandler existingConn = activeSessions.get(normUser);
-        if (existingConn != null && existingConn != connection && !existingConn.isClosed()) {
-            if (kickOnDuplicateLogin) {
-                existingConn.sendPacket(new ErrorMessagePacket("SESSION_REPLACED",
-                        "You have been logged out because this account logged in from another connection."));
-                existingConn.disconnect("Replaced by new login");
-            } else {
-                return new LoginResponsePacket(false, "User '" + username + "' is already logged in on another session.", null);
-            }
+        LoginResponsePacket duplicate = evictOrRejectDuplicate(normUser, username, connection);
+        if (duplicate != null) {
+            return duplicate;
         }
 
-        // Apply stay logged in if requested — mint opaque token for client persistence
         String sessionToken = null;
         if (packet.isStayLoggedIn()) {
             user.setStayLoggedIn(true);
@@ -256,13 +206,7 @@ public class AuthService {
             sessionToken = sessionTokenStore.mint(user.getUsername());
         }
 
-        // Attach context to connection handler and register active session
-        if (connection != null) {
-            connection.setUserProfile(user);
-            connection.setUsername(user.getUsername());
-            activeSessions.put(normUser, connection);
-        }
-
+        attachSession(user, normUser, connection);
         return new LoginResponsePacket(true, "Login successful.", UserSanitizer.sanitize(user), sessionToken);
     }
 
@@ -288,27 +232,17 @@ public class AuthService {
         User user = userOpt.get();
         String normUser = user.getUsername().toLowerCase();
 
-        ClientConnectionHandler existingConn = activeSessions.get(normUser);
-        if (existingConn != null && existingConn != connection && !existingConn.isClosed()) {
-            if (kickOnDuplicateLogin) {
-                existingConn.sendPacket(new ErrorMessagePacket("SESSION_REPLACED",
-                        "You have been logged out because this account logged in from another connection."));
-                existingConn.disconnect("Replaced by new login");
-            } else {
-                return new LoginResponsePacket(false,
-                        "User '" + user.getUsername() + "' is already logged in on another session.", null);
-            }
+        LoginResponsePacket duplicate = evictOrRejectDuplicate(normUser, user.getUsername(), connection);
+        if (duplicate != null) {
+            return duplicate;
         }
 
         user.setStayLoggedIn(true);
-        if (connection != null) {
-            connection.setUserProfile(user);
-            connection.setUsername(user.getUsername());
-            activeSessions.put(normUser, connection);
-        }
+        attachSession(user, normUser, connection);
 
         // Reuse the same token until logout/expiry (no rotation in first cut).
-        return new LoginResponsePacket(true, "Session resumed.", UserSanitizer.sanitize(user), packet.getToken().trim());
+        return new LoginResponsePacket(
+                true, "Session resumed.", UserSanitizer.sanitize(user), packet.getToken().trim());
     }
 
     /**
@@ -396,23 +330,72 @@ public class AuthService {
         return userRepository;
     }
 
-    // ==========================================
-    // Validation Helper Functions
-    // ==========================================
+    private boolean passwordMatches(User user, String passwordInput) {
+        String stored = user.getPasswordHash();
+        if (stored == null) {
+            return false;
+        }
+        return stored.equalsIgnoreCase(passwordInput)
+                || stored.equalsIgnoreCase(PasswordHasher.hash(passwordInput));
+    }
+
+    private LoginResponsePacket evictOrRejectDuplicate(
+            String normUser, String username, ClientConnectionHandler connection) {
+        ClientConnectionHandler existingConn = activeSessions.get(normUser);
+        if (existingConn == null || existingConn == connection || existingConn.isClosed()) {
+            return null;
+        }
+        if (kickOnDuplicateLogin) {
+            existingConn.sendPacket(new ErrorMessagePacket("SESSION_REPLACED",
+                    "You have been logged out because this account logged in from another connection."));
+            existingConn.disconnect("Replaced by new login");
+            return null;
+        }
+        return new LoginResponsePacket(false,
+                "User '" + username + "' is already logged in on another session.", null);
+    }
+
+    private void attachSession(User user, String normUser, ClientConnectionHandler connection) {
+        if (connection != null) {
+            connection.setUserProfile(user);
+            connection.setUsername(user.getUsername());
+            activeSessions.put(normUser, connection);
+        }
+    }
 
     private RegisterResponsePacket validateRegistrationFields(String usernameRaw, String passwordRawOrHash,
                                                               String nicknameRaw, String emailRaw, String genderRaw) {
+        RegisterResponsePacket usernameErr = validateUsername(usernameRaw);
+        if (usernameErr != null) {
+            return usernameErr;
+        }
+        RegisterResponsePacket passwordErr = validatePassword(passwordRawOrHash);
+        if (passwordErr != null) {
+            return passwordErr;
+        }
+        RegisterResponsePacket profileErr = validateNicknameEmailGender(nicknameRaw, emailRaw, genderRaw);
+        if (profileErr != null) {
+            return profileErr;
+        }
+        return new RegisterResponsePacket(true, "OK");
+    }
+
+    private RegisterResponsePacket validateUsername(String usernameRaw) {
         String username = usernameRaw != null ? usernameRaw.trim() : "";
         if (username.isEmpty()) {
             return new RegisterResponsePacket(false, "Username cannot be empty.");
         }
         if (!USERNAME_PATTERN.matcher(username).matches()) {
-            return new RegisterResponsePacket(false, "Invalid username. Only letters, numbers, and hyphens allowed.");
+            return new RegisterResponsePacket(false,
+                    "Invalid username. Only letters, numbers, and hyphens allowed.");
         }
         if (userRepository.existsByUsername(username)) {
             return new RegisterResponsePacket(false, "Username '" + username + "' is already taken.");
         }
+        return null;
+    }
 
+    private RegisterResponsePacket validatePassword(String passwordRawOrHash) {
         String rawOrHash = passwordRawOrHash != null ? passwordRawOrHash.trim() : "";
         if (rawOrHash.isEmpty()) {
             return new RegisterResponsePacket(false, "Password cannot be empty.");
@@ -423,7 +406,11 @@ public class AuthService {
                 return new RegisterResponsePacket(false, pwError);
             }
         }
+        return null;
+    }
 
+    private RegisterResponsePacket validateNicknameEmailGender(
+            String nicknameRaw, String emailRaw, String genderRaw) {
         String nickname = nicknameRaw != null ? nicknameRaw.trim() : "";
         if (nickname.isEmpty()) {
             return new RegisterResponsePacket(false, "Nickname cannot be empty.");
@@ -431,7 +418,6 @@ public class AuthService {
         if (nickname.length() < 3 || nickname.length() > 30) {
             return new RegisterResponsePacket(false, "Nickname must be between 3 and 30 characters.");
         }
-
         String email = emailRaw != null ? emailRaw.trim() : "";
         if (email.isEmpty()) {
             return new RegisterResponsePacket(false, "Email cannot be empty.");
@@ -443,13 +429,11 @@ public class AuthService {
         if (userRepository.existsByEmail(email)) {
             return new RegisterResponsePacket(false, "Email '" + email + "' is already in use.");
         }
-
         String gender = genderRaw != null ? genderRaw.trim().toLowerCase() : "";
         if (!gender.equals("male") && !gender.equals("female")) {
             return new RegisterResponsePacket(false, "Gender must be 'male' or 'female'.");
         }
-
-        return new RegisterResponsePacket(true, "OK");
+        return null;
     }
 
     private static String validatePasswordComplexity(String pw) {
@@ -457,8 +441,9 @@ public class AuthService {
         if (!pw.matches(".*[a-z].*")) return "Weak password: must include a lowercase letter.";
         if (!pw.matches(".*[A-Z].*")) return "Weak password: must include an uppercase letter.";
         if (!pw.matches(".*\\d.*")) return "Weak password: must include a digit.";
-        if (!pw.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
+        if (!pw.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
             return "Weak password: must include a special character.";
+        }
         return null;
     }
 
@@ -469,13 +454,27 @@ public class AuthService {
         String local = email.substring(0, at);
         String domain = email.substring(at + 1);
         if (local.isEmpty()) return "Invalid email: local part cannot be empty.";
-        if (!local.matches("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$") && local.length() > 1) return "Invalid email: invalid local part.";
-        if (local.length() == 1 && !local.matches("[a-zA-Z0-9]")) return "Invalid email: invalid local part.";
-        if (local.contains("..")) return "Invalid email: local part cannot have consecutive dots.";
-        if (domain.isEmpty()) return "Invalid email: domain cannot be empty.";
-        if (!domain.matches("^[a-zA-Z0-9][a-zA-Z0-9.-]*\\.[a-zA-Z]{2,}$")) return "Invalid email: invalid domain.";
-        if (domain.contains("..")) return "Invalid email: domain cannot have consecutive dots.";
-        if (email.matches(".*[?><, \"';:\\\\/|\\[\\]{}()+*&^%$#!].*")) return "Invalid email: contains forbidden characters.";
+        if (!local.matches("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$") && local.length() > 1) {
+            return "Invalid email: invalid local part.";
+        }
+        if (local.length() == 1 && !local.matches("[a-zA-Z0-9]")) {
+            return "Invalid email: invalid local part.";
+        }
+        if (local.contains("..")) {
+            return "Invalid email: local part cannot have consecutive dots.";
+        }
+        if (domain.isEmpty()) {
+            return "Invalid email: domain cannot be empty.";
+        }
+        if (!domain.matches("^[a-zA-Z0-9][a-zA-Z0-9.-]*\\.[a-zA-Z]{2,}$")) {
+            return "Invalid email: invalid domain.";
+        }
+        if (domain.contains("..")) {
+            return "Invalid email: domain cannot have consecutive dots.";
+        }
+        if (email.matches(".*[?><, \"';:\\\\/|\\[\\]{}()+*&^%$#!].*")) {
+            return "Invalid email: contains forbidden characters.";
+        }
         return null;
     }
 }

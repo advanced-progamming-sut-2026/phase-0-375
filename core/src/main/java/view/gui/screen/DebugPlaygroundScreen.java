@@ -162,7 +162,6 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         topLeft.setFillParent(true);
         topLeft.setTouchable(Touchable.childrenOnly);
         topLeft.top().left().pad(12f);
-
         if (SunHud.showFor(App.getInstance().getCurrentGameModel())) {
             sunHud = new SunHud(skin);
             topLeft.add(sunHud).left().padBottom(8f).row();
@@ -170,51 +169,64 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         statusLabel = new Label("", skin, "secondary");
         statusLabel.setWrap(true);
         topLeft.add(statusLabel).width(720f).left().padBottom(8f).row();
-
-        Table panel = new Table();
-        panel.defaults().pad(3f);
-
-        // Row 1 — tools that pick entities
-        panel.add(toolButton("Plant", Tool.PLANT, true)).width(120f).height(44f);
-        panel.add(toolButton("Zombie", Tool.ZOMBIE, true)).width(120f).height(44f);
-        panel.add(toolButton("Iced zombie", Tool.ICED, true)).width(150f).height(44f);
-        panel.add(toolButton("Shovel", Tool.SHOVEL, false)).width(120f).height(44f);
-        panel.row();
-
-        // Row 2 — cell tools
-        panel.add(toolButton("Feed", Tool.FEED, false)).width(120f).height(44f);
-        panel.add(toolButton("Collect sun", Tool.COLLECT_SUN, false)).width(150f).height(44f);
-        panel.row();
-
-        // Row 3 — cheats
-        panel.add(actionButton("+1000 sun", this::cheatAddSun, "purple")).width(140f).height(44f);
-        panel.add(actionButton("+PF", this::cheatAddPf, "purple")).width(90f).height(44f);
-        panel.add(actionButton("Nuke", this::cheatNuke, "purple")).width(100f).height(44f);
-        panel.row();
-
-        // Row 4 — water band (same WaterBand / underlayer beach will use)
-        panel.add(actionButton("Water", this::toggleWater, "purple")).width(120f).height(44f);
-        panel.add(actionButton("Water left", this::waterLeft, "purple")).width(140f).height(44f);
-        panel.add(actionButton("Water right", this::waterRight, "purple")).width(150f).height(44f);
-        panel.row();
-
-        // Row 5 — sim control
-        panel.add(actionButton("Pause/Resume", this::togglePause, "purple")).width(160f).height(44f);
-        panel.add(actionButton("Exit", this::exitToAdventure, "brown")).width(100f).height(44f);
-        panel.row();
-
-        // Row 6 — special spawns (sandstorm, low-tide ambush surface)
-        panel.add(actionButton("Sandstorm", this::spawnSandstorm, "purple")).width(140f).height(44f);
-        panel.add(toolButton("Low tide", Tool.LOW_TIDE, true)).width(140f).height(44f);
-
-        topLeft.add(panel).left();
+        topLeft.add(toolPanel()).left();
         uiStage.addActor(topLeft);
-
         pickerPanel = new Table();
         pickerPanel.setVisible(false);
         pickerPanel.setFillParent(true);
         uiStage.addActor(pickerPanel);
         toast.toFront();
+    }
+
+    private Table toolPanel() {
+        Table panel = new Table();
+        panel.defaults().pad(3f);
+        addEntityToolRow(panel);
+        addCellToolRow(panel);
+        addCheatRow(panel);
+        addWaterRow(panel);
+        addSimRow(panel);
+        addSpecialRow(panel);
+        return panel;
+    }
+
+    private void addEntityToolRow(Table panel) {
+        panel.add(toolButton("Plant", Tool.PLANT, true)).width(120f).height(44f);
+        panel.add(toolButton("Zombie", Tool.ZOMBIE, true)).width(120f).height(44f);
+        panel.add(toolButton("Iced zombie", Tool.ICED, true)).width(150f).height(44f);
+        panel.add(toolButton("Shovel", Tool.SHOVEL, false)).width(120f).height(44f);
+        panel.row();
+    }
+
+    private void addCellToolRow(Table panel) {
+        panel.add(toolButton("Feed", Tool.FEED, false)).width(120f).height(44f);
+        panel.add(toolButton("Collect sun", Tool.COLLECT_SUN, false)).width(150f).height(44f);
+        panel.row();
+    }
+
+    private void addCheatRow(Table panel) {
+        panel.add(actionButton("+1000 sun", this::cheatAddSun, "purple")).width(140f).height(44f);
+        panel.add(actionButton("+PF", this::cheatAddPf, "purple")).width(90f).height(44f);
+        panel.add(actionButton("Nuke", this::cheatNuke, "purple")).width(100f).height(44f);
+        panel.row();
+    }
+
+    private void addWaterRow(Table panel) {
+        panel.add(actionButton("Water", this::toggleWater, "purple")).width(120f).height(44f);
+        panel.add(actionButton("Water left", this::waterLeft, "purple")).width(140f).height(44f);
+        panel.add(actionButton("Water right", this::waterRight, "purple")).width(150f).height(44f);
+        panel.row();
+    }
+
+    private void addSimRow(Table panel) {
+        panel.add(actionButton("Pause/Resume", this::togglePause, "purple")).width(160f).height(44f);
+        panel.add(actionButton("Exit", this::exitToAdventure, "brown")).width(100f).height(44f);
+        panel.row();
+    }
+
+    private void addSpecialRow(Table panel) {
+        panel.add(actionButton("Sandstorm", this::spawnSandstorm, "purple")).width(140f).height(44f);
+        panel.add(toolButton("Low tide", Tool.LOW_TIDE, true)).width(140f).height(44f);
     }
 
     private TextButton toolButton(String label, Tool next, boolean openPicker) {
@@ -251,63 +263,81 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
         pickerPanel.setVisible(true);
         pickerPanel.center();
         clearHover();
-
         BorderedTable card = new BorderedTable();
         card.pad(16f);
-        card.add(new Label(plants ? "Choose a plant" : "Choose a zombie", skin, "big")).padBottom(12f).row();
-
+        card.add(new Label(plants ? "Choose a plant" : "Choose a zombie", skin, "big"))
+                .padBottom(12f).row();
         Table list = new Table();
         list.top().left();
         TextureRegionDrawable avatarDrawable =
                 new TextureRegionDrawable(new TextureRegion(placeholderAvatar));
-
         if (plants) {
-            for (String name : plantNames()) {
-                addPickerRow(list, avatarDrawable, name, () -> {
-                    selectedPlant = name;
-                    tool = Tool.PLANT;
-                    GameModel model = App.getInstance().getCurrentGameModel();
-                    if (model != null) {
-                        model.setImitaterCopyTarget(name);
-                    }
-                    closePicker();
-                    refreshStatus();
-                    showToast("Selected " + name, false);
-                });
-            }
+            fillPlantPicker(list, avatarDrawable);
         } else {
-            Chapter lastHeader = null;
-            boolean exclusiveHeader = false;
-            for (ZombiePick pick : zombiePicks()) {
-                if (pick.chapter != null && pick.chapter != lastHeader) {
-                    lastHeader = pick.chapter;
-                    list.add(new Label(chapterTitle(pick.chapter), skin, "big"))
-                            .left().padTop(10f).padBottom(6f).row();
-                } else if (pick.chapter == null && !exclusiveHeader) {
-                    exclusiveHeader = true;
-                    list.add(new Label("Exclusive", skin, "big"))
-                            .left().padTop(10f).padBottom(6f).row();
-                }
-                ZombiePick chosen = pick;
-                addPickerRow(list, avatarDrawable, pick.label, () -> {
-                    selectedZombie = chosen.name;
-                    selectedZombieChapter = chosen.chapter;
-                    tool = icedPick ? Tool.ICED : (lowTidePick ? Tool.LOW_TIDE : Tool.ZOMBIE);
-                    closePicker();
-                    refreshStatus();
-                    showToast("Selected " + chosen.label, false);
-                });
-            }
+            fillZombiePicker(list, avatarDrawable);
         }
+        ScrollPane scroll = pickerScroll(list);
+        card.add(scroll).width(620f).height(480f).growX().row();
+        card.add(pickerCloseButton()).width(160f).height(48f).padTop(12f);
+        pickerPanel.add(card);
+        pickerPanel.toFront();
+        toast.toFront();
+        uiStage.setScrollFocus(scroll);
+        uiStage.setKeyboardFocus(scroll);
+    }
 
+    private void fillPlantPicker(Table list, TextureRegionDrawable avatarDrawable) {
+        for (String name : plantNames()) {
+            addPickerRow(list, avatarDrawable, name, () -> {
+                selectedPlant = name;
+                tool = Tool.PLANT;
+                GameModel model = App.getInstance().getCurrentGameModel();
+                if (model != null) {
+                    model.setImitaterCopyTarget(name);
+                }
+                closePicker();
+                refreshStatus();
+                showToast("Selected " + name, false);
+            });
+        }
+    }
+
+    private void fillZombiePicker(Table list, TextureRegionDrawable avatarDrawable) {
+        Chapter lastHeader = null;
+        boolean exclusiveHeader = false;
+        for (ZombiePick pick : zombiePicks()) {
+            if (pick.chapter != null && pick.chapter != lastHeader) {
+                lastHeader = pick.chapter;
+                list.add(new Label(chapterTitle(pick.chapter), skin, "big"))
+                        .left().padTop(10f).padBottom(6f).row();
+            } else if (pick.chapter == null && !exclusiveHeader) {
+                exclusiveHeader = true;
+                list.add(new Label("Exclusive", skin, "big"))
+                        .left().padTop(10f).padBottom(6f).row();
+            }
+            ZombiePick chosen = pick;
+            addPickerRow(list, avatarDrawable, pick.label, () -> {
+                selectedZombie = chosen.name;
+                selectedZombieChapter = chosen.chapter;
+                tool = icedPick ? Tool.ICED : (lowTidePick ? Tool.LOW_TIDE : Tool.ZOMBIE);
+                closePicker();
+                refreshStatus();
+                showToast("Selected " + chosen.label, false);
+            });
+        }
+    }
+
+    private ScrollPane pickerScroll(Table list) {
         ScrollPane scroll = new ScrollPane(list, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
         scroll.setFlickScroll(true);
         scroll.setScrollbarsVisible(true);
         scroll.setForceScroll(false, true);
-        card.add(scroll).width(620f).height(480f).growX().row();
+        return scroll;
+    }
 
+    private TextButton pickerCloseButton() {
         TextButton close = new TextButton("Close", skin, "brown");
         close.addListener(new ChangeListener() {
             @Override
@@ -316,13 +346,7 @@ public final class DebugPlaygroundScreen extends AbstractGameplayScreen {
                 refreshStatus();
             }
         });
-        card.add(close).width(160f).height(48f).padTop(12f);
-
-        pickerPanel.add(card);
-        pickerPanel.toFront();
-        toast.toFront();
-        uiStage.setScrollFocus(scroll);
-        uiStage.setKeyboardFocus(scroll);
+        return close;
     }
 
     private void closePicker() {

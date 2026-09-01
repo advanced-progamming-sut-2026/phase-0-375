@@ -111,7 +111,6 @@ public final class SettingsOverlay {
             this.toast = toast;
             this.onResourceBarRefresh = onResourceBarRefresh;
             syncing = true;
-
             card = new BorderedTable();
             card.pad(CARD_PAD_Y, CARD_PAD_X, CARD_PAD_Y, CARD_PAD_X);
             Label title = new Label("Settings", skin, "big");
@@ -121,7 +120,16 @@ public final class SettingsOverlay {
             summary.setColor(MUTED);
             summary.setWrap(true);
             card.add(summary).width(CARD_WIDTH - CARD_PAD_X * 2f - 24f).padBottom(18f).row();
+            addDifficultyRow();
+            addSpeedRow();
+            addDisplayRow();
+            addAudioRow();
+            back = new TextButton("Back", skin, "brown");
+            UiMotion.bindPressScale(back);
+            card.add(back).width(220f).height(56f);
+        }
 
+        private void addDifficultyRow() {
             card.add(sectionLabel(skin, "Difficulty")).left().padBottom(6f).row();
             difficultyGroup = new ButtonGroup<>();
             difficultyGroup.setMaxCheckCount(1);
@@ -144,7 +152,9 @@ public final class SettingsOverlay {
                 difficultyRow.add(button).width(72f).height(ROW_HEIGHT).padRight(8f);
             }
             card.add(difficultyRow).left().padBottom(16f).row();
+        }
 
+        private void addSpeedRow() {
             card.add(sectionLabel(skin, "Game speed")).left().padBottom(6f).row();
             speedGroup = new ButtonGroup<>();
             speedGroup.setMaxCheckCount(1);
@@ -167,88 +177,79 @@ public final class SettingsOverlay {
                 speedRow.add(button).width(96f).height(ROW_HEIGHT).padRight(8f);
             }
             card.add(speedRow).left().padBottom(16f).row();
+        }
 
+        private void addDisplayRow() {
             card.add(sectionLabel(skin, "Display & debug")).left().padBottom(6f).row();
             lawnGrid = new CheckBox(" Show lawn grid (red lines in game)", skin);
             lawnGrid.getLabel().setColor(MUTED);
             lawnGrid.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (syncing) {
-                        return;
+                    if (!syncing) {
+                        applyLawnGrid(lawnGrid.isChecked());
                     }
-                    applyLawnGrid(lawnGrid.isChecked());
                 }
             });
             card.add(lawnGrid).left().padBottom(8f).row();
-
-            debugMode = new CheckBox(" Debug mode (all levels / coins / gems / sun / plant food cheats)", skin);
+            debugMode = new CheckBox(
+                    " Debug mode (all levels / coins / gems / sun / plant food cheats)", skin);
             debugMode.getLabel().setColor(MUTED);
             debugMode.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
-                    if (syncing) {
-                        return;
+                    if (!syncing) {
+                        applyDebugMode(debugMode.isChecked());
                     }
-                    applyDebugMode(debugMode.isChecked());
                 }
             });
             card.add(debugMode).left().padBottom(16f).row();
+        }
 
+        private void addAudioRow() {
             card.add(sectionLabel(skin, "Audio")).left().padBottom(6f).row();
             musicValue = new Label("100%", skin, "medium");
             musicValue.setColor(INK);
             musicSlider = volumeSlider(skin);
-            musicSlider.addListener(new ChangeListener() {
-                @Override
-                public void changed(ChangeEvent event, Actor actor) {
-                    if (syncing) {
-                        return;
-                    }
-                    float volume = musicSlider.getValue() / 100f;
-                    musicValue.setText(Math.round(musicSlider.getValue()) + "%");
-                    GameAudio.get().setMusicVolume(volume);
-                }
-            });
-            musicSlider.addListener(new ClickListener() {
-                @Override
-                public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                    super.touchUp(event, x, y, pointer, button);
-                    if (!syncing) {
-                        applyMusicVolume(musicSlider.getValue() / 100f);
-                    }
-                }
-            });
+            bindVolumeSlider(musicSlider, musicValue, true);
             card.add(volumeRow(skin, "Music", musicSlider, musicValue)).growX().padBottom(10f).row();
-
             sfxValue = new Label("100%", skin, "medium");
             sfxValue.setColor(INK);
             sfxSlider = volumeSlider(skin);
-            sfxSlider.addListener(new ChangeListener() {
+            bindVolumeSlider(sfxSlider, sfxValue, false);
+            card.add(volumeRow(skin, "SFX", sfxSlider, sfxValue)).growX().padBottom(20f).row();
+        }
+
+        private void bindVolumeSlider(Slider slider, Label valueLabel, boolean music) {
+            slider.addListener(new ChangeListener() {
                 @Override
                 public void changed(ChangeEvent event, Actor actor) {
                     if (syncing) {
                         return;
                     }
-                    float volume = sfxSlider.getValue() / 100f;
-                    sfxValue.setText(Math.round(sfxSlider.getValue()) + "%");
-                    GameAudio.get().setSfxVolume(volume);
-                }
-            });
-            sfxSlider.addListener(new ClickListener() {
-                @Override
-                public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                    super.touchUp(event, x, y, pointer, button);
-                    if (!syncing) {
-                        applySfxVolume(sfxSlider.getValue() / 100f);
+                    float volume = slider.getValue() / 100f;
+                    valueLabel.setText(Math.round(slider.getValue()) + "%");
+                    if (music) {
+                        GameAudio.get().setMusicVolume(volume);
+                    } else {
+                        GameAudio.get().setSfxVolume(volume);
                     }
                 }
             });
-            card.add(volumeRow(skin, "SFX", sfxSlider, sfxValue)).growX().padBottom(20f).row();
-
-            back = new TextButton("Back", skin, "brown");
-            UiMotion.bindPressScale(back);
-            card.add(back).width(220f).height(56f);
+            slider.addListener(new ClickListener() {
+                @Override
+                public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                    super.touchUp(event, x, y, pointer, button);
+                    if (syncing) {
+                        return;
+                    }
+                    if (music) {
+                        applyMusicVolume(slider.getValue() / 100f);
+                    } else {
+                        applySfxVolume(slider.getValue() / 100f);
+                    }
+                }
+            });
         }
 
         void refreshFromUser() {

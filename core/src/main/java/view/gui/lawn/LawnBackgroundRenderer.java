@@ -96,54 +96,35 @@ public final class LawnBackgroundRenderer {
 
     public void draw(Batch batch) {
         ensureLoaded();
-
-        TextureRegion left = textures.region(style.leftId());
-        if (left != null) {
-            batch.draw(
-                    left,
-                    LawnLayout.TEXTURE_LEFT_X,
-                    0f,
-                    LawnLayout.TEXTURE_LEFT_WIDTH,
-                    LawnLayout.TEXTURE_HEIGHT);
+        drawRegion(batch, style.leftId(), LawnLayout.TEXTURE_LEFT_X, 0f,
+                LawnLayout.TEXTURE_LEFT_WIDTH, LawnLayout.TEXTURE_HEIGHT);
+        drawCenter(batch);
+        drawRegion(batch, style.rightId(), LawnLayout.TEXTURE_RIGHT_X, 0f,
+                LawnLayout.TEXTURE_RIGHT_WIDTH, LawnLayout.TEXTURE_HEIGHT);
+        if (style.row05Id() != null) {
+            drawRegion(batch, style.row05Id(), LawnLayout.ROW05_DRAW_X, LawnLayout.ROW05_DRAW_Y,
+                    LawnLayout.ROW05_WIDTH, LawnLayout.ROW05_HEIGHT);
         }
+    }
 
+    private void drawCenter(Batch batch) {
         TextureRegion base = textures.region(style.centerId());
-        if (base != null) {
-            float h = LawnLayout.TEXTURE_HEIGHT;
-            float y = 0f;
-            if (Style.ICE_AGE.equals(style)) {
-                h = base.getRegionHeight();
-                y = LawnLayout.WORLD_HEIGHT - h;
-            }
-            batch.draw(
-                    base,
-                    LawnLayout.TEXTURE_ORIGIN_X,
-                    y,
-                    LawnLayout.TEXTURE_WIDTH,
-                    h);
-        }
-
-        TextureRegion right = textures.region(style.rightId());
-        if (right != null) {
-            batch.draw(
-                    right,
-                    LawnLayout.TEXTURE_RIGHT_X,
-                    0f,
-                    LawnLayout.TEXTURE_RIGHT_WIDTH,
-                    LawnLayout.TEXTURE_HEIGHT);
-        }
-
-        if (style.row05Id() == null) {
+        if (base == null) {
             return;
         }
-        TextureRegion row05 = textures.region(style.row05Id());
-        if (row05 != null) {
-            batch.draw(
-                    row05,
-                    LawnLayout.ROW05_DRAW_X,
-                    LawnLayout.ROW05_DRAW_Y,
-                    LawnLayout.ROW05_WIDTH,
-                    LawnLayout.ROW05_HEIGHT);
+        float h = LawnLayout.TEXTURE_HEIGHT;
+        float y = 0f;
+        if (Style.ICE_AGE.equals(style)) {
+            h = base.getRegionHeight();
+            y = LawnLayout.WORLD_HEIGHT - h;
+        }
+        batch.draw(base, LawnLayout.TEXTURE_ORIGIN_X, y, LawnLayout.TEXTURE_WIDTH, h);
+    }
+
+    private void drawRegion(Batch batch, String id, float x, float y, float w, float h) {
+        TextureRegion region = textures.region(id);
+        if (region != null) {
+            batch.draw(region, x, y, w, h);
         }
     }
 }

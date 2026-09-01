@@ -67,22 +67,22 @@ public final class PotSlotActor extends Table {
     private final TextureBank textures;
     private final Listener listener;
 
-    private final Image potImage;
-    private final Image overlayImage;
-    private final Image emptySlotImage;
-    private final Table emptyWrap;
-    private final TextButton unlockButton;
-    private final Table unlockWrap;
-    private final Label unlockPriceLabel;
-    private final PotPlantView plantView;
-    private final Table metaRow;
-    private final Stack timerStack;
-    private final Image timerBg;
-    private final Label timerLabel;
-    private final Stack growStack;
-    private final Image growChrome;
-    private final Label growCostLabel;
-    private final TextButton collectButton;
+    private Image potImage;
+    private Image overlayImage;
+    private Image emptySlotImage;
+    private Table emptyWrap;
+    private TextButton unlockButton;
+    private Table unlockWrap;
+    private Label unlockPriceLabel;
+    private PotPlantView plantView;
+    private Table metaRow;
+    private Stack timerStack;
+    private Image timerBg;
+    private Label timerLabel;
+    private Stack growStack;
+    private Image growChrome;
+    private Label growCostLabel;
+    private TextButton collectButton;
     private PotState lastState;
 
     public PotSlotActor(int potX, int potY, Skin skin, PvzAssets assets, PamClipCache clips,
@@ -91,21 +91,28 @@ public final class PotSlotActor extends Table {
         this.potY = potY;
         this.textures = assets.textures;
         this.listener = listener;
-
         setTransform(false);
         pad(0f);
         setTouchable(Touchable.childrenOnly);
+        initPotImages();
+        initUnlock(skin);
+        plantView = new PotPlantView(assets, clips);
+        initTimer(skin);
+        initGrow(skin);
+        initCollect(skin);
+        layoutSlot(assemblePotStack());
+        addListener(new SlotClick());
+    }
 
+    private void initPotImages() {
         TextureRegion potReg = textures.region(ZenGardenArt.SLOT);
         potImage = potReg != null
             ? new Image(new TextureRegionDrawable(potReg))
             : new Image();
         potImage.setTouchable(Touchable.disabled);
-
         overlayImage = new Image();
         overlayImage.setVisible(false);
         overlayImage.setTouchable(Touchable.disabled);
-
         emptySlotImage = regionImage(ZenGardenArt.EMPTY_SLOT);
         emptySlotImage.setVisible(false);
         emptySlotImage.setTouchable(Touchable.enabled);
@@ -116,7 +123,9 @@ public final class PotSlotActor extends Table {
                 firePlant();
             }
         });
+    }
 
+    private void initUnlock(Skin skin) {
         unlockButton = new TextButton("", skin, "purple");
         unlockButton.setVisible(false);
         unlockButton.addListener(new ChangeListener() {
@@ -126,13 +135,15 @@ public final class PotSlotActor extends Table {
             }
         });
         unlockPriceLabel = new Label(String.valueOf(POT_PRICE),
-            new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", UNLOCK_PRICE_FONT_SCALE)), Color.WHITE));
+                new Label.LabelStyle(
+                        SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", UNLOCK_PRICE_FONT_SCALE)),
+                        Color.WHITE));
         unlockPriceLabel.setAlignment(Align.left);
         unlockPriceLabel.setTouchable(Touchable.disabled);
         unlockPriceLabel.setVisible(false);
+    }
 
-        plantView = new PotPlantView(assets, clips);
-
+    private Stack assemblePotStack() {
         Stack potStack = new Stack();
         potStack.setTouchable(Touchable.childrenOnly);
         potStack.add(potImage);
@@ -144,9 +155,16 @@ public final class PotSlotActor extends Table {
         overlayWrap.setTouchable(Touchable.childrenOnly);
         overlayWrap.add(overlayImage).expand().center().padBottom(18f);
         potStack.add(overlayWrap);
-        unlockWrap = new Table();
-        unlockWrap.setTouchable(Touchable.childrenOnly);
-        unlockWrap.setVisible(false);
+        unlockWrap = buildUnlockWrap();
+        potStack.add(unlockWrap);
+        potStack.add(plantView);
+        return potStack;
+    }
+
+    private Table buildUnlockWrap() {
+        Table wrap = new Table();
+        wrap.setTouchable(Touchable.childrenOnly);
+        wrap.setVisible(false);
         Stack unlockStack = new Stack();
         unlockStack.setTouchable(Touchable.childrenOnly);
         unlockStack.add(unlockButton);
@@ -156,12 +174,14 @@ public final class PotSlotActor extends Table {
         unlockPriceWrap.add(coinIcon).size(BUY_COIN_ICON, BUY_COIN_ICON).padRight(4f);
         unlockPriceWrap.add(unlockPriceLabel);
         unlockStack.add(unlockPriceWrap);
-        unlockWrap.add(unlockStack).size(BUY_POT_W, BUY_POT_H).expand().center();
-        potStack.add(unlockWrap);
-        potStack.add(plantView);
+        wrap.add(unlockStack).size(BUY_POT_W, BUY_POT_H).expand().center();
+        return wrap;
+    }
 
+    private void initTimer(Skin skin) {
         timerBg = regionImage(ZenGardenArt.TIMER_BG);
-        timerLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", TIMER_FONT_SCALE)), Color.WHITE));
+        timerLabel = new Label("", new Label.LabelStyle(
+                SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", TIMER_FONT_SCALE)), Color.WHITE));
         timerLabel.setAlignment(Align.center);
         timerStack = new Stack();
         timerStack.add(timerBg);
@@ -170,9 +190,12 @@ public final class PotSlotActor extends Table {
         timerText.add(timerLabel).expand().center();
         timerStack.add(timerText);
         timerStack.setVisible(false);
+    }
 
+    private void initGrow(Skin skin) {
         growChrome = regionImage(ZenGardenArt.UNLOCK_ACTIVE);
-        growCostLabel = new Label("", new Label.LabelStyle(SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", GROW_FONT_SCALE)), Color.WHITE));
+        growCostLabel = new Label("", new Label.LabelStyle(
+                SkinFonts.outlined(SkinFonts.getScaled(skin, "medium", GROW_FONT_SCALE)), Color.WHITE));
         growCostLabel.setAlignment(Align.center);
         growCostLabel.setTouchable(Touchable.disabled);
         growStack = new Stack();
@@ -189,7 +212,9 @@ public final class PotSlotActor extends Table {
                 fireGrow();
             }
         });
+    }
 
+    private void initCollect(Skin skin) {
         collectButton = new TextButton("Collect", skin, "brown");
         SkinFonts.scaleButton(collectButton, skin, "brown", 0.68f);
         collectButton.setVisible(false);
@@ -199,36 +224,36 @@ public final class PotSlotActor extends Table {
                 fireCollect();
             }
         });
-
         metaRow = new Table();
         metaRow.setTouchable(Touchable.childrenOnly);
         metaRow.defaults().center();
         metaRow.add(timerStack).size(TIMER_W, TIMER_H).padRight(META_GAP);
         metaRow.add(growStack).size(UNLOCK_W, UNLOCK_H);
+    }
 
+    private void layoutSlot(Stack potStack) {
         add(potStack).size(POT_W, POT_H).row();
         add(metaRow).padTop(META_PAD_TOP).row();
         add(collectButton).width(ACTION_W).height(ACTION_H).padTop(2f);
+    }
 
-        addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                if (event.getTarget().isDescendantOf(growStack)
-                    || event.getTarget().isDescendantOf(collectButton)
-                    || event.getTarget().isDescendantOf(unlockButton)
-                    || event.getTarget().isDescendantOf(emptySlotImage)) {
-                    return;
-                }
-                // Growing plants ignore pot clicks — only the gem button grows.
-                if (lastState == PotState.EMPTY) {
-                    firePlant();
-                } else if (lastState == PotState.READY) {
-                    fireCollect();
-                } else if (lastState == PotState.LOCKED) {
-                    fireUnlock();
-                }
+    private final class SlotClick extends ClickListener {
+        @Override
+        public void clicked(InputEvent event, float x, float y) {
+            if (event.getTarget().isDescendantOf(growStack)
+                || event.getTarget().isDescendantOf(collectButton)
+                || event.getTarget().isDescendantOf(unlockButton)
+                || event.getTarget().isDescendantOf(emptySlotImage)) {
+                return;
             }
-        });
+            if (lastState == PotState.EMPTY) {
+                firePlant();
+            } else if (lastState == PotState.READY) {
+                fireCollect();
+            } else if (lastState == PotState.LOCKED) {
+                fireUnlock();
+            }
+        }
     }
 
     @Override
@@ -293,65 +318,71 @@ public final class PotSlotActor extends Table {
         pot.isReady();
         PotState state = pot.getState();
         lastState = state;
-
         switch (state) {
-            case LOCKED -> {
-                potImage.setColor(0.45f, 0.45f, 0.5f, 0.85f);
-                plantView.clearPlant();
-                emptySlotImage.setVisible(false);
-                emptySlotImage.setTouchable(Touchable.disabled);
-                if (purchasable) {
-                    clearOverlay();
-                    setUnlockVisible(true);
-                } else {
-                    setUnlockVisible(false);
-                    setOverlay(ZenGardenArt.LOCKED_ICON, 36f, 48f);
-                }
-                hideTimer();
-                hideGrow();
-                collectButton.setVisible(false);
-            }
-            case EMPTY -> {
-                potImage.setColor(Color.WHITE);
-                plantView.clearPlant();
-                clearOverlay();
-                setUnlockVisible(false);
-                emptySlotImage.setVisible(true);
-                emptySlotImage.setTouchable(Touchable.enabled);
-                hideTimer();
-                hideGrow();
-                collectButton.setVisible(false);
-            }
-            case GROWING -> {
-                potImage.setColor(Color.WHITE);
-                emptySlotImage.setVisible(false);
-                emptySlotImage.setTouchable(Touchable.disabled);
-                setUnlockVisible(false);
-                String plant = pot.getPlantType();
-                plantView.setPlant(plant, false);
-                if (plantView.isClipReady()) {
-                    clearOverlay();
-                } else {
-                    setOverlay(ZenGardenArt.SPROUT, 40f, 26f);
-                }
-                showTimer(formatRemaining(pot.getRemainingGrowthHours()));
-                showGrow(pot.accelerationCost());
-                collectButton.setVisible(false);
-            }
-            case READY -> {
-                potImage.setColor(Color.WHITE);
-                emptySlotImage.setVisible(false);
-                emptySlotImage.setTouchable(Touchable.disabled);
-                setUnlockVisible(false);
-                String plant = pot.getPlantType();
-                plantView.setPlant(plant, true);
-                setOverlay(ZenGardenArt.HIGHLIGHT, 86f, 86f);
-                showTimer("Ready!");
-                hideGrow();
-                collectButton.setVisible(true);
-            }
+            case LOCKED -> refreshLocked(purchasable);
+            case EMPTY -> refreshEmpty();
+            case GROWING -> refreshGrowing(pot);
+            case READY -> refreshReady(pot);
         }
         refreshMetaRow();
+    }
+
+    private void refreshLocked(boolean purchasable) {
+        potImage.setColor(0.45f, 0.45f, 0.5f, 0.85f);
+        plantView.clearPlant();
+        emptySlotImage.setVisible(false);
+        emptySlotImage.setTouchable(Touchable.disabled);
+        if (purchasable) {
+            clearOverlay();
+            setUnlockVisible(true);
+        } else {
+            setUnlockVisible(false);
+            setOverlay(ZenGardenArt.LOCKED_ICON, 36f, 48f);
+        }
+        hideTimer();
+        hideGrow();
+        collectButton.setVisible(false);
+    }
+
+    private void refreshEmpty() {
+        potImage.setColor(Color.WHITE);
+        plantView.clearPlant();
+        clearOverlay();
+        setUnlockVisible(false);
+        emptySlotImage.setVisible(true);
+        emptySlotImage.setTouchable(Touchable.enabled);
+        hideTimer();
+        hideGrow();
+        collectButton.setVisible(false);
+    }
+
+    private void refreshGrowing(Pot pot) {
+        potImage.setColor(Color.WHITE);
+        emptySlotImage.setVisible(false);
+        emptySlotImage.setTouchable(Touchable.disabled);
+        setUnlockVisible(false);
+        String plant = pot.getPlantType();
+        plantView.setPlant(plant, false);
+        if (plantView.isClipReady()) {
+            clearOverlay();
+        } else {
+            setOverlay(ZenGardenArt.SPROUT, 40f, 26f);
+        }
+        showTimer(formatRemaining(pot.getRemainingGrowthHours()));
+        showGrow(pot.accelerationCost());
+        collectButton.setVisible(false);
+    }
+
+    private void refreshReady(Pot pot) {
+        potImage.setColor(Color.WHITE);
+        emptySlotImage.setVisible(false);
+        emptySlotImage.setTouchable(Touchable.disabled);
+        setUnlockVisible(false);
+        plantView.setPlant(pot.getPlantType(), true);
+        setOverlay(ZenGardenArt.HIGHLIGHT, 86f, 86f);
+        showTimer("Ready!");
+        hideGrow();
+        collectButton.setVisible(true);
     }
 
     private void showTimer(String text) {

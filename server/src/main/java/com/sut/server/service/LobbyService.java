@@ -18,7 +18,6 @@ import model.network.packet.InviteStatusPacket;
 import model.network.packet.matchmaking.CancelMatchmakingPacket;
 import model.network.packet.matchmaking.MatchmakingRequestPacket;
 import model.network.packet.matchmaking.MatchmakingResponsePacket;
-import model.network.packet.system.ErrorMessagePacket;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -200,148 +199,61 @@ public class LobbyService {
     /**
      * Handles inbound direct invite requests from an inviter client.
      */
-    public synchronized void handleInviteRequest(ClientConnectionHandler connection, InviteRequestPacket packet) {
-        if (connection == null || connection.isClosed() || packet == null) return;
-
+    public synchronized void handleInviteRequest(
+            ClientConnectionHandler connection, InviteRequestPacket packet) {
+        if (connection == null || connection.isClosed() || packet == null) {
+            return;
+        }
         String targetUsername = packet.getTargetUsername();
         if (targetUsername == null || targetUsername.trim().isEmpty()) {
-            connection.sendPacket(new InviteStatusPacket(null, InviteStatus.NOT_FOUND, "Target username cannot be empty."));
+            sendInvite(connection, null, InviteStatus.NOT_FOUND, "Target username cannot be empty.");
             return;
         }
         targetUsername = targetUsername.trim();
-
-        String inviterUsername = connection.getUsername();
-        if (inviterUsername == null || inviterUsername.isBlank()) {
-            inviterUsername = packet.getInviterUsername() != null ? packet.getInviterUsername() : "Player";
-        }
-
-        // 1. Cannot invite self
-        if (targetUsername.equalsIgnoreCase(inviterUsername)) {
-            connection.sendPacket(new InviteStatusPacket(null, InviteStatus.NOT_FOUND, "Cannot invite yourself."));
+        String inviterUsername = resolveInviterUsername(connection, packet);
+        ClientConnectionHandler targetConn = findInviteTarget(
+                connection, targetUsername, inviterUsername);
+        if (targetConn == null) {
             return;
         }
-
-        // 2. Inviter in an active match guard
-        if (roomManager.getRoomForPlayer(connection) != null) {
-            connection.sendPacket(new InviteStatusPacket(null, InviteStatus.BUSY, "You are currently in an active multiplayer game."));
-            return;
-        }
-
-        // 3. Look up target client
-        ClientConnectionHandler targetConn = findConnection(targetUsername);
-        if (targetConn == null || targetConn.isClosed()) {
-            connection.sendPacket(new InviteStatusPacket(null, InviteStatus.OFFLINE, "User '" + targetUsername + "' is offline or not found."));
-            return;
-        }
-
-        // 4. Target busy in active multiplayer match guard (Auto-reject without disrupting target's active game)
-        if (roomManager.getRoomForPlayer(targetConn) != null) {
-            connection.sendPacket(new InviteStatusPacket(null, InviteStatus.BUSY, "'" + targetUsername + "' is currently in an active multiplayer match."));
-            return;
-        }
-
-        // 5. Cancel any prior pending invite sent by this inviter
         cancelPendingInvitesByInviter(connection);
-
-        // 6. Formulate new pending invite
-        String inviteId = "inv-" + UUID.randomUUID().toString().substring(0, 8);
-        PlayerRole inviterRole = packet.getPreferredRole() != null ? packet.getPreferredRole() : PlayerRole.ANY;
-        PendingInvite pending = new PendingInvite(inviteId, connection, targetConn, inviterUsername, targetUsername, inviterRole);
-
-        // 7. Register authoritative 10-second server timeout task
-        ScheduledExecutorService executor = roomManager.getScheduledExecutor() != null ? roomManager.getScheduledExecutor() : fallbackScheduler;
-        ScheduledFuture<?> timeoutFuture = executor.schedule(() -> {
-            handleInviteTimeout(inviteId);
-        }, 10, TimeUnit.SECONDS);
-        pending.setTimeoutFuture(timeoutFuture);
-
-        pendingInvites.put(inviteId, pending);
-
-        // 8. Send status to inviter
-        connection.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.PENDING,
-                "Invite sent to " + targetUsername + ". Waiting for response (10s)..."));
-
-        // 9. Forward InviteReceivedPacket to target client with 10s deadline
-        targetConn.sendPacket(new InviteReceivedPacket(inviteId, inviterUsername, inviterRole, 10));
-        System.out.println("[LobbyService] Direct invite " + inviteId + " sent from " + inviterUsername + " to " + targetUsername);
+        dispatchInvite(connection, targetConn, inviterUsername, targetUsername,
+                packet.getPreferredRole());
     }
 
     /**
      * Handles target client's decision on an incoming invite (ACCEPT, DECLINE, TIMEOUT).
      */
-    public synchronized void handleInviteResponse(ClientConnectionHandler connection, InviteResponsePacket packet) {
-        if (connection == null || packet == null) return;
-
-        String inviteId = packet.getInviteId();
-        if (inviteId == null) return;
-
-        PendingInvite pending = pendingInvites.remove(inviteId);
-        if (pending == null) {
-            // Expired, already resolved, or cancelled
+    public synchronized void handleInviteResponse(
+            ClientConnectionHandler connection, InviteResponsePacket packet) {
+        if (connection == null || packet == null) {
             return;
         }
-
-        // Cancel the 10s server timeout task
+        String inviteId = packet.getInviteId();
+        if (inviteId == null) {
+            return;
+        }
+        PendingInvite pending = pendingInvites.remove(inviteId);
+        if (pending == null) {
+            return;
+        }
         if (pending.getTimeoutFuture() != null) {
             pending.getTimeoutFuture().cancel(false);
         }
-
-        ClientConnectionHandler inviterConn = pending.getInviterConnection();
-        ClientConnectionHandler targetConn = pending.getTargetConnection();
-        InviteDecision decision = packet.getDecision() != null ? packet.getDecision() : InviteDecision.DECLINE;
-
+        InviteDecision decision = packet.getDecision() != null
+                ? packet.getDecision() : InviteDecision.DECLINE;
         if (decision == InviteDecision.ACCEPT) {
-            if (inviterConn.isClosed()) {
-                targetConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.OFFLINE, "Inviter disconnected."));
-                return;
-            }
-            if (targetConn.isClosed()) {
-                inviterConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.OFFLINE, "Target player disconnected."));
-                return;
-            }
-
-            if (roomManager.getRoomForPlayer(inviterConn) != null || roomManager.getRoomForPlayer(targetConn) != null) {
-                inviterConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.BUSY, "A player is already in an active room."));
-                targetConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.BUSY, "A player is already in an active room."));
-                return;
-            }
-
-            // Assign complementary roles
-            PlayerRole inviterRole = pending.getInviterRole();
-            ClientConnectionHandler plantConn;
-            ClientConnectionHandler zombieConn;
-
-            if (inviterRole == PlayerRole.PLANT) {
-                plantConn = inviterConn;
-                zombieConn = targetConn;
-            } else if (inviterRole == PlayerRole.ZOMBIE) {
-                plantConn = targetConn;
-                zombieConn = inviterConn;
-            } else {
-                plantConn = inviterConn;
-                zombieConn = targetConn;
-            }
-
-            System.out.println("[LobbyService] Direct invite " + inviteId + " accepted: "
-                    + (plantConn.getUsername() != null ? plantConn.getUsername() : "Plant") + " (PLANT) vs "
-                    + (zombieConn.getUsername() != null ? zombieConn.getUsername() : "Zombie") + " (ZOMBIE)");
-
-            inviterConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.ACCEPTED, "Invite accepted!"));
-            roomManager.createRoom(plantConn, zombieConn);
-
+            completeAcceptedInvite(inviteId, pending);
         } else if (decision == InviteDecision.DECLINE) {
-            if (!inviterConn.isClosed()) {
-                inviterConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.DECLINED,
-                        pending.getTargetUsername() + " declined the invite."));
-            }
-            System.out.println("[LobbyService] Direct invite " + inviteId + " declined by " + pending.getTargetUsername());
-
+            notifyInviter(pending, InviteStatus.DECLINED,
+                    pending.getTargetUsername() + " declined the invite.");
+            System.out.println("[LobbyService] Direct invite " + inviteId + " declined by "
+                    + pending.getTargetUsername());
         } else if (decision == InviteDecision.TIMEOUT) {
-            if (!inviterConn.isClosed()) {
-                inviterConn.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.TIMED_OUT,
-                        "Invite to " + pending.getTargetUsername() + " timed out."));
-            }
-            System.out.println("[LobbyService] Direct invite " + inviteId + " timed out by target client.");
+            notifyInviter(pending, InviteStatus.TIMED_OUT,
+                    "Invite to " + pending.getTargetUsername() + " timed out.");
+            System.out.println("[LobbyService] Direct invite " + inviteId
+                    + " timed out by target client.");
         }
     }
 
@@ -353,11 +265,13 @@ public class LobbyService {
         PendingInvite pending = pendingInvites.remove(inviteId);
         if (pending != null) {
             if (!pending.getInviterConnection().isClosed()) {
-                pending.getInviterConnection().sendPacket(new InviteStatusPacket(inviteId, InviteStatus.TIMED_OUT,
+                pending.getInviterConnection().sendPacket(new InviteStatusPacket(
+                        inviteId, InviteStatus.TIMED_OUT,
                         "Invite to " + pending.getTargetUsername() + " timed out after 10 seconds."));
             }
             if (!pending.getTargetConnection().isClosed()) {
-                pending.getTargetConnection().sendPacket(new CancelInvitePacket(inviteId, pending.getTargetUsername()));
+                pending.getTargetConnection().sendPacket(
+                        new CancelInvitePacket(inviteId, pending.getTargetUsername()));
             }
             System.out.println("[LobbyService] Direct invite " + inviteId + " server timeout executed.");
         }
@@ -376,9 +290,11 @@ public class LobbyService {
                 if (pending.getTimeoutFuture() != null) {
                     pending.getTimeoutFuture().cancel(false);
                 }
-                connection.sendPacket(new InviteStatusPacket(inviteId, InviteStatus.CANCELLED, "Invite cancelled."));
+                connection.sendPacket(new InviteStatusPacket(
+                        inviteId, InviteStatus.CANCELLED, "Invite cancelled."));
                 if (!pending.getTargetConnection().isClosed()) {
-                    pending.getTargetConnection().sendPacket(new CancelInvitePacket(inviteId, pending.getTargetUsername()));
+                    pending.getTargetConnection().sendPacket(
+                            new CancelInvitePacket(inviteId, pending.getTargetUsername()));
                 }
                 System.out.println("[LobbyService] Direct invite " + inviteId + " cancelled by inviter.");
             }
@@ -399,11 +315,195 @@ public class LobbyService {
                 it.remove();
                 removed = true;
                 if (!pending.getTargetConnection().isClosed()) {
-                    pending.getTargetConnection().sendPacket(new CancelInvitePacket(pending.getInviteId(), pending.getTargetUsername()));
+                    pending.getTargetConnection().sendPacket(
+                            new CancelInvitePacket(pending.getInviteId(), pending.getTargetUsername()));
                 }
             }
         }
         return removed;
+    }
+
+    private String resolveInviterUsername(
+            ClientConnectionHandler connection, InviteRequestPacket packet) {
+        String inviterUsername = connection.getUsername();
+        if (inviterUsername == null || inviterUsername.isBlank()) {
+            return packet.getInviterUsername() != null ? packet.getInviterUsername() : "Player";
+        }
+        return inviterUsername;
+    }
+
+    private ClientConnectionHandler findInviteTarget(
+            ClientConnectionHandler connection, String targetUsername, String inviterUsername) {
+        if (targetUsername.equalsIgnoreCase(inviterUsername)) {
+            sendInvite(connection, null, InviteStatus.NOT_FOUND, "Cannot invite yourself.");
+            return null;
+        }
+        if (roomManager.getRoomForPlayer(connection) != null) {
+            sendInvite(connection, null, InviteStatus.BUSY,
+                    "You are currently in an active multiplayer game.");
+            return null;
+        }
+        ClientConnectionHandler targetConn = findConnection(targetUsername);
+        if (targetConn == null || targetConn.isClosed()) {
+            sendInvite(connection, null, InviteStatus.OFFLINE,
+                    "User '" + targetUsername + "' is offline or not found.");
+            return null;
+        }
+        if (roomManager.getRoomForPlayer(targetConn) != null) {
+            sendInvite(connection, null, InviteStatus.BUSY,
+                    "'" + targetUsername + "' is currently in an active multiplayer match.");
+            return null;
+        }
+        return targetConn;
+    }
+
+    private void dispatchInvite(
+            ClientConnectionHandler connection,
+            ClientConnectionHandler targetConn,
+            String inviterUsername,
+            String targetUsername,
+            PlayerRole preferredRole
+    ) {
+        String inviteId = "inv-" + UUID.randomUUID().toString().substring(0, 8);
+        PlayerRole inviterRole = preferredRole != null ? preferredRole : PlayerRole.ANY;
+        PendingInvite pending = new PendingInvite(
+                inviteId, connection, targetConn, inviterUsername, targetUsername, inviterRole);
+        ScheduledExecutorService executor = roomManager.getScheduledExecutor() != null
+                ? roomManager.getScheduledExecutor() : fallbackScheduler;
+        pending.setTimeoutFuture(executor.schedule(() -> handleInviteTimeout(inviteId), 10, TimeUnit.SECONDS));
+        pendingInvites.put(inviteId, pending);
+        sendInvite(connection, inviteId, InviteStatus.PENDING,
+                "Invite sent to " + targetUsername + ". Waiting for response (10s)...");
+        targetConn.sendPacket(new InviteReceivedPacket(inviteId, inviterUsername, inviterRole, 10));
+        System.out.println("[LobbyService] Direct invite " + inviteId + " sent from "
+                + inviterUsername + " to " + targetUsername);
+    }
+
+    private void completeAcceptedInvite(String inviteId, PendingInvite pending) {
+        ClientConnectionHandler inviterConn = pending.getInviterConnection();
+        ClientConnectionHandler targetConn = pending.getTargetConnection();
+        if (inviterConn.isClosed()) {
+            sendInvite(targetConn, inviteId, InviteStatus.OFFLINE, "Inviter disconnected.");
+            return;
+        }
+        if (targetConn.isClosed()) {
+            sendInvite(inviterConn, inviteId, InviteStatus.OFFLINE, "Target player disconnected.");
+            return;
+        }
+        if (roomManager.getRoomForPlayer(inviterConn) != null
+                || roomManager.getRoomForPlayer(targetConn) != null) {
+            sendInvite(inviterConn, inviteId, InviteStatus.BUSY, "A player is already in an active room.");
+            sendInvite(targetConn, inviteId, InviteStatus.BUSY, "A player is already in an active room.");
+            return;
+        }
+        ClientConnectionHandler[] pair = LobbyRoleAssigner.plantThenZombie(
+                pending.getInviterRole(), inviterConn, targetConn);
+        logMatch("Direct invite " + inviteId + " accepted", pair[0], pair[1]);
+        sendInvite(inviterConn, inviteId, InviteStatus.ACCEPTED, "Invite accepted!");
+        roomManager.createRoom(pair[0], pair[1]);
+    }
+
+    private void notifyInviter(PendingInvite pending, InviteStatus status, String message) {
+        ClientConnectionHandler inviterConn = pending.getInviterConnection();
+        if (!inviterConn.isClosed()) {
+            sendInvite(inviterConn, pending.getInviteId(), status, message);
+        }
+    }
+
+    private QueueEntry takeComplementaryOpponent(
+            ClientConnectionHandler connection, PlayerRole preferredRole) {
+        for (Iterator<QueueEntry> it = randomQueue.iterator(); it.hasNext(); ) {
+            QueueEntry candidate = it.next();
+            if (candidate.getConnection().isClosed()) {
+                it.remove();
+                continue;
+            }
+            if (candidate.getConnection() == connection) {
+                continue;
+            }
+            if (LobbyRoleAssigner.complementaryQueueRole(preferredRole, candidate.getPreferredRole())
+                    != null) {
+                it.remove();
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private QueueEntry takeFallbackOpponent(ClientConnectionHandler connection) {
+        for (Iterator<QueueEntry> it = randomQueue.iterator(); it.hasNext(); ) {
+            QueueEntry candidate = it.next();
+            if (!candidate.getConnection().isClosed() && candidate.getConnection() != connection) {
+                it.remove();
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private void startMatchedRoom(
+            ClientConnectionHandler connection, QueueEntry opponent, PlayerRole myRole) {
+        ClientConnectionHandler plantConn = myRole == PlayerRole.PLANT
+                ? connection : opponent.getConnection();
+        ClientConnectionHandler zombieConn = myRole == PlayerRole.ZOMBIE
+                ? connection : opponent.getConnection();
+        logMatch("Match found in random queue", plantConn, zombieConn);
+        roomManager.createRoom(plantConn, zombieConn);
+    }
+
+    private void enqueueWaiting(ClientConnectionHandler connection, PlayerRole preferredRole) {
+        randomQueue.add(new QueueEntry(connection, preferredRole));
+        sendMatch(connection, MatchmakingStatus.QUEUED, null, "Waiting for opponent...");
+        System.out.println("[LobbyService] Queued player " + connection.getUsername()
+                + " with preference " + preferredRole + ". Queue size: " + randomQueue.size());
+    }
+
+    private PrivateRoom takeJoinablePrivateRoom(
+            ClientConnectionHandler guestConnection, String roomCode) {
+        if (roomCode == null || roomCode.trim().isEmpty()) {
+            sendMatch(guestConnection, MatchmakingStatus.ERROR, null, "Room code cannot be empty.");
+            return null;
+        }
+        String normalizedCode = roomCode.trim().toUpperCase();
+        PrivateRoom privateRoom = hostedPrivateRooms.remove(normalizedCode);
+        if (privateRoom == null) {
+            sendMatch(guestConnection, MatchmakingStatus.ERROR, normalizedCode,
+                    "Room not found or expired: " + normalizedCode);
+            return null;
+        }
+        ClientConnectionHandler hostConnection = privateRoom.getHostConnection();
+        if (hostConnection == null || hostConnection.isClosed()) {
+            sendMatch(guestConnection, MatchmakingStatus.ERROR, normalizedCode, "Host has disconnected.");
+            return null;
+        }
+        if (hostConnection == guestConnection) {
+            hostedPrivateRooms.put(normalizedCode, privateRoom);
+            sendMatch(guestConnection, MatchmakingStatus.ERROR, normalizedCode, "Cannot join your own room.");
+            return null;
+        }
+        return privateRoom;
+    }
+
+    private static void sendInvite(
+            ClientConnectionHandler conn, String inviteId, InviteStatus status, String message) {
+        if (conn != null && !conn.isClosed()) {
+            conn.sendPacket(new InviteStatusPacket(inviteId, status, message));
+        }
+    }
+
+    private static void sendMatch(
+            ClientConnectionHandler conn, MatchmakingStatus status, String code, String message) {
+        if (conn != null && !conn.isClosed()) {
+            conn.sendPacket(new MatchmakingResponsePacket(status, code, message));
+        }
+    }
+
+    private static void logMatch(
+            String prefix, ClientConnectionHandler plantConn, ClientConnectionHandler zombieConn) {
+        String plantName = plantConn.getUsername() != null ? plantConn.getUsername() : "Plant";
+        String zombieName = zombieConn.getUsername() != null ? zombieConn.getUsername() : "Zombie";
+        System.out.println("[LobbyService] " + prefix + ": " + plantName + " (PLANT) vs "
+                + zombieName + " (ZOMBIE)");
     }
 
     /**
@@ -427,121 +527,31 @@ public class LobbyService {
     /**
      * Processes Random Queue matchmaking with complementary role pairing.
      */
-    private synchronized void handleRandomMatchmaking(ClientConnectionHandler connection, PlayerRole preferredRole) {
-        // 1. Guard against duplicate queuing
+    private synchronized void handleRandomMatchmaking(
+            ClientConnectionHandler connection, PlayerRole preferredRole) {
         if (isPlayerInQueue(connection)) {
-            connection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, null, "Already in matchmaking queue."));
+            sendMatch(connection, MatchmakingStatus.ERROR, null, "Already in matchmaking queue.");
             return;
         }
-
-        // 2. Guard against players already inside an active room
         if (roomManager.getRoomForPlayer(connection) != null) {
-            connection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, null, "Already in an active game room."));
+            sendMatch(connection, MatchmakingStatus.ERROR, null, "Already in an active game room.");
             return;
         }
-
-        // 3. Purge dead connections from queue
         purgeClosedQueueEntries();
-
-        // 4. Find complementary opponent in queue
-        QueueEntry matchedOpponent = null;
-        PlayerRole assignedMyRole = null;
-        PlayerRole assignedOpponentRole = null;
-
-        for (Iterator<QueueEntry> it = randomQueue.iterator(); it.hasNext(); ) {
-            QueueEntry candidate = it.next();
-            if (candidate.getConnection().isClosed()) {
-                it.remove();
-                continue;
-            }
-            if (candidate.getConnection() == connection) {
-                continue;
-            }
-
-            // Evaluate role compatibility
-            PlayerRole cRole = candidate.getPreferredRole();
-            if (preferredRole == PlayerRole.PLANT && cRole == PlayerRole.ZOMBIE) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.PLANT;
-                assignedOpponentRole = PlayerRole.ZOMBIE;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.ZOMBIE && cRole == PlayerRole.PLANT) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.ZOMBIE;
-                assignedOpponentRole = PlayerRole.PLANT;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.PLANT && cRole == PlayerRole.ANY) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.PLANT;
-                assignedOpponentRole = PlayerRole.ZOMBIE;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.ZOMBIE && cRole == PlayerRole.ANY) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.ZOMBIE;
-                assignedOpponentRole = PlayerRole.PLANT;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.ANY && cRole == PlayerRole.PLANT) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.ZOMBIE;
-                assignedOpponentRole = PlayerRole.PLANT;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.ANY && cRole == PlayerRole.ZOMBIE) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.PLANT;
-                assignedOpponentRole = PlayerRole.ZOMBIE;
-                it.remove();
-                break;
-            } else if (preferredRole == PlayerRole.ANY && cRole == PlayerRole.ANY) {
-                matchedOpponent = candidate;
-                assignedMyRole = PlayerRole.PLANT;
-                assignedOpponentRole = PlayerRole.ZOMBIE;
-                it.remove();
-                break;
+        QueueEntry opponent = takeComplementaryOpponent(connection, preferredRole);
+        PlayerRole myRole = opponent != null
+                ? LobbyRoleAssigner.complementaryQueueRole(preferredRole, opponent.getPreferredRole())
+                : null;
+        if (opponent == null) {
+            opponent = takeFallbackOpponent(connection);
+            if (opponent != null) {
+                myRole = LobbyRoleAssigner.fallbackQueueRole(preferredRole, opponent.getPreferredRole());
             }
         }
-
-        // If no complementary match found, match with the oldest queued player anyway
-        if (matchedOpponent == null && !randomQueue.isEmpty()) {
-            for (Iterator<QueueEntry> it = randomQueue.iterator(); it.hasNext(); ) {
-                QueueEntry candidate = it.next();
-                if (!candidate.getConnection().isClosed() && candidate.getConnection() != connection) {
-                    matchedOpponent = candidate;
-                    if (candidate.getPreferredRole() == PlayerRole.PLANT) {
-                        assignedOpponentRole = PlayerRole.PLANT;
-                        assignedMyRole = PlayerRole.ZOMBIE;
-                    } else if (candidate.getPreferredRole() == PlayerRole.ZOMBIE) {
-                        assignedOpponentRole = PlayerRole.ZOMBIE;
-                        assignedMyRole = PlayerRole.PLANT;
-                    } else {
-                        assignedMyRole = preferredRole == PlayerRole.ZOMBIE ? PlayerRole.ZOMBIE : PlayerRole.PLANT;
-                        assignedOpponentRole = assignedMyRole == PlayerRole.PLANT ? PlayerRole.ZOMBIE : PlayerRole.PLANT;
-                    }
-                    it.remove();
-                    break;
-                }
-            }
-        }
-
-        // 5. Establish room if matched, or enqueue
-        if (matchedOpponent != null) {
-            ClientConnectionHandler plantConn = assignedMyRole == PlayerRole.PLANT ? connection : matchedOpponent.getConnection();
-            ClientConnectionHandler zombieConn = assignedMyRole == PlayerRole.ZOMBIE ? connection : matchedOpponent.getConnection();
-
-            System.out.println("[LobbyService] Match found in random queue: "
-                    + (plantConn.getUsername() != null ? plantConn.getUsername() : "Plant") + " (PLANT) vs "
-                    + (zombieConn.getUsername() != null ? zombieConn.getUsername() : "Zombie") + " (ZOMBIE)");
-
-            roomManager.createRoom(plantConn, zombieConn);
+        if (opponent != null && myRole != null) {
+            startMatchedRoom(connection, opponent, myRole);
         } else {
-            randomQueue.add(new QueueEntry(connection, preferredRole));
-            connection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.QUEUED, null, "Waiting for opponent..."));
-            System.out.println("[LobbyService] Queued player " + connection.getUsername() + " with preference " + preferredRole
-                    + ". Queue size: " + randomQueue.size());
+            enqueueWaiting(connection, preferredRole);
         }
     }
 
@@ -568,60 +578,20 @@ public class LobbyService {
             String roomCode,
             PlayerRole guestPreferredRole
     ) {
-        if (roomCode == null || roomCode.trim().isEmpty()) {
-            guestConnection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, null, "Room code cannot be empty."));
-            return;
-        }
-
-        String normalizedCode = roomCode.trim().toUpperCase();
-        PrivateRoom privateRoom = hostedPrivateRooms.remove(normalizedCode);
-
+        PrivateRoom privateRoom = takeJoinablePrivateRoom(guestConnection, roomCode);
         if (privateRoom == null) {
-            guestConnection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, normalizedCode,
-                    "Room not found or expired: " + normalizedCode));
             return;
         }
-
         ClientConnectionHandler hostConnection = privateRoom.getHostConnection();
-        if (hostConnection == null || hostConnection.isClosed()) {
-            guestConnection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, normalizedCode, "Host has disconnected."));
-            return;
-        }
-
-        if (hostConnection == guestConnection) {
-            hostedPrivateRooms.put(normalizedCode, privateRoom);
-            guestConnection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.ERROR, normalizedCode, "Cannot join your own room."));
-            return;
-        }
-
-        // Resolve roles
-        PlayerRole hostRole = privateRoom.getHostRole();
-        PlayerRole assignedHostRole;
-        PlayerRole assignedGuestRole;
-
-        if (hostRole == PlayerRole.PLANT) {
-            assignedHostRole = PlayerRole.PLANT;
-            assignedGuestRole = PlayerRole.ZOMBIE;
-        } else if (hostRole == PlayerRole.ZOMBIE) {
-            assignedHostRole = PlayerRole.ZOMBIE;
-            assignedGuestRole = PlayerRole.PLANT;
-        } else if (guestPreferredRole == PlayerRole.PLANT) {
-            assignedGuestRole = PlayerRole.PLANT;
-            assignedHostRole = PlayerRole.ZOMBIE;
-        } else if (guestPreferredRole == PlayerRole.ZOMBIE) {
-            assignedGuestRole = PlayerRole.ZOMBIE;
-            assignedHostRole = PlayerRole.PLANT;
-        } else {
-            assignedHostRole = PlayerRole.PLANT;
-            assignedGuestRole = PlayerRole.ZOMBIE;
-        }
-
-        ClientConnectionHandler plantConn = assignedHostRole == PlayerRole.PLANT ? hostConnection : guestConnection;
-        ClientConnectionHandler zombieConn = assignedHostRole == PlayerRole.ZOMBIE ? hostConnection : guestConnection;
-
-        System.out.println("[LobbyService] Direct invite room " + normalizedCode + " matched: "
+        PlayerRole assignedHostRole = LobbyRoleAssigner.hostRoleForPrivateRoom(
+                privateRoom.getHostRole(), guestPreferredRole);
+        ClientConnectionHandler plantConn = assignedHostRole == PlayerRole.PLANT
+                ? hostConnection : guestConnection;
+        ClientConnectionHandler zombieConn = assignedHostRole == PlayerRole.ZOMBIE
+                ? hostConnection : guestConnection;
+        String code = privateRoom.getRoomCode();
+        System.out.println("[LobbyService] Direct invite room " + code + " matched: "
                 + plantConn.getUsername() + " (PLANT) vs " + zombieConn.getUsername() + " (ZOMBIE)");
-
         roomManager.createRoom(plantConn, zombieConn);
     }
 
@@ -644,7 +614,8 @@ public class LobbyService {
 
         if (removedFromQueue || removedFromRooms) {
             if (!connection.isClosed()) {
-                connection.sendPacket(new MatchmakingResponsePacket(MatchmakingStatus.CANCELLED, null, "Matchmaking cancelled."));
+                connection.sendPacket(new MatchmakingResponsePacket(
+                        MatchmakingStatus.CANCELLED, null, "Matchmaking cancelled."));
             }
             System.out.println("[LobbyService] Cancelled matchmaking for " + connection.getUsername());
         }
@@ -669,8 +640,11 @@ public class LobbyService {
                 }
                 it.remove();
                 if (!pending.getTargetConnection().isClosed()) {
-                    pending.getTargetConnection().sendPacket(new InviteStatusPacket(pending.getInviteId(), InviteStatus.OFFLINE, "Inviter disconnected."));
-                    pending.getTargetConnection().sendPacket(new CancelInvitePacket(pending.getInviteId(), pending.getTargetUsername()));
+                    ClientConnectionHandler target = pending.getTargetConnection();
+                    String id = pending.getInviteId();
+                    target.sendPacket(new InviteStatusPacket(id, InviteStatus.OFFLINE,
+                            "Inviter disconnected."));
+                    target.sendPacket(new CancelInvitePacket(id, pending.getTargetUsername()));
                 }
             } else if (pending.getTargetConnection() == connection) {
                 if (pending.getTimeoutFuture() != null) {
@@ -678,7 +652,8 @@ public class LobbyService {
                 }
                 it.remove();
                 if (!pending.getInviterConnection().isClosed()) {
-                    pending.getInviterConnection().sendPacket(new InviteStatusPacket(pending.getInviteId(), InviteStatus.OFFLINE, "Target user disconnected."));
+                    pending.getInviterConnection().sendPacket(new InviteStatusPacket(
+                            pending.getInviteId(), InviteStatus.OFFLINE, "Target user disconnected."));
                 }
             }
         }

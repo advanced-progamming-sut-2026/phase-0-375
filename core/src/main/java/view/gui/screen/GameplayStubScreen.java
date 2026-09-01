@@ -27,36 +27,49 @@ public final class GameplayStubScreen extends AbstractMenuScreen {
     @Override
     protected void buildUi() {
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
+        addResourceBar();
+        GameModel model = App.getInstance().getCurrentGameModel();
+        Level level = model == null ? null : model.getCurrentLevel();
+        BorderedTable card = stubCard(model, level);
+        Table root = new Table();
+        root.setFillParent(true);
+        root.add(card).width(560f);
+        stage.addActor(root);
+    }
 
+    private void addResourceBar() {
         Table top = new Table();
         top.setFillParent(true);
         top.top();
         top.add(new ResourceBar(skin, game.assets != null ? game.assets.textures : null))
                 .expandX().right().pad(12f);
         stage.addActor(top);
+    }
 
-        GameModel model = App.getInstance().getCurrentGameModel();
-        Level level = model == null ? null : model.getCurrentLevel();
+    private BorderedTable stubCard(GameModel model, Level level) {
         String detail = level == null
                 ? "No level loaded"
                 : level.getConfig().getChapter() + " · Level " + level.getConfig().getLevelId();
-        String loadout = model == null || model.getSelectedPlants() == null || model.getSelectedPlants().isEmpty()
+        String loadout = model == null || model.getSelectedPlants() == null
+                || model.getSelectedPlants().isEmpty()
                 ? "Loadout: (empty / level-controlled)"
                 : "Loadout: " + String.join(", ", model.getSelectedPlants());
-
         BorderedTable card = new BorderedTable();
         card.pad(28f);
         card.add(new Label("Gameplay", skin, "big")).padBottom(8f).row();
         card.add(new Label(detail, skin, "medium")).padBottom(8f).row();
         card.add(new Label(loadout, skin, "secondary")).padBottom(12f).row();
         Label note = new Label(
-                "In-game lawn UI is not implemented yet. Your level and plant selection are loaded in App — "
-                        + "this screen only confirms the adventure flow.",
-                skin,
-                "secondary");
+                "In-game lawn UI is not implemented yet. Your level and plant selection "
+                        + "are loaded in App — this screen only confirms the adventure flow.",
+                skin, "secondary");
         note.setWrap(true);
         card.add(note).width(480f).padBottom(20f).row();
+        card.add(backButton(level)).width(260f).height(56f);
+        return card;
+    }
 
+    private TextButton backButton(Level level) {
         TextButton back = new TextButton("Back to levels", skin, "brown");
         back.addListener(new ChangeListener() {
             @Override
@@ -72,11 +85,6 @@ public final class GameplayStubScreen extends AbstractMenuScreen {
                 }
             }
         });
-        card.add(back).width(260f).height(56f);
-
-        Table root = new Table();
-        root.setFillParent(true);
-        root.add(card).width(560f);
-        stage.addActor(root);
+        return back;
     }
 }

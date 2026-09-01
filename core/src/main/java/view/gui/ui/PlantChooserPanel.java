@@ -52,12 +52,12 @@ public final class PlantChooserPanel extends Table implements Disposable {
     private final PamClipCache clips;
     private final Listener listener;
 
-    private final Label title;
-    private final Label description;
-    private final TextButton upgrade;
-    private final TextButton boost;
-    private final PamPreview preview;
-    private final Table grid;
+    private Label title;
+    private Label description;
+    private TextButton upgrade;
+    private TextButton boost;
+    private PamPreview preview;
+    private Table grid;
     private String inspected;
 
     public interface Listener {
@@ -72,12 +72,7 @@ public final class PlantChooserPanel extends Table implements Disposable {
         this.skin = skin;
         this.clips = new PamClipCache(assets.player);
         this.listener = listener;
-        assets.textures.loadSync("UI_AlwaysLoadedTiles_768");
-        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADEDTILES_768_00");
-        assets.textures.loadSync("UI_AlwaysLoaded_Uncompressed_768");
-        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADED_UNCOMPRESSED_768_00");
-        assets.textures.loadSync("UI_Almanac_768");
-        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALMANAC_768_00");
+        loadChooserAtlases(assets);
         pad(12f, 16f, 16f, 16f);
         Drawable panelBg = stretchStrip(assets.textures, SELECTOR_BG);
         if (panelBg == null) {
@@ -86,7 +81,20 @@ public final class PlantChooserPanel extends Table implements Disposable {
         if (panelBg != null) {
             setBackground(panelBg);
         }
+        add(buildChooserCard(assets)).growX().padBottom(10f).row();
+        add(buildPacketWell()).grow().minHeight(240f);
+    }
 
+    private void loadChooserAtlases(PvzAssets assets) {
+        assets.textures.loadSync("UI_AlwaysLoadedTiles_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADEDTILES_768_00");
+        assets.textures.loadSync("UI_AlwaysLoaded_Uncompressed_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADED_UNCOMPRESSED_768_00");
+        assets.textures.loadSync("UI_Almanac_768");
+        assets.textures.loadSync("ATLASIMAGE_ATLAS_UI_ALMANAC_768_00");
+    }
+
+    private Table buildChooserCard(PvzAssets assets) {
         Table card = new Table();
         Drawable cardBg = chooserCard(assets.textures);
         if (cardBg == null) {
@@ -99,15 +107,21 @@ public final class PlantChooserPanel extends Table implements Disposable {
         title.setAlignment(Align.center);
         title.setColor(TITLE);
         card.add(title).growX().height(CARD_GREEN_HEIGHT).pad(16f, 16f, 4f, 16f).row();
-
         preview = new PamPreview(assets, clips);
+        Table body = new Table();
+        body.add(preview).size(AVATAR, AVATAR).top().pad(8f, 12f, 12f, 8f);
+        body.add(buildChooserRight()).grow().top().pad(8f, 8f, 12f, 16f);
+        card.add(body).growX();
+        return card;
+    }
+
+    private Table buildChooserRight() {
         Table right = new Table();
         description = new Label("", skin, "secondary");
         description.setWrap(true);
         description.setAlignment(Align.topLeft);
         description.setColor(BODY);
         right.add(description).grow().top().left().padBottom(8f).padTop(32f).row();
-
         Table actions = new Table();
         upgrade = actionButton("purple", "image_ui_generic_coin_icon_small");
         upgrade.addListener(new ChangeListener() {
@@ -132,13 +146,10 @@ public final class PlantChooserPanel extends Table implements Disposable {
         actions.add(upgrade).width(176f).height(44f).padRight(8f);
         actions.add(boost).width(176f).height(44f);
         right.add(actions).growX().bottom().left();
+        return right;
+    }
 
-        Table body = new Table();
-        body.add(preview).size(AVATAR, AVATAR).top().pad(8f, 12f, 12f, 8f);
-        body.add(right).grow().top().pad(8f, 8f, 12f, 16f);
-        card.add(body).growX();
-        add(card).growX().padBottom(10f).row();
-
+    private Table buildPacketWell() {
         Table well = new Table();
         grid = new Table();
         grid.top().left();
@@ -155,7 +166,7 @@ public final class PlantChooserPanel extends Table implements Disposable {
             }
         });
         well.add(scroll).grow().pad(8f);
-        add(well).grow().minHeight(240f);
+        return well;
     }
 
     public void inspect(String plantName, boolean unlocked, boolean boosted, int level) {

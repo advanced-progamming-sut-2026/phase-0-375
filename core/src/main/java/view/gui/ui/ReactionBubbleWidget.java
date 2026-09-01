@@ -49,12 +49,12 @@ public final class ReactionBubbleWidget extends Group {
     private final ReactionBubbleLayout.Metrics metrics;
 
     private final Table bubble;
-    private final Table contentRoot;
-    private final Stack contentStack;
-    private final Table gridLayer;
-    private final Table previewLayer;
-    private final Label hintLabel;
-    private final Label previewLabel;
+    private Table contentRoot;
+    private Stack contentStack;
+    private Table gridLayer;
+    private Table previewLayer;
+    private Label hintLabel;
+    private Label previewLabel;
     private Table dismissLayer;
     private Actor previewContent;
     private float previewBubbleW;
@@ -79,7 +79,6 @@ public final class ReactionBubbleWidget extends Group {
         this.local = local;
         this.onPick = onPick;
         this.metrics = ReactionBubbleLayout.loadMetrics(skin);
-
         bubble = new Table();
         bubble.setTransform(true);
         bubble.setTouchable(local ? Touchable.enabled : Touchable.disabled);
@@ -88,50 +87,9 @@ public final class ReactionBubbleWidget extends Group {
             bubble.setBackground(bg);
         }
         addActor(bubble);
-
-        contentRoot = new Table();
-        bubble.add(contentRoot).grow();
-
-        hintLabel = new Label("...", skin, "medium");
-        hintLabel.setAlignment(Align.center);
-        hintLabel.setColor(new Color(0.2f, 0.15f, 0.1f, 1f));
-
-        gridLayer = buildGrid();
-        previewLayer = new Table();
-        previewLabel = createBorderedLabel("", 0.62f);
-        previewLabel.setWrap(true);
-
-        Table hintWrap = new Table();
-        hintWrap.add(hintLabel).center().expand();
-        previewLayer.add(previewLabel).grow().pad(18f, 28f, 28f, 28f);
-
-        contentStack = new Stack();
-        contentStack.add(hintWrap);
-        contentStack.add(gridLayer);
-        contentStack.add(previewLayer);
-        showContent(State.ICON);
-
-        float tailPad = Math.max(28f, metrics.nativeH() * 0.22f);
-        float sidePad = 24f;
-        if (ReactionBubbleLayout.isRightCorner(corner)) {
-            contentRoot.pad(sidePad, sidePad, sidePad, tailPad);
-        } else {
-            contentRoot.pad(sidePad, sidePad, tailPad, sidePad);
-        }
-
-        contentRoot.add(contentStack).grow();
-
-        if (local) {
-            bubble.addListener(new ClickListener() {
-                @Override
-                public void clicked(InputEvent event, float x, float y) {
-                    if (state == State.ICON) {
-                        openPanel();
-                    }
-                }
-            });
-        }
-
+        assembleContent();
+        padForCorner();
+        wireLocalClick();
         if (local) {
             resetToIcon(false);
             setVisible(true);
@@ -139,6 +97,51 @@ public final class ReactionBubbleWidget extends Group {
             setVisible(false);
             state = State.HIDDEN;
         }
+    }
+
+    private void assembleContent() {
+        contentRoot = new Table();
+        bubble.add(contentRoot).grow();
+        hintLabel = new Label("...", skin, "medium");
+        hintLabel.setAlignment(Align.center);
+        hintLabel.setColor(new Color(0.2f, 0.15f, 0.1f, 1f));
+        gridLayer = buildGrid();
+        previewLayer = new Table();
+        previewLabel = createBorderedLabel("", 0.62f);
+        previewLabel.setWrap(true);
+        Table hintWrap = new Table();
+        hintWrap.add(hintLabel).center().expand();
+        previewLayer.add(previewLabel).grow().pad(18f, 28f, 28f, 28f);
+        contentStack = new Stack();
+        contentStack.add(hintWrap);
+        contentStack.add(gridLayer);
+        contentStack.add(previewLayer);
+        showContent(State.ICON);
+        contentRoot.add(contentStack).grow();
+    }
+
+    private void padForCorner() {
+        float tailPad = Math.max(28f, metrics.nativeH() * 0.22f);
+        float sidePad = 24f;
+        if (ReactionBubbleLayout.isRightCorner(corner)) {
+            contentRoot.pad(sidePad, sidePad, sidePad, tailPad);
+        } else {
+            contentRoot.pad(sidePad, sidePad, tailPad, sidePad);
+        }
+    }
+
+    private void wireLocalClick() {
+        if (!local) {
+            return;
+        }
+        bubble.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (state == State.ICON) {
+                    openPanel();
+                }
+            }
+        });
     }
 
     public boolean isAvailable() {
@@ -286,7 +289,11 @@ public final class ReactionBubbleWidget extends Group {
 
         bubble.clearActions();
         bubble.addAction(Actions.parallel(
-                Actions.sizeTo(metrics.nativeW(), metrics.nativeH(), ReactionBubbleLayout.PREVIEW_SEC, Interpolation.sineOut),
+                Actions.sizeTo(
+                        metrics.nativeW(),
+                        metrics.nativeH(),
+                        ReactionBubbleLayout.PREVIEW_SEC,
+                        Interpolation.sineOut),
                 Actions.scaleTo(
                         ReactionBubbleLayout.ICON_SCALE,
                         ReactionBubbleLayout.ICON_SCALE,
@@ -447,7 +454,8 @@ public final class ReactionBubbleWidget extends Group {
             previewLayer.clearChildren();
             previewLayer.add(previewLabel).width(contentW).center();
         } else if (ReactionPresets.hasPamSequence(preset) && pamPlayer != null && pamClips != null) {
-            PamSequenceEffectActor seq = createPamSequence(preset, ReactionPresets.pamPreviewScale(preset), false, true);
+            PamSequenceEffectActor seq = createPamSequence(
+                    preset, ReactionPresets.pamPreviewScale(preset), false, true);
             if (onPamComplete != null) {
                 seq.onComplete(onPamComplete);
             }

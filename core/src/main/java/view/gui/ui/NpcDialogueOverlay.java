@@ -117,43 +117,51 @@ public final class NpcDialogueOverlay extends Table {
             finish();
             return;
         }
-
         clearChildren();
         advancing = false;
         currentNpcIndex = index;
-        if (index == 0 && introVoice != null && !introVoicePlayed) {
-            introVoicePlayed = true;
-            float delay = introVoice == GameSfx.RISE_AND_SHINE_DR_ZARRABI
-                    ? RISE_AND_SHINE_VOICE_DELAY_SEC
-                    : 0f;
-            addAction(Actions.sequence(
-                    Actions.delay(delay),
-                    Actions.run(() -> GameAudio.get().playSfx(introVoice))));
-        }
+        playIntroVoiceIfNeeded(index);
         boolean fromRight = index % 2 == 1;
-
         NpcDialogueData.NpcEntry npc = npcs.get(index);
         Image npcImage = loadNpcImage(npc.getImagePath());
         if (npcImage == null) {
             finish();
             return;
         }
+        layoutNpc(fromRight, npc, npcImage);
+    }
 
+    private void playIntroVoiceIfNeeded(int index) {
+        if (index != 0 || introVoice == null || introVoicePlayed) {
+            return;
+        }
+        introVoicePlayed = true;
+        float delay = introVoice == GameSfx.RISE_AND_SHINE_DR_ZARRABI
+                ? RISE_AND_SHINE_VOICE_DELAY_SEC
+                : 0f;
+        addAction(Actions.sequence(
+                Actions.delay(delay),
+                Actions.run(() -> GameAudio.get().playSfx(introVoice))));
+    }
+
+    private void layoutNpc(boolean fromRight, NpcDialogueData.NpcEntry npc, Image npcImage) {
         float npcW = NPC_WIDTH;
         float npcH = npcW * (npcImage.getHeight() / Math.max(1f, npcImage.getWidth()));
         npcImage.setSize(npcW, npcH);
-
         bubbleRoot = createSpeechBubble(npc.getDialogueLines(), npc.getContinueText(), fromRight);
         float bubbleW = bubbleRoot.getWidth();
-
         float bubbleLocalX = fromRight ? -bubbleW + npcW * 0.45f : npcW * 0.55f;
         float bubbleLocalY = npcH * 0.65f;
         bubbleRoot.setPosition(bubbleLocalX, bubbleLocalY);
-
         float minX = Math.min(0f, bubbleLocalX);
         float contentW = Math.max(npcW, bubbleLocalX + bubbleW) - minX;
         float contentH = Math.max(npcH, bubbleLocalY + bubbleRoot.getHeight());
+        assembleNpcRoot(fromRight, npcImage, minX, contentW, contentH, bubbleLocalX);
+        animateNpcEntrance();
+    }
 
+    private void assembleNpcRoot(boolean fromRight, Image npcImage, float minX,
+                                 float contentW, float contentH, float bubbleLocalX) {
         npcRoot = new Group();
         npcRoot.setTransform(true);
         npcRoot.setTouchable(Touchable.disabled);
@@ -162,24 +170,19 @@ public final class NpcDialogueOverlay extends Table {
         bubbleRoot.setX(bubbleLocalX - minX);
         npcRoot.addActor(npcImage);
         npcRoot.addActor(bubbleRoot);
-
         float stageW = getWidth() > 1f ? getWidth()
             : getStage() != null ? getStage().getWidth() : 1302f;
         restY = CORNER_PAD_Y;
-        if (fromRight) {
-            restX = stageW - CORNER_PAD_X - contentW;
-        } else {
-            restX = CORNER_PAD_X;
-        }
+        restX = fromRight ? stageW - CORNER_PAD_X - contentW : CORNER_PAD_X;
         offY = -contentH - 20f;
-
         npcRoot.setPosition(restX, offY);
         addActor(npcRoot);
+    }
 
+    private void animateNpcEntrance() {
         bubbleRoot.setOrigin(Align.center);
         bubbleRoot.setScale(0f);
         bubbleRoot.getColor().a = 0f;
-
         npcRoot.addAction(Actions.sequence(
             Actions.moveTo(restX, restY, SLIDE_SEC, Interpolation.sineOut),
             Actions.run(this::popBubble),

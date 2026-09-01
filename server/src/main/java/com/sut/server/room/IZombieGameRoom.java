@@ -100,38 +100,16 @@ public class IZombieGameRoom implements Runnable {
         this.zombiePlayer = zombiePlayer;
 
         ensureCatalogsLoaded();
-
-        // 1. Instantiate level & settings
-        IZombieLevel createdLevel = null;
-        try {
-            if (MiniGameRegistry.getInstance() != null) {
-                createdLevel = (IZombieLevel) MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
-            }
-        } catch (Exception e) {
-            System.err.println("[IZombieGameRoom] Could not create level from MiniGameRegistry: " + e.getMessage());
-        }
-        if (createdLevel == null) {
-            // Fallback manual level configuration
-            createdLevel = createDefaultIZombieLevel();
-        }
-        this.level = createdLevel;
+        this.level = createLevel();
         this.redLineColumn = level.redLineColumn();
-
-        // 2. Initialize GameModel and setup board
         this.gameModel = new GameModel(level);
         this.level.onStart(gameModel);
-
-        // 3. Initialize Headless PvZGameLoop
         this.gameLoop = new PvZGameLoop(gameModel);
-
-        // 4. Initial resource setup
         this.plantSun = DEFAULT_INITIAL_SUN;
         this.zombieSun = gameModel.getSunAmount() > 0 ? gameModel.getSunAmount() : DEFAULT_INITIAL_SUN;
         if (gameModel.getSunAmount() != zombieSun) {
             gameModel.addSun(zombieSun - gameModel.getSunAmount());
         }
-
-        // 5. Attach room ID context to client connection handlers
         if (plantPlayer != null) {
             plantPlayer.setCurrentRoomId(roomId);
         }
@@ -172,55 +150,49 @@ public class IZombieGameRoom implements Runnable {
     }
 
     public void tick() {
-        // Game may have ended outside this tick (surrender / external endGame).
-        // Always unregister so players are no longer treated as in-match/busy.
         if (gameOver) {
             stop();
             return;
         }
-
         try {
             tickCounter++;
-
-            // 1. Drain and execute pending action runnables
-            Runnable action;
-            while ((action = pendingActions.poll()) != null) {
-                try {
-                    action.run();
-                } catch (Exception e) {
-                    System.err.println("[IZombieGameRoom] Error executing player action runnable: " + e.getMessage());
-                }
-            }
-
-            // 2. Decrement active plant card cooldowns
-            for (Map.Entry<String, Float> entry : plantCardCooldowns.entrySet()) {
-                float remaining = entry.getValue() - TICK_INTERVAL_SECONDS;
-                if (remaining <= 0f) {
-                    plantCardCooldowns.remove(entry.getKey());
-                } else {
-                    entry.setValue(remaining);
-                }
-            }
-
-            // 3. Advance headless physics and combat simulation
+            drainPendingActions();
+            tickPlantCooldowns();
             gameLoop.update(TICK_INTERVAL_SECONDS);
             matchTime += TICK_INTERVAL_SECONDS;
             zombieSun = gameModel.getSunAmount();
-
-            // 5. Evaluate win / loss triggers
             checkWinLossConditions();
-
-            // 6. Broadcast authoritative state snapshot
             broadcastSnapshot();
-
-            // 7. Cleanup on game over
             if (gameOver) {
                 stop();
             }
-
         } catch (Exception e) {
-            System.err.println("[IZombieGameRoom] Exception during room tick in " + roomId + ": " + e.getMessage());
+            System.err.println("[IZombieGameRoom] Exception during room tick in "
+                    + roomId + ": " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void drainPendingActions() {
+        Runnable action;
+        while ((action = pendingActions.poll()) != null) {
+            try {
+                action.run();
+            } catch (Exception e) {
+                System.err.println("[IZombieGameRoom] Error executing player action runnable: "
+                        + e.getMessage());
+            }
+        }
+    }
+
+    private void tickPlantCooldowns() {
+        for (Map.Entry<String, Float> entry : plantCardCooldowns.entrySet()) {
+            float remaining = entry.getValue() - TICK_INTERVAL_SECONDS;
+            if (remaining <= 0f) {
+                plantCardCooldowns.remove(entry.getKey());
+            } else {
+                entry.setValue(remaining);
+            }
         }
     }
 
@@ -262,7 +234,8 @@ public class IZombieGameRoom implements Runnable {
             return false;
         }
 
-        String sunZombieName = level != null && level.getSettings() != null ? level.getSettings().getSunZombie() : "ZombieIZombieSun";
+        String sunZombieName = level != null && level.getSettings() != null
+                ? level.getSettings().getSunZombie() : "ZombieIZombieSun";
 
         // Check if there are attacking zombies or stationary sun producers that could still produce sun
         boolean hasSunProducers = false;
@@ -326,126 +299,112 @@ public class IZombieGameRoom implements Runnable {
      * Handles plant placement requests from the plant defender.
      */
     public void handlePlantAction(ClientConnectionHandler sender, PlacePlantRequestPacket packet) {
-        if (packet == null) return;
-
-        if (sender != plantPlayer) {
-            sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "UNAUTHORIZED_ROLE", packet.getRow(), packet.getCol()));
+        if (packet == null) {
             return;
         }
+        if (sender != plantPlayer) {
+            sendAction(sender, false, "PLACE_PLANT", "UNAUTHORIZED_ROLE", packet);
+            return;
+        }
+        pendingActions.offer(() -> executePlantPlacement(sender, packet));
+    }
 
-        pendingActions.offer(() -> {
-            int row = packet.getRow();
-            int col = packet.getCol();
+    private void executePlantPlacement(ClientConnectionHandler sender, PlacePlantRequestPacket packet) {
+        int row = packet.getRow();
+        int col = packet.getCol();
+        if (gameOver) {
+            sendAction(sender, false, "PLACE_PLANT", "GAME_OVER", row, col);
+            return;
+        }
+        int maxRows = gameModel.getGameMap() != null ? gameModel.getGameMap().getRows() : 5;
+        if (row < 0 || row >= maxRows || col < 0 || col >= redLineColumn) {
+            sendAction(sender, false, "PLACE_PLANT", "BEYOND_RED_LINE", row, col);
+            return;
+        }
+        Plant def = PlantFactory.getDefinition(packet.getPlantName());
+        String reject = plantPlacementRejectReason(def, row, col);
+        if (reject != null) {
+            sendAction(sender, false, "PLACE_PLANT", reject, row, col);
+            return;
+        }
+        PlantInstance instance = PlantFactory.createInstance(def);
+        if (instance == null) {
+            sendAction(sender, false, "PLACE_PLANT", "CREATION_FAILED", row, col);
+            return;
+        }
+        if (gameModel.placePlant(instance, row, col)) {
+            plantSun -= def.getCost();
+            float cd = def.getRechargeTime() > 0 ? def.getRechargeTime() : 5.0f;
+            plantCardCooldowns.put(def.getName(), cd);
+            sendAction(sender, true, "PLACE_PLANT", "OK", row, col);
+        } else {
+            sendAction(sender, false, "PLACE_PLANT", "PLACEMENT_REJECTED", row, col);
+        }
+    }
 
-            if (gameOver) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "GAME_OVER", row, col));
-                return;
-            }
-
-            int maxRows = gameModel.getGameMap() != null ? gameModel.getGameMap().getRows() : 5;
-            if (row < 0 || row >= maxRows || col < 0 || col >= redLineColumn) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "BEYOND_RED_LINE", row, col));
-                return;
-            }
-
-            String plantName = packet.getPlantName();
-            Plant def = PlantFactory.getDefinition(plantName);
-            if (def == null) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "INVALID_PLANT_NAME", row, col));
-                return;
-            }
-
-            if (plantSun < def.getCost()) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "INSUFFICIENT_SUN", row, col));
-                return;
-            }
-
-            if (plantCardCooldowns.containsKey(def.getName())) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "COOLDOWN_ACTIVE", row, col));
-                return;
-            }
-
-            Cell cell = gameModel.getGameMap().getCell(col, row);
-            if (cell == null || cell.getPlaceable(PlacableLayer.MAIN) != null) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "CELL_OCCUPIED", row, col));
-                return;
-            }
-
-            PlantInstance instance = PlantFactory.createInstance(def);
-            if (instance == null) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "CREATION_FAILED", row, col));
-                return;
-            }
-
-            boolean placed = gameModel.placePlant(instance, row, col);
-            if (placed) {
-                plantSun -= def.getCost();
-                float cd = def.getRechargeTime() > 0 ? def.getRechargeTime() : 5.0f;
-                plantCardCooldowns.put(def.getName(), cd);
-                sender.sendPacket(new PlayerActionResponsePacket(true, "PLACE_PLANT", "OK", row, col));
-            } else {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_PLANT", "PLACEMENT_REJECTED", row, col));
-            }
-        });
+    private String plantPlacementRejectReason(Plant def, int row, int col) {
+        if (def == null) {
+            return "INVALID_PLANT_NAME";
+        }
+        if (plantSun < def.getCost()) {
+            return "INSUFFICIENT_SUN";
+        }
+        if (plantCardCooldowns.containsKey(def.getName())) {
+            return "COOLDOWN_ACTIVE";
+        }
+        Cell cell = gameModel.getGameMap().getCell(col, row);
+        if (cell == null || cell.getPlaceable(PlacableLayer.MAIN) != null) {
+            return "CELL_OCCUPIED";
+        }
+        return null;
     }
 
     /**
      * Handles zombie spawn requests from the zombie attacker.
      */
     public void handleZombieAction(ClientConnectionHandler sender, PlaceZombieRequestPacket packet) {
-        if (packet == null) return;
-
-        if (sender != zombiePlayer) {
-            sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "UNAUTHORIZED_ROLE", packet.getRow(), packet.getCol()));
+        if (packet == null) {
             return;
         }
+        if (sender != zombiePlayer) {
+            sendAction(sender, false, "PLACE_ZOMBIE", "UNAUTHORIZED_ROLE", packet);
+            return;
+        }
+        pendingActions.offer(() -> executeZombieSpawn(sender, packet));
+    }
 
-        pendingActions.offer(() -> {
-            int row = packet.getRow();
-            int col = packet.getCol();
-
-            if (gameOver) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "GAME_OVER", row, col));
-                return;
-            }
-
-            int maxRows = gameModel.getGameMap() != null ? gameModel.getGameMap().getRows() : 5;
-            int maxCols = gameModel.getGameMap() != null ? gameModel.getGameMap().getCols() : 9;
-
-            if (row < 0 || row >= maxRows || col < redLineColumn || col >= maxCols) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "BEHIND_RED_LINE", row, col));
-                return;
-            }
-
-            String zombieName = packet.getZombieName();
-            Zombie def = ZombieFactory.getDefinition(zombieName);
-            if (def == null) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "INVALID_ZOMBIE_NAME", row, col));
-                return;
-            }
-
-            int cost = getZombieCost(def.getName());
-            if (gameModel.getSunAmount() < cost) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "INSUFFICIENT_SUN", row, col));
-                return;
-            }
-
-            boolean spent = gameModel.spendSun(cost);
-            if (!spent) {
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "INSUFFICIENT_SUN", row, col));
-                return;
-            }
+    private void executeZombieSpawn(ClientConnectionHandler sender, PlaceZombieRequestPacket packet) {
+        int row = packet.getRow();
+        int col = packet.getCol();
+        if (gameOver) {
+            sendAction(sender, false, "PLACE_ZOMBIE", "GAME_OVER", row, col);
+            return;
+        }
+        int maxRows = gameModel.getGameMap() != null ? gameModel.getGameMap().getRows() : 5;
+        int maxCols = gameModel.getGameMap() != null ? gameModel.getGameMap().getCols() : 9;
+        if (row < 0 || row >= maxRows || col < redLineColumn || col >= maxCols) {
+            sendAction(sender, false, "PLACE_ZOMBIE", "BEHIND_RED_LINE", row, col);
+            return;
+        }
+        Zombie def = ZombieFactory.getDefinition(packet.getZombieName());
+        if (def == null) {
+            sendAction(sender, false, "PLACE_ZOMBIE", "INVALID_ZOMBIE_NAME", row, col);
+            return;
+        }
+        int cost = getZombieCost(def.getName());
+        if (gameModel.getSunAmount() < cost || !gameModel.spendSun(cost)) {
+            sendAction(sender, false, "PLACE_ZOMBIE", "INSUFFICIENT_SUN", row, col);
+            return;
+        }
+        zombieSun = gameModel.getSunAmount();
+        ZombieInstance spawned = gameModel.spawnZombieAt(def.getName(), row, col);
+        if (spawned != null) {
+            sendAction(sender, true, "PLACE_ZOMBIE", "OK", row, col);
+        } else {
+            gameModel.addSun(cost);
             zombieSun = gameModel.getSunAmount();
-
-            ZombieInstance spawned = gameModel.spawnZombieAt(def.getName(), row, col);
-            if (spawned != null) {
-                sender.sendPacket(new PlayerActionResponsePacket(true, "PLACE_ZOMBIE", "OK", row, col));
-            } else {
-                gameModel.addSun(cost); // Refund
-                zombieSun = gameModel.getSunAmount();
-                sender.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "SPAWN_FAILED", row, col));
-            }
-        });
+            sendAction(sender, false, "PLACE_ZOMBIE", "SPAWN_FAILED", row, col);
+        }
     }
 
     /**
@@ -536,103 +495,13 @@ public class IZombieGameRoom implements Runnable {
      * Constructs a full GameStateSnapshotPacket from current game simulation state.
      */
     public GameStateSnapshotPacket createSnapshot() {
-        List<PlantSnapshotDto> plantDtos = new ArrayList<>();
-        List<ZombieSnapshotDto> zombieDtos = new ArrayList<>();
-        List<ProjectileSnapshotDto> projectileDtos = new ArrayList<>();
-
-        // Map plants
-        for (PlantInstance plant : gameModel.getAllPlants()) {
-            if (plant == null) continue;
-            String id = getEntityId(plant);
-            int row = plant.getPosition() != null ? plant.getPosition().getY() : 0;
-            int col = plant.getPosition() != null ? plant.getPosition().getX() : 0;
-            int maxHp = plant.getDefinition() != null ? plant.getDefinition().getBaseHP() : plant.getCurrentHP();
-            String state = plant.getState() != null ? plant.getState().name() : "IDLE";
-            plantDtos.add(new PlantSnapshotDto(
-                    id,
-                    plant.getDefinition() != null ? plant.getDefinition().getName() : "Unknown",
-                    row,
-                    col,
-                    plant.getCurrentHP(),
-                    maxHp,
-                    state,
-                    plant.isPlantFoodActive(),
-                    plant.isFrozen(),
-                    plant.getStackCount()
-            ));
-        }
-
-        // Map zombies
-        for (ZombieInstance zombie : gameModel.getActiveZombies()) {
-            if (zombie == null) continue;
-            String id = getEntityId(zombie);
-            int row = zombie.getGridY();
-            float x = zombie.getContinuousPosition() != null ? zombie.getContinuousPosition().getX() : (float) zombie.getGridPosition().getX();
-            float y = zombie.getContinuousPosition() != null ? zombie.getContinuousPosition().getY() : (float) zombie.getGridPosition().getY();
-            int maxHp = zombie.getDefinition() != null ? zombie.getDefinition().getBaseHP() : zombie.getCurrentHP();
-            int armorHp = 0;
-            if (zombie.getArmors() != null) {
-                for (Armor a : zombie.getArmors()) {
-                    if (a != null) armorHp += a.getCurrentHealth();
-                }
-            }
-            String state = zombie.getState() != null ? zombie.getState().name() : "WALKING";
-            zombieDtos.add(new ZombieSnapshotDto(
-                    id,
-                    zombie.getDefinition() != null ? zombie.getDefinition().getName() : "Unknown",
-                    row,
-                    x,
-                    y,
-                    zombie.getCurrentHP(),
-                    maxHp,
-                    armorHp,
-                    state,
-                    zombie.getCurrentSpeed(),
-                    zombie.isChilled(),
-                    zombie.isFrozen(),
-                    zombie.isButtered(),
-                    zombie.isHypnotized()
-            ));
-        }
-
-        // Map projectiles
-        for (Projectile projectile : gameModel.getActiveProjectiles()) {
-            if (projectile == null) continue;
-            String id = getEntityId(projectile);
-            projectileDtos.add(new ProjectileSnapshotDto(
-                    id,
-                    projectile.getClass().getSimpleName(),
-                    projectile.getRow(),
-                    projectile.getX(),
-                    projectile.getY(),
-                    projectile.getVelocity() * projectile.getDirection(),
-                    projectile.getElement() != null ? projectile.getElement().name() : "NONE"
-            ));
-        }
-
+        List<PlantSnapshotDto> plantDtos = IZombieSnapshotMapper.mapPlants(gameModel, this::getEntityId);
+        List<ZombieSnapshotDto> zombieDtos = IZombieSnapshotMapper.mapZombies(gameModel, this::getEntityId);
+        List<ProjectileSnapshotDto> projectileDtos =
+                IZombieSnapshotMapper.mapProjectiles(gameModel, this::getEntityId);
+        List<SunSnapshotDto> sunDtos = IZombieSnapshotMapper.mapSuns(gameModel);
         List<Integer> breached = new ArrayList<>(gameModel.getBreachedRows());
         float timeRemaining = Math.max(0f, matchDuration - matchTime);
-
-        List<SunSnapshotDto> sunDtos = new ArrayList<>();
-        for (Sun sun : gameModel.getActiveSuns()) {
-            if (sun == null) {
-                continue;
-            }
-            sunDtos.add(new SunSnapshotDto(
-                    sun.getX(),
-                    sun.getY(),
-                    sun.getValue(),
-                    sun.getType() != null ? sun.getType().name() : "NORMAL",
-                    sun.getOffsetX(),
-                    sun.getOffsetY(),
-                    sun.getFallRemaining(),
-                    sun.getFallDuration(),
-                    sun.hasOrigin(),
-                    sun.getOriginX(),
-                    sun.getOriginY()
-            ));
-        }
-
         GameStateSnapshotPacket snapshot = new GameStateSnapshotPacket(
                 tickCounter,
                 matchTime,
@@ -660,9 +529,43 @@ public class IZombieGameRoom implements Runnable {
         return entityIdMap.computeIfAbsent(entity, k -> "ent-" + entityIdSequence.getAndIncrement());
     }
 
-    /**
-     * Stops the room execution and unregisters it from RoomManager.
-     */
+    private static void sendAction(
+            ClientConnectionHandler sender,
+            boolean ok,
+            String action,
+            String code,
+            PlacePlantRequestPacket packet) {
+        sendAction(sender, ok, action, code, packet.getRow(), packet.getCol());
+    }
+
+    private static void sendAction(
+            ClientConnectionHandler sender,
+            boolean ok,
+            String action,
+            String code,
+            PlaceZombieRequestPacket packet) {
+        sendAction(sender, ok, action, code, packet.getRow(), packet.getCol());
+    }
+
+    private static void sendAction(
+            ClientConnectionHandler sender, boolean ok, String action, String code, int row, int col) {
+        sender.sendPacket(new PlayerActionResponsePacket(ok, action, code, row, col));
+    }
+
+    private static IZombieLevel createLevel() {
+        try {
+            if (MiniGameRegistry.getInstance() != null) {
+                return (IZombieLevel) MiniGameRegistry.getInstance()
+                        .createMiniGame(MiniGameType.I_ZOMBIE, 1);
+            }
+        } catch (Exception e) {
+            System.err.println("[IZombieGameRoom] Could not create level from MiniGameRegistry: "
+                    + e.getMessage());
+        }
+        return createDefaultIZombieLevel();
+    }
+
+    // --- Helpers & Catalogs ---
     public synchronized void stop() {
         this.running = false;
         if (scheduledTickFuture != null) {

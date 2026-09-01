@@ -24,9 +24,6 @@ public class StrikeThroughAbility implements PlantAbility {
     /** Distance (in grid units) that Fume-shroom's plant food pushes zombies back. */
     private static final float KNOCKBACK_TILES = 1.5f;
 
-    /** Cactus projectile damage when it's on plant food. */
-    private static final int BURST_DAMAGE = 100;
-
     /** Cactus projectile count when it's on plant food. */
     private static final int BURST_PROJ_COUNT = 3;
 

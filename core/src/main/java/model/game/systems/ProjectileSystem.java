@@ -78,41 +78,37 @@ public class ProjectileSystem implements Tickable {
             tickFumeCloud((FumeCloud) projectile, deltaTime);
             return false;
         }
-
         if (projectile instanceof Pellet pellet && pellet.tickLifetime(deltaTime)) {
             discard(pellet, false);
             return false;
         }
+        advanceProjectile(projectile, deltaTime);
+        return resolveProjectileHits(projectile);
+    }
 
+    private void advanceProjectile(Projectile projectile, float deltaTime) {
         moveProjectile(projectile, deltaTime);
-
         if (projectile instanceof BowlingBulb) {
             bounceOffLaneEdges(projectile);
         } else if (projectile instanceof Pellet pellet && pellet.isBouncing()) {
             bounceOffLaneEdges(projectile);
         }
         applyTorchwood(projectile);
-
-        // Fire peas melt ice terrain they cross (Frostbite Caves).
         damageIceIfPresent(projectile);
         thawFrozenPlantIfPresent(projectile);
+    }
 
+    private boolean resolveProjectileHits(Projectile projectile) {
         if (leftPlayableArea(projectile)) {
             discard(projectile, false);
             return false;
         }
-
-        // Non-lobber shots are blocked by ice/octopus coatings on frozen plants.
         if (hitFrozenPlantIfBlocking(projectile)) {
             return false;
         }
-
-        // Juggler-reflected pellets travel leftward and damage plants.
         if (projectile.isReflected() && hitPlantIfReflected(projectile)) {
             return false;
         }
-
-        // Homing shots (Caulipower, …) and bouncing grapes pass through graves.
         if (projectile instanceof Pellet pellet
                 && !projectile.isHoming()
                 && !pellet.isBouncing()
@@ -120,12 +116,9 @@ public class ProjectileSystem implements Tickable {
             discard(projectile, true);
             return true;
         }
-
-        // Lobs fly over zombies until they land, then splash at the impact tile.
         if (projectile instanceof Splash splash && splash.isLobbing() && !splash.hasLanded()) {
             return false;
         }
-
         ZombieInstance target = findCollision(projectile);
         if (target != null) {
             handleZombieHit(projectile, target);
@@ -521,54 +514,46 @@ public class ProjectileSystem implements Tickable {
     /** Applies on-hit status effects based on the projectile's element */
     private void applyOnHitEffects(Projectile projectile, ZombieInstance zombie) {
         if (projectile.isIce()) {
-            // Frostbite Caves / frostbite-native zombies: chill stacks apply,
-            // but they never freeze solid (cap at 2 stacks).
-            boolean frostbiteNative = gameModel.getChapter() == Chapter.FROSTBITE_CAVES
-                    || (zombie.getDefinition() != null
-                    && zombie.getDefinition().getChapter() == Chapter.FROSTBITE_CAVES);
-            if (frostbiteNative) {
-                if (zombie.getChillLevel() < 2) {
-                    zombie.applyChill();
-                }
-            } else {
-                zombie.applyChill();
-            }
-
-            // Prospector dynamite extinguish.
-            JumpBehavior jump = (JumpBehavior) zombie.getBehavior(ZombieBehaviorType.JUMP);
-            if (jump != null) {
-                jump.extinguish();
-            }
-
-            // Explorer torch extinguish.
-            ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
-            if (shoot != null && shoot.isExplorer(zombie)) {
-                shoot.extinguishTorch();
-            }
+            applyIceHit(zombie);
         }
-
         if (projectile.isFire()) {
-            // Explorer torch reignite.
             ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
             if (shoot != null && shoot.isExplorer(zombie)) {
                 shoot.igniteTorch();
             }
         }
-
         if (projectile.isButter()) {
             zombie.applyButter();
         }
-
         if (projectile.isPoison()) {
-            int dps = poisonDpsFor(projectile);
-            zombie.applyPoison(dps, ZombieInstance.POISON_DURATION);
+            zombie.applyPoison(poisonDpsFor(projectile), ZombieInstance.POISON_DURATION);
         }
-
         Plant source = projectile.getSourcePlant();
         if (source != null
                 && source.getCategory() == PlantCategory.HOMING
                 && source.hasTag(PlantTags.MAGIC)) {
             zombie.hypnotise();
+        }
+    }
+
+    private void applyIceHit(ZombieInstance zombie) {
+        boolean frostbiteNative = gameModel.getChapter() == Chapter.FROSTBITE_CAVES
+                || (zombie.getDefinition() != null
+                && zombie.getDefinition().getChapter() == Chapter.FROSTBITE_CAVES);
+        if (frostbiteNative) {
+            if (zombie.getChillLevel() < 2) {
+                zombie.applyChill();
+            }
+        } else {
+            zombie.applyChill();
+        }
+        JumpBehavior jump = (JumpBehavior) zombie.getBehavior(ZombieBehaviorType.JUMP);
+        if (jump != null) {
+            jump.extinguish();
+        }
+        ShootBehavior shoot = (ShootBehavior) zombie.getBehavior(ZombieBehaviorType.SHOOT);
+        if (shoot != null && shoot.isExplorer(zombie)) {
+            shoot.extinguishTorch();
         }
     }
 

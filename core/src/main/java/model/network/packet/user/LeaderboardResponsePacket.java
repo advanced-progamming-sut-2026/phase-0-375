@@ -77,7 +77,9 @@ public class LeaderboardResponsePacket extends Packet {
         public int getCompletedMiniGames() { return completedMiniGames; }
         public void setCompletedMiniGames(int completedMiniGames) { this.completedMiniGames = completedMiniGames; }
         public int getCompletedDailyQuests() { return completedDailyQuests; }
-        public void setCompletedDailyQuests(int completedDailyQuests) { this.completedDailyQuests = completedDailyQuests; }
+        public void setCompletedDailyQuests(int completedDailyQuests) {
+            this.completedDailyQuests = completedDailyQuests;
+        }
         public int getCompletedNonDailyQuests() { return completedNonDailyQuests; }
         public void setCompletedNonDailyQuests(int completedNonDailyQuests) {
             this.completedNonDailyQuests = completedNonDailyQuests;

@@ -26,8 +26,8 @@ public class ServerLauncher {
     public static final int DEFAULT_PORT = 8080;
     public static final String DEFAULT_HOST = "0.0.0.0";
 
-    private static final AtomicBoolean running = new AtomicBoolean(false);
-    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
+    private static final AtomicBoolean RUNNING = new AtomicBoolean(false);
+    private static final CountDownLatch SHUTDOWN_LATCH = new CountDownLatch(1);
     private static ServerUserRepository userRepository;
     private static AuthService authService;
     private static UserService userService;
@@ -39,48 +39,10 @@ public class ServerLauncher {
     public static void main(String[] args) {
         int port = resolvePort(args);
         String host = resolveHost(args);
-
         printBanner(port, host);
-
-        running.set(true);
-
+        RUNNING.set(true);
         try {
-            // Initialize game definitions and catalogs
-            initCatalogs();
-
-            // Initialize persistence repository and core server services
-            userRepository = new ServerUserRepository();
-            authService = new AuthService(userRepository);
-            DailyOfferService dailyOfferService = new DailyOfferService();
-            userService = new UserService(userRepository, authService, dailyOfferService);
-            roomManager = new RoomManager();
-            lobbyService = new LobbyService(roomManager);
-
-            // Configure packet routing and register auth, matchmaking, and room handlers
-            packetRouter = new PacketRouter();
-            authService.registerRoutes(packetRouter);
-            userService.registerRoutes(packetRouter);
-            lobbyService.registerRoutes(packetRouter);
-            roomManager.registerRoutes(packetRouter);
-
-            // Instantiate TCP server and wire lobby lookups to live connections
-            tcpServer = new TcpServer(host, port, packetRouter, TcpServer.createDefaultObjectMapper());
-            lobbyService.setTcpServer(tcpServer);
-            lobbyService.setAuthService(authService);
-
-            // Register JVM shutdown hook for clean termination
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("\n[Server] Shutdown hook invoked. Stopping server...");
-                stop();
-            }, "pvz-server-shutdown-hook"));
-
-            tcpServer.start();
-            System.out.println("[Server] Dedicated TCP Server successfully started on " + host + ":" + port);
-            System.out.println("[Server] Type 'stop' or 'exit' to terminate, 'status' for statistics, or 'help' for commands.\n");
-
-            // Process CLI input or await shutdown if non-interactive / daemon
-            handleConsoleInput();
-
+            runServer(host, port);
         } catch (IOException e) {
             System.err.println("[Server] Fatal error binding server to port " + port + ": " + e.getMessage());
             e.printStackTrace();
@@ -90,6 +52,34 @@ public class ServerLauncher {
             e.printStackTrace();
             System.exit(1);
         }
+    }
+
+    private static void runServer(String host, int port) throws IOException {
+        initCatalogs();
+        userRepository = new ServerUserRepository();
+        authService = new AuthService(userRepository);
+        DailyOfferService dailyOfferService = new DailyOfferService();
+        userService = new UserService(userRepository, authService, dailyOfferService);
+        roomManager = new RoomManager();
+        lobbyService = new LobbyService(roomManager);
+        packetRouter = new PacketRouter();
+        authService.registerRoutes(packetRouter);
+        userService.registerRoutes(packetRouter);
+        lobbyService.registerRoutes(packetRouter);
+        roomManager.registerRoutes(packetRouter);
+        tcpServer = new TcpServer(host, port, packetRouter, TcpServer.createDefaultObjectMapper());
+        lobbyService.setTcpServer(tcpServer);
+        lobbyService.setAuthService(authService);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\n[Server] Shutdown hook invoked. Stopping server...");
+            stop();
+        }, "pvz-server-shutdown-hook"));
+        tcpServer.start();
+        System.out.println("[Server] Dedicated TCP Server successfully started on " + host + ":" + port);
+        System.out.println(
+                "[Server] Type 'stop' or 'exit' to terminate, 'status' for statistics,"
+                        + " or 'help' for commands.\n");
+        handleConsoleInput();
     }
 
 
@@ -183,7 +173,7 @@ public class ServerLauncher {
     private static void handleConsoleInput() {
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         try {
-            while (running.get()) {
+            while (RUNNING.get()) {
                 if (!reader.ready()) {
                     try {
                         Thread.sleep(100);
@@ -214,15 +204,15 @@ public class ServerLauncher {
             // Error reading console input
         }
 
-        // If stdin closed (background daemon / non-interactive), wait on shutdownLatch
+        // If stdin closed (background daemon / non-interactive), wait on SHUTDOWN_LATCH
         try {
-            shutdownLatch.await();
+            SHUTDOWN_LATCH.await();
         } catch (InterruptedException ignored) {}
     }
 
     private static void printStatus() {
         System.out.println("[Server Status]");
-        System.out.println("  - Running: " + running.get());
+        System.out.println("  - Running: " + RUNNING.get());
         if (tcpServer != null) {
             System.out.println("  - Server Port: " + tcpServer.getBoundPort());
             System.out.println("  - Connected Clients: " + tcpServer.getActiveConnectionCount());
@@ -263,7 +253,7 @@ public class ServerLauncher {
      * Gracefully stops the server and releases all socket resources.
      */
     public static synchronized void stop() {
-        if (!running.compareAndSet(true, false)) {
+        if (!RUNNING.compareAndSet(true, false)) {
             return;
         }
         System.out.println("[Server] Shutting down RoomManager and rooms...");
@@ -274,12 +264,12 @@ public class ServerLauncher {
         if (tcpServer != null) {
             tcpServer.stop();
         }
-        shutdownLatch.countDown();
+        SHUTDOWN_LATCH.countDown();
         System.out.println("[Server] Server stopped successfully.");
     }
 
     public static boolean isRunning() {
-        return running.get();
+        return RUNNING.get();
     }
 
     public static TcpServer getTcpServer() {

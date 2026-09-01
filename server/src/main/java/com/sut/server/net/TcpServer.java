@@ -93,7 +93,9 @@ public class TcpServer {
             // JVM might already be shutting down in some test scenarios
         }
 
-        System.out.println("[INFO] [TcpServer] Server successfully started and listening on " + host + ":" + getBoundPort());
+        System.out.println(
+                "[INFO] [TcpServer] Server successfully started and listening on "
+                        + host + ":" + getBoundPort());
     }
 
     /**
@@ -114,7 +116,9 @@ public class TcpServer {
                 registerConnection(handler);
                 clientExecutor.submit(handler);
 
-                System.out.println("[INFO] [TcpServer] Accepted connection " + connectionId + " from " + clientSocket.getRemoteSocketAddress());
+                System.out.println(
+                        "[INFO] [TcpServer] Accepted connection " + connectionId
+                                + " from " + clientSocket.getRemoteSocketAddress());
             } catch (SocketException e) {
                 if (!running.get() || serverSocket == null || serverSocket.isClosed()) {
                     break; // Expected exception during graceful shutdown

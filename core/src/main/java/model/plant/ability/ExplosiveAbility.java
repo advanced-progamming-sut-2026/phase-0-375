@@ -316,10 +316,6 @@ public class ExplosiveAbility implements PlantAbility {
         return true;
     }
 
-    private boolean hasTrigger(PlantInstance plant, PlantAbilityContext context) {
-        return !getTriggerZombies(plant, context).isEmpty();
-    }
-
     /**
      * Returns the zombies that trigger this trap. Most traps trigger on
      * same-tile contact. Squash triggers on an adjacent zombie in its lane.

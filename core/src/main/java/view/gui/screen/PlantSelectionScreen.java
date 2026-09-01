@@ -79,6 +79,14 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
     }
 
     private void buildHud() {
+        addResourceHud();
+        addSlotColumn();
+        addChooserOrNote();
+        addBottomBar();
+        toast.toFront();
+    }
+
+    private void addResourceHud() {
         Table topRight = new Table();
         topRight.setFillParent(true);
         topRight.setTouchable(Touchable.childrenOnly);
@@ -86,7 +94,9 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         resourceBar = new ResourceBar(skin, game.assets != null ? game.assets.textures : null);
         topRight.add(resourceBar);
         uiStage.addActor(topRight);
+    }
 
+    private void addSlotColumn() {
         Table left = new Table();
         left.setFillParent(true);
         left.setTouchable(Touchable.childrenOnly);
@@ -94,74 +104,79 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
         slotColumn = new Table();
         left.add(slotColumn);
         uiStage.addActor(left);
+    }
 
+    private void addChooserOrNote() {
         Table mid = new Table();
         mid.setFillParent(true);
         mid.setTouchable(Touchable.childrenOnly);
         mid.top().left().padLeft(16f + SeedPacketActor.PACKET_WIDTH + 16f).padTop(8f).padBottom(72f);
         if (allowsChoosing) {
-            chooser = new PlantChooserPanel(skin, assets, new PlantChooserPanel.Listener() {
-                @Override
-                public void onToggle(String plantName, boolean locked) {
-                    inspected = plantName;
-                    if (!locked) {
-                        toggle(plantName, selectedPlants().contains(plantName));
-                    } else {
-                        refreshPackets();
-                    }
-                }
-
-                @Override
-                public void onUpgrade(String plantName) {
-                    CommandResult<Void> r = collection.upgradePlant(plantName);
-                    showPurchaseResult(r);
-                    if (r.isSuccess()) {
-                        refreshPackets();
-                    }
-                }
-
-                @Override
-                public void onBoost(String plantName) {
-                    CommandResult<Void> r = controller.boostPlant(plantName);
-                    showToast(r.getMessage(), !r.isSuccess());
-                    if (r.isSuccess()) {
-                        refreshPackets();
-                    }
-                }
-            });
+            chooser = new PlantChooserPanel(skin, assets, chooserListener());
             mid.add(chooser).width(680f).growY();
         } else {
             Label note = new Label(
                     "This level picks plants for you. Press Let's Rock to continue.",
-                    skin,
-                    "secondary");
+                    skin, "secondary");
             note.setWrap(true);
             mid.add(note).width(420f);
         }
         uiStage.addActor(mid);
+    }
 
+    private PlantChooserPanel.Listener chooserListener() {
+        return new PlantChooserPanel.Listener() {
+            @Override
+            public void onToggle(String plantName, boolean locked) {
+                inspected = plantName;
+                if (!locked) {
+                    toggle(plantName, selectedPlants().contains(plantName));
+                } else {
+                    refreshPackets();
+                }
+            }
+
+            @Override
+            public void onUpgrade(String plantName) {
+                CommandResult<Void> r = collection.upgradePlant(plantName);
+                showPurchaseResult(r);
+                if (r.isSuccess()) {
+                    refreshPackets();
+                }
+            }
+
+            @Override
+            public void onBoost(String plantName) {
+                CommandResult<Void> r = controller.boostPlant(plantName);
+                showToast(r.getMessage(), !r.isSuccess());
+                if (r.isSuccess()) {
+                    refreshPackets();
+                }
+            }
+        };
+    }
+
+    private void addBottomBar() {
         Table bottom = new Table();
         bottom.setFillParent(true);
         bottom.setTouchable(Touchable.childrenOnly);
         bottom.bottom().pad(16f);
         TextButton back = new TextButton("Back", skin, "brown");
-        back.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                goBack();
-            }
-        });
+        back.addListener(change(this::goBack));
         TextButton start = new TextButton("Let's Rock", skin);
-        start.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                startGame();
-            }
-        });
+        start.addListener(change(this::startGame));
         bottom.add(back).width(180f).height(48f).left().expandX();
         bottom.add(start).width(240f).height(52f).right();
         uiStage.addActor(bottom);
-        toast.toFront();
+    }
+
+    private ChangeListener change(Runnable action) {
+        return new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                action.run();
+            }
+        };
     }
 
     private void goBack() {

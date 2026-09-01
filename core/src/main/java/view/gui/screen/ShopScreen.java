@@ -243,10 +243,26 @@ public final class ShopScreen extends AbstractMenuScreen {
     protected void buildUi() {
         App.getInstance().setCurrentMenu(MenuType.SHOP);
         TextureBank t = game.assets.textures;
+        if (!DECO_ON_TOP) {
+            addDecorations(t);
+        }
+        addResourceBar(t);
+        float panelX = (UI_WIDTH - PANEL_W) * 0.5f;
+        float panelY = PANEL_Y + PANEL_LIFT;
+        addCloseButton(t, panelX, panelY);
+        addStatusLabel();
+        textures = t;
+        cards.defaults().pad(12f);
+        populateCards();
+        stage.addActor(shopPanel(t, panelX, panelY, shopScroller()));
+        addSkuBanner(t, panelX, panelY);
+        if (DECO_ON_TOP) {
+            addDecorations(t);
+        }
+        addTitle();
+    }
 
-        // Cosmic main-menu backdrop + edge fade are drawn in render(), not as stage actors.
-        if (!DECO_ON_TOP) addDecorations(t);
-
+    private void addResourceBar(TextureBank t) {
         Table top = new Table();
         top.setFillParent(true);
         top.setTouchable(Touchable.childrenOnly);
@@ -254,62 +270,54 @@ public final class ShopScreen extends AbstractMenuScreen {
         resources = new ResourceBar(skin, t);
         top.add(resources).pad(34f);
         stage.addActor(top);
+    }
 
-        float panelX = (UI_WIDTH - PANEL_W) * 0.5f;
-        float panelY = PANEL_Y + PANEL_LIFT;
+    private void addCloseButton(TextureBank t, float panelX, float panelY) {
         AtlasImageButton close = button(t, ShopArt.CLOSE, ShopArt.CLOSE_DOWN, CLOSE_SIZE,
-            panelX + PANEL_W - CLOSE_SIZE + CLOSE_SHIFT_X,
-            panelY + PANEL_H + CLOSE_SHIFT_Y, this::goBack);
+                panelX + PANEL_W - CLOSE_SIZE + CLOSE_SHIFT_X,
+                panelY + PANEL_H + CLOSE_SHIFT_Y, this::goBack);
         stage.addActor(close);
+    }
 
+    private void addStatusLabel() {
         status = new Label("", skin, "medium");
-        status.setAlignment(com.badlogic.gdx.utils.Align.center);
+        status.setAlignment(Align.center);
         status.setPosition(UI_WIDTH / 2f - 360f, STATUS_Y);
         status.setWidth(720f);
         stage.addActor(status);
+    }
 
-        textures = t;
-        cards.defaults().pad(12f);
-        populateCards();
+    private ScrollPane shopScroller() {
         ScrollPane scroll = new ScrollPane(cards, skin);
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(false, true);
         scroll.setOverscroll(false, false);
         scroll.setClamp(true);
+        return scroll;
+    }
 
-        // Brown border + cream fill come from one BorderedTable nine-patch.
+    private Group shopPanel(TextureBank t, float panelX, float panelY, ScrollPane scroll) {
         BorderedTable frame = new BorderedTable();
         frame.setBounds(0f, 0f, PANEL_W, PANEL_H);
-
-        // Plain Group, NOT Stack: Stack.layout() rewrites every child to the full
-        // panel rect on each validate, which is what silently discarded the inner
-        // bounds below and let the cards scroll out over the frame.
         Group panel = new Group();
         panel.setSize(PANEL_W, PANEL_H);
         panel.setPosition(panelX, panelY);
         panel.addActor(frame);
-
         float innerW = PANEL_W - FRAME * 2f;
         float innerH = PANEL_H - FRAME * 2f;
-
         TextureRegion miniBg = t.region(ShopArt.MINISTORE_BG);
         if (miniBg != null) {
-            // Rounded so it cannot cover the frame's curved corners.
             RoundedRegionImage inside = new RoundedRegionImage(paintedCore(miniBg), CORNER);
             inside.setBounds(FRAME, FRAME, innerW, innerH);
             inside.setTouchable(Touchable.disabled);
             panel.addActor(inside);
         }
-
-        // ScrollPane scissor-clips its widget to its own bounds, so with the
-        // bounds honoured the cards can never be painted over the frame.
         scroll.setBounds(FRAME, FRAME, innerW, innerH);
         panel.addActor(scroll);
-        stage.addActor(panel);
-        addSkuBanner(t, panelX, panelY);
-        if (DECO_ON_TOP) addDecorations(t);
+        return panel;
+    }
 
-        // Title last so it paints above panel, banner and decorations.
+    private void addTitle() {
         Label title = new Label("SHOP", skin, "big");
         title.setColor(Color.BLACK);
         SkinFonts.scaleLabel(title, skin, "big", TITLE_FONT_SCALE);
@@ -422,8 +430,17 @@ public final class ShopScreen extends AbstractMenuScreen {
                            String plantOverride, boolean daily, boolean soldOut) {
         Table box = new Table();
         TextureRegion bg = t.region(bgId);
-        if (bg != null) box.setBackground(new TextureRegionDrawable(bg));
+        if (bg != null) {
+            box.setBackground(new TextureRegionDrawable(bg));
+        }
         box.pad(18f);
+        box.add(artSlot(item, t, plantOverride, daily)).size(ART_SLOT_W, ART_SLOT_H).center().row();
+        addCardCopy(box, item, daily, soldOut);
+        addCardFooter(box, item, price, soldOut);
+        return box;
+    }
+
+    private Container<Actor> artSlot(ShopItem item, TextureBank t, String plantOverride, boolean daily) {
         Actor art = artwork(item, t, plantOverride, daily);
         float[] artBox = artBox(item.getItemType(), daily);
         Container<Actor> artSlot = new Container<>(art);
@@ -431,15 +448,16 @@ public final class ShopScreen extends AbstractMenuScreen {
         artSlot.size(artBox[0], artBox[1]);
         artSlot.padLeft(artBox[2]).padRight(-artBox[2]);
         artSlot.padTop(artBox[3]).padBottom(-artBox[3]);
-        box.add(artSlot).size(ART_SLOT_W, ART_SLOT_H).center().row();
+        return artSlot;
+    }
 
+    private void addCardCopy(Table box, ShopItem item, boolean daily, boolean soldOut) {
         String title = daily ? "DAILY OFFER\n" + labelFor(item) : labelFor(item);
         Label name = new Label(title, skin, "medium");
         name.setColor(Color.WHITE);
         name.setWrap(true);
-        name.setAlignment(com.badlogic.gdx.utils.Align.center);
+        name.setAlignment(Align.center);
         box.add(name).width(210f).height(NAME_H).padTop(6f).row();
-
         if (daily && !soldOut) {
             Label timer = new Label("Ends in --:--:--", skin, "secondary");
             timer.setColor(TIMER_COLOR);
@@ -448,27 +466,26 @@ public final class ShopScreen extends AbstractMenuScreen {
             box.add(timer).width(210f).height(TIMER_H).padTop(2f).row();
             dailyOfferTimer = timer;
         }
-
         Label desc = new Label(item.getDescription(), skin, "secondary");
         desc.setColor(Color.WHITE);
         desc.setWrap(true);
-        desc.setAlignment(com.badlogic.gdx.utils.Align.top | com.badlogic.gdx.utils.Align.center);
+        desc.setAlignment(Align.top | Align.center);
         float descH = daily && !soldOut ? DESC_H - TIMER_H - 2f : DESC_H;
         box.add(desc).width(210f).height(descH).row();
+    }
 
+    private void addCardFooter(Table box, ShopItem item, int price, boolean soldOut) {
         if (soldOut) {
             Label sold = new Label("ALREADY BOUGHT TODAY", skin, "medium");
             sold.setColor(Color.LIGHT_GRAY);
-            sold.setAlignment(com.badlogic.gdx.utils.Align.center);
+            sold.setAlignment(Align.center);
             sold.setWrap(true);
             box.add(sold).width(210f).height(BUY_H).center()
-                .padTop(6f - BUY_LIFT).padBottom(BUY_LIFT);
+                    .padTop(6f - BUY_LIFT).padBottom(BUY_LIFT);
         } else {
-            // Mirrored pads keep the row height identical while lifting the cell.
-            box.add(priceButton(item, price, t)).width(BUY_W).height(BUY_H).center()
-                .padTop(6f - BUY_LIFT).padBottom(BUY_LIFT);
+            box.add(priceButton(item, price, textures)).width(BUY_W).height(BUY_H).center()
+                    .padTop(6f - BUY_LIFT).padBottom(BUY_LIFT);
         }
-        return box;
     }
 
     /** One tunable decoration entry. */
@@ -655,9 +672,16 @@ public final class ShopScreen extends AbstractMenuScreen {
             TextureRegion coin = t.region(ShopArt.COIN);
             TextureRegion arrow = t.region(ShopArt.CONVERT_ARROW);
             TextureRegion gem = t.region(ShopArt.GEM);
-            if (gem != null) row.add(new Image(new TextureRegionDrawable(gem))).size(CONV_GEM_W, CONV_GEM_H);
-            if (arrow != null) row.add(new Image(new TextureRegionDrawable(arrow))).size(CONV_ARROW_W, CONV_ARROW_H).pad(4f);
-            if (coin != null) row.add(new Image(new TextureRegionDrawable(coin))).size(CONV_COIN_W, CONV_COIN_H);
+            if (gem != null) {
+                row.add(new Image(new TextureRegionDrawable(gem))).size(CONV_GEM_W, CONV_GEM_H);
+            }
+            if (arrow != null) {
+                row.add(new Image(new TextureRegionDrawable(arrow)))
+                        .size(CONV_ARROW_W, CONV_ARROW_H).pad(4f);
+            }
+            if (coin != null) {
+                row.add(new Image(new TextureRegionDrawable(coin))).size(CONV_COIN_W, CONV_COIN_H);
+            }
             conversion.add(row);
             return conversion;
         }
@@ -719,7 +743,8 @@ public final class ShopScreen extends AbstractMenuScreen {
         }
     }
 
-    private AtlasImageButton button(TextureBank t, String up, String down, float size, float x, float y, Runnable action) {
+    private AtlasImageButton button(TextureBank t, String up, String down, float size,
+                                    float x, float y, Runnable action) {
         AtlasImageButton b = new AtlasImageButton(t.region(up), t.region(down), size, action);
         b.setPosition(x, y);
         return b;

@@ -15,7 +15,8 @@ public class UserCommandResponsePacket extends Packet {
         super(PacketType.USER_COMMAND_RESPONSE);
     }
 
-    public UserCommandResponsePacket(String clientRequestId, boolean success, String errorCode, String message, User user) {
+    public UserCommandResponsePacket(
+            String clientRequestId, boolean success, String errorCode, String message, User user) {
         super(PacketType.USER_COMMAND_RESPONSE);
         this.clientRequestId = clientRequestId;
         this.success = success;

@@ -36,19 +36,31 @@ public final class SpritesheetClipCache implements Disposable {
         if (cached != null) {
             return cached;
         }
-        FileHandle file = assetsRoot.child(spec.relativePath());
-        if (!file.exists()) {
-            // Case-sensitive FS: try lowercase images/
-            String alt = spec.relativePath().replace("IMAGES/", "images/");
-            file = assetsRoot.child(alt);
-            if (!file.exists()) {
-                return null;
-            }
+        FileHandle file = resolveSheetFile(spec);
+        if (file == null) {
+            return null;
         }
+        SheetAnim anim = loadSheet(file, spec);
+        if (anim != null) {
+            clips.put(key, anim);
+        }
+        return anim;
+    }
+
+    private FileHandle resolveSheetFile(PlantSpritesheetCatalog.ClipSpec spec) {
+        FileHandle file = assetsRoot.child(spec.relativePath());
+        if (file.exists()) {
+            return file;
+        }
+        String alt = spec.relativePath().replace("IMAGES/", "images/");
+        file = assetsRoot.child(alt);
+        return file.exists() ? file : null;
+    }
+
+    private SheetAnim loadSheet(FileHandle file, PlantSpritesheetCatalog.ClipSpec spec) {
         Texture texture = new Texture(file);
         texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear);
         textures.add(texture);
-
         int cols = Math.max(1, spec.columns());
         int rows = Math.max(1, spec.rows());
         int frameW = texture.getWidth() / cols;
@@ -56,7 +68,18 @@ public final class SpritesheetClipCache implements Disposable {
         if (frameW <= 0 || frameH <= 0) {
             return null;
         }
+        Array<TextureRegion> frames = collectFrames(texture, spec, cols, rows, frameW, frameH);
+        if (frames.size == 0) {
+            return null;
+        }
+        float frameDuration = Math.max(0.001f, spec.frameDuration());
+        Animation<TextureRegion> animation =
+                new Animation<>(frameDuration, frames, Animation.PlayMode.NORMAL);
+        return new SheetAnim(animation, frames.size * frameDuration, texture);
+    }
 
+    private static Array<TextureRegion> collectFrames(Texture texture,
+            PlantSpritesheetCatalog.ClipSpec spec, int cols, int rows, int frameW, int frameH) {
         TextureRegion[][] grid = TextureRegion.split(texture, frameW, frameH);
         Array<TextureRegion> frames = new Array<>(spec.frameCount());
         if (spec.frameIndices() != null && spec.frameIndices().length > 0) {
@@ -73,16 +96,7 @@ public final class SpritesheetClipCache implements Disposable {
                 }
             }
         }
-        if (frames.size == 0) {
-            return null;
-        }
-
-        float frameDuration = Math.max(0.001f, spec.frameDuration());
-        Animation<TextureRegion> animation =
-                new Animation<>(frameDuration, frames, Animation.PlayMode.NORMAL);
-        SheetAnim anim = new SheetAnim(animation, frames.size * frameDuration, texture);
-        clips.put(key, anim);
-        return anim;
+        return frames;
     }
 
     private static TextureRegion regionAt(TextureRegion[][] grid, int cols, int rows, int index) {

@@ -25,113 +25,41 @@ import java.util.Map;
  * The runtime representation of a plant on the game field.
  */
 public class PlantInstance implements Placeable {
-    private Plant definition;
-    private PlantState state;
-    private int currentHP;
-    private int armorHP;
-    private int armorMaxHP;
-    private int reflectDamageBonus;
-    private boolean armorExplodesOnBreak;
-    private boolean pendingArmorExplosion;
-    private int armorBreakEpoch;
-    private boolean deathDetonated;
-    private int level;                                 // 1-4
-    private Point position;                            // grid (col, row); null if not yet placed
-    private float currentRecharge;                     // seconds remaining before the seed is available again
-    private boolean isPlantFoodActive;
-    private float lifespanRemaining;                   // -1 = infinite
-    private float lifespanTotal;                       // >0 when a finite stay was scheduled (mints)
-    private float plantFoodDurationRemaining;
-    private boolean pendingPlantFoodEffect;
-    private PlantAction activeAction; // Multi-tick ability sequence (attack anim, windup, …); at most one.
-    private int actionEpoch; // Bumped when a presentation action starts so the view can restart clips
-    private final Map<PlantAbilityType, AbilityState> abilityStates; // Per-ability runtime state
-    private int freezeHitCount;
-    private PlantState stateBeforeFreeze;
-    private PlantState stateBeforeTransform;
-    private int iceHp = 0;
+    Plant definition;
+    PlantState state;
+    int currentHP;
+    int armorHP;
+    int armorMaxHP;
+    int reflectDamageBonus;
+    boolean armorExplodesOnBreak;
+    boolean pendingArmorExplosion;
+    int armorBreakEpoch;
+    boolean deathDetonated;
+    int level;                                 // 1-4
+    Point position;                            // grid (col, row); null if not yet placed
+    float currentRecharge;                     // seconds remaining before the seed is available again
+    boolean isPlantFoodActive;
+    float lifespanRemaining;                   // -1 = infinite
+    float lifespanTotal;                       // >0 when a finite stay was scheduled (mints)
+    float plantFoodDurationRemaining;
+    boolean pendingPlantFoodEffect;
+    PlantAction activeAction; // Multi-tick ability sequence (attack anim, windup, …); at most one.
+    int actionEpoch; // Bumped when a presentation action starts so the view can restart clips
+    final Map<PlantAbilityType, AbilityState> abilityStates; // Per-ability runtime state
+    int freezeHitCount;
+    PlantState stateBeforeFreeze;
+    PlantState stateBeforeTransform;
+    int iceHp = 0;
     public static final int DEFAULT_ICE_HP = 600;
-    private boolean octopusCoating;
-    private String imitateTarget; // Imitater support: null for non-Imitaters
-    private float transformCountdown; // Imitater support: -1 means already transformed
-    private int stackCount;
-    private PlantAbility abilityStrategy; // Cached ability strategy
+    boolean octopusCoating;
+    String imitateTarget; // Imitater support: null for non-Imitaters
+    float transformCountdown; // Imitater support: -1 means already transformed
+    int stackCount;
+    PlantAbility abilityStrategy; // Cached ability strategy
 
     public PlantInstance(Plant definition) {
-        this.definition = definition;
-        this.state = PlantState.IDLE;
-        this.currentHP = definition.getBaseHP();
-        this.armorHP = 0;
-        this.armorMaxHP = 0;
-        this.reflectDamageBonus = 0;
-        this.armorExplodesOnBreak = false;
-        this.pendingArmorExplosion = false;
-        this.armorBreakEpoch = 0;
-        this.deathDetonated = false;
-        this.level = 1;
-        this.currentRecharge = definition.getRechargeTime();
-        this.isPlantFoodActive = false;
-        this.plantFoodDurationRemaining = 0f;
-        this.pendingPlantFoodEffect = false;
-        this.activeAction = null;
-        this.actionEpoch = 0;
-        this.lifespanRemaining = -1f;
-        this.lifespanTotal = 0f;
-        this.abilityStates = new EnumMap<>(PlantAbilityType.class);
-        this.freezeHitCount = 0;
-        this.stateBeforeFreeze = null;
-        this.stateBeforeTransform = null;
-        this.stackCount = 1;
-        if (definition.getAbilityType() != null) {
-            AbilityState abilityState = new AbilityState(definition.getAbilityType());
-            // Traps start disarmed; CHARGE mines wait actionInterval to arm.
-            if (definition.hasTag(PlantTags.TRAP)) {
-                abilityState.setArmed(false);
-                if (definition.hasTag(PlantTags.CHARGE) && definition.getActionInterval() > 0) {
-                    abilityState.setCooldownRemaining(definition.getActionInterval());
-                    this.state = PlantState.ARMING;
-                }
-            } else if (definition.hasTag(PlantTags.CHARGE)
-                    && definition.getCategory() == PlantCategory.SHOOTER
-                    && definition.getActionInterval() >= 5f) {
-                abilityState.setCooldownRemaining(definition.getActionInterval());
-                this.state = PlantState.ARMING;
-            }
-            abilityStates.put(definition.getAbilityType(), abilityState);
-            if (definition.getAbilityType() == PlantAbilityType.PRODUCE_SUN
-                    && definition.getActionInterval() > 0f) {
-                abilityState.setCooldownRemaining(definition.getActionInterval());
-            }
-        }
-
-        // Temporary plants (Puff-shroom, Sea-shroom, etc.) get a finite lifespan.
-        if (definition.hasTag(PlantTags.WARM_UP)) {
-            // Warm-up plants start growing; lifespan is infinite, but they ramp.
-            this.lifespanRemaining = -1f;
-        } else if (definition.isShroom() && !isImitater(definition)) {
-            // Non-warm-up shrooms (Puff-shroom, Sea-shroom) are temporary
-            this.lifespanRemaining = SHROOM_BASE_LIFESPAN;
-        }
-        // Imitater starts a short countdown before it morphs into its target.
-        this.imitateTarget = null;
-        this.transformCountdown = -1f;
-        if (isImitater(definition)) {
-            this.transformCountdown = IMITATER_TRANSFORM_DELAY;
-            if (this.currentHP <= 0) {
-                this.currentHP = 300;
-            }
-        }
-        if (isMint(definition)) {
-            if (this.currentHP <= 0) {
-                this.currentHP = MINT_BASE_HP;
-            }
-            float stay = definition.getAbilityValue();
-            if (stay <= 0f) {
-                stay = MINT_DEFAULT_DURATION;
-            }
-            this.lifespanRemaining = stay;
-            this.lifespanTotal = stay;
-        }
+        this.abilityStates = PlantInstanceInit.newAbilityMap();
+        PlantInstanceInit.initialize(this, definition);
     }
 
     /** @return true if the given definition represents an Imitater. */
@@ -445,92 +373,7 @@ public class PlantInstance implements Placeable {
 
     // --- Level upgrades ---
     public void applyLevelUpgrade(int targetLevel) {
-        if (targetLevel <= 1 || definition.getLevels() == null) {
-            this.level = Math.max(1, targetLevel);
-            return;
-        }
-        PlantLevels levels = definition.getLevels();
-        int newHP = definition.getBaseHP();
-        int newDamage = definition.getDamage();
-        int newCost = definition.getCost();
-        float newRecharge = definition.getRechargeTime();
-        float newActionInterval = definition.getActionInterval();
-        for (Map.Entry<Integer, LevelUpgrade> entry : levels.cumulativeUpgrades(targetLevel).entrySet()) {
-            LevelUpgrade upgrade = entry.getValue();
-            if (upgrade == null) continue;
-            switch (upgrade.getType()) {
-                case BUFF_HP:
-                    newHP += (int) upgrade.getValue();
-                    break;
-                case BUFF_DAMAGE:
-                    newDamage += (int) upgrade.getValue();
-                    break;
-                case BUFF_COST:
-                    newCost = Math.max(0, newCost + (int) upgrade.getValue());
-                    break;
-                case BUFF_RECHARGE:
-                    newRecharge = Math.max(0, newRecharge + upgrade.getValue());
-                    break;
-                case BUFF_ACTION_INTERVAL:
-                    newActionInterval = Math.max(0, newActionInterval + upgrade.getValue());
-                    break;
-                case SPECIAL_MECHANIC:
-                    applySpecialMechanic(upgrade);
-                    break;
-            }
-        }
-        int hpDelta = newHP - definition.getBaseHP();
-        this.currentHP = Math.min(newHP, this.currentHP + Math.max(0, hpDelta));
-        this.definition = new Plant(definition);
-        definition.setBaseHP(newHP);
-        definition.setDamage(newDamage);
-        definition.setCost(newCost);
-        definition.setRechargeTime(newRecharge);
-        definition.setActionInterval(newActionInterval);
-        this.level = targetLevel;
-    }
-    /** Applies a non-numeric special-mechanic upgrade. */
-    private void applySpecialMechanic(LevelUpgrade upgrade) {
-        switch (upgrade.getSpecialTag()) {
-            case LIFESPAN_EXT:
-                if (lifespanRemaining > 0) {
-                    lifespanRemaining += upgrade.getValue();
-                } else if (lifespanRemaining < 0 && definition.isShroom()) {
-                    lifespanRemaining = SHROOM_BASE_LIFESPAN + upgrade.getValue();
-                }
-                break;
-            case GROWTH_STAGE_MAX_UP:
-                AbilityState state = abilityStates.get(definition.getAbilityType());
-                if (state != null) {
-                    state.setGrowthStage(state.getGrowthStage() + (int) upgrade.getValue());
-                }
-                break;
-            case GROW_TIME_REDUCTION:
-                AbilityState prodState = abilityStates.get(PlantAbilityType.PRODUCE_SUN);
-                if (prodState != null && prodState.getCooldownRemaining() > 0) {
-                    prodState.setCooldownRemaining(
-                            Math.max(0f, prodState.getCooldownRemaining() - upgrade.getValue()));
-                }
-                break;
-            case ARM_TIME_REDUCTION:
-                AbilityState trapState = abilityStates.get(PlantAbilityType.DELAYED_EXPLOSIVE);
-                if (trapState != null && !trapState.isArmed() && trapState.getCooldownRemaining() > 0) {
-                    trapState.setCooldownRemaining(
-                            Math.max(0f, trapState.getCooldownRemaining() - upgrade.getValue()));
-                }
-                break;
-            case DURATION_EXT:
-                plantFoodDurationRemaining += upgrade.getValue();
-                if (lifespanRemaining > 0f) {
-                    lifespanRemaining += upgrade.getValue();
-                    if (lifespanTotal > 0f) {
-                        lifespanTotal += upgrade.getValue();
-                    }
-                }
-                break;
-            default:
-                break;
-        }
+        PlantUpgradeApplier.apply(this, targetLevel);
     }
     // --- Ability strategy resolution ---
     public PlantAbility getAbilityStrategy() {
@@ -654,62 +497,10 @@ public class PlantInstance implements Placeable {
     }
     /** Morphs this instance into the plant named by {@link #imitateTarget}. */
     public void transformIntoImitated() {
-        if (imitateTarget == null || imitateTarget.isEmpty()) return;
-        Plant newDef = null;
-        try {
-            newDef = PlantFactory.getDefinition(imitateTarget);
-        } catch (IllegalStateException ignored) {
-            // PlantFactory not initialized - leave the instance as-is.
-        }
-        if (newDef == null) return;
-        transformInto(newDef);
+        PlantMorph.transformIntoImitated(this);
     }
     public void transformInto(Plant newDefinition) {
-        if (newDefinition == null) return;
-        PlacableLayer oldLayer = getLayer();
-
-        this.definition = newDefinition;
-
-        if (position != null && App.getInstance().getCurrentGameModel() != null) {
-            Cell cell = App.getInstance().getCurrentGameModel().getCellAt(position.getY(), position.getX());
-            if (cell != null) {
-                cell.rekeyPlaceable(this, oldLayer);
-            }
-        }
-
-        this.state = PlantState.IDLE;
-        this.currentHP = newDefinition.getBaseHP();
-        this.armorHP = 0;
-        this.armorMaxHP = 0;
-        this.reflectDamageBonus = 0;
-        this.armorExplodesOnBreak = false;
-        this.pendingArmorExplosion = false;
-        this.deathDetonated = false;
-        this.currentRecharge = newDefinition.getRechargeTime();
-        this.isPlantFoodActive = false;
-        this.plantFoodDurationRemaining = 0f;
-        this.pendingPlantFoodEffect = false;
-        this.activeAction = null;
-        this.abilityStates.clear();
-        if (newDefinition.getAbilityType() != null) {
-            AbilityState fresh = new AbilityState(newDefinition.getAbilityType());
-            if (newDefinition.hasTag(PlantTags.TRAP)) {
-                fresh.setArmed(false);
-            } else if (newDefinition.hasTag(PlantTags.CHARGE)
-                    && newDefinition.getCategory() == PlantCategory.SHOOTER
-                    && newDefinition.getActionInterval() >= 5f) {
-                fresh.setCooldownRemaining(newDefinition.getActionInterval());
-            }
-            this.abilityStates.put(newDefinition.getAbilityType(), fresh);
-        }
-        this.abilityStrategy = null;
-        this.imitateTarget = null;
-        bumpActionEpoch();
-        if (newDefinition.isShroom() && !isImitater(newDefinition)) {
-            this.lifespanRemaining = SHROOM_BASE_LIFESPAN;
-        } else {
-            this.lifespanRemaining = -1f;
-        }
+        PlantMorph.transformInto(this, newDefinition);
     }
     // --- Getters ---
     public Plant getDefinition() { return definition; }

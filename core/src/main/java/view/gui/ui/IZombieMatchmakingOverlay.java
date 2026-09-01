@@ -95,91 +95,12 @@ public class IZombieMatchmakingOverlay extends Table {
     private void buildCard() {
         BorderedTable card = new BorderedTable();
         card.pad(24f);
-
         Label title = new Label("I, ZOMBIE — MULTIPLAYER", skin, "big");
         title.setColor(Color.BLACK);
         title.setAlignment(Align.center);
         card.add(title).colspan(3).padBottom(18f).row();
-
-        // Play with Known Player
-        Table knownSection = createSectionBox();
-        Label knownHeading = new Label("👥 Play with Known Player", skin, "medium");
-        knownHeading.setColor(Color.BLACK);
-        knownSection.add(knownHeading).left().row();
-
-        Label knownDesc = new Label("Invite an online player to an authoritative 1v1 match (10s invite window).", skin, "secondary");
-        knownDesc.setColor(new Color(0.3f, 0.25f, 0.2f, 1f));
-        knownDesc.setWrap(true);
-        knownSection.add(knownDesc).width(500f).left().padTop(4f).padBottom(8f).row();
-
-        Table knownControls = new Table();
-        usernameField = new TextField("", skin);
-        usernameField.setMessageText("Target username");
-        knownControls.add(usernameField).width(170f).height(44f).padRight(8f);
-
-        knownRoleSelect = new SelectBox<>(skin);
-        knownRoleSelect.setItems("ANY", "PLANT", "ZOMBIE");
-        knownControls.add(knownRoleSelect).width(110f).height(44f).padRight(8f);
-
-        sendInviteBtn = new TextButton("SEND INVITE", skin, "green");
-        sendInviteBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                sendDirectInvite();
-            }
-        });
-        knownControls.add(sendInviteBtn).width(140f).height(44f).padRight(8f);
-
-        cancelInviteBtn = new TextButton("CANCEL", skin, "brown");
-        cancelInviteBtn.setVisible(false);
-        cancelInviteBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                cancelDirectInvite();
-            }
-        });
-        knownControls.add(cancelInviteBtn).width(100f).height(44f);
-        knownSection.add(knownControls).left().padBottom(4f).row();
-
-        inviteStatusLabel = new Label("", skin, "secondary");
-        inviteStatusLabel.setColor(new Color(0.2f, 0.5f, 0.2f, 1f));
-        knownSection.add(inviteStatusLabel).left().padTop(2f).row();
-
-        card.add(knownSection).growX().padBottom(14f).row();
-
-        // Play with Random Player
-        Table randomSection = createSectionBox();
-        Label randomHeading = new Label("🎲 Play with Random Player", skin, "medium");
-        randomHeading.setColor(Color.BLACK);
-        randomSection.add(randomHeading).left().row();
-
-        Label randomDesc = new Label("Join the matchmaking queue to pair with any available opponent.", skin, "secondary");
-        randomDesc.setColor(new Color(0.3f, 0.25f, 0.2f, 1f));
-        randomDesc.setWrap(true);
-        randomSection.add(randomDesc).width(500f).left().padTop(4f).padBottom(8f).row();
-
-        Table randomControls = new Table();
-        randomControls.add(new Label("Role: ", skin, "secondary")).padRight(6f);
-        randomRoleSelect = new SelectBox<>(skin);
-        randomRoleSelect.setItems("ANY", "PLANT", "ZOMBIE");
-        randomControls.add(randomRoleSelect).width(120f).height(44f).padRight(12f);
-
-        findRandomBtn = new TextButton("FIND MATCH", skin, "green");
-        findRandomBtn.addListener(new ChangeListener() {
-            @Override
-            public void changed(ChangeEvent event, Actor actor) {
-                startRandomMatchmaking();
-            }
-        });
-        randomControls.add(findRandomBtn).width(160f).height(44f);
-        randomSection.add(randomControls).left().padBottom(4f).row();
-
-        randomStatusLabel = new Label("", skin, "secondary");
-        randomStatusLabel.setColor(new Color(0.2f, 0.5f, 0.2f, 1f));
-        randomSection.add(randomStatusLabel).left().padTop(2f).row();
-
-        card.add(randomSection).growX().padBottom(18f).row();
-
+        card.add(knownPlayerSection()).growX().padBottom(14f).row();
+        card.add(randomPlayerSection()).growX().padBottom(18f).row();
         TextButton closeBtn = new TextButton("CLOSE", skin, "brown");
         closeBtn.addListener(new ChangeListener() {
             @Override
@@ -188,8 +109,74 @@ public class IZombieMatchmakingOverlay extends Table {
             }
         });
         card.add(closeBtn).width(180f).height(50f).center();
-
         add(card).width(620f).pad(20f);
+    }
+
+    private Table knownPlayerSection() {
+        Table knownSection = createSectionBox();
+        Label knownHeading = new Label("Play with Known Player", skin, "medium");
+        knownHeading.setColor(Color.BLACK);
+        knownSection.add(knownHeading).left().row();
+        Label knownDesc = new Label(
+                "Invite an online player to an authoritative 1v1 match (10s invite window).",
+                skin, "secondary");
+        knownDesc.setColor(new Color(0.3f, 0.25f, 0.2f, 1f));
+        knownDesc.setWrap(true);
+        knownSection.add(knownDesc).width(500f).left().padTop(4f).padBottom(8f).row();
+        Table knownControls = new Table();
+        usernameField = new TextField("", skin);
+        usernameField.setMessageText("Target username");
+        knownControls.add(usernameField).width(170f).height(44f).padRight(8f);
+        knownRoleSelect = new SelectBox<>(skin);
+        knownRoleSelect.setItems("ANY", "PLANT", "ZOMBIE");
+        knownControls.add(knownRoleSelect).width(110f).height(44f).padRight(8f);
+        sendInviteBtn = new TextButton("SEND INVITE", skin, "green");
+        sendInviteBtn.addListener(change(this::sendDirectInvite));
+        knownControls.add(sendInviteBtn).width(140f).height(44f).padRight(8f);
+        cancelInviteBtn = new TextButton("CANCEL", skin, "brown");
+        cancelInviteBtn.setVisible(false);
+        cancelInviteBtn.addListener(change(this::cancelDirectInvite));
+        knownControls.add(cancelInviteBtn).width(100f).height(44f);
+        knownSection.add(knownControls).left().padBottom(4f).row();
+        inviteStatusLabel = new Label("", skin, "secondary");
+        inviteStatusLabel.setColor(new Color(0.2f, 0.5f, 0.2f, 1f));
+        knownSection.add(inviteStatusLabel).left().padTop(2f).row();
+        return knownSection;
+    }
+
+    private Table randomPlayerSection() {
+        Table randomSection = createSectionBox();
+        Label randomHeading = new Label("Play with Random Player", skin, "medium");
+        randomHeading.setColor(Color.BLACK);
+        randomSection.add(randomHeading).left().row();
+        Label randomDesc = new Label(
+                "Join the matchmaking queue to pair with any available opponent.",
+                skin, "secondary");
+        randomDesc.setColor(new Color(0.3f, 0.25f, 0.2f, 1f));
+        randomDesc.setWrap(true);
+        randomSection.add(randomDesc).width(500f).left().padTop(4f).padBottom(8f).row();
+        Table randomControls = new Table();
+        randomControls.add(new Label("Role: ", skin, "secondary")).padRight(6f);
+        randomRoleSelect = new SelectBox<>(skin);
+        randomRoleSelect.setItems("ANY", "PLANT", "ZOMBIE");
+        randomControls.add(randomRoleSelect).width(120f).height(44f).padRight(12f);
+        findRandomBtn = new TextButton("FIND MATCH", skin, "green");
+        findRandomBtn.addListener(change(this::startRandomMatchmaking));
+        randomControls.add(findRandomBtn).width(160f).height(44f);
+        randomSection.add(randomControls).left().padBottom(4f).row();
+        randomStatusLabel = new Label("", skin, "secondary");
+        randomStatusLabel.setColor(new Color(0.2f, 0.5f, 0.2f, 1f));
+        randomSection.add(randomStatusLabel).left().padTop(2f).row();
+        return randomSection;
+    }
+
+    private ChangeListener change(Runnable action) {
+        return new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                action.run();
+            }
+        };
     }
 
     private Table createSectionBox() {
@@ -228,73 +215,70 @@ public class IZombieMatchmakingOverlay extends Table {
 
     private void setupNetworkListeners() {
         NetworkClient client = getOrConnectClient();
-        if (client == null) return;
-
-        // Re-bind global invite listener in case connect happened just now.
+        if (client == null) {
+            return;
+        }
         game.bindNetworkInviteListener();
-
-        inviteStatusHandler = status -> Gdx.app.postRunnable(() -> {
-            if (status.getStatus() == InviteStatus.PENDING) {
-                currentInviteId = status.getInviteId();
-                waitingForInvite = true;
-                inviteTimer = 10f;
-                inviteStatusLabel.setText(status.getMessage() != null ? status.getMessage() : "Invite sent!");
-                inviteStatusLabel.setColor(new Color(0.2f, 0.6f, 0.2f, 1f));
-            } else if (status.getStatus() == InviteStatus.ACCEPTED) {
-                waitingForInvite = false;
-                inviteStatusLabel.setText("Invite accepted! Joining game room...");
-                inviteStatusLabel.setColor(Color.GREEN);
-            } else if (status.getStatus() == InviteStatus.DECLINED) {
-                waitingForInvite = false;
-                resetInvitePanel(status.getMessage() != null ? status.getMessage() : "Invite declined.");
-            } else if (status.getStatus() == InviteStatus.TIMED_OUT) {
-                waitingForInvite = false;
-                resetInvitePanel(status.getMessage() != null ? status.getMessage() : "Invite timed out.");
-            } else if (status.getStatus() == InviteStatus.BUSY) {
-                waitingForInvite = false;
-                resetInvitePanel(status.getMessage() != null ? status.getMessage() : "Player is currently busy.");
-            } else if (status.getStatus() == InviteStatus.OFFLINE || status.getStatus() == InviteStatus.NOT_FOUND) {
-                waitingForInvite = false;
-                resetInvitePanel(status.getMessage() != null ? status.getMessage() : "User is offline or not found.");
-            } else if (status.getStatus() == InviteStatus.CANCELLED) {
-                waitingForInvite = false;
-                resetInvitePanel("Invite cancelled.");
-            }
-        });
+        inviteStatusHandler = status -> Gdx.app.postRunnable(() -> onInviteStatus(status));
         client.registerHandler(InviteStatusPacket.class, inviteStatusHandler);
-
-        matchmakingResponseHandler = resp -> Gdx.app.postRunnable(() -> {
-            if (resp.getStatus() == MatchmakingStatus.QUEUED) {
-                waitingForRandom = true;
-                showSearchingOverlay();
-            } else if (resp.getStatus() == MatchmakingStatus.CANCELLED) {
-                waitingForRandom = false;
-                hideSearchingOverlay();
-                randomStatusLabel.setText("Queue cancelled.");
-                randomStatusLabel.setColor(Color.GRAY);
-            } else if (resp.getStatus() == MatchmakingStatus.ERROR) {
-                waitingForRandom = false;
-                hideSearchingOverlay();
-                randomStatusLabel.setText("Error: " + resp.getMessage());
-                randomStatusLabel.setColor(Color.RED);
-            }
-        });
+        matchmakingResponseHandler = resp -> Gdx.app.postRunnable(() -> onMatchmakingResponse(resp));
         client.registerHandler(MatchmakingResponsePacket.class, matchmakingResponseHandler);
+        matchFoundHandler = match -> Gdx.app.postRunnable(() -> onMatchFound(client, match));
+        client.registerHandler(MatchFoundPacket.class, matchFoundHandler);
+    }
 
-        matchFoundHandler = match -> Gdx.app.postRunnable(() -> {
-            if (getStage() == null) {
+    private void onInviteStatus(InviteStatusPacket status) {
+        if (status.getStatus() == InviteStatus.PENDING) {
+            currentInviteId = status.getInviteId();
+            waitingForInvite = true;
+            inviteTimer = 10f;
+            inviteStatusLabel.setText(status.getMessage() != null ? status.getMessage() : "Invite sent!");
+            inviteStatusLabel.setColor(new Color(0.2f, 0.6f, 0.2f, 1f));
+            return;
+        }
+        waitingForInvite = false;
+        if (status.getStatus() == InviteStatus.ACCEPTED) {
+            inviteStatusLabel.setText("Invite accepted! Joining game room...");
+            inviteStatusLabel.setColor(Color.GREEN);
+        } else if (status.getStatus() == InviteStatus.CANCELLED) {
+            resetInvitePanel("Invite cancelled.");
+        } else {
+            String fallback = status.getStatus() == InviteStatus.DECLINED ? "Invite declined."
+                    : status.getStatus() == InviteStatus.TIMED_OUT ? "Invite timed out."
+                    : status.getStatus() == InviteStatus.BUSY ? "Player is currently busy."
+                    : "User is offline or not found.";
+            resetInvitePanel(status.getMessage() != null ? status.getMessage() : fallback);
+        }
+    }
+
+    private void onMatchmakingResponse(MatchmakingResponsePacket resp) {
+        if (resp.getStatus() == MatchmakingStatus.QUEUED) {
+            waitingForRandom = true;
+            showSearchingOverlay();
+            return;
+        }
+        waitingForRandom = false;
+        hideSearchingOverlay();
+        if (resp.getStatus() == MatchmakingStatus.CANCELLED) {
+            randomStatusLabel.setText("Queue cancelled.");
+            randomStatusLabel.setColor(Color.GRAY);
+        } else if (resp.getStatus() == MatchmakingStatus.ERROR) {
+            randomStatusLabel.setText("Error: " + resp.getMessage());
+            randomStatusLabel.setColor(Color.RED);
+        }
+    }
+
+    private void onMatchFound(NetworkClient client, MatchFoundPacket match) {
+        if (getStage() == null) {
+            return;
+        }
+        for (Actor actor : getStage().getActors()) {
+            if (actor instanceof InviteReceivedOverlay invite && invite.isJoiningAcceptedInvite()) {
                 return;
             }
-            // Only defer when an accepted invite is waiting for its room MatchFound.
-            for (Actor actor : getStage().getActors()) {
-                if (actor instanceof InviteReceivedOverlay invite && invite.isJoiningAcceptedInvite()) {
-                    return;
-                }
-            }
-            hideSearchingOverlay();
-            dismissCleanly(() -> MultiplayerMatchBootstrap.open(game, client, match));
-        });
-        client.registerHandler(MatchFoundPacket.class, matchFoundHandler);
+        }
+        hideSearchingOverlay();
+        dismissCleanly(() -> MultiplayerMatchBootstrap.open(game, client, match));
     }
 
     private void unregisterNetworkListeners() {

@@ -44,7 +44,8 @@ public class TimedWarLevel extends RegularLevel {
         effectiveKills = 0;
         lastKnownModelKills = 0;
         timeSinceLastKill = 0f;
-        if (getConfig() != null && getConfig().getRules() != null && getConfig().getRules().getTimedWarDecayInterval() > 0) {
+        if (getConfig() != null && getConfig().getRules() != null
+                && getConfig().getRules().getTimedWarDecayInterval() > 0) {
             decayInterval = getConfig().getRules().getTimedWarDecayInterval();
         }
     }

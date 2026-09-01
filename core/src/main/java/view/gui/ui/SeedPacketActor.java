@@ -73,114 +73,123 @@ public final class SeedPacketActor extends WidgetGroup {
                 : (boosted ? SeedPacketIds.BOOST : SeedPacketIds.READY);
         setSize(PACKET_WIDTH, PACKET_HEIGHT);
         setTouchable(Touchable.enabled);
-
         chrome = image(textures, chromeId);
         chrome.setFillParent(true);
+        styleChrome(locked);
+        addActor(chrome);
+        addPortraitAndCost(skin, sunCost, level, locked, showCostAndLevel);
+        cooldownShade = cooldownShadeImage();
+        addActor(cooldownShade);
+        layoutCooldownShade();
+        lock = locked ? lockImage(textures, skin) : null;
+        if (lock != null) {
+            addActor(lock);
+        }
+        select = image(textures, SeedPacketIds.SELECT);
+        select.setFillParent(true);
+        select.setVisible(false);
+        select.setTouchable(Touchable.disabled);
+        addActor(select);
+        addListener(new PacketInput());
+    }
+
+    private void styleChrome(boolean locked) {
         if (plantName == null) {
             chrome.getColor().a = EMPTY_ALPHA;
             setTouchable(Touchable.disabled);
         } else if (locked) {
             chrome.getColor().a = LOCKED_ALPHA;
         }
-        addActor(chrome);
+    }
 
-        if (plantName != null) {
-            String portraitRegion = SeedPacketIds.portraitId(plantName);
-            portrait = image(textures, portraitRegion);
-            float ph = portrait.getPrefHeight() > 0 ? portrait.getPrefHeight() : PACKET_HEIGHT * 0.82f;
-            float pw = portrait.getPrefWidth() > 0 ? portrait.getPrefWidth() : PACKET_WIDTH * 0.52f;
-            portrait.setSize(pw, ph);
-            portrait.setPosition(4f, Math.max(2f, (PACKET_HEIGHT - ph) * 0.5f));
-            if (locked) {
-                portrait.getColor().a = LOCKED_ALPHA;
-            }
-            addActor(portrait);
-
-            if (showCostAndLevel) {
-                float textW = PACKET_WIDTH * 0.52f;
-                float textX = PACKET_WIDTH * 0.44f;
-                addActor(packetLabel(skin, "LVL " + Math.max(1, level), 1.2f,
-                        textX, PACKET_HEIGHT - 18f, textW, 16f));
-                if (!locked) {
-                    addActor(packetLabel(skin, String.valueOf(sunCost), 2f,
-                            textX, 4f, textW, 18f));
-                }
-            }
-        } else {
+    private void addPortraitAndCost(Skin skin, int sunCost, int level,
+                                    boolean locked, boolean showCostAndLevel) {
+        if (plantName == null) {
             portrait = null;
+            return;
         }
-
-        cooldownShade = new Image(new TextureRegionDrawable(new TextureRegion(whitePixel())));
-        cooldownShade.setColor(COOLDOWN_SHADE_COLOR);
-        cooldownShade.setTouchable(Touchable.disabled);
-        cooldownShade.setVisible(false);
-        addActor(cooldownShade);
-        layoutCooldownShade();
-
-        lock = locked ? lockImage(textures, skin) : null;
-        if (lock != null) {
-            addActor(lock);
+        portrait = image(textures, SeedPacketIds.portraitId(plantName));
+        float ph = portrait.getPrefHeight() > 0 ? portrait.getPrefHeight() : PACKET_HEIGHT * 0.82f;
+        float pw = portrait.getPrefWidth() > 0 ? portrait.getPrefWidth() : PACKET_WIDTH * 0.52f;
+        portrait.setSize(pw, ph);
+        portrait.setPosition(4f, Math.max(2f, (PACKET_HEIGHT - ph) * 0.5f));
+        if (locked) {
+            portrait.getColor().a = LOCKED_ALPHA;
         }
+        addActor(portrait);
+        if (!showCostAndLevel) {
+            return;
+        }
+        float textW = PACKET_WIDTH * 0.52f;
+        float textX = PACKET_WIDTH * 0.44f;
+        addActor(packetLabel(skin, "LVL " + Math.max(1, level), 1.2f,
+                textX, PACKET_HEIGHT - 18f, textW, 16f));
+        if (!locked) {
+            addActor(packetLabel(skin, String.valueOf(sunCost), 2f,
+                    textX, 4f, textW, 18f));
+        }
+    }
 
-        select = image(textures, SeedPacketIds.SELECT);
-        select.setFillParent(true);
-        select.setVisible(false);
-        select.setTouchable(Touchable.disabled);
-        addActor(select);
+    private Image cooldownShadeImage() {
+        Image shade = new Image(new TextureRegionDrawable(new TextureRegion(whitePixel())));
+        shade.setColor(COOLDOWN_SHADE_COLOR);
+        shade.setTouchable(Touchable.disabled);
+        shade.setVisible(false);
+        return shade;
+    }
 
-        addListener(new InputListener() {
-            @Override
-            public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
-                if (pointer == -1 && plantName != null) {
-                    hovered = true;
-                    refreshSelect();
-                }
-            }
-
-            @Override
-            public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
-                if (pointer == -1) {
-                    hovered = false;
-                    refreshSelect();
-                }
-            }
-
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (dragPlant != null) {
-                    if (dimmed || plantName == null) {
-                        return true;
-                    }
-                    dragging = true;
-                    refreshSelect();
-                    event.stop();
-                    dragPlant.dragStart(SeedPacketActor.this);
-                    return true;
-                }
-                if (onClick != null) {
-                    onClick.run();
-                    return true;
-                }
-                return false;
-            }
-
-            @Override
-            public void touchDragged(InputEvent event, float x, float y, int pointer) {
-                if (dragging && dragPlant != null) {
-                    dragPlant.drag(SeedPacketActor.this, event.getStageX(), event.getStageY());
-                }
-            }
-
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                if (!dragging || dragPlant == null) {
-                    return;
-                }
-                dragging = false;
+    private final class PacketInput extends InputListener {
+        @Override
+        public void enter(InputEvent event, float x, float y, int pointer, Actor fromActor) {
+            if (pointer == -1 && plantName != null) {
+                hovered = true;
                 refreshSelect();
-                dragPlant.dragEnd(SeedPacketActor.this, event.getStageX(), event.getStageY());
             }
-        });
+        }
+
+        @Override
+        public void exit(InputEvent event, float x, float y, int pointer, Actor toActor) {
+            if (pointer == -1) {
+                hovered = false;
+                refreshSelect();
+            }
+        }
+
+        @Override
+        public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+            if (dragPlant != null) {
+                if (dimmed || plantName == null) {
+                    return true;
+                }
+                dragging = true;
+                refreshSelect();
+                event.stop();
+                dragPlant.dragStart(SeedPacketActor.this);
+                return true;
+            }
+            if (onClick != null) {
+                onClick.run();
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public void touchDragged(InputEvent event, float x, float y, int pointer) {
+            if (dragging && dragPlant != null) {
+                dragPlant.drag(SeedPacketActor.this, event.getStageX(), event.getStageY());
+            }
+        }
+
+        @Override
+        public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+            if (!dragging || dragPlant == null) {
+                return;
+            }
+            dragging = false;
+            refreshSelect();
+            dragPlant.dragEnd(SeedPacketActor.this, event.getStageX(), event.getStageY());
+        }
     }
 
     /** In-game: drag a packet onto the lawn to plant it. */

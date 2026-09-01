@@ -160,13 +160,20 @@ public final class ChapterCarousel extends Group {
         }
         float centerX = getWidth() * 0.5f;
         float centerY = getHeight() * 0.5f + 36f;
+        int[] order = zOrder(n);
+        for (int i = 0; i < n; i++) {
+            slots.get(order[i]).setZIndex(i);
+        }
+        for (int i = 0; i < n; i++) {
+            placeSlot(slots.get(i), i, n, centerX, centerY);
+        }
+    }
 
-        // Draw far slots first so the focused island is on top.
+    private int[] zOrder(int n) {
         int[] order = new int[n];
         for (int i = 0; i < n; i++) {
             order[i] = i;
         }
-        // Sort by distance from focus descending.
         for (int a = 0; a < n; a++) {
             for (int b = a + 1; b < n; b++) {
                 if (Math.abs(circularDelta(order[a], focus, n))
@@ -177,36 +184,28 @@ public final class ChapterCarousel extends Group {
                 }
             }
         }
-        for (int i = 0; i < n; i++) {
-            slots.get(order[i]).setZIndex(i);
+        return order;
+    }
+
+    private void placeSlot(ChapterIslandView view, int i, int n, float centerX, float centerY) {
+        float d = circularDelta(i, focus, n);
+        float abs = Math.abs(d);
+        float scale;
+        float alpha;
+        if (abs <= 1f) {
+            scale = MathUtils.lerp(1f, SIDE_SCALE, abs);
+            alpha = MathUtils.lerp(1f, SIDE_ALPHA, abs);
+        } else {
+            float t = Math.min(1f, abs - 1f);
+            scale = MathUtils.lerp(SIDE_SCALE, FAR_SCALE, t);
+            alpha = MathUtils.lerp(SIDE_ALPHA, FAR_ALPHA, t);
         }
-
-        for (int i = 0; i < n; i++) {
-            ChapterIslandView view = slots.get(i);
-            float d = circularDelta(i, focus, n);
-            float abs = Math.abs(d);
-
-            float scale;
-            float alpha;
-            if (abs <= 1f) {
-                scale = MathUtils.lerp(1f, SIDE_SCALE, abs);
-                alpha = MathUtils.lerp(1f, SIDE_ALPHA, abs);
-            } else {
-                float t = Math.min(1f, abs - 1f);
-                scale = MathUtils.lerp(SIDE_SCALE, FAR_SCALE, t);
-                alpha = MathUtils.lerp(SIDE_ALPHA, FAR_ALPHA, t);
-            }
-
-            float x = centerX + d * SPACING - SLOT_W * 0.5f;
-            float y = centerY - SLOT_H * 0.5f;
-            // Slight vertical dip for side cards.
-            y -= Math.min(abs, 1.5f) * 18f;
-
-            view.setPosition(x, y);
-            view.setScale(scale);
-            view.getColor().a = alpha;
-            view.setVisible(abs < 2.2f);
-        }
+        float x = centerX + d * SPACING - SLOT_W * 0.5f;
+        float y = centerY - SLOT_H * 0.5f - Math.min(abs, 1.5f) * 18f;
+        view.setPosition(x, y);
+        view.setScale(scale);
+        view.getColor().a = alpha;
+        view.setVisible(abs < 2.2f);
     }
 
     /** Signed circular distance from focus to slot index, in (−n/2, n/2]. */

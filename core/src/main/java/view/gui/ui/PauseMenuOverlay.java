@@ -70,26 +70,60 @@ public final class PauseMenuOverlay {
             Runnable onExit) {
         GameAudio.get().playOverlayOpen();
         ensureAtlas(textures);
+        Table overlay = dimOverlay();
+        Table outer = outerFrame(skin);
+        Table card = objectivesCard(skin, config);
+        outer.add(card).pad(48f, 52f, 20f, 52f).minWidth(PANEL_MIN_W - 80f)
+                .minHeight(CARD_MIN_H).growX().row();
+        outer.add(volumeSection(skin)).pad(12f, 64f, 40f, 64f).growX().row();
+        Table buttons = actionButtons(skin, onResume, onRestart, onExit);
+        float topperW = WINDOWTOPPER_W * TOPPER_SCALE;
+        float topperH = WINDOWTOPPER_H * TOPPER_SCALE;
+        Table frame = new Table();
+        frame.add(outer).minWidth(PANEL_MIN_W).row();
+        frame.add(buttons).padTop(-BTN_H * 0.5f);
+        Stack stack = new Stack();
+        stack.add(frame);
+        Table topperLayer = new Table();
+        topperLayer.top();
+        topperLayer.add(topperStack(textures, topperW, topperH))
+            .size(topperW, topperH)
+            .padTop(-topperH * 0.55f)
+            .expandX()
+            .top();
+        stack.add(topperLayer);
+        overlay.add(stack).pad(24f);
+        return overlay;
+    }
 
+    private static Table dimOverlay() {
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setTouchable(Touchable.enabled);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
+        return overlay;
+    }
 
+    private static Table outerFrame(Skin skin) {
         Table outer = new Table();
         Drawable outerBg = UiDrawables.tenPatch(skin, "image_ui_if_bundle_reward1_bg");
         if (outerBg != null) {
             outer.setBackground(outerBg);
         } else {
-            outer.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0.55f, 0.35f, 0.12f, 1f)));
+            outer.setBackground(new TextureRegionDrawable(whitePixel())
+                    .tint(new Color(0.55f, 0.35f, 0.12f, 1f)));
         }
+        return outer;
+    }
 
+    private static Table objectivesCard(Skin skin, LevelConfig config) {
         Table card = new Table();
         Drawable cardBg = UiDrawables.tenPatch(skin, BLANK_CARD);
         if (cardBg != null) {
             card.setBackground(cardBg);
         } else {
-            card.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0.96f, 0.92f, 0.78f, 1f)));
+            card.setBackground(new TextureRegionDrawable(whitePixel())
+                    .tint(new Color(0.96f, 0.92f, 0.78f, 1f)));
         }
         card.pad(28f, 36f, 32f, 36f);
         card.defaults().left().growX();
@@ -103,44 +137,22 @@ public final class PauseMenuOverlay {
             cb.getLabel().setColor(OBJECTIVE_COLOR);
             card.add(cb).padBottom(10f).row();
         }
+        return card;
+    }
 
-        outer.add(card).pad(48f, 52f, 20f, 52f).minWidth(PANEL_MIN_W - 80f).minHeight(CARD_MIN_H).growX().row();
-        outer.add(volumeSection(skin)).pad(12f, 64f, 40f, 64f).growX().row();
-
+    private static Table actionButtons(Skin skin, Runnable onResume, Runnable onRestart,
+                                       Runnable onExit) {
         TextButton exitBtn = new TextButton("SAVE AND EXIT", skin, "brown");
         TextButton restartBtn = new TextButton("RESTART", skin, "brown");
         TextButton resumeBtn = new TextButton("RESUME", skin, "purple");
         exitBtn.addListener(change(onExit));
         restartBtn.addListener(change(onRestart));
         resumeBtn.addListener(change(onResume));
-
         Table buttons = new Table();
         buttons.add(exitBtn).width(BTN_W).height(BTN_H).padRight(16f);
         buttons.add(restartBtn).width(BTN_W).height(BTN_H).padRight(16f);
         buttons.add(resumeBtn).width(BTN_W).height(BTN_H);
-
-        float topperW = WINDOWTOPPER_W * TOPPER_SCALE;
-        float topperH = WINDOWTOPPER_H * TOPPER_SCALE;
-
-        // Panel + buttons first; topper stacked last so it draws over the brown frame.
-        Table frame = new Table();
-        frame.add(outer).minWidth(PANEL_MIN_W).row();
-        frame.add(buttons).padTop(-BTN_H * 0.5f);
-
-        Stack stack = new Stack();
-        stack.add(frame);
-
-        Table topperLayer = new Table();
-        topperLayer.top();
-        topperLayer.add(topperStack(textures, topperW, topperH))
-            .size(topperW, topperH)
-            .padTop(-topperH * 0.55f)
-            .expandX()
-            .top();
-        stack.add(topperLayer);
-
-        overlay.add(stack).pad(24f);
-        return overlay;
+        return buttons;
     }
 
     private static Actor topperStack(TextureBank textures, float topperW, float topperH) {

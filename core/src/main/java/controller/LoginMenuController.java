@@ -41,55 +41,71 @@ public class LoginMenuController extends AppMenuController {
             return CommandResult.error("Username cannot be empty.");
         if (password == null || password.isEmpty())
             return CommandResult.error("Password cannot be empty.");
+        NetworkClient client = connectForLogin();
+        if (client == null) {
+            return CommandResult.error("Cannot log in: server is unreachable.");
+        }
+        LoginResponsePacket resp = requestLogin(client, username.trim(),
+                PasswordHasher.hash(password), stayLoggedIn);
+        return applyLoginResponse(client, resp, username.trim(), stayLoggedIn);
+    }
 
-        String rawUsername = username.trim();
-        String passwordHash = PasswordHasher.hash(password);
-
-        NetworkClient client;
+    private NetworkClient connectForLogin() {
         try {
-            client = App.getInstance().ensureConnected();
+            NetworkClient client = App.getInstance().ensureConnected();
+            if (client == null || !client.isConnected()) {
+                return null;
+            }
+            return client;
         } catch (Exception e) {
-            return CommandResult.error("Cannot log in: server is unreachable.");
+            return null;
         }
-        if (client == null || !client.isConnected()) {
-            return CommandResult.error("Cannot log in: server is unreachable.");
-        }
+    }
 
+    private LoginResponsePacket requestLogin(NetworkClient client, String rawUsername,
+                                             String passwordHash, boolean stayLoggedIn) {
         AtomicReference<LoginResponsePacket> responseRef = new AtomicReference<>(null);
         Consumer<LoginResponsePacket> handler = responseRef::set;
-
         boolean prevAutoPost = client.isAutoPostToGdx();
         client.setAutoPostToGdx(false);
         client.registerHandler(LoginResponsePacket.class, handler);
-
         try {
-            boolean sent = client.sendPacket(new LoginRequestPacket(rawUsername, passwordHash, stayLoggedIn));
+            boolean sent = client.sendPacket(
+                    new LoginRequestPacket(rawUsername, passwordHash, stayLoggedIn));
             if (!sent) {
-                return CommandResult.error("Cannot log in: failed to reach the server.");
+                return null;
             }
-            long deadline = System.currentTimeMillis() + 3000;
-            while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
-                client.pollEvents();
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
+            pollUntil(client, responseRef, 3000);
         } finally {
             client.unregisterHandler(LoginResponsePacket.class, handler);
             client.setAutoPostToGdx(prevAutoPost);
         }
+        return responseRef.get();
+    }
 
-        LoginResponsePacket resp = responseRef.get();
+    private static void pollUntil(NetworkClient client,
+                                  AtomicReference<LoginResponsePacket> responseRef, long timeoutMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
+            client.pollEvents();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+    }
+
+    private CommandResult<Void> applyLoginResponse(NetworkClient client, LoginResponsePacket resp,
+                                                   String rawUsername, boolean stayLoggedIn) {
         if (resp == null) {
             return CommandResult.error("Cannot log in: no response from server.");
         }
         if (!resp.isSuccess()) {
-            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Invalid username or password.");
+            return CommandResult.error(resp.getMessage() != null
+                    ? resp.getMessage() : "Invalid username or password.");
         }
-
         User serverUser = resp.getUserProfile();
         if (serverUser == null) {
             serverUser = new User();
@@ -103,10 +119,12 @@ public class LoginMenuController extends AppMenuController {
         }
         App.getInstance().setCurrentUser(serverUser);
         if (client != null && client.isConnected()) {
-            App.getInstance().setUserRepository(new model.user.persistance.RemoteUserRepository(client));
+            App.getInstance().setUserRepository(
+                    new model.user.persistance.RemoteUserRepository(client));
         }
         App.getInstance().setCurrentMenu(MenuType.MAIN);
-        String nick = serverUser.getNickname() != null ? serverUser.getNickname() : serverUser.getUsername();
+        String nick = serverUser.getNickname() != null
+                ? serverUser.getNickname() : serverUser.getUsername();
         return CommandResult.success("Welcome back, " + nick + "!");
     }
 

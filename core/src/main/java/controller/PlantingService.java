@@ -168,23 +168,52 @@ final class PlantingService {
     private CommandResult<Void> placeNewPlant(GameModel model, boolean conveyor, List<String> selected,
                                               Plant definition, PlacableLayer targetLayer,
                                               String type, int x, int y) {
-        // --- Build the instance first so leveled stats (incl. cost) apply ---
         PlantInstance instance = new PlantInstance(definition);
         int level = plantLevelFor(definition.getName());
         if (level > 1) {
             instance.applyLevelUpgrade(level);
         }
+        boolean isSetupPhase = isLastStandSetup(model);
+        CommandResult<Void> recharge = guardRecharge(model, conveyor, isSetupPhase, definition, type);
+        if (recharge != null) {
+            return recharge;
+        }
+        instance.setPosition(new Point(x, y));
+        CommandResult<Void> imitate = wireImitaterOrBind(model, instance, definition, type);
+        if (imitate != null) {
+            return imitate;
+        }
+        Plant billing = billingDefinition(instance, definition);
+        int cost = conveyor ? 0 : billing.getCost();
+        CommandResult<Void> paid = spendSunOrFail(model, cost);
+        if (paid != null) {
+            return paid;
+        }
+        if (!model.placePlant(instance, y, x)) {
+            refundSun(model, cost);
+            return CommandResult.error("Cannot plant '" + type + "' at (" + x + ", " + y
+                    + ") on layer " + targetLayer + ".");
+        }
+        afterPlace(model, conveyor, selected, isSetupPhase, definition, instance, billing, type);
+        return plantSuccess(model, instance, definition, type, x, y, cost);
+    }
 
-        // --- Seed packet recharge (skipped for conveyor and Last Stand setup phase) ---
-        boolean isSetupPhase = model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
+    private static boolean isLastStandSetup(GameModel model) {
+        return model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
                 && lastStand.isSetupPhase();
+    }
+
+    private static CommandResult<Void> guardRecharge(GameModel model, boolean conveyor,
+                                                     boolean isSetupPhase, Plant definition, String type) {
         if (!conveyor && !isSetupPhase && !model.isSeedReady(definition.getName())) {
             return CommandResult.error("'" + type + "' is recharging. "
                     + String.format("%.1f", model.getSeedCooldown(definition.getName())) + "s left.");
         }
+        return null;
+    }
 
-        instance.setPosition(new Point(x, y));
-
+    private CommandResult<Void> wireImitaterOrBind(GameModel model, PlantInstance instance,
+                                                   Plant definition, String type) {
         if (PlantInstance.isImitater(definition)) {
             wireImitateTargetIfNeeded(instance, definition, model);
             if (instance.getImitateTarget() == null || instance.getImitateTarget().isEmpty()) {
@@ -194,31 +223,31 @@ final class PlantingService {
         } else {
             model.setImitaterCopyTarget(type);
         }
-        Plant billing = billingDefinition(instance, definition);
+        return null;
+    }
 
-        // --- Sun cost (Imitater bills the copied plant) ---
-        int cost = conveyor ? 0 : billing.getCost();
-        boolean spent = model.isCouchPlay()
-                ? model.spendPlantSun(cost)
-                : model.spendSun(cost);
-        if (!spent) {
-            int have = model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount();
-            return CommandResult.error("Not enough sun. Need " + cost
-                    + ", have " + have + ".");
+    private static CommandResult<Void> spendSunOrFail(GameModel model, int cost) {
+        boolean spent = model.isCouchPlay() ? model.spendPlantSun(cost) : model.spendSun(cost);
+        if (spent) {
+            return null;
         }
+        int have = model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount();
+        return CommandResult.error("Not enough sun. Need " + cost + ", have " + have + ".");
+    }
 
-        boolean placed = model.placePlant(instance, y, x);
-        if (!placed) {
-            if (model.isCouchPlay()) {
-                model.addPlantSun(cost);
-            } else {
-                model.addSun(cost);
-            }
-            return CommandResult.error("Cannot plant '" + type + "' at (" + x + ", " + y
-                    + ") on layer " + targetLayer + ".");
+    private static void refundSun(GameModel model, int cost) {
+        if (model.isCouchPlay()) {
+            model.addPlantSun(cost);
+        } else {
+            model.addSun(cost);
         }
+    }
+
+    private static void afterPlace(GameModel model, boolean conveyor, List<String> selected,
+                                   boolean isSetupPhase, Plant definition, PlantInstance instance,
+                                   Plant billing, String type) {
         if (conveyor) {
-            selected.remove(type); // consume the seed packet from the belt
+            selected.remove(type);
         } else if (!isSetupPhase) {
             float recharge = billing.getRechargeTime();
             if (recharge <= 0f) {
@@ -226,16 +255,18 @@ final class PlantingService {
             }
             model.startSeedRecharge(definition.getName(), Math.max(0f, recharge));
         }
+    }
+
+    private CommandResult<Void> plantSuccess(GameModel model, PlantInstance instance, Plant definition,
+                                             String type, int x, int y, int cost) {
         String note = consumeBoostIfAny(instance) ? " Boost consumed: plant food activated!" : "";
         String stackNote = definition.hasTag(PlantTags.STACK)
-                ? " (STACK: layer=" + targetLayer + ")"
-                : "";
+                ? " (STACK: layer=" + instance.getLayer() + ")" : "";
         String copyNote = PlantInstance.isImitater(definition) && instance.getImitateTarget() != null
-                ? " Copies " + instance.getImitateTarget() + "."
-                : "";
+                ? " Copies " + instance.getImitateTarget() + "." : "";
+        int remaining = model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount();
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
-                + ") for " + cost + " sun. Remaining sun: "
-                + (model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount())
+                + ") for " + cost + " sun. Remaining sun: " + remaining
                 + "." + stackNote + note + copyNote);
     }
 
@@ -266,7 +297,8 @@ final class PlantingService {
             return CommandResult.error("'" + type + "' at (" + x + ", " + y
                     + ") is already at its max stack of " + limit + ".");
         }
-        boolean isSetupPhase = model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
+        boolean isSetupPhase = model.getCurrentLevel()
+                instanceof model.game.level.special.PlantWhatYouGetLevel lastStand
                 && lastStand.isSetupPhase();
         if (!conveyor && !isSetupPhase && !model.isSeedReady(existing.getDefinition().getName())) {
             return CommandResult.error("'" + type + "' is recharging. "
@@ -524,46 +556,56 @@ final class PlantingService {
     public CommandResult<Void> pluck(int x, int y) {
         CommandResult<Void> guard = guardGameRunning();
         if (guard != null) return guard;
-
         GameModel model = requireGame();
         GameMap map = model.getMap();
         if (!inBounds(map, x, y)) {
             return CommandResult.error("Position (" + x + ", " + y + ") is out of bounds.");
         }
         Cell cell = map.getCell(x, y);
-        if (cell == null) {
+        PlantInstance instance = plantToPluck(cell);
+        if (instance == null) {
             return CommandResult.error("No plant at (" + x + ", " + y + ").");
+        }
+        if (instance.getStackCount() > 1) {
+            return pluckStackHead(model, instance, x, y);
+        }
+        cell.removePlaceable(instance);
+        return pluckRefundOrDone(model, instance, x, y);
+    }
+
+    private static PlantInstance plantToPluck(Cell cell) {
+        if (cell == null) {
+            return null;
         }
         PlantInstance instance = cell.getTopmostPlant();
-        if (instance == null) {
-            Placeable ground = cell.getPlaceable(PlacableLayer.GROUND);
-            if (ground instanceof PlantInstance groundPlant) {
-                instance = groundPlant;
-            }
+        if (instance != null) {
+            return instance;
         }
-        if (instance == null) {
-            return CommandResult.error("No plant at (" + x + ", " + y + ").");
-        }
+        Placeable ground = cell.getPlaceable(PlacableLayer.GROUND);
+        return ground instanceof PlantInstance groundPlant ? groundPlant : null;
+    }
+
+    private static CommandResult<Void> pluckStackHead(GameModel model, PlantInstance instance, int x, int y) {
         String plantName = instance.getDefinition().getName();
-        PlacableLayer layer = instance.getLayer();
-        if (instance.getStackCount() > 1) {
-            instance.setStackCount(instance.getStackCount() - 1);
-            instance.setCurrentHP(Math.max(1,
-                    instance.getCurrentHP() - instance.getDefinition().getBaseHP()));
-            if (model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand && lastStand.isSetupPhase()) {
-                int refund = instance.getDefinition().getCost();
-                model.addSun(refund);
-                return CommandResult.success("Refunded " + refund + " sun for one head of '" + plantName
-                        + "' at (" + x + ", " + y + "). Stack remaining: "
-                        + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
-            }
-            return CommandResult.success("Plucked one head of '" + plantName
+        instance.setStackCount(instance.getStackCount() - 1);
+        instance.setCurrentHP(Math.max(1,
+                instance.getCurrentHP() - instance.getDefinition().getBaseHP()));
+        if (isLastStandSetup(model)) {
+            int refund = instance.getDefinition().getCost();
+            model.addSun(refund);
+            return CommandResult.success("Refunded " + refund + " sun for one head of '" + plantName
                     + "' at (" + x + ", " + y + "). Stack remaining: "
                     + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
         }
-        // PlantInstance implements Placeable; remove via the cell API.
-        cell.removePlaceable(instance);
-        if (model.getCurrentLevel() instanceof model.game.level.special.PlantWhatYouGetLevel lastStand && lastStand.isSetupPhase()) {
+        return CommandResult.success("Plucked one head of '" + plantName
+                + "' at (" + x + ", " + y + "). Stack remaining: "
+                + instance.getStackCount() + "/" + instance.getStackLimit() + ".");
+    }
+
+    private static CommandResult<Void> pluckRefundOrDone(GameModel model, PlantInstance instance, int x, int y) {
+        String plantName = instance.getDefinition().getName();
+        PlacableLayer layer = instance.getLayer();
+        if (isLastStandSetup(model)) {
             int refund = instance.getDefinition().getCost();
             model.addSun(refund);
             return CommandResult.success("Refunded " + refund + " sun for plant '" + plantName
