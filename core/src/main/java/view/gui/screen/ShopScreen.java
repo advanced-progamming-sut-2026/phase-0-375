@@ -55,6 +55,7 @@ import view.gui.anim.PamClipCache;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /** PvZ2-inspired graphical shop backed by the existing Shop controller/model. */
@@ -113,6 +114,10 @@ public final class ShopScreen extends AbstractMenuScreen {
     private static final float ART_SLOT_H = 148f;
     private static final float NAME_H = 46f;
     private static final float DESC_H = 58f;
+    /** Countdown row under the daily-offer title. */
+    private static final float TIMER_H = 22f;
+    private static final float TIMER_TEXT_SCALE = 0.9f;
+    private static final Color TIMER_COLOR = new Color(1f, 0.95f, 0.65f, 1f);
     /** Daily-offer seed packet: display scale only; plant/frame ratio matches SeedPacketActor. */
     private static final float PACKET_SCALE = 1.23f;
     /** Purple price button (replaces the old BUY label). */
@@ -209,6 +214,8 @@ public final class ShopScreen extends AbstractMenuScreen {
     private Label status;
     /** Set when rebuild should keep a fading sparkle on the sold-out daily card. */
     private boolean fadeDailySparkle;
+    /** Live countdown on the active daily-offer card; cleared when cards rebuild. */
+    private Label dailyOfferTimer;
     /** Spritesheet portraits for plants without {@code IMAGE_UI_PACKETS_*} art (e.g. Cat-tail). */
     private SpritesheetClipCache sheetClips;
 
@@ -362,6 +369,7 @@ public final class ShopScreen extends AbstractMenuScreen {
 
     /** (Re)builds the card row; called again after a purchase so state stays fresh. */
     private void populateCards() {
+        dailyOfferTimer = null;
         cards.clear();
         Shop shop = controller.ensureDailyOffer();
         for (ShopItem item : shop.getPermanentItems()) {
@@ -432,11 +440,21 @@ public final class ShopScreen extends AbstractMenuScreen {
         name.setAlignment(com.badlogic.gdx.utils.Align.center);
         box.add(name).width(210f).height(NAME_H).padTop(6f).row();
 
+        if (daily && !soldOut) {
+            Label timer = new Label("Ends in --:--:--", skin, "secondary");
+            timer.setColor(TIMER_COLOR);
+            timer.setAlignment(Align.center);
+            SkinFonts.scaleLabel(timer, skin, "secondary", TIMER_TEXT_SCALE);
+            box.add(timer).width(210f).height(TIMER_H).padTop(2f).row();
+            dailyOfferTimer = timer;
+        }
+
         Label desc = new Label(item.getDescription(), skin, "secondary");
         desc.setColor(Color.WHITE);
         desc.setWrap(true);
         desc.setAlignment(com.badlogic.gdx.utils.Align.top | com.badlogic.gdx.utils.Align.center);
-        box.add(desc).width(210f).height(DESC_H).row();
+        float descH = daily && !soldOut ? DESC_H - TIMER_H - 2f : DESC_H;
+        box.add(desc).width(210f).height(descH).row();
 
         if (soldOut) {
             Label sold = new Label("ALREADY BOUGHT TODAY", skin, "medium");
@@ -733,8 +751,35 @@ public final class ShopScreen extends AbstractMenuScreen {
             game.batch.end();
         }
 
+        updateDailyOfferTimer();
         stage.act(delta);
         stage.draw();
+    }
+
+    private void updateDailyOfferTimer() {
+        if (dailyOfferTimer == null) {
+            return;
+        }
+        DailyOffer offer = controller.ensureDailyOffer().getDailyOffer();
+        if (offer == null || offer.isPurchased() || offer.isExpired()) {
+            return;
+        }
+        long seconds = offer.secondsUntilExpiry();
+        if (seconds <= 0) {
+            populateCards();
+            return;
+        }
+        dailyOfferTimer.setText("Ends in " + formatCountdown(seconds));
+    }
+
+    private static String formatCountdown(long totalSeconds) {
+        long hours = totalSeconds / 3600;
+        long minutes = (totalSeconds % 3600) / 60;
+        long seconds = totalSeconds % 60;
+        if (hours > 0) {
+            return String.format(Locale.US, "%dh %02dm %02ds", hours, minutes, seconds);
+        }
+        return String.format(Locale.US, "%dm %02ds", minutes, seconds);
     }
 
     @Override

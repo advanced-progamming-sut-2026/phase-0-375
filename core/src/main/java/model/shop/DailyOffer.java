@@ -1,6 +1,8 @@
 package model.shop;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Represents a daily offer in the shop.
@@ -54,6 +56,15 @@ public class DailyOffer {
      */
     public boolean isExpired() {
         return LocalDate.now().isAfter(offerDate);
+    }
+
+    /** Seconds until this offer rolls at midnight (00:00 after {@link #offerDate}). */
+    public long secondsUntilExpiry() {
+        if (isExpired()) {
+            return 0;
+        }
+        LocalDateTime expiry = offerDate.plusDays(1).atStartOfDay();
+        return Math.max(0, Duration.between(LocalDateTime.now(), expiry).getSeconds());
     }
 
     // --- Getters ---
