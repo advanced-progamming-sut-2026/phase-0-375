@@ -6,7 +6,7 @@ SFX binaries (`.ogg` / `.mp3` under this folder) are **gitignored**. After `git 
 python3 tools/install_sfx.py
 ```
 
-This extracts `tools/sfx-bundle.zip` (13 files, ~230 KB) into `assets/music/SFXs/`.
+This extracts `tools/sfx-bundle.zip` (15 files, ~250 KB) into `assets/music/SFXs/`.
 
 **Format:** use Ogg **Vorbis** or MP3. Opus-in-Ogg will not play in libGDX (e.g. level-1 voice is shipped as `.mp3`).
 
@@ -34,5 +34,7 @@ git add tools/sfx-bundle.zip
 | `PVZ-gravebuster/...381.ogg` | Grave Buster |
 | `PVZ-plantfood/...011.ogg` | Plant Food / boosted plant |
 | `PVZ-shovel/...022.ogg` | Shovel |
+| `PVZ-fireprojectile/...009.ogg` | Projectile fired — toggle: `GameplayCombatSfx.fireProjectileEnabled` |
+| `PVZ-zombiegotshot/...315.ogg` | Zombie hit — toggle: `GameplayCombatSfx.zombieGotShotEnabled` |
 | `RiseaAndShineDrZarrabi.mp3` | Level 1 NPC intro — delay: `NpcDialogueOverlay.RISE_AND_SHINE_VOICE_DELAY_SEC` |
 | `PVZ-zomboss/...213.ogg` | Zomboss spawn laugh |

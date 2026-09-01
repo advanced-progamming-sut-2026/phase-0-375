@@ -118,6 +118,9 @@ import view.gui.anim.zombie.ZombieGait;
 import view.gui.anim.zombie.ZombieGaitProfiles;
 import view.gui.anim.zombie.ZombotanyAnim;
 import view.gui.assets.BeghouledArt;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameplayCombatSfx;
+import view.gui.audio.GameSfx;
 import view.gui.assets.EffectPamPaths;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.ProjectilePamPaths;
@@ -1043,6 +1046,9 @@ public final class LawnEntityRenderer {
         for (Projectile projectile : hits) {
             if (projectile == null) {
                 continue;
+            }
+            if (GameplayCombatSfx.zombieGotShotEnabled) {
+                GameAudio.get().playSfx(GameSfx.ZOMBIE_GOT_SHOT);
             }
             projectileWorldCenter(projectile, xyTmp);
             spawnProjectileHit(projectile, xyTmp[0], xyTmp[1]);

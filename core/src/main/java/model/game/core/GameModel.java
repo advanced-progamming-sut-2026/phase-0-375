@@ -56,6 +56,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class GameModel implements BehaviorContext {
     private long currentTick;
@@ -85,6 +86,7 @@ public class GameModel implements BehaviorContext {
     private List<Pushable> orphanedPushables;
 
     private EventBus eventBus;
+    private Consumer<GameEvent> gameEventListener;
     private List<String> selectedPlants;       // plant types chosen for this level
     private String imitaterCopyTarget; // Plant Imitater should morph into; last non-Imitater the player picked or planted
 
@@ -167,10 +169,9 @@ public class GameModel implements BehaviorContext {
 
         this.chapterEffects = new ChapterEffectsSystem(this);
 
-        this.eventBus = new EventBus() {
-            @Override
-            public void dispatch(GameEvent event) {
-
+        this.eventBus = event -> {
+            if (gameEventListener != null) {
+                gameEventListener.accept(event);
             }
         };
     }
@@ -350,6 +351,11 @@ public class GameModel implements BehaviorContext {
 
     public EventBus getEventBus() {
         return eventBus;
+    }
+
+    /** Optional GUI hook for {@link GameEvent}s (e.g. combat SFX). */
+    public void setGameEventListener(Consumer<GameEvent> gameEventListener) {
+        this.gameEventListener = gameEventListener;
     }
 
     public List<ZombieInstance> getZombies() {

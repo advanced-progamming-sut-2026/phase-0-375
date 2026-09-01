@@ -26,6 +26,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.GameState;
 import model.enums.MenuType;
+import model.event.GameEvent;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.Level;
@@ -52,6 +53,7 @@ import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
 import view.gui.audio.GameAudio;
+import view.gui.audio.GameplayCombatSfx;
 import view.gui.audio.GameSfx;
 import view.gui.audio.GameplayMusic;
 import view.gui.anim.AnimScale;
@@ -241,6 +243,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         }
         buildHud();
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            model.setGameEventListener(this::onGameplayEvent);
+        }
+    }
+
+    private void onGameplayEvent(GameEvent event) {
+        if (event == null || event.getType() != GameEvent.Type.PROJECTILE_FIRED) {
+            return;
+        }
+        if (!GameplayCombatSfx.fireProjectileEnabled) {
+            return;
+        }
+        GameAudio.get().playSfx(GameSfx.FIRE_PROJECTILE);
     }
 
     private BitmapFont resolveFont() {
@@ -1877,6 +1893,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setShovelMode(false);
         }
         flushPendingLoot();
+        GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            model.setGameEventListener(null);
+        }
         super.hide();
     }
 

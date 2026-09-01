@@ -17,6 +17,10 @@ public enum GameSfx {
     GRAVE_BUSTER("SFXs/PVZ-gravebuster/Audio_Always_Loaded.381"),
     PLANT_FOOD("SFXs/PVZ-plantfood/Audio_Always_Loaded.011"),
     SHOVEL("SFXs/PVZ-shovel/Audio_Always_Loaded.022"),
+    /** Pea / projectile fired. */
+    FIRE_PROJECTILE("SFXs/PVZ-fireprojectile/Audio_Always_Loaded.009"),
+    /** Zombie hit by a plant projectile. */
+    ZOMBIE_GOT_SHOT("SFXs/PVZ-zombiegotshot/Audio_Always_Loaded.315"),
     /** Level 1 NPC intro — "Rise and shine, Dr. Zarrabi." */
     RISE_AND_SHINE_DR_ZARRABI("SFXs/RiseaAndShineDrZarrabi"),
     /** Zomboss laugh when the boss spawns. */

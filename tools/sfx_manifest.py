@@ -16,6 +16,8 @@ WIRED_SFX: tuple[str, ...] = (
     "SFXs/PVZ-gravebuster/Audio_Always_Loaded.381.ogg",
     "SFXs/PVZ-plantfood/Audio_Always_Loaded.011.ogg",
     "SFXs/PVZ-shovel/Audio_Always_Loaded.022.ogg",
+    "SFXs/PVZ-fireprojectile/Audio_Always_Loaded.009.ogg",
+    "SFXs/PVZ-zombiegotshot/Audio_Always_Loaded.315.ogg",
     "SFXs/RiseaAndShineDrZarrabi.mp3",
     "SFXs/PVZ-zomboss/Audio_Always_Loaded.213.ogg",
 )
