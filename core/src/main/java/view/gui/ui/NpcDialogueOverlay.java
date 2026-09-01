@@ -20,6 +20,8 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import model.data.level.NpcDialogueData;
 import pvz.libpvz.textures.TextureBank;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameSfx;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -54,27 +56,42 @@ public final class NpcDialogueOverlay extends Table {
     private static final float BOB_PX = 3.5f;
     private static final float BOB_SEC = 0.7f;
 
+    /**
+     * Seconds after the first NPC slides in before the intro voice plays.
+     * Tune in-game, then set the value you like here.
+     */
+    public static float RISE_AND_SHINE_VOICE_DELAY_SEC = 0.45f;
+
     private final Skin skin;
     private final TextureBank textures;
     private final FileHandle assetsRoot;
     private final List<NpcDialogueData.NpcEntry> npcs;
     private final Runnable onComplete;
+    private final GameSfx introVoice;
     private final List<Texture> ownedTextures = new ArrayList<>();
 
     private int currentNpcIndex;
     private Group npcRoot;
     private Group bubbleRoot;
     private boolean advancing;
+    private boolean introVoicePlayed;
     private float restX;
     private float restY;
     private float offY;
 
     public NpcDialogueOverlay(Skin skin, TextureBank textures, FileHandle assetsRoot,
                               List<NpcDialogueData.NpcEntry> npcs, Runnable onComplete) {
+        this(skin, textures, assetsRoot, npcs, null, onComplete);
+    }
+
+    public NpcDialogueOverlay(Skin skin, TextureBank textures, FileHandle assetsRoot,
+                              List<NpcDialogueData.NpcEntry> npcs,
+                              GameSfx introVoice, Runnable onComplete) {
         this.skin = skin;
         this.textures = textures;
         this.assetsRoot = assetsRoot;
         this.npcs = npcs;
+        this.introVoice = introVoice;
         this.onComplete = onComplete;
 
         setFillParent(true);
@@ -104,6 +121,15 @@ public final class NpcDialogueOverlay extends Table {
         clearChildren();
         advancing = false;
         currentNpcIndex = index;
+        if (index == 0 && introVoice != null && !introVoicePlayed) {
+            introVoicePlayed = true;
+            float delay = introVoice == GameSfx.RISE_AND_SHINE_DR_ZARRABI
+                    ? RISE_AND_SHINE_VOICE_DELAY_SEC
+                    : 0f;
+            addAction(Actions.sequence(
+                    Actions.delay(delay),
+                    Actions.run(() -> GameAudio.get().playSfx(introVoice))));
+        }
         boolean fromRight = index % 2 == 1;
 
         NpcDialogueData.NpcEntry npc = npcs.get(index);

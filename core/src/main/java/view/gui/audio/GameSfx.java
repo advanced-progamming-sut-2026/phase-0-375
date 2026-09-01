@@ -16,7 +16,11 @@ public enum GameSfx {
     PLANT_ON_WATER("SFXs/PVZ-plantonwater/Audio_Always_Loaded.252"),
     GRAVE_BUSTER("SFXs/PVZ-gravebuster/Audio_Always_Loaded.381"),
     PLANT_FOOD("SFXs/PVZ-plantfood/Audio_Always_Loaded.011"),
-    SHOVEL("SFXs/PVZ-shovel/Audio_Always_Loaded.022");
+    SHOVEL("SFXs/PVZ-shovel/Audio_Always_Loaded.022"),
+    /** Level 1 NPC intro — "Rise and shine, Dr. Zarrabi." */
+    RISE_AND_SHINE_DR_ZARRABI("SFXs/RiseaAndShineDrZarrabi"),
+    /** Zomboss laugh when the boss spawns. */
+    ZOMBOSS_SPAWN("SFXs/PVZ-zomboss/Audio_Always_Loaded.213");
 
     public final String relativePath;
 

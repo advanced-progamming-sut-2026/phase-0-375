@@ -57,17 +57,17 @@ public class ZombossLevel extends ConveyorBeltLevel {
         super.onStart();
     }
 
-    public void ensureBossSpawned() {
-        spawnBoss();
+    public boolean ensureBossSpawned() {
+        return spawnBoss();
     }
 
-    private void spawnBoss() {
+    private boolean spawnBoss() {
         if (bossSpawned) {
-            return;
+            return false;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
         if (model == null) {
-            return;
+            return false;
         }
         String name = zombossName();
         int rows = model.getRowCount();
@@ -76,7 +76,9 @@ public class ZombossLevel extends ConveyorBeltLevel {
         ZombieInstance boss = model.spawnZombieAt(name, primary, col);
         if (boss != null) {
             bossSpawned = true;
+            return true;
         }
+        return false;
     }
 
     private String zombossName() {

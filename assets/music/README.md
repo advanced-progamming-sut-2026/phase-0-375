@@ -57,13 +57,13 @@ If it is silent, check volume in Settings or confirm files exist under `assets/m
 
 ## Sound effects (SFX)
 
-SFX files are **not** in git (`.ogg` under `assets/music/SFXs/` is ignored). After `git pull`, install once:
+SFX files are **not** in git (`.ogg` / `.mp3` under `assets/music/SFXs/` are ignored). After `git pull`, install once:
 
 ```bash
 python3 tools/install_sfx.py
 ```
 
-This extracts the tracked bundle `tools/sfx-bundle.zip` into `assets/music/SFXs/`. See [`SFXs/README.md`](SFXs/README.md) for the wired file list.
+This extracts the tracked bundle `tools/sfx-bundle.zip` (13 wired files, ~230 KB) into `assets/music/SFXs/`. File list: [`SFXs/README.md`](SFXs/README.md). Manifest: `tools/sfx_manifest.py` (keep in sync with `GameSfx.java`).
 
 Maintainers can rebuild the bundle after changing local SFX:
 
@@ -79,6 +79,7 @@ python3 tools/build_sfx_bundle.py
 | `curl failed` / timeout | Check internet or VPN; rerun the script |
 | Corrupt or tiny file | Delete that `.mp3` and rerun the script |
 | `ModuleNotFoundError` | Only the standard library is needed; no pip dependencies |
+| SFX silent after `install_sfx.py` | Rerun install; delete stale `RiseaAndShineDrZarrabi.ogg` if present (Opus breaks libGDX) |
 
 **Important:** Do not commit `.mp3` / `.ogg` files — they are listed in `.gitignore`.
 

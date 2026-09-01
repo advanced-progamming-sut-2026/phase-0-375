@@ -1284,7 +1284,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         boolean pregame = isPregame();
         if (wasPregame && !pregame && model != null
                 && model.getCurrentLevel() instanceof ZombossLevel zombossLevel) {
-            zombossLevel.ensureBossSpawned();
+            if (zombossLevel.ensureBossSpawned()) {
+                GameAudio.get().playSfx(GameSfx.ZOMBOSS_SPAWN);
+            }
         }
         wasPregame = pregame;
         if (pregame) {
