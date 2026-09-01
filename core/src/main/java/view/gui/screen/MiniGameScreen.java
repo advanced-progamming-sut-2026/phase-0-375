@@ -47,6 +47,7 @@ public final class MiniGameScreen extends AbstractMenuScreen {
                 addEntry(list, entry);
             }
             addMultiplayerIZombieEntry(list);
+            addCouchPlayIZombieEntry(list);
         }
 
         ScrollPane scroll = new ScrollPane(list, skin);
@@ -113,6 +114,26 @@ public final class MiniGameScreen extends AbstractMenuScreen {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 stage.addActor(new IZombieMatchmakingOverlay(game, skin, null));
+            }
+        });
+
+        list.add(info).width(590f);
+        list.add(play).width(150f).height(48f).row();
+    }
+
+    private void addCouchPlayIZombieEntry(Table list) {
+        Label info = new Label(
+            "I Zombie  •  Couch Play — plants (mouse) vs zombies (keyboard) on one device.",
+            skin, "medium");
+        info.setColor(Color.WHITE);
+        info.setWrap(true);
+
+        TextButton play = new TextButton("Play", skin, "purple");
+        play.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> result = MultiplayerMatchBootstrap.openCouchPlay(game);
+                showToast(result.getMessage(), !result.isSuccess());
             }
         });
 

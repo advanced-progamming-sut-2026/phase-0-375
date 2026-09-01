@@ -67,6 +67,9 @@ public class GameModel implements BehaviorContext {
     private final Map<String, Float> seedCooldowns = new HashMap<>();
     /** Set by `cheat remove-cooldown` — disables seed cooldowns for the rest of the level. */
     private boolean seedCooldownsDisabled = false;
+    /** Couch-play I, Zombie: plant-side sun is separate from {@link #getSunAmount()} (zombie bank). */
+    private boolean couchPlay;
+    private int plantSun;
 
     private Level currentLevel;
     private WaveManager waveManager;
@@ -190,6 +193,34 @@ public class GameModel implements BehaviorContext {
     @Override
     public int getSunAmount() {
         return resources.getSunAmount();
+    }
+
+    public boolean isCouchPlay() {
+        return couchPlay;
+    }
+
+    public void setCouchPlay(boolean couchPlay) {
+        this.couchPlay = couchPlay;
+    }
+
+    public int getPlantSun() {
+        return plantSun;
+    }
+
+    public void setPlantSun(int amount) {
+        plantSun = Math.max(0, amount);
+    }
+
+    public void addPlantSun(int amount) {
+        plantSun = Math.min(9990, plantSun + Math.max(0, amount));
+    }
+
+    public boolean spendPlantSun(int amount) {
+        if (amount < 0 || plantSun < amount) {
+            return false;
+        }
+        plantSun -= amount;
+        return true;
     }
 
     public int getPlantFoodCount() {
@@ -820,7 +851,11 @@ public class GameModel implements BehaviorContext {
 
     public void collectSun(Sun sun) {
         activeSuns.remove(sun);
-        resources.addSun(sun.getValue());
+        if (couchPlay) {
+            addPlantSun(sun.getValue());
+        } else {
+            resources.addSun(sun.getValue());
+        }
         questStats.onSunCollected(sun.getValue());
     }
 

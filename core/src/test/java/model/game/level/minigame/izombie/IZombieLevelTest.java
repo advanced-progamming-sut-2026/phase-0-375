@@ -3,8 +3,10 @@ package model.game.level.minigame.izombie;
 import model.app.App;
 import model.data.minigame.MiniGameRegistry;
 import model.enums.MiniGameType;
+import model.enums.SunType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.item.Sun;
 import model.plant.PlantFactory;
 import model.plant.instance.PlantInstance;
 import model.projectile.Projectile;
@@ -318,5 +320,42 @@ class IZombieLevelTest {
         }
         assertTrue(level.checkWinCondition(model));
         assertFalse(level.checkLossCondition(model), "Winning state must override loss condition");
+    }
+
+    @Test
+    @DisplayName("Couch play: plants win on timer, lose when all brains are eaten")
+    void couchPlayWinLossFlipsToPlantPerspective() throws Exception {
+        IZombieLevel level = (IZombieLevel) MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
+        GameModel model = new GameModel(level);
+        level.onStart(model);
+        model.setCouchPlay(true);
+        model.setPlantSun(IZombieLevel.VERSUS_PLANT_SUN);
+
+        assertFalse(level.checkWinCondition(model));
+        assertFalse(level.checkLossCondition(model));
+
+        model.tick(IZombieLevel.VERSUS_MATCH_SECONDS);
+        assertTrue(level.checkWinCondition(model), "Timer expiry is a plant win");
+        assertFalse(level.checkLossCondition(model));
+
+        for (int r = 0; r < 5; r++) {
+            model.markBrainEaten(r);
+        }
+        assertTrue(level.checkLossCondition(model), "All brains eaten is a plant loss");
+        assertFalse(level.checkWinCondition(model));
+    }
+
+    @Test
+    @DisplayName("Couch play: collecting sun feeds the plant bank, not the zombie bank")
+    void couchPlayCollectSunGoesToPlantBank() throws Exception {
+        IZombieLevel level = (IZombieLevel) MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
+        GameModel model = new GameModel(level);
+        model.setCouchPlay(true);
+        model.setPlantSun(50);
+        int zombieSun = model.getSunAmount();
+        model.spawnSun(new Sun(SunType.NORMAL, 25, 0, 0));
+        model.collectSun(model.getActiveSuns().get(0));
+        assertEquals(75, model.getPlantSun());
+        assertEquals(zombieSun, model.getSunAmount());
     }
 }

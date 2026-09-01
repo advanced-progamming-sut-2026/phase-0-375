@@ -1,7 +1,9 @@
 package view.gui.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.InputMultiplexer;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Cursor;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -53,7 +55,9 @@ import view.gui.anim.AnimScale;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
+import view.gui.ui.IZombieDropCursor;
 import view.gui.ui.InviteReceivedOverlay;
+import view.gui.ui.ZombieHotkeys;
 import model.network.client.NetworkClient;
 import model.network.enums.PlayerRole;
 import model.network.enums.ReactionType;
@@ -125,6 +129,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final int[] cellTmp = new int[2];
 
     private SunHud sunHud;
+    private SunHud zombieSunHud;
     private CoinHud coinHud;
     private BeghouledMatchHud beghouledMatchHud;
     private LoveYourPlantsHud loveYourPlantsHud;
@@ -138,6 +143,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private TimedProgressHud timedProgressHud;
     private TimedProgressHud multiplayerMatchTimer;
     private Table packetColumn;
+    private Table zombiePacketColumn;
     private LawnRowColHighlight rowColHighlight;
     private NecromancyTileRenderer necromancyTiles;
     private LawnGridRenderer lawnGridRenderer;
@@ -154,6 +160,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final boolean vaseBreakerMode;
     private final boolean beghouledMode;
     private final boolean iZombieMode;
+    private final boolean couchPlayMode;
     private final boolean multiplayerMode;
     private final boolean multiplayerPlantSide;
     private final boolean useZombiePackets;
@@ -168,6 +175,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private int swapFromCol = -1;
     private int swapFromRow = -1;
     private boolean swapDragging;
+    private boolean zombieDropMode;
+    private String dropZombieName;
+    private int dropCol = -1;
+    private int dropRow = -1;
 
     private boolean plantfoodMode;
     private boolean shovelMode;
@@ -223,6 +234,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
         beghouledMode = currentLevel() instanceof BeghouledLevel;
         iZombieMode = currentLevel() instanceof IZombieLevel;
+        GameModel bootModel = App.getInstance().getCurrentGameModel();
+        couchPlayMode = iZombieMode && !multiplayerMode && bootModel != null && bootModel.isCouchPlay();
         useZombiePackets = iZombieMode && !multiplayerPlantSide;
         scoreMode = currentLevel() instanceof ScoreLevel;
         saveOurSeedsMode = currentLevel() instanceof SaveOurSeedsLevel || ProtectTileRenderer.isProtectLevel(currentLevel());
@@ -274,13 +287,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (beghouledMode) {
             setWorldInput(createBeghouledWorldInput());
         } else {
-            setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
+            InputProcessor click = createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover);
+            setWorldInput(couchPlayMode ? new InputMultiplexer(createCouchKeyInput(), click) : click);
         }
         buildHud();
         if (multiplayerMode) {
             String roleLabel = multiplayerPlantSide ? "Plant" : "Zombie";
             String vs = multiplayerOpponent != null ? multiplayerOpponent : "Opponent";
             showToast(roleLabel + " vs " + vs, false);
+        } else if (couchPlayMode) {
+            showToast("Couch play: mouse plants, A–L + arrows spawn zombies.", false);
         }
     }
 
@@ -364,7 +380,18 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         left.setTouchable(Touchable.childrenOnly);
         left.top().left().pad(8f);
         packetColumn = new Table();
-        if (useZombiePackets) {
+        if (couchPlayMode) {
+            if (sunBank) {
+                sunHud = new SunHud(skin);
+                sunHud.setAmount(model == null ? 0 : model.getPlantSun());
+                Table sunRow = new Table();
+                sunRow.add(sunHud).left();
+                left.add(sunRow).left().padBottom(8f).row();
+            }
+            left.add(packetColumn).left().top();
+            uiStage.addActor(left);
+            hudRoots.add(left);
+        } else if (useZombiePackets) {
             Table topRow = new Table();
             if (sunBank) {
                 sunHud = new SunHud(skin);
@@ -524,6 +551,25 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             uiStage.addActor(mpTopBar);
             hudRoots.add(mpTopBar);
             buildReactionBubbles(model);
+        }
+
+        if (couchPlayMode) {
+            Table izTop = new Table();
+            izTop.setFillParent(true);
+            izTop.setTouchable(Touchable.childrenOnly);
+            izTop.top().padTop(8f);
+            zombiePacketColumn = new Table();
+            zombieSunHud = new SunHud(skin);
+            zombieSunHud.setAmount(model == null ? 0 : model.getSunAmount());
+            multiplayerMatchTimer = new TimedProgressHud(skin, assets.textures);
+            multiplayerMatchTimer.setBarWidth(WaveProgressHud.BAR_W);
+            izTop.add().width(160f);
+            izTop.add(zombiePacketColumn).left().padRight(8f);
+            izTop.add(zombieSunHud).left().padRight(10f);
+            izTop.add(multiplayerMatchTimer).center().expandX();
+            izTop.add().width(160f);
+            uiStage.addActor(izTop);
+            hudRoots.add(izTop);
         }
 
         lootRewardPopup = new LootRewardPopup(skin);
@@ -700,7 +746,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             refreshBeghouledUpgrades();
             return;
         }
-        if (useZombiePackets) {
+        if (useZombiePackets && !couchPlayMode) {
             refreshIZombiePackets();
             return;
         }
@@ -726,7 +772,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 @Override
                 public void dragStart(SeedPacketActor packet) {
                     previewPlant = name;
-                    previewTime = 0f;
+                    if (dropZombieName == null) {
+                        previewTime = 0f;
+                    }
                     entityRenderer.preloadPlantIdle(name);
                     stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
                     packet.localToStageCoordinates(stageToScreen);
@@ -750,42 +798,59 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 .size(SeedPacketActor.PACKET_WIDTH, SeedPacketActor.PACKET_HEIGHT)
                 .padBottom(6f).row();
         }
-        refreshPacketChrome();
+        if (couchPlayMode) {
+            refreshIZombiePackets();
+        } else {
+            refreshPacketChrome();
+        }
     }
 
     private void refreshIZombiePackets() {
         List<String> roster = iZombieRosterNames();
-        shownPackets = new ArrayList<>(roster);
-        packetColumn.clearChildren();
+        if (!couchPlayMode) {
+            shownPackets = new ArrayList<>(roster);
+        }
+        Table host = zombiePacketColumn != null ? zombiePacketColumn : packetColumn;
+        host.clearChildren();
         Map<String, Integer> costs = iZombieRosterCosts();
+        int index = 0;
         for (String name : roster) {
             int cost = costs.getOrDefault(name, 0);
             ZombiePacketActor packet = new ZombiePacketActor(assets.textures, skin, name, cost);
-            packet.onDragZombie(new ZombiePacketActor.DragZombie() {
-                @Override
-                public void dragStart(ZombiePacketActor packet) {
-                    previewPlant = name;
-                    previewTime = 0f;
-                    entityRenderer.preloadZombieIdle(name, currentChapter());
-                    stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
-                    packet.localToStageCoordinates(stageToScreen);
-                    followPlantDrag(stageToScreen.x, stageToScreen.y);
+            if (couchPlayMode) {
+                packet.setPickable(false);
+                char letter = ZombieHotkeys.letterAt(index);
+                if (letter != 0) {
+                    packet.setHotkey(skin, letter);
                 }
+                index++;
+            } else {
+                packet.onDragZombie(new ZombiePacketActor.DragZombie() {
+                    @Override
+                    public void dragStart(ZombiePacketActor packet) {
+                        previewPlant = name;
+                        previewTime = 0f;
+                        entityRenderer.preloadZombieIdle(name, currentChapter());
+                        stageToScreen.set(packet.getWidth() * 0.5f, packet.getHeight() * 0.5f);
+                        packet.localToStageCoordinates(stageToScreen);
+                        followPlantDrag(stageToScreen.x, stageToScreen.y);
+                    }
 
-                @Override
-                public void drag(ZombiePacketActor packet, float stageX, float stageY) {
-                    followPlantDrag(stageX, stageY);
-                }
+                    @Override
+                    public void drag(ZombiePacketActor packet, float stageX, float stageY) {
+                        followPlantDrag(stageX, stageY);
+                    }
 
-                @Override
-                public void dragEnd(ZombiePacketActor packet, float stageX, float stageY) {
-                    dropZombie(name, stageX, stageY);
-                    previewPlant = null;
-                    hoverCol = -1;
-                    hoverRow = -1;
-                }
-            });
-            packetColumn.add(packet)
+                    @Override
+                    public void dragEnd(ZombiePacketActor packet, float stageX, float stageY) {
+                        dropZombie(name, stageX, stageY);
+                        previewPlant = null;
+                        hoverCol = -1;
+                        hoverRow = -1;
+                    }
+                });
+            }
+            host.add(packet)
                 .size(ZombiePacketActor.PACKET_WIDTH, ZombiePacketActor.PACKET_HEIGHT)
                 .padRight(6f);
         }
@@ -837,6 +902,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         GameModel model = App.getInstance().getCurrentGameModel();
         int sun = model == null ? 0 : model.getSunAmount();
+        int plantSun = couchPlayMode && model != null ? model.getPlantSun() : sun;
         if (beghouledMode) {
             Level level = currentLevel();
             Map<String, Integer> costs = beghouledUpgradeCosts(level);
@@ -851,14 +917,18 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         if (useZombiePackets) {
             Map<String, Integer> costs = iZombieRosterCosts();
-            for (Actor actor : packetColumn.getChildren()) {
+            Table host = zombiePacketColumn != null ? zombiePacketColumn : packetColumn;
+            for (Actor actor : host.getChildren()) {
                 if (!(actor instanceof ZombiePacketActor packet) || packet.zombieName() == null) {
                     continue;
                 }
                 Integer cost = costs.get(packet.zombieName());
                 packet.setDimmed(cost != null && cost > sun);
+                packet.setSelected(zombieDropMode && packet.zombieName().equals(dropZombieName));
             }
-            return;
+            if (!couchPlayMode) {
+                return;
+            }
         }
         if (multiplayerMode && multiplayerPlantSide) {
             for (Actor actor : packetColumn.getChildren()) {
@@ -866,7 +936,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                     continue;
                 }
                 String name = packet.plantName();
-                boolean afford = plantCost(name) <= sun;
+                boolean afford = plantCost(name) <= plantSun;
                 boolean ready = model == null || model.isSeedReady(name);
                 packet.setDimmed(!afford || !ready);
             }
@@ -888,7 +958,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
                 continue;
             }
             boolean ready = model == null || model.isSeedReady(name);
-            boolean afford = plantCost(name) <= sun;
+            boolean afford = plantCost(name) <= plantSun;
             packet.setDimmed(!ready || !afford);
         }
     }
@@ -933,8 +1003,13 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             refreshPacketChrome();
             return;
         }
+        if (couchPlayMode && !canPlaceMultiplayerPlantAt(cellTmp[0])) {
+            showToast("Plants must be placed behind the red line.", true);
+            return;
+        }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
+        syncSunHuds(App.getInstance().getCurrentGameModel());
         if (conveyorMode || bowlingMode || vaseBreakerMode) {
             refreshPackets();
         } else {
@@ -967,10 +1042,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         CommandResult<Void> result = gameplay.placeZombie(zombieName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
-        GameModel model = App.getInstance().getCurrentGameModel();
-        if (sunHud != null && model != null) {
-            sunHud.setAmount(model.getSunAmount());
-        }
+        syncSunHuds(App.getInstance().getCurrentGameModel());
         refreshPacketChrome();
     }
 
@@ -1165,7 +1237,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             sunHud.logoCenter(logoTmp);
             destX = logoTmp.x;
             destY = logoTmp.y;
-            sunHud.setAmount(model.getSunAmount());
+            syncSunHuds(model);
         }
         entityRenderer.startSunCollect(sun, sunPosTmp[0], sunPosTmp[1], destX, destY);
         refreshPacketChrome();
@@ -1376,6 +1448,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartMiniGame(MiniGameLevel mini) {
+        GameModel current = App.getInstance().getCurrentGameModel();
+        if (current != null && current.isCouchPlay()) {
+            CommandResult<Void> opened = MultiplayerMatchBootstrap.openCouchPlay(game);
+            if (!opened.isSuccess()) {
+                showToast(opened.getMessage(), true);
+            }
+            return;
+        }
         String type = mini.getMiniGameType().name();
         int stage = mini.getStage();
         CommandResult<Void> enter = TravelLogMenuController.getInstance().enterMiniGame(type, stage);
@@ -1430,6 +1510,20 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (multiplayerMode && multiplayerClient != null) {
             reactionPacketHandler = this::onReactionReceived;
             multiplayerClient.registerHandler(ReactionPacket.class, reactionPacketHandler);
+        }
+    }
+
+    @Override
+    protected void onBack() {
+        if (couchPlayMode && zombieDropMode) {
+            cancelZombieDrop();
+        }
+    }
+
+    @Override
+    protected void onConfirm() {
+        if (couchPlayMode && zombieDropMode) {
+            confirmZombieDrop();
         }
     }
 
@@ -1515,14 +1609,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             myopointHud.sync(model);
         }
         syncMyopointAwards(model);
-        if (sunHud != null && model != null) {
-            sunHud.setAmount(model.getSunAmount());
+        syncSunHuds(model);
+        if (couchPlayMode && multiplayerMatchTimer != null && model != null) {
+            float duration = IZombieLevel.VERSUS_MATCH_SECONDS;
+            multiplayerMatchTimer.syncMatchTimer(duration - model.getElapsedSeconds(), duration);
         }
         if (plantFoodBank != null && model != null) {
             plantFoodBank.setCount(model.getPlantFoodCount());
         }
         autoCollectLoot(model);
-        if (previewPlant != null) {
+        if (previewPlant != null || dropZombieName != null) {
             previewTime += delta;
         }
         if (!hudPlantNames().equals(shownPackets)) {
@@ -1648,6 +1744,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         previewPlant = null;
         hoverCol = -1;
         hoverRow = -1;
+        cancelZombieDrop();
     }
 
     @Override
@@ -1676,26 +1773,38 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (brainLaneRenderer != null) {
             brainLaneRenderer.draw(game.batch, lawnLayout, App.getInstance().getCurrentGameModel());
         }
+        boolean dropHighlight = zombieDropMode && dropCol >= 0 && dropRow >= 0;
         boolean highlight = (previewPlant != null || plantfoodMode || shovelMode || swapDragging)
             && hoverCol >= 0;
         if (highlight && bowlingMode && previewPlant != null && !canBowlAt(hoverCol)) {
             highlight = false;
         }
-        if (highlight && useZombiePackets && previewPlant != null && !canPlaceIZombieAt(hoverCol)) {
+        if (highlight && useZombiePackets && !couchPlayMode && previewPlant != null && !canPlaceIZombieAt(hoverCol)) {
             highlight = false;
         }
-        if (highlight && multiplayerPlantSide && previewPlant != null && !canPlaceMultiplayerPlantAt(hoverCol)) {
+        if (highlight && (multiplayerPlantSide || couchPlayMode) && previewPlant != null
+                && !canPlaceMultiplayerPlantAt(hoverCol)) {
             highlight = false;
         }
-        if (highlight) {
+        if (highlight || dropHighlight) {
             if (rowColHighlight == null) {
                 rowColHighlight = new LawnRowColHighlight();
             }
-            rowColHighlight.draw(game.batch, lawnLayout, hoverCol, hoverRow);
+            if (highlight) {
+                rowColHighlight.draw(game.batch, lawnLayout, hoverCol, hoverRow);
+            }
+            if (dropHighlight) {
+                rowColHighlight.draw(game.batch, lawnLayout, dropCol, dropRow);
+            }
         }
         entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
+        if (zombieDropMode && dropZombieName != null && dropCol >= 0) {
+            float[] xy = lawnLayout.centerOf(dropRow, dropCol);
+            entityRenderer.drawZombieIdle(
+                game.batch, dropZombieName, xy[0], xy[1], previewTime, currentChapter());
+        }
         if (previewPlant != null) {
-            if (useZombiePackets) {
+            if (useZombiePackets && !couchPlayMode) {
                 entityRenderer.drawZombieIdle(
                     game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, currentChapter());
             } else {
@@ -1845,11 +1954,118 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return true;
     }
 
+    private void syncSunHuds(GameModel model) {
+        if (model == null) {
+            return;
+        }
+        if (sunHud != null) {
+            sunHud.setAmount(couchPlayMode ? model.getPlantSun() : model.getSunAmount());
+        }
+        if (zombieSunHud != null) {
+            zombieSunHud.setAmount(model.getSunAmount());
+        }
+    }
+
+    private InputProcessor createCouchKeyInput() {
+        return new InputAdapter() {
+            @Override
+            public boolean keyDown(int keycode) {
+                if (!couchPlayMode || pauseMenuOpen || endSequenceActive || isPregame()) {
+                    return false;
+                }
+                if (zombieDropMode) {
+                    int dCol = 0;
+                    int dRow = 0;
+                    if (keycode == Input.Keys.LEFT) {
+                        dCol = -1;
+                    } else if (keycode == Input.Keys.RIGHT) {
+                        dCol = 1;
+                    } else if (keycode == Input.Keys.UP) {
+                        dRow = -1;
+                    } else if (keycode == Input.Keys.DOWN) {
+                        dRow = 1;
+                    }
+                    if (dCol != 0 || dRow != 0) {
+                        nudgeDropCursor(dCol, dRow);
+                        return true;
+                    }
+                }
+                String keyName = Input.Keys.toString(keycode);
+                if (keyName != null && keyName.length() == 1) {
+                    int index = ZombieHotkeys.indexOf(keyName.charAt(0));
+                    List<String> roster = iZombieRosterNames();
+                    if (index >= 0 && index < roster.size()) {
+                        enterZombieDrop(roster.get(index));
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+    }
+
+    private void enterZombieDrop(String zombieName) {
+        if (zombieName == null) {
+            return;
+        }
+        boolean wasDropping = zombieDropMode;
+        zombieDropMode = true;
+        dropZombieName = zombieName;
+        if (previewPlant == null) {
+            previewTime = 0f;
+        }
+        entityRenderer.preloadZombieIdle(zombieName, currentChapter());
+        if (!wasDropping || dropCol < 0) {
+            IZombieLevel iZombie = currentLevel() instanceof IZombieLevel level ? level : null;
+            int red = iZombie != null ? iZombie.redLineColumn() : 0;
+            int[] cell = {dropCol, dropRow};
+            IZombieDropCursor.origin(cell, red);
+            dropCol = cell[0];
+            dropRow = cell[1];
+        }
+        refreshPacketChrome();
+    }
+
+    private void nudgeDropCursor(int dCol, int dRow) {
+        Level level = currentLevel();
+        if (!(level instanceof IZombieLevel iZombie) || level.getConfig() == null) {
+            return;
+        }
+        int[] cell = {dropCol, dropRow};
+        IZombieDropCursor.nudge(cell, dCol, dRow,
+                iZombie.redLineColumn(),
+                level.getConfig().getColumns() - 1,
+                level.getConfig().getRows());
+        dropCol = cell[0];
+        dropRow = cell[1];
+    }
+
+    private void confirmZombieDrop() {
+        if (!zombieDropMode || dropZombieName == null || dropCol < 0 || isPregame()) {
+            return;
+        }
+        CommandResult<Void> result = gameplay.placeZombie(dropZombieName, dropCol, dropRow);
+        showToast(result.getMessage(), !result.isSuccess());
+        syncSunHuds(App.getInstance().getCurrentGameModel());
+        refreshPacketChrome();
+    }
+
+    private void cancelZombieDrop() {
+        if (!zombieDropMode && dropCol < 0) {
+            return;
+        }
+        zombieDropMode = false;
+        dropZombieName = null;
+        dropCol = -1;
+        dropRow = -1;
+        refreshPacketChrome();
+    }
+
     private List<String> hudPlantNames() {
         if (beghouledMode) {
             return beghouledUpgradeFromNames();
         }
-        if (useZombiePackets) {
+        if (useZombiePackets && !couchPlayMode) {
             return iZombieRosterNames();
         }
         if (vaseBreakerMode) {

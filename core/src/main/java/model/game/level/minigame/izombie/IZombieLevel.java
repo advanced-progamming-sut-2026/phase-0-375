@@ -2,12 +2,14 @@ package model.game.level.minigame.izombie;
 
 import model.app.App;
 import model.enums.MiniGameType;
+import model.enums.ZombieState;
 import model.game.core.GameModel;
 import model.game.level.LevelConfig;
 import model.game.level.minigame.MiniGameLevel;
 import model.plant.PlantFactory;
 import model.plant.instance.PlantInstance;
 import model.zombie.ZombieFactory;
+import model.zombie.instance.ZombieInstance;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -17,6 +19,10 @@ import java.util.Set;
  * I, Zombie: the player fights on the zombies' side.
  */
 public class IZombieLevel extends MiniGameLevel {
+
+    /** Couch / versus match length; plants win if brains survive this long. */
+    public static final float VERSUS_MATCH_SECONDS = 180f;
+    public static final int VERSUS_PLANT_SUN = 150;
 
     private IZombieSettings settings = new IZombieSettings();
 
@@ -112,25 +118,64 @@ public class IZombieLevel extends MiniGameLevel {
         // No special teardown.
     }
 
-    /** Win: every lane's brain has been eaten (all rows breached). */
+    /** Win: every lane's brain has been eaten (all rows breached). Couch play inverts this. */
     @Override
     public boolean checkWinCondition(GameModel model) {
-        return model != null
-                && model.getBreachedRows().size() >= getConfig().getRows();
+        if (model != null && model.isCouchPlay()) {
+            return !allBrainsEaten(model)
+                    && (model.getElapsedSeconds() >= VERSUS_MATCH_SECONDS
+                    || zombieAttackerExhausted(model));
+        }
+        return allBrainsEaten(model);
     }
 
     /**
      * Loss: no zombies left on the lawn and not enough sun to place even the
      * cheapest roster zombie - unless the last zombie just ate the final
-     * brain, which is a win.
+     * brain, which is a win. Couch play: plants lose when all brains are eaten.
      */
     @Override
     public boolean checkLossCondition(GameModel model) {
-        if (model == null || checkWinCondition(model)) {
+        if (model == null) {
+            return false;
+        }
+        if (model.isCouchPlay()) {
+            return allBrainsEaten(model);
+        }
+        if (checkWinCondition(model)) {
             return false;
         }
         return model.getZombieCount() == 0
                 && model.getSunAmount() < (int) (settings.minZombieCost() * model.difficultyPenalty());
+    }
+
+    private boolean allBrainsEaten(GameModel model) {
+        return model != null
+                && getConfig() != null
+                && model.getBreachedRows().size() >= getConfig().getRows();
+    }
+
+    /** No attacking zombies and no sun producers left, and not enough sun to spawn one. */
+    private boolean zombieAttackerExhausted(GameModel model) {
+        int minCost = (int) (settings.minZombieCost() * model.difficultyPenalty());
+        if (model.getSunAmount() >= minCost) {
+            return false;
+        }
+        String sunName = settings.getSunZombie();
+        boolean hasSun = false;
+        boolean hasAttacker = false;
+        for (ZombieInstance zombie : model.getActiveZombies()) {
+            if (zombie == null || zombie.isDead() || zombie.getState() == ZombieState.DYING) {
+                continue;
+            }
+            String name = zombie.getDefinition() != null ? zombie.getDefinition().getName() : "";
+            if (name.equalsIgnoreCase(sunName)) {
+                hasSun = true;
+            } else {
+                hasAttacker = true;
+            }
+        }
+        return !hasAttacker && !hasSun;
     }
 
     /**
