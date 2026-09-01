@@ -4,6 +4,7 @@ import model.enums.MenuType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.network.client.NetworkClient;
+import model.network.client.ServerEndpoint;
 import model.network.packet.auth.LoginResponsePacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.user.User;
@@ -115,21 +116,11 @@ public class App {
     }
 
     private static String hostFromSystem() {
-        String host = System.getProperty("pvz.server.host");
-        return (host != null && !host.isBlank()) ? host.trim() : NetworkClient.DEFAULT_HOST;
+        return ServerEndpoint.host();
     }
 
     private static int portFromSystem() {
-        String port = System.getProperty("pvz.server.port");
-        if (port == null || port.isBlank()) {
-            return NetworkClient.DEFAULT_PORT;
-        }
-        try {
-            int parsed = Integer.parseInt(port.trim());
-            return parsed > 0 ? parsed : NetworkClient.DEFAULT_PORT;
-        } catch (NumberFormatException ignored) {
-            return NetworkClient.DEFAULT_PORT;
-        }
+        return ServerEndpoint.port();
     }
 
     public LocalSessionStore getLocalSessionStore() {

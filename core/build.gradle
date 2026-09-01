@@ -38,6 +38,37 @@ tasks.named('test') {
   }
 }
 
+def networkConfigDir = layout.buildDirectory.dir('generated/resources/network')
+
+tasks.register('generateNetworkConfig') {
+  def clientHost = (rootProject.findProperty('pvz.client.host')
+      ?: rootProject.findProperty('pvz.server.host')
+      ?: '127.0.0.1').toString()
+  def clientPort = (rootProject.findProperty('pvz.client.port')
+      ?: rootProject.findProperty('pvz.server.port')
+      ?: '8080').toString()
+  inputs.property('host', clientHost)
+  inputs.property('port', clientPort)
+  def outputFile = networkConfigDir.map { it.file('pvz-network.properties') }
+  outputs.file(outputFile)
+  doLast {
+    def file = outputFile.get().asFile
+    file.parentFile.mkdirs()
+    file.setText(
+        '# Generated from gradle.properties — do not edit.\n' +
+            "host=${clientHost}\n" +
+            "port=${clientPort}\n",
+        'UTF-8')
+  }
+}
+
+tasks.named('processResources') {
+  dependsOn 'generateNetworkConfig'
+  from(networkConfigDir) {
+    include 'pvz-network.properties'
+  }
+}
+
 // Phase-1 TUI (no LWJGL natives).
 tasks.register('runTui', JavaExec) {
   group = 'application'
@@ -47,6 +78,8 @@ tasks.register('runTui', JavaExec) {
   standardInput = System.in
   workingDir = rootProject.projectDir
   jvmArgs = ['--enable-native-access=ALL-UNNAMED']
+  systemProperty 'pvz.client.host', rootProject.findProperty('pvz.client.host') ?: rootProject.findProperty('pvz.server.host') ?: '127.0.0.1'
+  systemProperty 'pvz.client.port', rootProject.findProperty('pvz.client.port') ?: rootProject.findProperty('pvz.server.port') ?: '8080'
 }
 
 jar {

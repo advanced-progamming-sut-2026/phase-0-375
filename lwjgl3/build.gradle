@@ -62,6 +62,8 @@ run {
   systemProperty 'pvz.resolution', rootProject.findProperty('pvz.resolution') ?: '768'
   systemProperty 'pvz.server.host', rootProject.findProperty('pvz.server.host') ?: '127.0.0.1'
   systemProperty 'pvz.server.port', rootProject.findProperty('pvz.server.port') ?: '8080'
+  systemProperty 'pvz.client.host', rootProject.findProperty('pvz.client.host') ?: rootProject.findProperty('pvz.server.host') ?: '127.0.0.1'
+  systemProperty 'pvz.client.port', rootProject.findProperty('pvz.client.port') ?: rootProject.findProperty('pvz.server.port') ?: '8080'
 }
 
 jar {
