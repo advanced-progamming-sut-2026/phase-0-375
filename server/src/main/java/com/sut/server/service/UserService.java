@@ -42,14 +42,20 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final AuthService authService;
+    private final DailyOfferService dailyOfferService;
 
     public UserService(UserRepository userRepository) {
-        this(userRepository, null);
+        this(userRepository, null, null);
     }
 
     public UserService(UserRepository userRepository, AuthService authService) {
+        this(userRepository, authService, null);
+    }
+
+    public UserService(UserRepository userRepository, AuthService authService, DailyOfferService dailyOfferService) {
         this.userRepository = Objects.requireNonNull(userRepository);
         this.authService = authService;
+        this.dailyOfferService = dailyOfferService != null ? dailyOfferService : new DailyOfferService();
     }
 
     public void registerRoutes(PacketRouter router) {
@@ -79,7 +85,7 @@ public class UserService {
         if (user == null) {
             return new ProfileGetResponsePacket(false, "Not authenticated.", null);
         }
-        return new ProfileGetResponsePacket(true, "OK", UserSanitizer.sanitize(user));
+        return new ProfileGetResponsePacket(true, "OK", enrichDailyOffer(UserSanitizer.sanitize(user)));
     }
 
     public ProfileUpdateResponsePacket handleProfileUpdate(ClientConnectionHandler connection,
@@ -224,7 +230,7 @@ public class UserService {
             if (connection != null) {
                 connection.setUserProfile(fresh);
             }
-            return UserCommandResponsePacket.ok(reqId, "OK", UserSanitizer.sanitize(fresh));
+            return UserCommandResponsePacket.ok(reqId, "OK", enrichDailyOffer(UserSanitizer.sanitize(fresh)));
         } catch (Exception e) {
             return UserCommandResponsePacket.fail(reqId, "ERROR", e.getMessage() != null ? e.getMessage() : "Command failed.");
         }
@@ -349,7 +355,7 @@ public class UserService {
                 yield null;
             }
             case SET_SETTINGS -> applySettings(username, packet);
-            case SET_DAILY_OFFER -> applyDailyOffer(username, packet);
+            case GET_DAILY_OFFER -> null;
             case SET_QUEST_PROGRESS -> applyQuestProgress(username, packet);
             case PURCHASE_SHOP_ITEM -> applyShopPurchase(username, packet);
             case SET_PLANT_LEVEL -> applyPlantLevel(username, packet);
@@ -384,14 +390,14 @@ public class UserService {
         return null;
     }
 
-    private String applyDailyOffer(String username, UserCommandRequestPacket packet) {
-        Optional<User> opt = userRepository.findByUsername(username);
-        if (opt.isEmpty()) return "User not found.";
-        User u = opt.get();
-        u.setDailyOfferPlant(packet.arg("plant"));
-        u.setDailyOfferDate(packet.arg("date"));
-        userRepository.save(u);
-        return null;
+    private User enrichDailyOffer(User user) {
+        if (user == null) {
+            return null;
+        }
+        DailyOfferService.Snapshot offer = dailyOfferService.getToday();
+        user.setDailyOfferPlant(offer.plant());
+        user.setDailyOfferDate(offer.date());
+        return user;
     }
 
     private String applyQuestProgress(String username, UserCommandRequestPacket packet) {
@@ -417,8 +423,9 @@ public class UserService {
         Optional<User> opt = userRepository.findByUsername(username);
         if (opt.isEmpty()) return "User not found.";
         User u = opt.get();
+        DailyOfferService.Snapshot offer = dailyOfferService.getToday();
         Shop shop = Shop.getInstance(u);
-        shop.refreshDailyOffer();
+        shop.refreshDailyOffer(offer.plant(), offer.date());
         int itemId = packet.argInt("itemId", -1);
         int count = packet.argInt("count", 1);
         String plantType = packet.arg("plantType");

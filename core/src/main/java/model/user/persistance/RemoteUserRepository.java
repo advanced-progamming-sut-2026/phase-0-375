@@ -333,8 +333,8 @@ public class RemoteUserRepository implements UserRepository {
         return execute(UserCommand.SET_SETTINGS, settings);
     }
 
-    public boolean setDailyOffer(String plant, String date) {
-        return execute(UserCommand.SET_DAILY_OFFER, args("plant", plant, "date", date));
+    public boolean fetchDailyOffer() {
+        return execute(UserCommand.GET_DAILY_OFFER, Map.of());
     }
 
     public boolean setQuestProgress(String questId, int value, String dailyRefreshDate) {

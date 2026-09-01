@@ -8,6 +8,7 @@ import model.enums.ShopItemType;
 import model.greenhouse.Greenhouse;
 import model.shop.Shop;
 import model.shop.ShopItem;
+import model.user.User;
 import model.user.persistance.RemoteUserRepository;
 import model.user.persistance.UserSync;
 
@@ -71,8 +72,16 @@ public class ShopMenuController extends AppMenuController {
     }
 
     private void ensureDailyOffer(Shop shop) {
-        shop.refreshDailyOffer();
-        UserSync.persistDailyOfferFromCurrentUser();
+        if (App.getInstance().getUserRepository() instanceof RemoteUserRepository) {
+            UserSync.syncDailyOfferFromServer();
+            User user = App.getInstance().getCurrentUser();
+            shop.refreshDailyOffer(
+                    user != null ? user.getDailyOfferPlant() : null,
+                    user != null ? user.getDailyOfferDate() : null);
+        } else {
+            shop.refreshDailyOffer();
+            UserSync.flushIfLocal();
+        }
     }
 
     public CommandResult<Void> shopBuy(int itemId, int count, String plantType) {

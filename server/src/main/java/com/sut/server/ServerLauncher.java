@@ -5,6 +5,7 @@ import com.sut.server.net.TcpServer;
 import com.sut.server.repository.ServerUserRepository;
 import com.sut.server.room.RoomManager;
 import com.sut.server.service.AuthService;
+import com.sut.server.service.DailyOfferService;
 import com.sut.server.service.LobbyService;
 import com.sut.server.service.UserService;
 import model.data.minigame.MiniGameRegistry;
@@ -50,7 +51,8 @@ public class ServerLauncher {
             // Initialize persistence repository and core server services
             userRepository = new ServerUserRepository();
             authService = new AuthService(userRepository);
-            userService = new UserService(userRepository, authService);
+            DailyOfferService dailyOfferService = new DailyOfferService();
+            userService = new UserService(userRepository, authService, dailyOfferService);
             roomManager = new RoomManager();
             lobbyService = new LobbyService(roomManager);
 

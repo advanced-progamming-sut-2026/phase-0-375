@@ -6,6 +6,7 @@ import com.sut.server.net.PacketRouter;
 import com.sut.server.net.TcpServer;
 import com.sut.server.repository.ServerUserRepository;
 import model.network.enums.UserCommand;
+import model.plant.PlantFactory;
 import model.network.packet.user.ProfileUpdateRequestPacket;
 import model.network.packet.user.ProfileUpdateResponsePacket;
 import model.network.packet.user.UserCommandRequestPacket;
@@ -13,6 +14,7 @@ import model.network.packet.user.UserCommandResponsePacket;
 import model.user.PasswordHasher;
 import model.user.User;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,11 +45,16 @@ class UserServiceTest {
     private Socket accepted;
     private String username;
 
+    @BeforeAll
+    static void initPlants() throws Exception {
+        PlantFactory.init("/assets/data/plants/plants.json");
+    }
+
     @BeforeEach
     void setUp() throws IOException {
         repo = new ServerUserRepository(tempDir.resolve("users.json"));
         authService = new AuthService(repo);
-        userService = new UserService(repo, authService);
+        userService = new UserService(repo, authService, new DailyOfferService(tempDir.resolve("daily_offer.json")));
 
         username = "u-" + UUID.randomUUID().toString().substring(0, 8);
         User user = new User();

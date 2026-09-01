@@ -67,14 +67,10 @@ public final class UserSync {
         }
     }
 
-    public static void persistDailyOfferFromCurrentUser() {
-        User user = App.getInstance().getCurrentUser();
+    public static void syncDailyOfferFromServer() {
         UserRepository r = repo();
-        if (user == null || r == null) return;
         if (r instanceof RemoteUserRepository remote) {
-            remote.setDailyOffer(user.getDailyOfferPlant(), user.getDailyOfferDate());
-        } else {
-            r.flush();
+            remote.fetchDailyOffer();
         }
     }
 
