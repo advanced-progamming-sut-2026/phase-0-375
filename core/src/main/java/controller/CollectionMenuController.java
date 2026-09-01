@@ -355,12 +355,19 @@ public class CollectionMenuController extends AppMenuController {
             return CommandResult.error("Could not upgrade '" + plantName + "'.");
         }
 
-        user.getSeedPackets().put(plantName, packets - seedCost);
-        user.setCoins(user.getCoins() - coinCost);
-        persistPlantLevel(user, collection, plantName);
-        App.getInstance().getUserRepository().flush();
-        return CommandResult.success("'" + plantName + "' upgraded to level "
-                + collection.getPlantLevel(plantName) + "!");
+        var repo = App.getInstance().getUserRepository();
+        if (!repo.spendSeedPackets(user.getUsername(), plantName, seedCost)
+                || !repo.spendCoins(user.getUsername(), coinCost)) {
+            return CommandResult.error("Could not pay upgrade cost.");
+        }
+        int newLevel = collection.getPlantLevel(plantName);
+        if (repo instanceof model.user.persistance.RemoteUserRepository remote) {
+            remote.setPlantLevel(plantName, newLevel);
+        } else {
+            persistPlantLevel(App.getInstance().getCurrentUser(), collection, plantName);
+            repo.flush();
+        }
+        return CommandResult.success("'" + plantName + "' upgraded to level " + newLevel + "!");
     }
 
     public CommandResult<Void> purchasePlant(String plantName) {
@@ -379,11 +386,11 @@ public class CollectionMenuController extends AppMenuController {
                     + ", have " + user.getCoins() + ".");
         }
 
-        user.setCoins(user.getCoins() - PURCHASE_COST_COINS);
-        collection.unlockPlant(plantName);
-        user.rememberNewsPublishDate(NewsFactory.plantNewsId(plantName));
-        persistPlantLevel(user, collection, plantName);
-        App.getInstance().getUserRepository().flush();
+        var repo = App.getInstance().getUserRepository();
+        if (!repo.spendCoins(user.getUsername(), PURCHASE_COST_COINS)) {
+            return CommandResult.error("Not enough coins.");
+        }
+        repo.unlockPlant(user.getUsername(), plantName);
         return CommandResult.success("'" + plantName + "' purchased successfully!");
     }
 }

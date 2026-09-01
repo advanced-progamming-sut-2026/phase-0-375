@@ -733,6 +733,35 @@ public class PlantInstance implements Placeable {
     public int getActionEpoch() { return actionEpoch; }
     public boolean hasActiveAction() { return activeAction != null; }
 
+    /** Starts a presentation-only attack clip (network display sync). */
+    public void beginPresentationAction(PlantAbilityContext context) {
+        if (activeAction != null || state == PlantState.DYING || state == PlantState.FROZEN
+                || state == PlantState.TRANSFORMED) {
+            return;
+        }
+        PlantAbility strategy = getAbilityStrategy();
+        if (strategy == null) {
+            return;
+        }
+        PlantAction action = strategy.beginAction(this, context);
+        if (action != null) {
+            activeAction = action;
+            activeAction.start(this, context);
+        }
+    }
+
+    /** Advances the active presentation action; returns true when it completes. */
+    public boolean tickPresentationAction(PlantAbilityContext context, float deltaTime) {
+        if (activeAction == null) {
+            return false;
+        }
+        if (activeAction.tick(this, context, deltaTime)) {
+            activeAction = null;
+            return true;
+        }
+        return false;
+    }
+
     /**
      * Buried charge mines (Potato Mine, Primal Potato Mine) are walked over
      * until they finish arming — zombies must not chew them in that window.

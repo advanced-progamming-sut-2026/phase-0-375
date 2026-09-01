@@ -1,5 +1,6 @@
 package model.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import model.enums.Chapter;
 
 import java.time.LocalDate;
@@ -9,7 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class User {
+
     public static final Set<String> STARTER_PLANTS = Set.of("Sunflower", "Peashooter", "Wall-nut", "Potato Mine");
 
     private String username;
@@ -238,6 +241,14 @@ public class User {
 
     public void setHighestMyopoint(int highestMyopoint) {
         this.highestMyopoint = highestMyopoint;
+    }
+
+    /**
+     * Leaderboard "My Point". Unplayed is ASCII "-" — the skin bitmap fonts have
+     * no glyph for U+2013, so an en dash draws as a blank cell.
+     */
+    public String formattedHighestMyopoint() {
+        return highestMyopoint <= 0 ? "-" : Integer.toString(highestMyopoint);
     }
 
     public Map<Chapter, Integer> getChapterProgress() {

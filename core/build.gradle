@@ -33,6 +33,9 @@ dependencies {
 
 tasks.named('test') {
   useJUnitPlatform()
+  testLogging {
+    events "passed", "skipped", "failed", "standardOut", "standardError"
+  }
 }
 
 // Phase-1 TUI (no LWJGL natives).

@@ -126,7 +126,9 @@ public class GreenhouseMenuController extends AppMenuController {
         if (!greenhouse.commitGrow(x, y)) {
             return CommandResult.error("Failed to accelerate growth.");
         }
-        user.setGems(user.getGems() - cost);
+        if (!model.user.persistance.UserSync.spendGems(cost)) {
+            return CommandResult.error("Need " + cost + " gems.");
+        }
         saveGreenhouse();
         return CommandResult.success("Accelerated growth for " + cost + " gem(s).");
     }
@@ -151,24 +153,36 @@ public class GreenhouseMenuController extends AppMenuController {
     private void saveGreenhouse() {
         Greenhouse greenhouse = currentGreenhouse();
         greenhouse.save();
-        UserRepository repo = App.getInstance().getUserRepository();
-        repo.save(App.getInstance().getCurrentUser());
+        model.user.persistance.UserSync.flushIfLocal();
+        // Remote: re-push pot plantings from the current user snapshot.
+        User user = App.getInstance().getCurrentUser();
+        var repo = App.getInstance().getUserRepository();
+        if (user != null && repo instanceof model.user.persistance.RemoteUserRepository
+                && user.getGreenhousePots() != null) {
+            for (var e : user.getGreenhousePots().entrySet()) {
+                String[] xy = e.getKey().split(",");
+                if (xy.length != 2) continue;
+                int px = Integer.parseInt(xy[0].trim());
+                int py = Integer.parseInt(xy[1].trim());
+                long ts = user.getGreenhousePlantTimestamps() != null
+                        ? user.getGreenhousePlantTimestamps().getOrDefault(e.getKey(), System.currentTimeMillis())
+                        : System.currentTimeMillis();
+                repo.plantInGreenhouse(user.getUsername(), px, py, e.getValue(), ts);
+            }
+        }
     }
 
-    /** Applies harvest produce to the current user; returns the message. */
     private String applyProduceToUser(GreenhouseProduce produce) {
         User user = App.getInstance().getCurrentUser();
         if (produce.isCoinReward()) {
-            user.setCoins(user.getCoins() + produce.getCoinAmount());
+            model.user.persistance.UserSync.addCoins(produce.getCoinAmount());
             return "Harvested marigold for " + produce.getCoinAmount() + " coins.";
         }
         if (produce.isBoost()) {
-            Map<String, Boolean> boosts = user.getPlantBoosts();
-            if (boosts == null) {
-                boosts = new HashMap<>(); // old saves may miss the map
-                user.setPlantBoosts(boosts);
+            var repo = App.getInstance().getUserRepository();
+            if (user != null && repo != null) {
+                repo.storePlantBoost(user.getUsername(), produce.getBoostPlantType());
             }
-            boosts.put(produce.getBoostPlantType(), true);
             return "Harvested " + produce.getBoostPlantType()
                 + " — a one-shot boost has been stored for that plant.";
         }

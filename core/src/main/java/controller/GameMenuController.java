@@ -274,6 +274,7 @@ public class GameMenuController extends AppMenuController {
      * Leaderboard sorted by any column. Sort keys: "username", "score"/"myopoint"
      * (default), "progress", "minigames", "daily-quests" and "quests"
      * (non-daily). Order: "desc" (default) or "asc".
+     * Data is loaded from the server when connected.
      */
     public CommandResult<List<User>> leaderboard(String sortKey, String order) {
         String key = sortKey == null ? "score" : sortKey.toLowerCase();
@@ -298,9 +299,85 @@ public class GameMenuController extends AppMenuController {
         }
         comparator = comparator.thenComparing(User::getUsername, String.CASE_INSENSITIVE_ORDER);
 
-        UserRepository repo = App.getInstance().getUserRepository();
-        List<User> sorted = repo.findAll().stream().sorted(comparator).collect(Collectors.toList());
+        List<User> players = fetchLeaderboardUsers();
+        if (players == null) {
+            return errorTyped("Cannot load leaderboard: server is unreachable.");
+        }
+        List<User> sorted = players.stream().sorted(comparator).collect(Collectors.toList());
         return CommandResult.successWithData("Leaderboard (" + sorted.size() + " players).", sorted);
+    }
+
+    /**
+     * Loads public leaderboard rows from the server. Falls back to local
+     * {@code findAll()} only when not connected (offline / tests with JsonUserRepository).
+     */
+    private List<User> fetchLeaderboardUsers() {
+        model.network.client.NetworkClient client = App.getInstance().getNetworkClient();
+        if (client == null || !client.isConnected()) {
+            UserRepository repo = App.getInstance().getUserRepository();
+            if (repo == null) return List.of();
+            return new ArrayList<>(repo.findAll());
+        }
+
+        model.network.enums.LeaderboardCategory category = model.network.enums.LeaderboardCategory.MYOPOINT;
+        model.network.packet.user.LeaderboardRequestPacket req =
+                new model.network.packet.user.LeaderboardRequestPacket(category);
+        java.util.concurrent.atomic.AtomicReference<model.network.packet.user.LeaderboardResponsePacket> ref =
+                new java.util.concurrent.atomic.AtomicReference<>(null);
+        java.util.function.Consumer<model.network.packet.user.LeaderboardResponsePacket> handler = ref::set;
+
+        boolean prev = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(model.network.packet.user.LeaderboardResponsePacket.class, handler);
+        try {
+            if (!client.sendPacket(req)) {
+                return null;
+            }
+            long deadline = System.currentTimeMillis() + 3000;
+            while (System.currentTimeMillis() < deadline && ref.get() == null && client.isConnected()) {
+                client.pollEvents();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        } finally {
+            client.unregisterHandler(model.network.packet.user.LeaderboardResponsePacket.class, handler);
+            client.setAutoPostToGdx(prev);
+        }
+
+        model.network.packet.user.LeaderboardResponsePacket resp = ref.get();
+        if (resp == null || !resp.isSuccess() || resp.getEntries() == null) {
+            return null;
+        }
+        List<User> users = new ArrayList<>();
+        for (var entry : resp.getEntries()) {
+            users.add(toLeaderboardUser(entry));
+        }
+        return users;
+    }
+
+    private static User toLeaderboardUser(model.network.packet.user.LeaderboardResponsePacket.LeaderboardEntryDto entry) {
+        User u = new User();
+        u.setUsername(entry.getUsername());
+        u.setNickname(entry.getNickname());
+        u.setHighestMyopoint(entry.getHighestMyopoint());
+        u.setCompletedMiniGames(entry.getCompletedMiniGames());
+        u.setCompletedDailyQuests(entry.getCompletedDailyQuests());
+        u.setCompletedNonDailyQuests(entry.getCompletedNonDailyQuests());
+        if (entry.getChapterProgress() != null && !entry.getChapterProgress().isEmpty()) {
+            java.util.Map<Chapter, Integer> progress = new java.util.HashMap<>();
+            for (var e : entry.getChapterProgress().entrySet()) {
+                try {
+                    progress.put(Chapter.valueOf(e.getKey()), e.getValue() == null ? 0 : e.getValue());
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            u.setChapterProgress(progress);
+        }
+        return u;
     }
 
     /** Total chapter progress across all chapters (leaderboard sort helper). */
@@ -332,13 +409,12 @@ public class GameMenuController extends AppMenuController {
     public CommandResult<Void> cheatAdd(int n, String type) {
         User user = App.getInstance().getCurrentUser();
         if (type.equalsIgnoreCase("coin")) {
-            user.setCoins(user.getCoins() + n);
+            model.user.persistance.UserSync.addCoins(n);
         } else if (type.equalsIgnoreCase("diamond")) {
-            user.setGems(user.getGems() + n);
+            model.user.persistance.UserSync.addGems(n);
         } else {
             return CommandResult.error("Type must be 'coin' or 'diamond'.");
         }
-        App.getInstance().getUserRepository().flush();
         return CommandResult.success("Added " + n + " " + type + "s.");
     }
 

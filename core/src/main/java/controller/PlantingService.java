@@ -111,6 +111,11 @@ final class PlantingService {
             return CommandResult.error("Hot Potato can only be planted on ice.");
         }
 
+        if (model.isCouchPlay() && model.getCurrentLevel() instanceof IZombieLevel iZombie
+                && x >= iZombie.redLineColumn()) {
+            return CommandResult.error("Plants must be placed behind the red line.");
+        }
+
         PlacableLayer targetLayer = computeLayer(definition);
 
         // --- Same-type stacker (Pea Pod) ---
@@ -193,14 +198,22 @@ final class PlantingService {
 
         // --- Sun cost (Imitater bills the copied plant) ---
         int cost = conveyor ? 0 : billing.getCost();
-        if (!model.spendSun(cost)) {
+        boolean spent = model.isCouchPlay()
+                ? model.spendPlantSun(cost)
+                : model.spendSun(cost);
+        if (!spent) {
+            int have = model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount();
             return CommandResult.error("Not enough sun. Need " + cost
-                    + ", have " + model.getSunAmount() + ".");
+                    + ", have " + have + ".");
         }
 
         boolean placed = model.placePlant(instance, y, x);
         if (!placed) {
-            model.addSun(cost);
+            if (model.isCouchPlay()) {
+                model.addPlantSun(cost);
+            } else {
+                model.addSun(cost);
+            }
             return CommandResult.error("Cannot plant '" + type + "' at (" + x + ", " + y
                     + ") on layer " + targetLayer + ".");
         }
@@ -221,7 +234,8 @@ final class PlantingService {
                 ? " Copies " + instance.getImitateTarget() + "."
                 : "";
         return CommandResult.success("Planted " + type + " at (" + x + ", " + y
-                + ") for " + cost + " sun. Remaining sun: " + model.getSunAmount()
+                + ") for " + cost + " sun. Remaining sun: "
+                + (model.isCouchPlay() ? model.getPlantSun() : model.getSunAmount())
                 + "." + stackNote + note + copyNote);
     }
 
@@ -292,8 +306,7 @@ final class PlantingService {
         String name = instance.getDefinition().getName();
         for (Map.Entry<String, Boolean> e : user.getPlantBoosts().entrySet()) {
             if (Boolean.TRUE.equals(e.getValue()) && e.getKey().equalsIgnoreCase(name)) {
-                e.setValue(false); // one-shot
-                App.getInstance().getUserRepository().flush();
+                App.getInstance().getUserRepository().consumePlantBoost(user.getUsername(), e.getKey());
                 instance.activatePlantFood();
                 return true;
             }

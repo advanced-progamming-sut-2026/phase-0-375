@@ -85,12 +85,12 @@ public class GameMenuView extends AppMenuView {
             for (int i = 0; i < users.size(); i++) {
                 User u = users.get(i);
                 String progress = formatProgress(u);
-                displayMessage(String.format("%-20s %-12s %-10d %-12d %-8d %d",
+                displayMessage(String.format("%-20s %-12s %-10d %-12d %-8d %s",
                         u.getUsername(), progress,
                         u.getCompletedMiniGames(),
                         u.getCompletedDailyQuests(),
                         u.getCompletedNonDailyQuests(),
-                        u.getHighestMyopoint()));
+                        u.formattedHighestMyopoint()));
             }
         } else {
             displayError(result.getMessage());

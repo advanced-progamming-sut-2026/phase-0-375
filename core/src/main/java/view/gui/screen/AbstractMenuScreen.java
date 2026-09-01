@@ -158,6 +158,11 @@ public abstract class AbstractMenuScreen implements Screen {
         toast.show(message, error);
     }
 
+    /** Stage used by overlays (invites, matchmaking). */
+    public Stage getStage() {
+        return stage;
+    }
+
     /** Purchase / upgrade feedback (092 or error) without double-playing error on toast. */
     protected void showPurchaseResult(CommandResult<?> result) {
         if (result == null) {

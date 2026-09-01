@@ -5,6 +5,8 @@ import model.enums.PurchaseResult;
 import model.enums.ShopCategory;
 import model.enums.ShopItemType;
 import model.greenhouse.Greenhouse;
+import model.plant.PlantFactory;
+import model.plant.definition.Plant;
 import model.user.User;
 
 import java.time.LocalDate;
@@ -113,10 +115,18 @@ public class Shop {
     }
 
     /**
-     * Refreshes the daily offer if the date has changed.
-     * Reuses today's persisted offer (plant + date) so it survives restarts.
+     * Refreshes today's offer using the global daily roll (offline / local saves).
      */
     public void refreshDailyOffer() {
+        LocalDate today = LocalDate.now();
+        refreshDailyOffer(DailyOfferRoll.pickPlantForDate(today, catalogPlantNames()), today.toString());
+    }
+
+    /**
+     * Refreshes the daily offer from the authoritative global plant for today.
+     * The user must have that plant unlocked to see or buy the deal.
+     */
+    public void refreshDailyOffer(String globalPlant, String globalDate) {
         LocalDate today = LocalDate.now();
         if (dailyOffer != null && today.equals(lastRefreshDate)) {
             return;
@@ -125,16 +135,11 @@ public class Shop {
             return;
         }
 
-        // Reuse today's saved offer if it exists and is still unlocked.
         String plant = null;
-        if (today.toString().equals(customer.getDailyOfferDate())) {
-            plant = resolveUnlockedPlantName(customer.getDailyOfferPlant());
+        if (globalPlant != null && today.toString().equals(globalDate)) {
+            plant = resolveCatalogPlantName(globalPlant);
         }
         if (plant == null) {
-            plant = pickRandomUnlockedPlant();
-        }
-        if (plant == null) {
-            // No unlocked plants — no daily offer possible.
             dailyOffer = null;
             lastRefreshDate = today;
             return;
@@ -153,11 +158,9 @@ public class Shop {
         dailyOffer = new DailyOffer(offerItem, DAILY_OFFER_BASE_PRICE, today);
         lastRefreshDate = today;
 
-        // Persist the offer's identity (plant + date).
         customer.setDailyOfferPlant(plant);
         customer.setDailyOfferDate(today.toString());
 
-        // Restore the purchased flag from persistence.
         if (customer.getPurchasedDailyDeals() != null
                 && Boolean.TRUE.equals(customer.getPurchasedDailyDeals().get(today.toString()))) {
             dailyOffer.setPurchased(true);
@@ -225,13 +228,19 @@ public class Shop {
             return PurchaseResult.ALREADY_PURCHASED;
         }
 
+        String offerPlant = dailyOffer.getItem().getTargetPlantType();
+        String unlockedPlant = resolveUnlockedPlantName(offerPlant);
+        if (unlockedPlant == null) {
+            return PurchaseResult.PLANT_NOT_UNLOCKED;
+        }
+
         int cost = dailyOffer.getDiscountedPrice();
         if (customer.getCoins() < cost) {
             return PurchaseResult.INSUFFICIENT_FUNDS;
         }
 
         customer.setCoins(customer.getCoins() - cost);
-        applySeedPacketPurchase(dailyOffer.getItem().getTargetPlantType(), DAILY_OFFER_PACKET_AMOUNT);
+        applySeedPacketPurchase(unlockedPlant, DAILY_OFFER_PACKET_AMOUNT);
 
         dailyOffer.setPurchased(true);
         if (customer.getPurchasedDailyDeals() == null) {
@@ -355,6 +364,27 @@ public class Shop {
         return null;
     }
 
+    /** Finds the canonical catalog plant name, ignoring case. */
+    private String resolveCatalogPlantName(String plantName) {
+        if (plantName == null || plantName.isBlank()) {
+            return null;
+        }
+        try {
+            if (PlantFactory.hasDefinition(plantName.trim())) {
+                return PlantFactory.getDefinition(plantName.trim()).getName();
+            }
+            for (Plant plant : PlantFactory.getAllDefinitions()) {
+                if (plant.getName() != null && plant.getName().equalsIgnoreCase(plantName.trim())) {
+                    return plant.getName();
+                }
+            }
+        } catch (IllegalStateException ignored) {
+            // PlantFactory not loaded (tests); fall back to the raw name.
+            return plantName.trim();
+        }
+        return null;
+    }
+
     /** Finds the canonical unlocked plant name, ignoring case. */
     private String resolveUnlockedPlantName(String plantName) {
         Set<String> unlocked = customer != null ? customer.getUnlockedPlants() : null;
@@ -367,6 +397,18 @@ public class Shop {
             }
         }
         return null;
+    }
+
+    private static List<String> catalogPlantNames() {
+        try {
+            return PlantFactory.getAllDefinitions().stream()
+                    .map(Plant::getName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .sorted()
+                    .toList();
+        } catch (IllegalStateException e) {
+            return List.of();
+        }
     }
 
     private String pickRandomUnlockedPlant() {

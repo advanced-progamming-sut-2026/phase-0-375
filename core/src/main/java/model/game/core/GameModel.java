@@ -69,6 +69,9 @@ public class GameModel implements BehaviorContext {
     private final Map<String, Float> seedCooldowns = new HashMap<>();
     /** Set by `cheat remove-cooldown` — disables seed cooldowns for the rest of the level. */
     private boolean seedCooldownsDisabled = false;
+    /** Couch-play I, Zombie: plant-side sun is separate from {@link #getSunAmount()} (zombie bank). */
+    private boolean couchPlay;
+    private int plantSun;
 
     private Level currentLevel;
     private WaveManager waveManager;
@@ -140,7 +143,8 @@ public class GameModel implements BehaviorContext {
 
     public GameModel(Level currentLevel) {
         this.currentTick = 0;
-        this.difficultyLevel = App.getInstance().getCurrentUser().getDifficultyLevel();
+        User currentUser = App.getInstance().getCurrentUser();
+        this.difficultyLevel = currentUser != null ? currentUser.getDifficultyLevel() : 3;
         this.gameState = GameState.RUNNING;
 
         this.currentLevel = currentLevel;
@@ -180,6 +184,10 @@ public class GameModel implements BehaviorContext {
         return gameMap;
     }
 
+    public GameMap getGameMap() {
+        return gameMap;
+    }
+
     public long getTick() {
         return currentTick;
     }
@@ -189,11 +197,43 @@ public class GameModel implements BehaviorContext {
         return resources.getSunAmount();
     }
 
+    public boolean isCouchPlay() {
+        return couchPlay;
+    }
+
+    public void setCouchPlay(boolean couchPlay) {
+        this.couchPlay = couchPlay;
+    }
+
+    public int getPlantSun() {
+        return plantSun;
+    }
+
+    public void setPlantSun(int amount) {
+        plantSun = Math.max(0, amount);
+    }
+
+    public void addPlantSun(int amount) {
+        plantSun = Math.min(9990, plantSun + Math.max(0, amount));
+    }
+
+    public boolean spendPlantSun(int amount) {
+        if (amount < 0 || plantSun < amount) {
+            return false;
+        }
+        plantSun -= amount;
+        return true;
+    }
+
     public int getPlantFoodCount() {
         return resources.getPlantFoodCount();
     }
 
     public int getDifficulty() {
+        return difficultyLevel;
+    }
+
+    public int getDifficultyLevel() {
         return difficultyLevel;
     }
 
@@ -362,7 +402,15 @@ public class GameModel implements BehaviorContext {
         return activeZombies;
     }
 
+    public List<ZombieInstance> getActiveZombies() {
+        return activeZombies;
+    }
+
     public List<Projectile> getProjectiles() {
+        return activeProjectiles;
+    }
+
+    public List<Projectile> getActiveProjectiles() {
         return activeProjectiles;
     }
 
@@ -587,22 +635,14 @@ public class GameModel implements BehaviorContext {
     public void addDiamonds(int amount) {
         if (amount > 0) {
             diamondCount += amount;
-            User user = App.getInstance().getCurrentUser();
-            if (user != null) {
-                user.setGems(user.getGems() + amount);
-                App.getInstance().getUserRepository().flush();
-            }
+            model.user.persistance.UserSync.addGems(amount);
         }
     }
 
     public void addCoins(int amount) {
         if (amount > 0) {
             coinCount += amount;
-            User user = App.getInstance().getCurrentUser();
-            if (user != null) {
-                user.setCoins(user.getCoins() + amount);
-                App.getInstance().getUserRepository().flush();
-            }
+            model.user.persistance.UserSync.addCoins(amount);
         }
     }
 
@@ -610,9 +650,14 @@ public class GameModel implements BehaviorContext {
         if (amount > 0) {
             flowerPotCount += amount;
             User user = App.getInstance().getCurrentUser();
-            if (user != null) {
-                user.setUnlockedPots(user.getUnlockedPots() + amount);
-                App.getInstance().getUserRepository().flush();
+            if (user != null && App.getInstance().getUserRepository() != null) {
+                // Unlock next pots on the server one-by-one (x,y from greenhouse layout).
+                for (int i = 0; i < amount; i++) {
+                    int potIndex = user.getUnlockedPots() + i;
+                    int x = potIndex % 4;
+                    int y = potIndex / 4;
+                    App.getInstance().getUserRepository().unlockGreenhousePot(user.getUsername(), x, y);
+                }
             }
         }
     }
@@ -672,6 +717,11 @@ public class GameModel implements BehaviorContext {
         resources.addSun(amount);
     }
 
+    /** Absolute sun balance (used by networked display sync). */
+    public void setSunAmount(int amount) {
+        resources.setSunAmount(amount);
+    }
+
     @Override
     public boolean spendSun(int amount) {
         return resources.spendSun(amount);
@@ -699,7 +749,9 @@ public class GameModel implements BehaviorContext {
         }
         if (seen.add(zombieName)) {
             user.rememberNewsPublishDate(NewsFactory.zombieNewsId(zombieName));
-            App.getInstance().getUserRepository().flush();
+            if (App.getInstance().getUserRepository() != null) {
+                App.getInstance().getUserRepository().unlockZombie(user.getUsername(), zombieName);
+            }
         }
     }
 
@@ -899,7 +951,11 @@ public class GameModel implements BehaviorContext {
 
     public void collectSun(Sun sun) {
         activeSuns.remove(sun);
-        resources.addSun(sun.getValue());
+        if (couchPlay) {
+            addPlantSun(sun.getValue());
+        } else {
+            resources.addSun(sun.getValue());
+        }
         questStats.onSunCollected(sun.getValue());
     }
 
@@ -1064,6 +1120,36 @@ public class GameModel implements BehaviorContext {
     /** Rows whose lane end has been breached at least once. */
     public Set<Integer> getBreachedRows() {
         return breachedRows;
+    }
+
+    /** Authoritative breach list from a networked snapshot. */
+    public void syncBreachedRows(java.util.Collection<Integer> rows) {
+        breachedRows.clear();
+        if (rows != null) {
+            breachedRows.addAll(rows);
+        }
+    }
+
+    /** Replaces falling/collectible sun tokens for display sync. */
+    public void replaceActiveSuns(List<Sun> suns) {
+        activeSuns.clear();
+        if (suns != null) {
+            activeSuns.addAll(suns);
+        }
+    }
+
+    /** Plant-side seed packet cooldowns from the authoritative server. */
+    public void syncSeedCooldowns(java.util.Map<String, Float> cooldowns) {
+        seedCooldowns.clear();
+        if (cooldowns == null) {
+            return;
+        }
+        for (java.util.Map.Entry<String, Float> entry : cooldowns.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null || entry.getValue() <= 0f) {
+                continue;
+            }
+            seedCooldowns.put(entry.getKey(), entry.getValue());
+        }
     }
 
     /** Zombie chewing at the house after a breach, or {@code null}. */
@@ -1645,12 +1731,69 @@ public class GameModel implements BehaviorContext {
      */
     public void addExistingZombie(ZombieInstance zombie, int row, int col) {
         if (zombie == null) return;
+        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
+        int clampedCol = Math.max(0, Math.min(col, gameMap.getCols() - 1));
+        zombie.setGridPosition(new Point(clampedCol, clampedRow));
+        if (zombie.getContinuousPosition() == null) {
+            zombie.setContinuousPosition(new FloatPoint(clampedCol, clampedRow));
+        }
         if (!activeZombies.contains(zombie)) {
             activeZombies.add(zombie);
         }
-        Cell cell = gameMap.getCell(col, row);
+        Cell cell = gameMap.getCell(clampedCol, clampedRow);
         if (cell != null && !cell.getZombies().contains(zombie)) {
             cell.addZombie(zombie);
         }
+    }
+
+    /** Removes a plant from the board immediately (no death FX bookkeeping). */
+    public void removePlantFromBoard(PlantInstance plant) {
+        if (plant == null || plant.getPosition() == null || gameMap == null) return;
+        Cell cell = gameMap.getCell(plant.getPosition().getX(), plant.getPosition().getY());
+        if (cell != null) {
+            cell.removePlaceable(plant);
+        }
+    }
+
+    /**
+     * Updates a zombie's continuous pose and remaps its grid cell when the
+     * floored column/row changes. Used by networked snapshot display sync.
+     * Continuous X may be &lt; 0 (brain lane) or past the right edge — those
+     * poses stay off-grid and must not call {@link GameMap#getCell}.
+     */
+    public void syncZombieWorldPose(ZombieInstance zombie, int row, float continuousX, float continuousY) {
+        if (zombie == null || gameMap == null) return;
+        int clampedRow = Math.max(0, Math.min(row, gameMap.getRows() - 1));
+        float y = continuousY;
+        if (Float.isNaN(y)) {
+            y = clampedRow;
+        }
+        zombie.setContinuousPosition(new FloatPoint(continuousX, y));
+
+        int newCol = (int) Math.floor(continuousX);
+        Point grid = zombie.getGridPosition();
+        int oldCol = grid != null ? grid.getX() : newCol;
+        int oldRow = grid != null ? grid.getY() : clampedRow;
+        if (oldCol != newCol || oldRow != clampedRow) {
+            if (inMapBounds(oldCol, oldRow)) {
+                Cell oldCell = gameMap.getCell(oldCol, oldRow);
+                if (oldCell != null) {
+                    oldCell.removeZombie(zombie);
+                }
+            }
+            if (inMapBounds(newCol, clampedRow)) {
+                Cell newCell = gameMap.getCell(newCol, clampedRow);
+                if (newCell != null) {
+                    newCell.addZombie(zombie);
+                }
+            }
+            zombie.setGridPosition(new Point(newCol, clampedRow));
+        } else if (grid == null) {
+            zombie.setGridPosition(new Point(newCol, clampedRow));
+        }
+    }
+
+    private boolean inMapBounds(int col, int row) {
+        return col >= 0 && row >= 0 && col < gameMap.getCols() && row < gameMap.getRows();
     }
 }

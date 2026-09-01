@@ -233,7 +233,7 @@ public final class ProfileOverlay {
                 levelsCompleted = user.getChapterProgress().values().stream().mapToInt(Integer::intValue).sum();
             }
             levelsValue.setText(String.valueOf(levelsCompleted));
-            myopointValue.setText(String.valueOf(user.getHighestMyopoint()));
+            myopointValue.setText(user.formattedHighestMyopoint());
             if (onResourceBarRefresh != null) {
                 onResourceBarRefresh.run();
             }

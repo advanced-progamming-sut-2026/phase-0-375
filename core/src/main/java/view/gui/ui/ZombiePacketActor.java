@@ -32,6 +32,7 @@ public final class ZombiePacketActor extends WidgetGroup {
     private boolean hovered;
     private boolean dragging;
     private boolean dimmed;
+    private boolean selected;
     private DragZombie dragZombie;
 
     public ZombiePacketActor(TextureBank textures, Skin skin, String zombieName, int sunCost) {
@@ -122,6 +123,28 @@ public final class ZombiePacketActor extends WidgetGroup {
         getColor().a = dimmed ? 0.55f : 1f;
     }
 
+    public void setSelected(boolean selected) {
+        this.selected = selected;
+        refreshSelect();
+    }
+
+    /** Couch play: zombie cards are keyboard-only. */
+    public void setPickable(boolean pickable) {
+        setTouchable(pickable ? Touchable.enabled : Touchable.disabled);
+    }
+
+    public void setHotkey(Skin skin, char letter) {
+        if (letter == 0) {
+            return;
+        }
+        float size = 18f;
+        Label label = packetLabel(skin, String.valueOf(letter), 1.35f,
+                3f, 3f, size, size);
+        label.setAlignment(Align.left);
+        addActor(label);
+        label.toFront();
+    }
+
     public void onDragZombie(DragZombie dragZombie) {
         this.dragZombie = dragZombie;
     }
@@ -141,7 +164,7 @@ public final class ZombiePacketActor extends WidgetGroup {
     }
 
     private void refreshSelect() {
-        select.setVisible((hovered || dragging) && zombieName != null);
+        select.setVisible((hovered || dragging || selected) && zombieName != null);
     }
 
     @Override

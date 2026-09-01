@@ -46,6 +46,7 @@ import view.gui.assets.QuestArt;
 import view.gui.assets.ShopArt;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.EdgeFadeOverlay;
+import view.gui.ui.IZombieMatchmakingOverlay;
 import view.gui.ui.PamEffectActor;
 import view.gui.ui.ResourceBar;
 import view.gui.ui.RoundedRegionImage;
@@ -370,11 +371,15 @@ public final class QuestsScreen extends AbstractMenuScreen {
             return;
         }
         List<MiniGameDataEntry> games = result.getData();
-        statusLabel.setText("Mini-Games  ·  " + games.size() + " stages");
+        statusLabel.setText("Mini-Games  ·  " + (games.size() + 2) + " stages");
         for (MiniGameDataEntry entry : games) {
             list.add(miniGameCard(entry)).growX()
                 .padLeft(CARD_SIDE).padRight(CARD_SIDE).padBottom(CARD_GAP).row();
         }
+        list.add(iZombieMultiplayerCard()).growX()
+            .padLeft(CARD_SIDE).padRight(CARD_SIDE).padBottom(CARD_GAP).row();
+        list.add(iZombieCouchPlayCard()).growX()
+            .padLeft(CARD_SIDE).padRight(CARD_SIDE).padBottom(CARD_GAP).row();
     }
 
     private Table questCard(Quest quest) {
@@ -458,6 +463,51 @@ public final class QuestsScreen extends AbstractMenuScreen {
             false,
             null,
             entry.getCoinReward(),
+            play);
+    }
+
+    /** Same I, Zombie branding as the SP stages; opens multiplayer matchmaking only. */
+    private Table iZombieMultiplayerCard() {
+        TextButton play = new TextButton("PLAY", skin, "purple");
+        play.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                stage.addActor(new IZombieMatchmakingOverlay(game, skin, () -> refresh()));
+            }
+        });
+        return questRow(
+            prettyType("I_ZOMBIE"),
+            "Multiplayer 1v1 — invite a friend or match with a random opponent.",
+            miniGameIconId("I_ZOMBIE"),
+            0,
+            1,
+            false,
+            false,
+            null,
+            0,
+            play);
+    }
+
+    /** Offline two-player I, Zombie on one machine (couch play). */
+    private Table iZombieCouchPlayCard() {
+        TextButton play = new TextButton("PLAY", skin, "purple");
+        play.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> result = MultiplayerMatchBootstrap.openCouchPlay(game);
+                showToast(result.getMessage(), !result.isSuccess());
+            }
+        });
+        return questRow(
+            prettyType("I_ZOMBIE") + " · Couch Play",
+            "Offline 1v1 on this device — plants use the mouse, zombies use the keyboard.",
+            miniGameIconId("I_ZOMBIE"),
+            0,
+            1,
+            false,
+            false,
+            null,
+            0,
             play);
     }
 

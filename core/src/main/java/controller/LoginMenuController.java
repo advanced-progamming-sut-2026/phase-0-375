@@ -3,14 +3,17 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
-import model.enums.SecurityQuestion;
+import model.network.client.NetworkClient;
+import model.network.packet.auth.LoginRequestPacket;
+import model.network.packet.auth.LoginResponsePacket;
 import model.user.PasswordHasher;
+import model.user.User;
+
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 public class LoginMenuController extends AppMenuController {
     private static LoginMenuController instance = null;
-
-    // Pending forgot-password state
-    private String pendingResetUsername;
 
     private LoginMenuController() {}
 
@@ -30,77 +33,92 @@ public class LoginMenuController extends AppMenuController {
         return CommandResult.success("Returned to register menu.");
     }
 
+    /**
+     * Authenticates against the server only. No client-side user lookup or persistence.
+     */
     public CommandResult<Void> login(String username, String password, boolean stayLoggedIn) {
         if (username == null || username.trim().isEmpty())
             return CommandResult.error("Username cannot be empty.");
         if (password == null || password.isEmpty())
             return CommandResult.error("Password cannot be empty.");
 
-        var opt = App.getInstance().getUserRepository().authenticate(username, PasswordHasher.hash(password));
-        if (opt.isEmpty())
-            return CommandResult.error("Invalid username or password.");
+        String rawUsername = username.trim();
+        String passwordHash = PasswordHasher.hash(password);
 
-        var user = opt.get();
-        if (stayLoggedIn) {
-            user.setStayLoggedIn(true);
-            App.getInstance().getUserRepository().flush();
+        NetworkClient client;
+        try {
+            client = App.getInstance().ensureConnected();
+        } catch (Exception e) {
+            return CommandResult.error("Cannot log in: server is unreachable.");
         }
-        App.getInstance().setCurrentUser(user);
+        if (client == null || !client.isConnected()) {
+            return CommandResult.error("Cannot log in: server is unreachable.");
+        }
+
+        AtomicReference<LoginResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<LoginResponsePacket> handler = responseRef::set;
+
+        boolean prevAutoPost = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(LoginResponsePacket.class, handler);
+
+        try {
+            boolean sent = client.sendPacket(new LoginRequestPacket(rawUsername, passwordHash, stayLoggedIn));
+            if (!sent) {
+                return CommandResult.error("Cannot log in: failed to reach the server.");
+            }
+            long deadline = System.currentTimeMillis() + 3000;
+            while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
+                client.pollEvents();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        } finally {
+            client.unregisterHandler(LoginResponsePacket.class, handler);
+            client.setAutoPostToGdx(prevAutoPost);
+        }
+
+        LoginResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot log in: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Invalid username or password.");
+        }
+
+        User serverUser = resp.getUserProfile();
+        if (serverUser == null) {
+            serverUser = new User();
+            serverUser.setUsername(rawUsername);
+        }
+        if (stayLoggedIn && resp.getSessionToken() != null && !resp.getSessionToken().isBlank()) {
+            serverUser.setStayLoggedIn(true);
+            App.getInstance().applyStayLoggedInToken(serverUser.getUsername(), resp.getSessionToken());
+        } else {
+            App.getInstance().clearStayLoggedInToken();
+        }
+        App.getInstance().setCurrentUser(serverUser);
+        if (client != null && client.isConnected()) {
+            App.getInstance().setUserRepository(new model.user.persistance.RemoteUserRepository(client));
+        }
         App.getInstance().setCurrentMenu(MenuType.MAIN);
-        return CommandResult.success("Welcome back, " + user.getNickname() + "!");
+        String nick = serverUser.getNickname() != null ? serverUser.getNickname() : serverUser.getUsername();
+        return CommandResult.success("Welcome back, " + nick + "!");
     }
 
     public CommandResult<Void> forgetPassword(String username, String email) {
-        if (username == null || username.trim().isEmpty())
-            return CommandResult.error("Username cannot be empty.");
-        if (email == null || email.trim().isEmpty())
-            return CommandResult.error("Email cannot be empty.");
-
-        var opt = App.getInstance().getUserRepository().findByUsername(username);
-        if (opt.isEmpty())
-            return CommandResult.error("Username not found.");
-
-        var user = opt.get();
-        if (!user.getEmail().equalsIgnoreCase(email.trim()))
-            return CommandResult.error("Email does not match this username.");
-
-        // Store for the answer step
-        this.pendingResetUsername = username;
-
-        SecurityQuestion q = SecurityQuestion.fromNumber(user.getSecurityQuestionNumber());
-        String questionText = (q != null) ? q.getText() : "Security question";
-        return CommandResult.success(questionText);
+        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
     }
 
     public CommandResult<Void> answer(String answer) {
-        if (pendingResetUsername == null)
-            return CommandResult.error("No password reset in progress.");
-
-        boolean ok = App.getInstance().getUserRepository()
-                .verifySecurityAnswer(pendingResetUsername, answer);
-        if (!ok) {
-            pendingResetUsername = null;
-            return CommandResult.error("Incorrect answer. Returning to login.");
-        }
-
-        // Answer correct — signal view to capture new password
-        return CommandResult.success("Correct! Enter your new password:");
+        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
     }
 
-    /**
-     * Called after the user enters a new password during forgot-password flow.
-     */
     public CommandResult<Void> resetPassword(String newPassword) {
-        if (pendingResetUsername == null)
-            return CommandResult.error("No password reset in progress.");
-
-        if (newPassword == null || newPassword.length() < 8)
-            return CommandResult.error("Password must be at least 8 characters.");
-
-        String hash = PasswordHasher.hash(newPassword);
-        App.getInstance().getUserRepository().updatePassword(pendingResetUsername, hash);
-        App.getInstance().getUserRepository().flush();
-        pendingResetUsername = null;
-        return CommandResult.success("Password updated! Please log in.");
+        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
     }
 }

@@ -85,7 +85,7 @@ public class TravelLogMenuController extends AppMenuController {
             removeDailyEntries(user.getQuestStatus(), dailyBases);
             removeDailyEntries(user.getQuestProgress(), dailyBases);
             user.setDailyQuestRefreshDate(today);
-            App.getInstance().getUserRepository().flush();
+            model.user.persistance.UserSync.persistQuestProgressFromCurrentUser();
         }
 
         // always rebuild so progress saved at level end shows up immediately
@@ -255,23 +255,18 @@ public class TravelLogMenuController extends AppMenuController {
                     + "' is not complete yet. Progress: " + remaining);
         }
 
-        travelLog.completeQuest(q);
-        // Bookkeeping on the user
         User user = App.getInstance().getCurrentUser();
         if (user != null) {
-            if (q.getCategory() == QuestCategory.DAILY) {
-                user.setCompletedDailyQuests(user.getCompletedDailyQuests() + 1);
-            } else {
-                user.setCompletedNonDailyQuests(user.getCompletedNonDailyQuests() + 1);
-            }
             if (user.getQuestStatus() == null) {
                 user.setQuestStatus(new HashMap<>());
             }
             user.getQuestStatus().put(q.getName(), true);
-            if (user.getQuestProgress() != null) {
-                user.getQuestProgress().remove(q.getName());
-            }
-            App.getInstance().getUserRepository().flush();
+        }
+
+        travelLog.completeQuest(q);
+        if (user != null) {
+            App.getInstance().getUserRepository().completeQuest(
+                    user.getUsername(), q.getName(), q.getCategory() == QuestCategory.DAILY);
         }
         String note = "";
         QuestReward reward = q.getReward();

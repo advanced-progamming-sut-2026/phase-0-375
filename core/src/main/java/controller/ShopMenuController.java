@@ -8,6 +8,9 @@ import model.enums.ShopItemType;
 import model.greenhouse.Greenhouse;
 import model.shop.Shop;
 import model.shop.ShopItem;
+import model.user.User;
+import model.user.persistance.RemoteUserRepository;
+import model.user.persistance.UserSync;
 
 import java.util.List;
 
@@ -69,17 +72,40 @@ public class ShopMenuController extends AppMenuController {
     }
 
     private void ensureDailyOffer(Shop shop) {
-        shop.refreshDailyOffer();
-        App.getInstance().getUserRepository().flush();
+        if (App.getInstance().getUserRepository() instanceof RemoteUserRepository) {
+            UserSync.syncDailyOfferFromServer();
+            User user = App.getInstance().getCurrentUser();
+            shop.refreshDailyOffer(
+                    user != null ? user.getDailyOfferPlant() : null,
+                    user != null ? user.getDailyOfferDate() : null);
+        } else {
+            shop.refreshDailyOffer();
+            UserSync.flushIfLocal();
+        }
     }
 
     public CommandResult<Void> shopBuy(int itemId, int count, String plantType) {
+        if (App.getInstance().getUserRepository() instanceof RemoteUserRepository) {
+            if (!UserSync.purchaseShopItem(itemId, count, plantType)) {
+                return CommandResult.error("Purchase failed (check funds / capacity / server).");
+            }
+            Shop shop = buildShop();
+            ShopItem item = shop.findItemById(itemId);
+            String message = "Purchase successful!";
+            if (item != null && item.getItemType() == ShopItemType.POT) {
+                Greenhouse greenhouse = Greenhouse.getInstance(App.getInstance().getCurrentUser());
+                int unlocked = greenhouse.getUnlockedPotCount();
+                message = "Bought pot. You now have " + unlocked + "/" + Greenhouse.TOTAL_POTS + " pots.";
+            }
+            return CommandResult.success(message);
+        }
+
         Shop shop = buildShop();
         PurchaseResult result = shop.buy(itemId, count, plantType);
         if (result != PurchaseResult.SUCCESS) {
             return CommandResult.error(errorMessage(result));
         }
-        App.getInstance().getUserRepository().flush();
+        UserSync.flushIfLocal();
 
         // For pots, enrich the message with unlock progress.
         ShopItem item = shop.findItemById(itemId);

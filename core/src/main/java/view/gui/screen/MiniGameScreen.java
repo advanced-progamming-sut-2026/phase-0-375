@@ -13,6 +13,7 @@ import model.app.App;
 import model.data.minigame.MiniGameDataEntry;
 import model.enums.MenuType;
 import view.gui.PvzGdxGame;
+import view.gui.ui.IZombieMatchmakingOverlay;
 
 import java.util.List;
 
@@ -45,6 +46,8 @@ public final class MiniGameScreen extends AbstractMenuScreen {
             for (MiniGameDataEntry entry : result.getData()) {
                 addEntry(list, entry);
             }
+            addMultiplayerIZombieEntry(list);
+            addCouchPlayIZombieEntry(list);
         }
 
         ScrollPane scroll = new ScrollPane(list, skin);
@@ -91,11 +94,51 @@ public final class MiniGameScreen extends AbstractMenuScreen {
     }
 
     private void enter(MiniGameDataEntry entry) {
-        CommandResult<Void> result = controller.enterMiniGame(entry.getMiniGameType(), entry.getStage());
+        CommandResult<Void> result = controller.enterMiniGame(
+            entry.getMiniGameType(), entry.getStage());
         showToast(result.getMessage(), !result.isSuccess());
         if (result.isSuccess()) {
             game.setScreen(new LevelObjectivesScreen(game, null));
         }
+    }
+
+    private void addMultiplayerIZombieEntry(Table list) {
+        Label info = new Label(
+            "I Zombie  •  Multiplayer 1v1 — invite a friend or match with a random opponent.",
+            skin, "medium");
+        info.setColor(Color.WHITE);
+        info.setWrap(true);
+
+        TextButton play = new TextButton("Play", skin, "purple");
+        play.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                stage.addActor(new IZombieMatchmakingOverlay(game, skin, null));
+            }
+        });
+
+        list.add(info).width(590f);
+        list.add(play).width(150f).height(48f).row();
+    }
+
+    private void addCouchPlayIZombieEntry(Table list) {
+        Label info = new Label(
+            "I Zombie  •  Couch Play — plants (mouse) vs zombies (keyboard) on one device.",
+            skin, "medium");
+        info.setColor(Color.WHITE);
+        info.setWrap(true);
+
+        TextButton play = new TextButton("Play", skin, "purple");
+        play.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                CommandResult<Void> result = MultiplayerMatchBootstrap.openCouchPlay(game);
+                showToast(result.getMessage(), !result.isSuccess());
+            }
+        });
+
+        list.add(info).width(590f);
+        list.add(play).width(150f).height(48f).row();
     }
 
     private static String prettyType(String raw) {

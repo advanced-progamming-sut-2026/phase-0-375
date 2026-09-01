@@ -64,6 +64,31 @@ public class PlantSystem implements Tickable {
     }
 
     /**
+     * Presentation-only plant tick for networked clients: advances active
+     * attack clips without re-running ability AI (avoids double-fire loops).
+     */
+    public void tickPresentation(float deltaTime) {
+        List<PlantInstance> snapshot = new ArrayList<>(gameModel.getAllPlants());
+        for (PlantInstance plant : snapshot) {
+            if (plant.getState() == PlantState.DYING) {
+                continue;
+            }
+            context.setCurrentPlant(plant);
+            plant.tickPresentationAction(context, deltaTime);
+        }
+        context.setCurrentPlant(null);
+    }
+
+    public void beginPresentationAttack(PlantInstance plant) {
+        if (plant == null) {
+            return;
+        }
+        context.setCurrentPlant(plant);
+        plant.beginPresentationAction(context);
+        context.setCurrentPlant(null);
+    }
+
+    /**
      * Instant explosives (Doom-shroom, Cherry Bomb, ...) spawn at 0 HP so they
      * must tick once and start their attack clip before leaving the cell.
      */

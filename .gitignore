@@ -32,6 +32,10 @@ bin/
 ### Runtime Data ###
 data/users.json
 data/saves/
+data/session.json
+server/data/sessions.json
+server/data/users.json
+server/data/daily_offer.json
 
 ## Gradle:
 .gradle/
