@@ -31,7 +31,6 @@ import view.gui.assets.SeasonMapLayout;
 import view.gui.assets.WorldMapArt;
 import view.gui.audio.GameAudio;
 import view.gui.audio.MusicTracks;
-import view.gui.debug.DecoLayoutDebugger;
 import view.gui.ui.AtlasImageButton;
 import view.gui.ui.EdgeFadeOverlay;
 import view.gui.ui.LevelEnterOverlay;
@@ -60,14 +59,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     public static float KEYBOARD_PAN_SPEED = 700f;
 
     /**
-     * When true, decoration is draggable (scroll/Q-E to scale) and “Save Deco Layout”
-     * prints paste-ready lines. Still starts from the active chapter’s deco list.
-     * Flip on while tuning Beach / Frostbite / Egypt positions.
-     */
-    private static final boolean DECO_DEBUG = true;
-
-    /**
-     * Ancient Egypt decoration. Paste debugger dumps here — do not mix Frostbite IDs.
+     * Ancient Egypt decoration.
      */
     private static final Deco[] EGYPT_DECORATIONS = {
         new Deco(WorldMapArt.DECOR_20,  626.2f,  286.1f, 0.55f), // x=626.2 y=286.1 scale=0.55
@@ -83,9 +75,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     };
 
     /**
-     * Frostbite Caves decoration. Paste debugger dumps here — Egypt is untouched.
-     * Placeholder positions; drag in {@link #DECO_DEBUG} then Save.
-     * All entries are static atlas images (no PAM).
+     * Frostbite Caves decoration.
      */
     private static final Deco[] FROSTBITE_DECORATIONS = {
         new Deco(WorldMapArt.DECOR_ICE_22, 1265.8f,  628.2f, 1.07f), // x=1265.8 y=628.2 scale=1.07
@@ -97,8 +87,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     };
 
     /**
-     * Big Wave Beach decoration. Paste debugger dumps here — other seasons untouched.
-     * Placeholder positions; drag with {@link #DECO_DEBUG} then Save.
+     * Big Wave Beach decoration.
      */
     private static final Deco[] BEACH_DECORATIONS = {
         new Deco(WorldMapArt.DECOR_BEACH_22, 1090.6f,  708.2f, 0.55f), // x=1090.6 y=708.2 scale=0.55
@@ -112,8 +101,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     };
 
     /**
-     * Dark Ages decoration. Paste debugger dumps here — other seasons untouched.
-     * Placeholder positions; drag with {@link #DECO_DEBUG} then Save.
+     * Dark Ages decoration.
      */
     private static final Deco[] DARK_AGES_DECORATIONS = {
         new Deco(WorldMapArt.DECOR_DARK_8,  976.4f,  783.6f, 0.54f), // x=976.4 y=783.6 scale=0.54
@@ -133,26 +121,6 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         };
     }
 
-    private String decoDumpTarget() {
-        return switch (chapter) {
-            case FROSTBITE_CAVES -> "ChapterLevelsScreen.FROSTBITE_DECORATIONS";
-            case BIG_WAVE_BEACH -> "ChapterLevelsScreen.BEACH_DECORATIONS";
-            case DARK_AGES -> "ChapterLevelsScreen.DARK_AGES_DECORATIONS";
-            default -> "ChapterLevelsScreen.EGYPT_DECORATIONS";
-        };
-    }
-
-    /** Debugger spawn list — mirrors the active chapter’s deco array. */
-    private DecoLayoutDebugger.Spec[] debugDecorSpecs() {
-        Deco[] list = activeDecorations();
-        DecoLayoutDebugger.Spec[] specs = new DecoLayoutDebugger.Spec[list.length];
-        for (int i = 0; i < list.length; i++) {
-            Deco d = list[i];
-            specs[i] = new DecoLayoutDebugger.Spec(d.id, d.x, d.y, d.scale);
-        }
-        return specs;
-    }
-
     private final GameMenuController controller = GameMenuController.getInstance();
     private final WorldMapArt mapArt = new WorldMapArt();
     private final MainMenuArt menuArt = new MainMenuArt();
@@ -161,7 +129,6 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     private PamClipCache pamClips;
     private SeasonWorldMap map;
     private EdgeFadeOverlay edgeFade;
-    private DecoLayoutDebugger decoDebugger;
 
     public ChapterLevelsScreen(PvzGdxGame game, Chapter chapter) {
         super(game);
@@ -198,10 +165,6 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         addStaticDecor();
         addMap();
         addHud();
-        if (DECO_DEBUG && decoDebugger != null) {
-            decoDebugger.addSaveButton(
-                    stage, skin, CORNER_PAD, CORNER_PAD, decoDumpTarget());
-        }
     }
 
     private void addStaticDecor() {
@@ -211,11 +174,6 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         }
         Deco[] list = activeDecorations();
         if (list.length == 0) {
-            return;
-        }
-        if (DECO_DEBUG) {
-            decoDebugger = new DecoLayoutDebugger();
-            decoDebugger.spawn(stage, textures, debugDecorSpecs());
             return;
         }
         for (Deco deco : list) {
@@ -280,8 +238,7 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
         viewport.setPosition(0f, 0f);
         viewport.setTouchable(Touchable.childrenOnly);
         viewport.addActor(map);
-        // In deco-debug, let empty map space fall through to decoration underneath.
-        map.setTouchable(DECO_DEBUG ? Touchable.childrenOnly : Touchable.enabled);
+        map.setTouchable(Touchable.enabled);
         map.addListener(new DragListener() {
             {
                 setTapSquareSize(8f);

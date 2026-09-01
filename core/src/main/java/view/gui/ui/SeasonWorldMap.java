@@ -217,10 +217,21 @@ public final class SeasonWorldMap extends Group {
             markerLayer.addActor(number);
 
             Group hit = new Group();
-            float hitW = Math.max(pw, ORB_SIZE + 40f);
-            float hitH = ph + ORB_SIZE + orbLift + 40f;
-            hit.setSize(hitW, hitH);
-            hit.setPosition(platformX + pw * 0.5f - hitW * 0.5f, platformY);
+            float pad = 24f;
+            float platLeft = platformX;
+            float platRight = platformX + pw;
+            float platBottom = platformY;
+            float platTop = platformY + ph;
+            float orbLeft = orbX;
+            float orbRight = orbX + ORB_SIZE;
+            float orbBottom = orbY;
+            float orbTop = orbY + ORB_SIZE;
+            float hitLeft = Math.min(platLeft, orbLeft) - pad;
+            float hitRight = Math.max(platRight, orbRight) + pad;
+            float hitBottom = Math.min(platBottom, orbBottom) - pad;
+            float hitTop = Math.max(platTop, orbTop) + pad;
+            hit.setSize(hitRight - hitLeft, hitTop - hitBottom);
+            hit.setPosition(hitLeft, hitBottom);
             final int levelId = summary.levelId();
             final float fxCx = orbCx;
             final float fxCy = orbCy;
