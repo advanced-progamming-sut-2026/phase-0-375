@@ -14,7 +14,7 @@ public enum GameSfx {
     PAUSE("SFXs/PVZ-pause/Audio_Always_Loaded.048"),
     PLANT("SFXs/PVZ-plantaplant/Audio_Always_Loaded.204"),
     PLANT_ON_WATER("SFXs/PVZ-plantonwater/Audio_Always_Loaded.252"),
-    GRAVE_BUSTER("SFXs/PVZ-ghabrkan/Audio_Always_Loaded.381"),
+    GRAVE_BUSTER("SFXs/PVZ-gravebuster/Audio_Always_Loaded.381"),
     PLANT_FOOD("SFXs/PVZ-plantfood/Audio_Always_Loaded.011"),
     SHOVEL("SFXs/PVZ-shovel/Audio_Always_Loaded.022");
 

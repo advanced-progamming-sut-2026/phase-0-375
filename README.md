@@ -15,3 +15,13 @@ python3 tools/download_ost.py
 ```
 
 Full setup guide, troubleshooting, and track names: [`assets/music/README.md`](assets/music/README.md)
+
+## Sound effects (SFX)
+
+SFX `.ogg` files are not in git either. After clone or pull:
+
+```bash
+python3 tools/install_sfx.py
+```
+
+This unpacks `tools/sfx-bundle.zip` (~110 KB) into `assets/music/SFXs/`. Details: [`assets/music/SFXs/README.md`](assets/music/SFXs/README.md)

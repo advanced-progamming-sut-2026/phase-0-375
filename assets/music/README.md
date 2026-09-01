@@ -53,6 +53,24 @@ Run the game and check:
 
 If it is silent, check volume in Settings or confirm files exist under `assets/music/`.
 
+---
+
+## Sound effects (SFX)
+
+SFX files are **not** in git (`.ogg` under `assets/music/SFXs/` is ignored). After `git pull`, install once:
+
+```bash
+python3 tools/install_sfx.py
+```
+
+This extracts the tracked bundle `tools/sfx-bundle.zip` into `assets/music/SFXs/`. See [`SFXs/README.md`](SFXs/README.md) for the wired file list.
+
+Maintainers can rebuild the bundle after changing local SFX:
+
+```bash
+python3 tools/build_sfx_bundle.py
+```
+
 ### Troubleshooting
 
 | Problem | Fix |
