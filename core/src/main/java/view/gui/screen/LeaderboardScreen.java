@@ -211,7 +211,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
         row.add(cell(String.valueOf(user.getCompletedMiniGames()), color, skin)).width(COL_MINI);
         row.add(cell(String.valueOf(user.getCompletedDailyQuests()), color, skin)).width(COL_DAILY);
         row.add(cell(String.valueOf(user.getCompletedNonDailyQuests()), color, skin)).width(COL_QUESTS);
-        row.add(cell(String.valueOf(user.getHighestMyopoint()), color, skin)).width(COL_SCORE);
+        row.add(cell(user.formattedHighestMyopoint(), color, skin)).width(COL_SCORE);
         return row;
     }
 

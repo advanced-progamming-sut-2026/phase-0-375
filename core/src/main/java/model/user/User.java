@@ -232,6 +232,14 @@ public class User {
         this.highestMyopoint = highestMyopoint;
     }
 
+    /**
+     * Leaderboard "My Point". Unplayed is ASCII "-" — the skin bitmap fonts have
+     * no glyph for U+2013, so an en dash draws as a blank cell.
+     */
+    public String formattedHighestMyopoint() {
+        return highestMyopoint <= 0 ? "-" : Integer.toString(highestMyopoint);
+    }
+
     public Map<Chapter, Integer> getChapterProgress() {
         return chapterProgress;
     }

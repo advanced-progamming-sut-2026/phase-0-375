@@ -75,7 +75,7 @@ public class ProfileMenuView extends AppMenuView {
             displayMessage("  Coins:         " + u.getCoins());
             displayMessage("  Gems:          " + u.getGems());
             displayMessage("  Difficulty:    " + u.getDifficultyLevel());
-            displayMessage("  Highest Score: " + u.getHighestMyopoint());
+            displayMessage("  Highest Score: " + u.formattedHighestMyopoint());
             int levelsCompleted = u.getChapterProgress().values().stream()
                     .mapToInt(Integer::intValue).sum();
             displayMessage("  Levels Done:   " + levelsCompleted);

@@ -179,7 +179,6 @@ public class AuthService {
         user.setMusicVolume(1.0f);
         user.setSfxVolume(1.0f);
         user.setGamesPlayed(0);
-        user.setHighestMyopoint(0);
         user.setPlantFoodCount(0);
         user.setUnlockedPots(4);
 
