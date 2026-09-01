@@ -1,6 +1,8 @@
 package view.gui.ui;
 
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Actor;
@@ -27,18 +29,23 @@ public final class SeedPacketActor extends WidgetGroup {
     private static final float EMPTY_ALPHA = 0.55f;
     private static final float LOCKED_ALPHA = 0.45f;
 
+    private static final Color COOLDOWN_SHADE_COLOR = new Color(0f, 0f, 0f, 0.55f);
+    private static Texture whitePixelTexture;
+
     private final TextureBank textures;
     private final Image chrome;
     private Image portrait;
     private boolean portraitOverride;
     private final Image lock;
     private final Image select;
+    private final Image cooldownShade;
     private final String plantName;
     private final String chromeId;
     private boolean inspected;
     private boolean hovered;
     private boolean dragging;
     private boolean dimmed;
+    private float cooldownFraction; // 0 = ready, 1 = just used; shade height scales with this
     private Runnable onClick;
     private DragPlant dragPlant;
     private Label expiryLabel;
@@ -102,6 +109,13 @@ public final class SeedPacketActor extends WidgetGroup {
         } else {
             portrait = null;
         }
+
+        cooldownShade = new Image(new TextureRegionDrawable(new TextureRegion(whitePixel())));
+        cooldownShade.setColor(COOLDOWN_SHADE_COLOR);
+        cooldownShade.setTouchable(Touchable.disabled);
+        cooldownShade.setVisible(false);
+        addActor(cooldownShade);
+        layoutCooldownShade();
 
         lock = locked ? lockImage(textures, skin) : null;
         if (lock != null) {
@@ -185,6 +199,38 @@ public final class SeedPacketActor extends WidgetGroup {
     public void setDimmed(boolean dimmed) {
         this.dimmed = dimmed;
         getColor().a = dimmed ? 0.55f : 1f;
+    }
+
+    /**
+     * Sets how much of the packet is still covered by the recharge shade.
+     * @param fraction 0 = fully ready (no shade), 1 = just used (fully covered);
+     *                 values outside [0,1] are clamped
+     */
+    public void setCooldownFraction(float fraction) {
+        this.cooldownFraction = Math.max(0f, Math.min(1f, fraction));
+        layoutCooldownShade();
+    }
+
+    public float getCooldownFraction() {
+        return cooldownFraction;
+    }
+
+    private void layoutCooldownShade() {
+        cooldownShade.setVisible(plantName != null && cooldownFraction > 0f);
+        float shadeHeight = PACKET_HEIGHT * cooldownFraction;
+        cooldownShade.setSize(PACKET_WIDTH, shadeHeight);
+        cooldownShade.setPosition(0f, 0f);
+    }
+
+    private static Texture whitePixel() {
+        if (whitePixelTexture == null) {
+            Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+            pixmap.setColor(Color.WHITE);
+            pixmap.fill();
+            whitePixelTexture = new Texture(pixmap);
+            pixmap.dispose();
+        }
+        return whitePixelTexture;
     }
 
     public void setInspected(boolean inspected) {

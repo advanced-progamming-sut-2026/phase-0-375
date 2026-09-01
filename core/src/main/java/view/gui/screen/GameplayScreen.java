@@ -788,7 +788,21 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             boolean ready = model == null || model.isSeedReady(name);
             boolean afford = plantCost(name) <= sun;
             packet.setDimmed(!ready || !afford);
+            packet.setCooldownFraction(seedCooldownFraction(model, name));
         }
+    }
+
+    /** @return 0 (ready) to 1 (just used) fraction of this seed's recharge remaining. */
+    private static float seedCooldownFraction(GameModel model, String name) {
+        if (model == null || model.areSeedCooldownsDisabled()) {
+            return 0f;
+        }
+        float total = plantRechargeTime(name);
+        if (total <= 0f) {
+            return 0f;
+        }
+        float remaining = model.getSeedCooldown(name);
+        return remaining / total;
     }
 
     private void followPlantDrag(float stageX, float stageY) {
@@ -1863,6 +1877,17 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return PlantFactory.getDefinition(name).getCost();
         } catch (IllegalStateException e) {
             return 0;
+        }
+    }
+
+    private static float plantRechargeTime(String name) {
+        try {
+            if (!PlantFactory.hasDefinition(name)) {
+                return 0f;
+            }
+            return PlantFactory.getDefinition(name).getRechargeTime();
+        } catch (IllegalStateException e) {
+            return 0f;
         }
     }
 
