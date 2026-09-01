@@ -137,7 +137,7 @@ public class Shop {
 
         String plant = null;
         if (globalPlant != null && today.toString().equals(globalDate)) {
-            plant = resolveUnlockedPlantName(globalPlant);
+            plant = resolveCatalogPlantName(globalPlant);
         }
         if (plant == null) {
             dailyOffer = null;
@@ -228,13 +228,19 @@ public class Shop {
             return PurchaseResult.ALREADY_PURCHASED;
         }
 
+        String offerPlant = dailyOffer.getItem().getTargetPlantType();
+        String unlockedPlant = resolveUnlockedPlantName(offerPlant);
+        if (unlockedPlant == null) {
+            return PurchaseResult.PLANT_NOT_UNLOCKED;
+        }
+
         int cost = dailyOffer.getDiscountedPrice();
         if (customer.getCoins() < cost) {
             return PurchaseResult.INSUFFICIENT_FUNDS;
         }
 
         customer.setCoins(customer.getCoins() - cost);
-        applySeedPacketPurchase(dailyOffer.getItem().getTargetPlantType(), DAILY_OFFER_PACKET_AMOUNT);
+        applySeedPacketPurchase(unlockedPlant, DAILY_OFFER_PACKET_AMOUNT);
 
         dailyOffer.setPurchased(true);
         if (customer.getPurchasedDailyDeals() == null) {
@@ -354,6 +360,27 @@ public class Shop {
             if (item.getId() == itemId) {
                 return item;
             }
+        }
+        return null;
+    }
+
+    /** Finds the canonical catalog plant name, ignoring case. */
+    private String resolveCatalogPlantName(String plantName) {
+        if (plantName == null || plantName.isBlank()) {
+            return null;
+        }
+        try {
+            if (PlantFactory.hasDefinition(plantName.trim())) {
+                return PlantFactory.getDefinition(plantName.trim()).getName();
+            }
+            for (Plant plant : PlantFactory.getAllDefinitions()) {
+                if (plant.getName() != null && plant.getName().equalsIgnoreCase(plantName.trim())) {
+                    return plant.getName();
+                }
+            }
+        } catch (IllegalStateException ignored) {
+            // PlantFactory not loaded (tests); fall back to the raw name.
+            return plantName.trim();
         }
         return null;
     }
