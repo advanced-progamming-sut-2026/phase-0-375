@@ -20,6 +20,7 @@ import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
 import model.user.User;
+import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.audio.GameAudio;
 
@@ -34,6 +35,8 @@ public final class ProfileOverlay {
     // ── Profile action buttons (tune in place) ─────────────────────────────
     public static float EDIT_BTN_W = 200f;
     public static float EDIT_BTN_H = 45;
+    /** Narrower header action beside nickname. */
+    public static float AVATAR_BTN_W = 168f;
     public static float BACK_BTN_W = 200f;
     public static float BACK_BTN_H = 50f;
     /** Label scale on purple edit buttons. */
@@ -43,6 +46,8 @@ public final class ProfileOverlay {
 
     public static float CARD_PAD = 40f;
     public static float INFO_PAD = 12f;
+    /** Large portrait beside the profile header. */
+    public static float AVATAR_SIZE = 120f;
     private static final float FADE_IN = 0.11f;
     private static final float FADE_OUT = 0.07f;
     private static final Color DIM = new Color(0f, 0f, 0f, 0.55f);
@@ -53,13 +58,13 @@ public final class ProfileOverlay {
 
     private ProfileOverlay() {}
 
-    public static Table create(Skin skin, BiConsumer<String, Boolean> toast, Runnable onClose,
-                               Runnable onResourceBarRefresh) {
+    public static Table create(Skin skin, TextureBank textures, BiConsumer<String, Boolean> toast,
+                               Runnable onClose, Runnable onResourceBarRefresh) {
         App.getInstance().setCurrentMenu(MenuType.PROFILE);
         GameAudio.get().playOverlayOpen();
 
         ProfileMenuController controller = ProfileMenuController.getInstance();
-        Panel panel = new Panel(skin, controller, toast, onResourceBarRefresh);
+        Panel panel = new Panel(skin, textures, controller, toast, onResourceBarRefresh);
 
         Table overlay = new Table();
         overlay.setFillParent(true);
@@ -73,7 +78,7 @@ public final class ProfileOverlay {
         scroll.setFadeScrollBars(false);
         scroll.setScrollingDisabled(true, false);
 
-        overlay.add(scroll).width(560f).maxHeight(980f).pad(40f);
+        overlay.add(scroll).width(640f).maxHeight(880f).pad(40f);
 
         panel.back.addListener(new ChangeListener() {
             @Override
@@ -91,11 +96,15 @@ public final class ProfileOverlay {
 
     private static final class Panel {
         private final Skin skin;
+        private final TextureBank textures;
         private final ProfileMenuController controller;
         private final BiConsumer<String, Boolean> toast;
         private final Runnable onResourceBarRefresh;
         private final BorderedTable card;
         private final TextButton back;
+        private final AvatarPortrait avatarPortrait;
+        private final Label headerNickname;
+        private final Label headerUsername;
 
         private Table overlayRef;
         private Label usernameValue;
@@ -107,9 +116,10 @@ public final class ProfileOverlay {
         private Label levelsValue;
         private Label myopointValue;
 
-        Panel(Skin skin, ProfileMenuController controller, BiConsumer<String, Boolean> toast,
-              Runnable onResourceBarRefresh) {
+        Panel(Skin skin, TextureBank textures, ProfileMenuController controller,
+              BiConsumer<String, Boolean> toast, Runnable onResourceBarRefresh) {
             this.skin = skin;
+            this.textures = textures;
             this.controller = controller;
             this.toast = toast;
             this.onResourceBarRefresh = onResourceBarRefresh;
@@ -118,7 +128,25 @@ public final class ProfileOverlay {
             card.pad(CARD_PAD);
             Label title = new Label("Profile", skin, "big");
             title.setColor(INK);
-            card.add(title).padBottom(20f).row();
+            card.add(title).padBottom(16f).row();
+
+            avatarPortrait = new AvatarPortrait(textures, 1, AVATAR_SIZE, true);
+            headerNickname = new Label("—", skin, "medium");
+            headerNickname.setColor(INK);
+            headerUsername = new Label("—", skin, "secondary");
+            headerUsername.setColor(MUTED);
+
+            Table header = new Table();
+            header.add(avatarPortrait).size(AVATAR_SIZE, AVATAR_SIZE).padRight(16f);
+
+            Table names = new Table();
+            names.add(headerNickname).left().row();
+            names.add(headerUsername).left().padTop(4f);
+            header.add(names).left().expandX().padRight(12f).top();
+
+            TextButton changeAvatar = editButton("Change avatar", this::openAvatarPicker);
+            header.add(changeAvatar).width(AVATAR_BTN_W).height(EDIT_BTN_H).right().center();
+            card.add(header).growX().left().padBottom(18f).row();
 
             Table info = new Table();
             info.pad(INFO_PAD);
@@ -130,16 +158,19 @@ public final class ProfileOverlay {
             gemsValue = addInfoRow(info, "Gems");
             levelsValue = addInfoRow(info, "Levels completed");
             myopointValue = addInfoRow(info, "Highest myopoint");
-            card.add(info).growX().padBottom(20f).row();
+            card.add(info).growX().padBottom(18f).row();
 
-            card.add(editButton("Change username", this::openChangeUsername)).width(EDIT_BTN_W).height(EDIT_BTN_H)
-                    .padBottom(8f).row();
-            card.add(editButton("Change nickname", this::openChangeNickname)).width(EDIT_BTN_W).height(EDIT_BTN_H)
-                    .padBottom(8f).row();
-            card.add(editButton("Change email", this::openChangeEmail)).width(EDIT_BTN_W).height(EDIT_BTN_H)
-                    .padBottom(8f).row();
-            card.add(editButton("Change password", this::openChangePassword)).width(EDIT_BTN_W).height(EDIT_BTN_H)
-                    .padBottom(16f).row();
+            Table edits = new Table();
+            edits.defaults().pad(5f);
+            edits.add(editButton("Change username", this::openChangeUsername))
+                    .width(EDIT_BTN_W).height(EDIT_BTN_H);
+            edits.add(editButton("Change nickname", this::openChangeNickname))
+                    .width(EDIT_BTN_W).height(EDIT_BTN_H).row();
+            edits.add(editButton("Change email", this::openChangeEmail))
+                    .width(EDIT_BTN_W).height(EDIT_BTN_H);
+            edits.add(editButton("Change password", this::openChangePassword))
+                    .width(EDIT_BTN_W).height(EDIT_BTN_H);
+            card.add(edits).padBottom(16f).row();
 
             back = styledButton("Back", "brown", BACK_BTN_FONT_SCALE);
             card.add(back).width(BACK_BTN_W).height(BACK_BTN_H);
@@ -188,6 +219,9 @@ public final class ProfileOverlay {
                 return;
             }
             User user = result.getData();
+            avatarPortrait.setAvatarId(textures, user.getAvatarId());
+            headerNickname.setText(nullSafe(user.getNickname()));
+            headerUsername.setText("@" + nullSafe(user.getUsername()));
             usernameValue.setText(nullSafe(user.getUsername()));
             nicknameValue.setText(nullSafe(user.getNickname()));
             emailValue.setText(nullSafe(user.getEmail()));
@@ -203,6 +237,24 @@ public final class ProfileOverlay {
             if (onResourceBarRefresh != null) {
                 onResourceBarRefresh.run();
             }
+        }
+
+        private void openAvatarPicker() {
+            Stage stage = stage();
+            if (stage == null) {
+                return;
+            }
+            User user = App.getInstance().getCurrentUser();
+            int current = user == null ? 1 : user.getAvatarId();
+            Table picker = AvatarPickerOverlay.create(
+                    skin,
+                    textures,
+                    current,
+                    toast,
+                    ignored -> refreshInfo());
+            stage.addActor(picker);
+            picker.toFront();
+            bringToastFront(stage);
         }
 
         private void openChangeUsername() {

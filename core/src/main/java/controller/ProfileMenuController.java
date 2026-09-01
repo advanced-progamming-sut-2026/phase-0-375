@@ -6,6 +6,7 @@ import model.enums.MenuType;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
+import view.gui.assets.AvatarArt;
 
 public class ProfileMenuController extends AppMenuController {
     private static ProfileMenuController instance = null;
@@ -115,6 +116,18 @@ public class ProfileMenuController extends AppMenuController {
 
     public CommandResult<User> showInfo() {
         return CommandResult.successWithData("Profile info retrieved.", user());
+    }
+
+    public CommandResult<Void> changeAvatar(int avatarId) {
+        if (!AvatarArt.isValid(avatarId)) {
+            return CommandResult.error("Invalid avatar.");
+        }
+        if (user().getAvatarId() == avatarId) {
+            return CommandResult.error("That is already your avatar.");
+        }
+        user().setAvatarId(avatarId);
+        repo().flush();
+        return CommandResult.success("Avatar updated.");
     }
 
     // ── Validation helpers ──

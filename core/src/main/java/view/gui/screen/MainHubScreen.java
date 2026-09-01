@@ -23,8 +23,10 @@ import controller.SettingsMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.user.User;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
+import view.gui.assets.AvatarArt;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
 import view.gui.audio.GameAudio;
@@ -61,6 +63,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
     private ZarrabiIntro zarrabiIntro;
 
     private SkinIconButton newsButton;
+    private SkinIconButton profileButton;
     private ResourceBar resourceBar;
 
     public MainHubScreen(PvzGdxGame game) {
@@ -162,9 +165,10 @@ public final class MainHubScreen extends AbstractMenuScreen {
         float y = CORNER_PAD;
         float gap = 20f;
 
-        SkinIconButton profile = iconButton(textures, UiRegions.PROFILE_ICON, 0.7f, this::enterProfile);
+        SkinIconButton profile = profileButton(textures, this::enterProfile);
         profile.setPosition(CORNER_PAD, y);
         stage.addActor(profile);
+        profileButton = profile;
 
         // iconScale > 1 → news icon larger than brown background (pad alone cannot do this).
         newsButton = iconButton(textures, UiRegions.NEWS_ICON, 1.35f, this::openNewsOverlay);
@@ -185,6 +189,33 @@ public final class MainHubScreen extends AbstractMenuScreen {
                                       Runnable action) {
         TextureRegion icon = art.region(textures, regionId);
         return new SkinIconButton(skin, icon, ICON_SIZE, iconScale, action);
+    }
+
+    private SkinIconButton profileButton(TextureBank textures, Runnable action) {
+        TextureRegion icon = profileAvatarRegion(textures);
+        if (icon == null) {
+            icon = art.region(textures, UiRegions.PROFILE_ICON);
+        }
+        return new SkinIconButton(skin, icon, ICON_SIZE, 0.78f, action);
+    }
+
+    private TextureRegion profileAvatarRegion(TextureBank textures) {
+        User user = App.getInstance().getCurrentUser();
+        if (user == null || textures == null) {
+            return null;
+        }
+        return AvatarArt.faceRegion(textures, user.getAvatarId());
+    }
+
+    private void refreshProfileButton() {
+        if (profileButton == null || game.assets == null) {
+            return;
+        }
+        TextureRegion icon = profileAvatarRegion(game.assets.textures);
+        if (icon == null) {
+            icon = art.region(game.assets.textures, UiRegions.PROFILE_ICON);
+        }
+        profileButton.setIcon(icon, 0.78f);
     }
 
     private void addLogoutButton() {
@@ -247,6 +278,7 @@ public final class MainHubScreen extends AbstractMenuScreen {
         }
         Table overlay = ProfileOverlay.create(
                 skin,
+                game.assets.textures,
                 this::showToast,
                 () -> {
                     CommandResult<Void> exit = ProfileMenuController.getInstance().menuExit();
@@ -254,7 +286,10 @@ public final class MainHubScreen extends AbstractMenuScreen {
                         showToast(exit.getMessage(), true);
                     }
                 },
-                () -> resourceBar.refresh());
+                () -> {
+                    resourceBar.refresh();
+                    refreshProfileButton();
+                });
         stage.addActor(overlay);
         toast.toFront();
     }

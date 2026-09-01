@@ -72,6 +72,9 @@ public class User {
     // Last date the daily quests were refreshed
     private String dailyQuestRefreshDate;
 
+    /** Joust avatar portrait id ({@code IMAGE_UI_JOUST_AVATARS_AVATAR_n}), 1–30. */
+    private int avatarId = 1;
+
     public User() {
     }
 
@@ -113,6 +116,14 @@ public class User {
 
     public void setGender(String gender) {
         this.gender = gender;
+    }
+
+    public int getAvatarId() {
+        return avatarId >= 1 && avatarId <= 30 ? avatarId : 1;
+    }
+
+    public void setAvatarId(int avatarId) {
+        this.avatarId = avatarId >= 1 && avatarId <= 30 ? avatarId : 1;
     }
 
     public int getSecurityQuestionNumber() {

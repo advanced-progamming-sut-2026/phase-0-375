@@ -8,10 +8,12 @@ import model.news.NewsFactory;
 import model.user.PasswordHasher;
 import model.user.User;
 import model.user.persistance.UserRepository;
+import view.gui.assets.AvatarArt;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class RegisterMenuController extends AppMenuController {
     private static RegisterMenuController instance = null;
@@ -158,6 +160,7 @@ public class RegisterMenuController extends AppMenuController {
         }
         user.setQuestStatus(new HashMap<>());
         user.setPurchasedDailyDeals(new HashMap<>());
+        user.setAvatarId(ThreadLocalRandom.current().nextInt(AvatarArt.MIN_ID, AvatarArt.MAX_ID + 1));
 
         getRepo().save(user);
         clearPending();

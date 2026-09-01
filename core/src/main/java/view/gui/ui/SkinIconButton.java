@@ -23,6 +23,8 @@ public final class SkinIconButton extends Stack {
     public static final float DEFAULT_ICON_SCALE = 1f;
 
     private final Label badge;
+    private final float buttonSize;
+    private final Table iconLayer;
 
     public SkinIconButton(Skin skin, TextureRegion icon, float size, Runnable action) {
         this(skin, icon, size, DEFAULT_ICON_SCALE, action);
@@ -32,6 +34,7 @@ public final class SkinIconButton extends Stack {
      * @param iconScale 1 = icon matches button size; e.g. 1.35 = 35% larger than brown chrome
      */
     public SkinIconButton(Skin skin, TextureRegion icon, float size, float iconScale, Runnable action) {
+        buttonSize = size;
         TextButton.TextButtonStyle brown = skin.get("brown", TextButton.TextButtonStyle.class);
 
         Button.ButtonStyle chrome = new Button.ButtonStyle();
@@ -51,17 +54,10 @@ public final class SkinIconButton extends Stack {
         });
         add(background);
 
-        if (icon != null) {
-            float iconSize = size * Math.max(0.1f, iconScale);
-            Image iconImage = new Image(new TextureRegionDrawable(icon));
-            iconImage.setScaling(Scaling.fit);
-            iconImage.setTouchable(Touchable.disabled);
-
-            Table iconLayer = new Table();
-            iconLayer.setTouchable(Touchable.disabled);
-            iconLayer.add(iconImage).size(iconSize, iconSize);
-            add(iconLayer);
-        }
+        iconLayer = new Table();
+        iconLayer.setTouchable(Touchable.disabled);
+        setIcon(icon, iconScale);
+        add(iconLayer);
 
         Table badgeLayer = new Table();
         badgeLayer.top().right();
@@ -73,6 +69,17 @@ public final class SkinIconButton extends Stack {
         add(badgeLayer);
 
         setSize(size, size);
+    }
+
+    public void setIcon(TextureRegion icon, float iconScale) {
+        iconLayer.clear();
+        if (icon != null) {
+            float iconSize = buttonSize * Math.max(0.1f, iconScale);
+            Image iconImage = new Image(new TextureRegionDrawable(icon));
+            iconImage.setScaling(Scaling.fit);
+            iconImage.setTouchable(Touchable.disabled);
+            iconLayer.add(iconImage).size(iconSize, iconSize);
+        }
     }
 
     public void setBadge(int unreadCount) {
