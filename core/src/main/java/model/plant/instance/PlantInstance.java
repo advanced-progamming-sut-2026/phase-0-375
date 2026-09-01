@@ -818,4 +818,40 @@ public class PlantInstance implements Placeable {
     }
 
     public void setLifespanRemaining(float lifespanRemaining) { this.lifespanRemaining = lifespanRemaining; }
+
+    public void setLifespanTotal(float lifespanTotal) { this.lifespanTotal = lifespanTotal; }
+
+    public void setArmorHp(int armorHp, int armorMaxHp) {
+        this.armorHP = Math.max(0, armorHp);
+        this.armorMaxHP = Math.max(this.armorHP, armorMaxHp);
+    }
+
+    public void setPlantFoodActive(boolean active, float durationRemaining) {
+        this.isPlantFoodActive = active;
+        this.plantFoodDurationRemaining = Math.max(0f, durationRemaining);
+    }
+
+    public void setTransformCountdown(float transformCountdown) {
+        this.transformCountdown = transformCountdown;
+    }
+
+    public float getTransformCountdown() {
+        return transformCountdown;
+    }
+
+    public void setIceHp(int iceHp) {
+        this.iceHp = Math.max(0, iceHp);
+    }
+
+    public void setOctopusCoating(boolean octopusCoating) {
+        this.octopusCoating = octopusCoating;
+    }
+
+    public void setFreezeHitCount(int freezeHitCount) {
+        this.freezeHitCount = Math.max(0, freezeHitCount);
+    }
+
+    public float getCurrentRecharge() {
+        return currentRecharge;
+    }
 }

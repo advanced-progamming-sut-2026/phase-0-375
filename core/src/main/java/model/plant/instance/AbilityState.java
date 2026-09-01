@@ -119,4 +119,17 @@ public class AbilityState {
     public int nextShotOrdinal() {
         return shotOrdinal++;
     }
+
+    public int getShotOrdinal() {
+        return shotOrdinal;
+    }
+
+    public void setShotOrdinal(int shotOrdinal) {
+        this.shotOrdinal = Math.max(0, shotOrdinal);
+    }
+
+    public void restoreArmed(boolean armed, float elapsed) {
+        this.isArmed = armed;
+        this.armedElapsed = Math.max(0f, elapsed);
+    }
 }

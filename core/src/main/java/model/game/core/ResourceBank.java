@@ -24,6 +24,14 @@ final class ResourceBank {
 
     int getPlantFoodCount() { return plantFoodCount; }
 
+    int getPersistentPlantFood() { return persistentPlantFood; }
+
+    void restore(int sun, int plantFood, int persistent) {
+        this.sunAmount = Math.max(0, sun);
+        this.plantFoodCount = Math.max(0, plantFood);
+        this.persistentPlantFood = Math.max(0, Math.min(persistent, this.plantFoodCount));
+    }
+
     void addSun(int amount) {
         sunAmount += amount;
     }

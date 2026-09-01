@@ -83,6 +83,21 @@ public class LawnMower {
         return Collections.unmodifiableList(sweepKills);
     }
 
+    public float getTransitionElapsed() {
+        return transitionElapsed;
+    }
+
+    /** Restores mower progress from a mid-level save. */
+    public void restore(boolean active, boolean triggered, boolean sweeping,
+                        float xPosition, float transitionElapsed) {
+        this.active = active;
+        this.isTriggered = triggered;
+        this.sweeping = sweeping;
+        this.xPosition = xPosition;
+        this.transitionElapsed = Math.max(0f, transitionElapsed);
+        this.sweepKills.clear();
+    }
+
     /**
      * Advances the mower by {@code deltaTime} seconds. Returns true once
      * the mower has crossed the rightmost column and can be removed.

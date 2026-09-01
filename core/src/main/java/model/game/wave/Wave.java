@@ -232,6 +232,10 @@ public class Wave implements Tickable {
         return waveClock;
     }
 
+    public void setWaveClock(float waveClock) {
+        this.waveClock = Math.max(0f, waveClock);
+    }
+
     public WaveRandomGenerator getRng() {
         return rng;
     }

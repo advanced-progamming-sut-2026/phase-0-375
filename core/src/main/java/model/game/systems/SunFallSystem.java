@@ -58,6 +58,20 @@ public class SunFallSystem implements Tickable {
         return skyDropEnabled;
     }
 
+    public float getElapsedSeconds() {
+        return elapsedSeconds;
+    }
+
+    public float getDropTimer() {
+        return dropTimer;
+    }
+
+    public void restoreTimers(float elapsed, float nextDropIn, boolean enabled) {
+        this.elapsedSeconds = Math.max(0f, elapsed);
+        this.dropTimer = Math.max(0.1f, nextDropIn);
+        this.skyDropEnabled = enabled;
+    }
+
     @Override
     public void tick(float deltaTime) {
         elapsedSeconds += deltaTime;

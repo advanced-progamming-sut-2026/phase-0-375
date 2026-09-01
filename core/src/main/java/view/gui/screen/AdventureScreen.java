@@ -19,6 +19,7 @@ import controller.result.CommandResult;
 import model.app.App;
 import model.enums.Chapter;
 import model.enums.MenuType;
+import model.game.save.GameSaveService;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.assets.AdventureHudRegions;
@@ -211,6 +212,16 @@ public final class AdventureScreen extends AbstractMenuScreen {
     }
 
     private void openScoreGame() {
+        if (GameSaveService.getInstance().hasScoreSave()) {
+            try {
+                GameSaveService.getInstance().resumeSavedGame();
+                game.setScreen(new GameplayScreen(game));
+                return;
+            } catch (Exception e) {
+                GameSaveService.getInstance().clearCurrentUserSave();
+                showToast("Could not resume save; starting fresh.", true);
+            }
+        }
         CommandResult<Void> r = MainMenuController.getInstance().enterScoreGame();
         showToast(r.getMessage(), !r.isSuccess());
         if (r.isSuccess()) {

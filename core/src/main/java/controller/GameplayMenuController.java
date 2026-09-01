@@ -13,6 +13,7 @@ import model.enums.ZombieState;
 import model.event.GameEvent;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
+import model.game.save.GameSaveService;
 import model.enums.BowlingWalnutType;
 import model.game.level.special.ConveyorBeltLevel;
 import model.game.level.special.ScoreLevel;
@@ -97,6 +98,7 @@ public class GameplayMenuController extends AppMenuController {
                 model.removeLootPickup(loot);
             }
         }
+        GameSaveService.getInstance().clearCurrentUserSave();
         app.setCurrentMenu(MenuType.GAME);
         app.setCurrentGameModel(null);
         app.setCurrentGameLoop(null);

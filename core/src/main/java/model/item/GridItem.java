@@ -14,6 +14,10 @@ public abstract class GridItem {
         return hp;
     }
 
+    public void setHp(int hp) {
+        this.hp = hp;
+    }
+
     public void takeDamage(int damage) {
         this.hp -= damage;
     }

@@ -21,6 +21,7 @@ import model.app.App;
 import model.enums.Chapter;
 import model.enums.LevelType;
 import model.enums.MenuType;
+import model.game.save.GameSaveService;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
 import view.gui.anim.PamClipCache;
@@ -441,6 +442,16 @@ public final class ChapterLevelsScreen extends AbstractMenuScreen {
     private record SeasonSlots(List<LevelSummary> levels, Set<Integer> placeholderIds) {}
 
     private void startLevel(int levelId) {
+        if (GameSaveService.getInstance().hasSaveForAdventure(chapter, levelId)) {
+            try {
+                GameSaveService.getInstance().resumeSavedGame();
+                game.setScreen(new GameplayScreen(game));
+                return;
+            } catch (Exception e) {
+                GameSaveService.getInstance().clearCurrentUserSave();
+                showToast("Could not resume save; starting fresh.", true);
+            }
+        }
         String chapterArg = chapter.name().toLowerCase(Locale.ROOT);
         CommandResult<Void> r = controller.enterChapter(chapterArg, levelId);
         showToast(r.getMessage(), !r.isSuccess());

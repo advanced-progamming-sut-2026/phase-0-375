@@ -240,6 +240,99 @@ public class GameModel implements BehaviorContext {
         seedCooldowns.clear();
     }
 
+    public boolean areSeedCooldownsDisabled() {
+        return seedCooldownsDisabled;
+    }
+
+    public Map<String, Float> getSeedCooldownsSnapshot() {
+        return new HashMap<>(seedCooldowns);
+    }
+
+    /** Restores seed cooldowns from a mid-level save. */
+    public void restoreSeedCooldowns(Map<String, Float> cooldowns, boolean disabled) {
+        seedCooldowns.clear();
+        if (cooldowns != null) {
+            seedCooldowns.putAll(cooldowns);
+        }
+        seedCooldownsDisabled = disabled;
+    }
+
+    /** Overwrites sun / plant-food balances from a mid-level save. */
+    public void restoreResources(int sun, int plantFood, int persistentPlantFood) {
+        resources.restore(sun, plantFood, persistentPlantFood);
+    }
+
+    public int getPersistentPlantFood() {
+        return resources.getPersistentPlantFood();
+    }
+
+    /** Restores bookkeeping counters from a mid-level save. */
+    public void restoreProgress(long tick, float elapsed, int difficulty,
+                                boolean breached, Set<Integer> breachedLaneRows,
+                                int killed, int lost,
+                                int diamonds, int coins, int pots) {
+        this.currentTick = Math.max(0L, tick);
+        this.elapsedSeconds = Math.max(0f, elapsed);
+        this.difficultyLevel = Math.max(1, difficulty);
+        this.houseBreached = breached;
+        this.breachedRows.clear();
+        if (breachedLaneRows != null) {
+            this.breachedRows.addAll(breachedLaneRows);
+        }
+        this.zombiesKilled = Math.max(0, killed);
+        this.plantsLost = Math.max(0, lost);
+        this.diamondCount = Math.max(0, diamonds);
+        this.coinCount = Math.max(0, coins);
+        this.flowerPotCount = Math.max(0, pots);
+    }
+
+    /** Clears plants/graves/zombies/projectiles/pickups before applying a save. */
+    public void clearBoardForRestore() {
+        activeZombies.clear();
+        activeProjectiles.clear();
+        projectileHitCues.clear();
+        activeSuns.clear();
+        activePlantFood.clear();
+        activeLootPickups.clear();
+        pendingLootDrops.clear();
+        orphanedPushables.clear();
+        pendingSandstorms.clear();
+        iceWinds.clear();
+        pendingAnnouncements.clear();
+        breachingZombie = null;
+        for (int row = 0; row < gameMap.getRows(); row++) {
+            for (int col = 0; col < gameMap.getCols(); col++) {
+                gameMap.getCell(col, row).clearDynamics();
+            }
+        }
+    }
+
+    /** Places a plant without spending sun or updating quest placement stats. */
+    public boolean restorePlant(PlantInstance plant, int row, int col) {
+        if (plant == null || row < 0 || col < 0
+                || row >= gameMap.getRows() || col >= gameMap.getCols()) {
+            return false;
+        }
+        Cell cell = gameMap.getCell(col, row);
+        plant.setPosition(new Point(col, row));
+        return cell.addPlaceable(plant);
+    }
+
+    /** Re-adds a zombie that was already constructed from a save. */
+    public void restoreZombie(ZombieInstance instance) {
+        if (instance == null) {
+            return;
+        }
+        activeZombies.add(instance);
+        Point grid = instance.getGridPosition();
+        if (grid != null) {
+            int col = Math.max(0, Math.min(grid.getX(), gameMap.getCols() - 1));
+            int row = Math.max(0, Math.min(grid.getY(), gameMap.getRows() - 1));
+            instance.setGridPosition(new Point(col, row));
+            gameMap.addZombie(instance, col, row);
+        }
+    }
+
     public Level getCurrentLevel() { return currentLevel; }
 
     /** Attaches the optional Myopoint scorer (set by the daily score level). */

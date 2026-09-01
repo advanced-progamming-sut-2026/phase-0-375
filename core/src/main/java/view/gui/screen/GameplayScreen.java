@@ -44,6 +44,7 @@ import model.game.level.special.ZombossLevel;
 import model.game.level.special.SaveOurSeedsLevel;
 import model.game.level.special.ScoreLevel;
 import model.game.score.MyopointTracker;
+import model.game.save.GameSaveService;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.item.Sun;
@@ -492,7 +493,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         uiStage.addActor(readySetPlant);
         boolean inSetup = model != null && model.getCurrentLevel() instanceof PlantWhatYouGetLevel lastStand
                 && lastStand.isSetupPhase();
-        if (!inSetup) {
+        boolean resumedMidLevel = model != null && model.getElapsedSeconds() > 0.5f;
+        if (!inSetup && !resumedMidLevel) {
             readySetPlant.play();
         }
 
@@ -1055,6 +1057,35 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
     }
 
+    private void saveAndExit() {
+        try {
+            GameSaveService.getInstance().saveCurrentGame();
+        } catch (Exception e) {
+            showToast("Could not save game: " + e.getMessage(), true);
+            return;
+        }
+        Level level = currentLevel();
+        App.getInstance().setCurrentGameModel(null);
+        App.getInstance().setCurrentGameLoop(null);
+        if (scoreMode || level instanceof ScoreLevel) {
+            App.getInstance().setCurrentMenu(MenuType.GAME);
+            game.setScreen(new AdventureScreen(game));
+            return;
+        }
+        if (bowlingMode || level instanceof MiniGameLevel) {
+            App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+            game.setScreen(new QuestsScreen(game, QuestsScreen.Tab.MINI_GAMES));
+            return;
+        }
+        Chapter chapter = currentChapter();
+        App.getInstance().setCurrentMenu(MenuType.GAME);
+        if (chapter != null) {
+            game.setScreen(new ChapterLevelsScreen(game, chapter));
+        } else {
+            game.setScreen(new AdventureScreen(game));
+        }
+    }
+
     /** After a win: load the next level in this chapter, or fall back to the map. */
     private void continueToNextLevel() {
         Level level = currentLevel();
@@ -1107,7 +1138,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             skin, assets.textures, config,
             this::closePauseMenu,
             this::restartLevel,
-            this::exitToLevels);
+            this::saveAndExit);
         uiStage.addActor(pauseOverlay);
         toast.toFront();
     }
@@ -1131,6 +1162,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartLevel() {
+        GameSaveService.getInstance().clearCurrentUserSave();
         flushPendingLoot();
         Level level = currentLevel();
         if (scoreMode || level instanceof ScoreLevel) {
@@ -1341,6 +1373,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startLoseSequence() {
+        GameSaveService.getInstance().clearCurrentUserSave();
         gameplayMusic.playDefeat(currentChapter());
         flushPendingLoot();
         endSequenceActive = true;
@@ -1363,6 +1396,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void startWinSequence() {
+        GameSaveService.getInstance().clearCurrentUserSave();
         gameplayMusic.playVictory(currentChapter());
         flushPendingLoot();
         endSequenceActive = true;

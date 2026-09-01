@@ -691,4 +691,23 @@ public class ZombieInstance implements Tickable, Placeable {
     public void setPushableItem(Pushable pushableItem) { this.pushableItem = pushableItem; }
     /** @return true if this zombie takes no damage from FIRE-elemental sources. */
     public boolean isImmuneToFire() { return fireDamageMultiplier <= 0f; }
+
+    /** Restores chill / butter / glow / hypnosis from a mid-level save. */
+    public void restoreStatus(boolean glowing, int chillLevel, float chillStackTimer,
+                              boolean buttered, boolean hypnotized, boolean movingBackward,
+                              float currentSpeed, float speedModifier) {
+        this.isGlowing = glowing;
+        this.chillLevel = Math.max(0, Math.min(3, chillLevel));
+        this.chillStackTimer = Math.max(0f, chillStackTimer);
+        this.buttered = buttered;
+        this.hypnotized = hypnotized;
+        this.movingBackward = movingBackward;
+        this.speedModifier = speedModifier <= 0f ? 1f : speedModifier;
+        this.currentSpeed = currentSpeed > 0f ? currentSpeed
+                : (definition == null ? 0f : definition.getSpeed() * this.speedModifier);
+    }
+
+    public float getChillStackTimer() {
+        return chillStackTimer;
+    }
 }

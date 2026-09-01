@@ -28,6 +28,8 @@ import controller.TravelLogMenuController;
 import controller.result.CommandResult;
 import model.app.App;
 import model.data.minigame.MiniGameDataEntry;
+import model.enums.MiniGameType;
+import model.game.save.GameSaveService;
 import model.enums.MenuType;
 import model.enums.QuestCategory;
 import model.quest.Quest;
@@ -49,6 +51,7 @@ import view.gui.ui.RoundedRegionImage;
 import view.gui.ui.SkinFonts;
 
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Travel-log quests UI: Daily / Main / Epic / Mini-Games tabs with claimable cards.
@@ -414,6 +417,23 @@ public final class QuestsScreen extends AbstractMenuScreen {
         play.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
+                try {
+                    MiniGameType type = MiniGameType.valueOf(
+                        entry.getMiniGameType().toUpperCase(Locale.ROOT)
+                            .replace(' ', '_').replace('-', '_'));
+                    if (GameSaveService.getInstance().hasSaveForMiniGame(type, entry.getStage())) {
+                        try {
+                            GameSaveService.getInstance().resumeSavedGame();
+                            game.setScreen(new GameplayScreen(game));
+                            return;
+                        } catch (Exception resumeError) {
+                            GameSaveService.getInstance().clearCurrentUserSave();
+                            showToast("Could not resume save; starting fresh.", true);
+                        }
+                    }
+                } catch (IllegalArgumentException ignored) {
+                    // Unknown mini-game type — fall through to controller error.
+                }
                 CommandResult<Void> result = controller.enterMiniGame(
                     entry.getMiniGameType(), entry.getStage());
                 showToast(result.getMessage(), !result.isSuccess());

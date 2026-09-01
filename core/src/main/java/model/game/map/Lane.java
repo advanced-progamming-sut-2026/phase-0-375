@@ -38,4 +38,9 @@ public class Lane {
     public void clearLawnMower() {
         lawnMower = null;
     }
+
+    /** Replaces or clears this lane's mower (save restore). */
+    public void setLawnMower(LawnMower lawnMower) {
+        this.lawnMower = lawnMower;
+    }
 }

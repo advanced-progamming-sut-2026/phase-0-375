@@ -133,6 +133,15 @@ public class IceTerrainStrategy implements TerrainStrategy {
         this.containedEntity = containedEntity;
     }
 
+    /** Restores ice HP / melt state from a mid-level save. */
+    public void restore(int hp, boolean melted) {
+        this.hp = Math.max(0, hp);
+        this.melted = melted || this.hp <= 0;
+        if (this.melted) {
+            this.hp = 0;
+        }
+    }
+
     // --- Internal helpers ---
 
     /**

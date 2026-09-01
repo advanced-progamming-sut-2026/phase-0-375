@@ -202,6 +202,38 @@ public class WaveManager implements Tickable {
     }
     public List<Wave> getWaves() { return Collections.unmodifiableList(waves); }
     public WaveManagerPhase getPhase() { return phase; }
+    public float getInterWaveTimer() { return interWaveTimer; }
+    public int getCurrentWaveTotal() { return currentWaveTotal; }
+    public int getCurrentWaveKilled() { return currentWaveKilled; }
+    public float getMaxReportedProgress() { return maxReportedProgress; }
+
+    /** True when {@code zombie} is still counted as living for the current wave meter. */
+    public boolean isCurrentWaveLiving(ZombieInstance zombie) {
+        return zombie != null && currentWaveLiving.contains(zombie);
+    }
+
+    /**
+     * Restores wave-manager progress from a mid-level save. Wave entry runtimes
+     * must already have been patched onto {@link #waves}.
+     */
+    public void restoreFromSave(int waveIndex, WaveManagerPhase phase, float interWaveTimer,
+                                int waveTotal, int waveKilled, float maxProgress,
+                                List<ZombieInstance> living) {
+        this.currentWaveIndex = Math.max(0, Math.min(waveIndex, Math.max(0, waves.size() - 1)));
+        this.phase = phase == null ? WaveManagerPhase.WAITING_FOR_NEXT_WAVE : phase;
+        this.interWaveTimer = Math.max(0f, interWaveTimer);
+        this.currentWaveTotal = Math.max(0, waveTotal);
+        this.currentWaveKilled = Math.max(0, waveKilled);
+        this.maxReportedProgress = Math.max(0f, maxProgress);
+        this.currentWaveLiving.clear();
+        if (living != null) {
+            for (ZombieInstance z : living) {
+                if (z != null) {
+                    currentWaveLiving.add(z);
+                }
+            }
+        }
+    }
 
     private float maxReportedProgress = 0f;
 

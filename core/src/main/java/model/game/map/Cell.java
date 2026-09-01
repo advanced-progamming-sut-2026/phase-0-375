@@ -47,6 +47,12 @@ public class Cell {
         placeables.remove(placeable.getLayer());
     }
 
+    public void clearDynamics() {
+        placeables.clear();
+        zombies.clear();
+        projectiles.clear();
+    }
+
     public Placeable getPlaceable(PlacableLayer layer) {
         return placeables.get(layer);
     }
