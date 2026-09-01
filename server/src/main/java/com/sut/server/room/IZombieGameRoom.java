@@ -13,15 +13,18 @@ import model.game.level.minigame.izombie.IZombieSettings;
 import model.game.map.Cell;
 import model.network.dto.PlantSnapshotDto;
 import model.network.dto.ProjectileSnapshotDto;
+import model.network.dto.SunSnapshotDto;
 import model.network.dto.ZombieSnapshotDto;
 import model.network.enums.PlayerRole;
 import model.network.enums.ReactionType;
 import model.network.packet.chat.ReactionPacket;
+import model.network.packet.game.CollectSunRequestPacket;
 import model.network.packet.game.GameStateSnapshotPacket;
 import model.network.packet.game.PlacePlantRequestPacket;
 import model.network.packet.game.PlaceZombieRequestPacket;
 import model.network.packet.game.PlayerActionResponsePacket;
 import model.network.packet.matchmaking.MatchFoundPacket;
+import model.item.Sun;
 import model.plant.PlantFactory;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
@@ -34,6 +37,7 @@ import model.zombie.instance.ZombieInstance;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -67,7 +71,6 @@ public class IZombieGameRoom implements Runnable {
 
     // Asymmetric Economies & Match Progress
     private int plantSun = DEFAULT_INITIAL_SUN;
-    private float plantSunTimer = 0f;
     private int zombieSun = DEFAULT_INITIAL_SUN;
     private float matchTime = 0f;
     private float matchDuration = DEFAULT_MATCH_DURATION;
@@ -199,14 +202,7 @@ public class IZombieGameRoom implements Runnable {
                 }
             }
 
-            // 3. Passive plant sun economy (e.g. +25 sun every 10 seconds)
-            plantSunTimer += TICK_INTERVAL_SECONDS;
-            if (plantSunTimer >= 10.0f) {
-                plantSun = Math.min(9990, plantSun + 25);
-                plantSunTimer = 0f;
-            }
-
-            // 4. Advance headless physics and combat simulation
+            // 3. Advance headless physics and combat simulation
             gameLoop.update(TICK_INTERVAL_SECONDS);
             matchTime += TICK_INTERVAL_SECONDS;
             zombieSun = gameModel.getSunAmount();
@@ -295,6 +291,35 @@ public class IZombieGameRoom implements Runnable {
         this.winnerRole = winner;
         this.endReason = reason;
         System.out.println("[IZombieGameRoom] Game Over in " + roomId + ". Winner: " + winner + ", Reason: " + reason);
+    }
+
+    /**
+     * Handles sun collection from the plant defender.
+     */
+    public void handleCollectSun(ClientConnectionHandler sender, CollectSunRequestPacket packet) {
+        if (packet == null) {
+            return;
+        }
+        if (sender != plantPlayer) {
+            return;
+        }
+        pendingActions.offer(() -> {
+            if (gameOver) {
+                return;
+            }
+            Sun picked = null;
+            for (Sun sun : gameModel.getActiveSuns()) {
+                if (sun != null && sun.getX() == packet.getX() && sun.getY() == packet.getY()) {
+                    picked = sun;
+                    break;
+                }
+            }
+            if (picked == null) {
+                return;
+            }
+            gameModel.collectSun(picked);
+            plantSun = Math.min(9990, plantSun + picked.getValue());
+        });
     }
 
     /**
@@ -588,7 +613,27 @@ public class IZombieGameRoom implements Runnable {
         List<Integer> breached = new ArrayList<>(gameModel.getBreachedRows());
         float timeRemaining = Math.max(0f, matchDuration - matchTime);
 
-        return new GameStateSnapshotPacket(
+        List<SunSnapshotDto> sunDtos = new ArrayList<>();
+        for (Sun sun : gameModel.getActiveSuns()) {
+            if (sun == null) {
+                continue;
+            }
+            sunDtos.add(new SunSnapshotDto(
+                    sun.getX(),
+                    sun.getY(),
+                    sun.getValue(),
+                    sun.getType() != null ? sun.getType().name() : "NORMAL",
+                    sun.getOffsetX(),
+                    sun.getOffsetY(),
+                    sun.getFallRemaining(),
+                    sun.getFallDuration(),
+                    sun.hasOrigin(),
+                    sun.getOriginX(),
+                    sun.getOriginY()
+            ));
+        }
+
+        GameStateSnapshotPacket snapshot = new GameStateSnapshotPacket(
                 tickCounter,
                 matchTime,
                 timeRemaining,
@@ -602,6 +647,10 @@ public class IZombieGameRoom implements Runnable {
                 winnerRole,
                 endReason
         );
+        snapshot.setSuns(sunDtos);
+        snapshot.setPlantSeedCooldowns(new HashMap<>(plantCardCooldowns));
+        snapshot.setMatchDuration(matchDuration);
+        return snapshot;
     }
 
     /**

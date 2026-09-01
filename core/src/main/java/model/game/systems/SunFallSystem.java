@@ -121,7 +121,18 @@ public class SunFallSystem implements Tickable {
         }
     }
 
+    /**
+     * Advances falling-sun motion for display clients without sky drops or landing effects.
+     */
+    public void tickFallingSunsPresentation(float deltaTime) {
+        tickFallingSuns(deltaTime, false);
+    }
+
     private void tickFallingSuns(float deltaTime) {
+        tickFallingSuns(deltaTime, true);
+    }
+
+    private void tickFallingSuns(float deltaTime, boolean applyLanding) {
         List<Sun> active = gameModel.getActiveSuns();
         if (active == null || active.isEmpty()) {
             return;
@@ -131,7 +142,7 @@ public class SunFallSystem implements Tickable {
                 continue;
             }
             sun.tickFall(deltaTime);
-            if (!sun.isFalling()) {
+            if (applyLanding && !sun.isFalling()) {
                 land(sun);
             }
         }

@@ -58,6 +58,7 @@ import model.network.enums.PlayerRole;
 import model.network.enums.ReactionType;
 import model.network.packet.InviteReceivedPacket;
 import model.network.packet.chat.ReactionPacket;
+import model.network.packet.game.CollectSunRequestPacket;
 import model.network.packet.game.GameStateSnapshotPacket;
 import model.network.packet.game.PlacePlantRequestPacket;
 import model.network.packet.game.PlaceZombieRequestPacket;
@@ -130,6 +131,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private WaveAnnounceBanner waveAnnounce;
     private WaveProgressHud waveProgress;
     private TimedProgressHud timedProgressHud;
+    private TimedProgressHud multiplayerMatchTimer;
     private Table packetColumn;
     private LawnRowColHighlight rowColHighlight;
     private NecromancyTileRenderer necromancyTiles;
@@ -492,6 +494,28 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             hudRoots.add(topBar);
         }
 
+        if (multiplayerMode) {
+            Table mpTopBar = new Table();
+            mpTopBar.setFillParent(true);
+            mpTopBar.setTouchable(Touchable.childrenOnly);
+            mpTopBar.top().padTop(8f);
+            multiplayerMatchTimer = new TimedProgressHud(skin, assets.textures);
+            multiplayerMatchTimer.setBarWidth(WaveProgressHud.BAR_W);
+            if (multiplayerPlantSide) {
+                mpTopBar.add().width(160f);
+                mpTopBar.add(multiplayerMatchTimer).center().expandX();
+                mpTopBar.add().width(160f);
+            } else {
+                float leftPad = 8f + (sunHud != null ? SunHud.WIDTH + 10f : 0f)
+                        + SeedPacketActor.PACKET_WIDTH + 8f;
+                mpTopBar.add().width(leftPad);
+                mpTopBar.add(multiplayerMatchTimer).center().expandX();
+                mpTopBar.add().width(160f);
+            }
+            uiStage.addActor(mpTopBar);
+            hudRoots.add(mpTopBar);
+        }
+
         lootRewardPopup = new LootRewardPopup(skin);
         Table rewardAnchor = new Table();
         rewardAnchor.setFillParent(true);
@@ -771,6 +795,18 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             return;
         }
+        if (multiplayerMode && multiplayerPlantSide) {
+            for (Actor actor : packetColumn.getChildren()) {
+                if (!(actor instanceof SeedPacketActor packet) || packet.plantName() == null) {
+                    continue;
+                }
+                String name = packet.plantName();
+                boolean afford = plantCost(name) <= sun;
+                boolean ready = model == null || model.isSeedReady(name);
+                packet.setDimmed(!afford || !ready);
+            }
+            return;
+        }
         List<PendingSeedPacket> pending = vaseBreakerMode ? pendingPackets() : List.of();
         int pendingIndex = 0;
         for (Actor actor : packetColumn.getChildren()) {
@@ -1032,11 +1068,28 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (model == null) {
             return false;
         }
+        if (multiplayerMode && !multiplayerPlantSide) {
+            return false;
+        }
         Sun sun = entityRenderer.pickSun(model, worldX, worldY);
         if (sun == null) {
             return false;
         }
         entityRenderer.writeSunDrawPos(sun, sunPosTmp);
+        if (multiplayerMode) {
+            if (multiplayerClient != null && multiplayerClient.isConnected()) {
+                multiplayerClient.sendPacket(new CollectSunRequestPacket(sun.getX(), sun.getY()));
+            }
+            float destX = sunPosTmp[0];
+            float destY = sunPosTmp[1];
+            if (sunHud != null) {
+                sunHud.logoCenter(logoTmp);
+                destX = logoTmp.x;
+                destY = logoTmp.y;
+            }
+            entityRenderer.startSunCollect(sun, sunPosTmp[0], sunPosTmp[1], destX, destY);
+            return true;
+        }
         CommandResult<Void> result = gameplay.collectSun(sun);
         if (!result.isSuccess()) {
             return false;
@@ -1419,6 +1472,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         snapshotApplier.apply(model, snap, multiplayerRole);
+        snapshotApplier.drainPresentationAttacks(App.getInstance().getCurrentGameLoop());
+        if (multiplayerMatchTimer != null) {
+            float duration = snap.getMatchDuration() > 0f ? snap.getMatchDuration() : 180f;
+            multiplayerMatchTimer.syncMatchTimer(snap.getTimeRemaining(), duration);
+        }
         if (snap.isGameOver() && !endSequenceActive) {
             boolean won = multiplayerRole != null
                     && multiplayerRole.name().equalsIgnoreCase(snap.getWinnerRole());

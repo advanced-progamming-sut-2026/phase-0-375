@@ -5,6 +5,7 @@ import model.enums.MiniGameType;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import model.game.level.minigame.MiniGameLevel;
+import model.item.Sun;
 import model.network.dto.PlantSnapshotDto;
 import model.network.dto.ZombieSnapshotDto;
 import model.network.enums.PlayerRole;
@@ -90,33 +91,35 @@ class GameStateSnapshotApplierTest {
     }
 
     @Test
-    void applyDoesNotStompActivePlantPresentation() throws Exception {
+    void applyStartsPresentationAttackOnServerAttackingEdge() throws Exception {
         MiniGameLevel level = MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
         GameModel model = new GameModel(level);
         GameStateSnapshotApplier applier = new GameStateSnapshotApplier();
         PvZGameLoop loop = new PvZGameLoop(model);
 
-        GameStateSnapshotPacket setup = new GameStateSnapshotPacket(
+        GameStateSnapshotPacket idle = new GameStateSnapshotPacket(
                 1L, 1f, 179f, 200, 75,
                 List.of(new PlantSnapshotDto("p1", "Peashooter", 0, 1, 300, 300, "IDLE", false, false, 1)),
                 List.of(new ZombieSnapshotDto("z1", "ZombieDefault", 0, 3f, 0f, 200, 200, 0, "WALKING", 0.2f,
                         false, false, false, false)),
                 List.of(), List.of(), false, null, null
         );
-        applier.apply(model, setup, PlayerRole.PLANT);
+        applier.apply(model, idle, PlayerRole.PLANT);
+
+        GameStateSnapshotPacket attacking = new GameStateSnapshotPacket(
+                2L, 2f, 178f, 200, 75,
+                List.of(new PlantSnapshotDto("p1", "Peashooter", 0, 1, 300, 300, "ATTACKING", false, false, 1)),
+                List.of(new ZombieSnapshotDto("z1", "ZombieDefault", 0, 3f, 0f, 200, 200, 0, "WALKING", 0.2f,
+                        false, false, false, false)),
+                List.of(), List.of(), false, null, null
+        );
+        applier.apply(model, attacking, PlayerRole.PLANT);
+        applier.drainPresentationAttacks(loop);
 
         for (int i = 0; i < 30; i++) {
             loop.updatePresentation(1f / 30f);
         }
 
-        GameStateSnapshotPacket idleSnap = new GameStateSnapshotPacket(
-                2L, 2f, 178f, 200, 75,
-                List.of(new PlantSnapshotDto("p1", "Peashooter", 0, 1, 300, 300, "IDLE", false, false, 1)),
-                List.of(new ZombieSnapshotDto("z1", "ZombieDefault", 0, 3f, 0f, 200, 200, 0, "WALKING", 0.2f,
-                        false, false, false, false)),
-                List.of(), List.of(), false, null, null
-        );
-        applier.apply(model, idleSnap, PlayerRole.PLANT);
         assertTrue(model.getAllPlants().get(0).hasActiveAction() || !model.getProjectiles().isEmpty());
     }
 
@@ -158,5 +161,26 @@ class GameStateSnapshotApplierTest {
         applier.apply(model, popped, PlayerRole.PLANT);
         assertEquals(0, model.getActiveZombies().get(0).getTotalArmorHealth());
         assertTrue(model.getActiveZombies().get(0).getArmors().isEmpty());
+    }
+
+    @Test
+    void reconcileSunsRestoresPlantDropOriginForBothRoles() throws Exception {
+        MiniGameLevel level = MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
+        GameModel model = new GameModel(level);
+        GameStateSnapshotApplier applier = new GameStateSnapshotApplier();
+
+        GameStateSnapshotPacket snap = new GameStateSnapshotPacket(
+                1L, 1f, 179f, 200, 75,
+                List.of(), List.of(), List.of(), List.of(), false, null, null
+        );
+        snap.setSuns(List.of(new model.network.dto.SunSnapshotDto(
+                0, 0, 25, "NORMAL", 0f, 0f, 0.5f, 0.75f, true, 0f, -0.35f
+        )));
+
+        applier.apply(model, snap, PlayerRole.ZOMBIE);
+        assertEquals(1, model.getActiveSuns().size());
+        Sun sun = model.getActiveSuns().get(0);
+        assertTrue(sun.hasOrigin());
+        assertEquals(-0.35f, sun.getOriginY(), 0.001f);
     }
 }

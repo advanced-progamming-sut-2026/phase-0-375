@@ -43,6 +43,7 @@ public enum PacketType {
     // In-Game Player Actions
     PLACE_PLANT_REQUEST,
     PLACE_ZOMBIE_REQUEST,
+    COLLECT_SUN_REQUEST,
     PLAYER_ACTION_RESPONSE,
 
     // State Synchronization

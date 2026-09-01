@@ -124,6 +124,24 @@ public final class TimedProgressHud extends WidgetGroup {
         bar.setValue(Math.min(1f, Math.max(0f, progress01)));
     }
 
+    /** Match timer for networked I, Zombie (elapsed fraction). */
+    public void syncMatchTimer(float timeRemaining, float matchDuration) {
+        setVisible(true);
+        float duration = matchDuration > 0f ? matchDuration : 1f;
+        float elapsed = Math.max(0f, duration - Math.max(0f, timeRemaining));
+        setProgress(Math.min(1f, elapsed / duration));
+    }
+
+    public void setBarWidth(float width) {
+        if (width <= 0f) {
+            return;
+        }
+        setSize(width, Math.max(BAR_H, HEAD_H));
+        bar.setSize(width, BAR_H);
+        bar.setPosition(0f, barY());
+        layoutHead();
+    }
+
     public float getProgress() {
         return bar.getValue();
     }
@@ -192,7 +210,7 @@ public final class TimedProgressHud extends WidgetGroup {
 
     @Override
     public float getPrefWidth() {
-        return BAR_W;
+        return getWidth() > 0f ? getWidth() : BAR_W;
     }
 
     @Override

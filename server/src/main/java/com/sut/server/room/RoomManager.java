@@ -3,6 +3,7 @@ package com.sut.server.room;
 import com.sut.server.net.ClientConnectionHandler;
 import com.sut.server.net.PacketRouter;
 import model.network.packet.chat.ReactionPacket;
+import model.network.packet.game.CollectSunRequestPacket;
 import model.network.packet.game.PlacePlantRequestPacket;
 import model.network.packet.game.PlaceZombieRequestPacket;
 import model.network.packet.game.PlayerActionResponsePacket;
@@ -59,6 +60,13 @@ public class RoomManager {
             } else {
                 conn.sendPacket(new PlayerActionResponsePacket(false, "PLACE_ZOMBIE", "NOT_IN_ROOM",
                         packet.getRow(), packet.getCol()));
+            }
+        });
+
+        router.registerHandler(CollectSunRequestPacket.class, (conn, packet) -> {
+            IZombieGameRoom room = getRoomForPlayer(conn);
+            if (room != null) {
+                room.handleCollectSun(conn, packet);
             }
         });
 

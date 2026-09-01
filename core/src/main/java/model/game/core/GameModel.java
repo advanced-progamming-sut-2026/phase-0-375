@@ -987,6 +987,36 @@ public class GameModel implements BehaviorContext {
         return breachedRows;
     }
 
+    /** Authoritative breach list from a networked snapshot. */
+    public void syncBreachedRows(java.util.Collection<Integer> rows) {
+        breachedRows.clear();
+        if (rows != null) {
+            breachedRows.addAll(rows);
+        }
+    }
+
+    /** Replaces falling/collectible sun tokens for display sync. */
+    public void replaceActiveSuns(List<Sun> suns) {
+        activeSuns.clear();
+        if (suns != null) {
+            activeSuns.addAll(suns);
+        }
+    }
+
+    /** Plant-side seed packet cooldowns from the authoritative server. */
+    public void syncSeedCooldowns(java.util.Map<String, Float> cooldowns) {
+        seedCooldowns.clear();
+        if (cooldowns == null) {
+            return;
+        }
+        for (java.util.Map.Entry<String, Float> entry : cooldowns.entrySet()) {
+            if (entry.getKey() == null || entry.getValue() == null || entry.getValue() <= 0f) {
+                continue;
+            }
+            seedCooldowns.put(entry.getKey(), entry.getValue());
+        }
+    }
+
     /** Zombie chewing at the house after a breach, or {@code null}. */
     public ZombieInstance getBreachingZombie() {
         return breachingZombie;

@@ -2,12 +2,16 @@ package model.network.util;
 
 import model.enums.PlacableLayer;
 import model.enums.PlantState;
+import model.enums.SunType;
 import model.enums.ZombieState;
 import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
 import model.game.map.Cell;
 import model.game.map.Point;
+import model.item.Sun;
 import model.item.placeable.Placeable;
 import model.network.dto.PlantSnapshotDto;
+import model.network.dto.SunSnapshotDto;
 import model.network.dto.ZombieSnapshotDto;
 import model.network.enums.PlayerRole;
 import model.network.packet.game.GameStateSnapshotPacket;
@@ -17,6 +21,7 @@ import model.zombie.ZombieFactory;
 import model.zombie.armor.Armor;
 import model.zombie.instance.ZombieInstance;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,6 +38,8 @@ public final class GameStateSnapshotApplier {
 
     private final Map<String, PlantInstance> plantsById = new HashMap<>();
     private final Map<String, ZombieInstance> zombiesById = new HashMap<>();
+    private final Map<String, PlantState> lastPlantStates = new HashMap<>();
+    private final List<PlantInstance> pendingPresentationAttacks = new ArrayList<>();
 
     public void apply(GameModel model, GameStateSnapshotPacket snap, PlayerRole localRole) {
         if (model == null || snap == null) {
@@ -45,9 +52,26 @@ public final class GameStateSnapshotApplier {
         int sun = localRole == PlayerRole.ZOMBIE ? snap.getZombieSun() : snap.getPlantSun();
         model.setSunAmount(sun);
 
+        model.syncBreachedRows(snap.getBreachedRows());
+        if (localRole == PlayerRole.PLANT) {
+            model.syncSeedCooldowns(snap.getPlantSeedCooldowns());
+        }
+        reconcileSuns(model, snap);
+
+        pendingPresentationAttacks.clear();
         reconcilePlants(model, snap);
         reconcileZombies(model, snap);
         // Projectiles: local PvZGameLoop.updatePresentation() (PamPlantProjectileOrigins).
+    }
+
+    public void drainPresentationAttacks(PvZGameLoop loop) {
+        if (loop == null || pendingPresentationAttacks.isEmpty()) {
+            return;
+        }
+        for (PlantInstance plant : pendingPresentationAttacks) {
+            loop.beginPresentationAttack(plant);
+        }
+        pendingPresentationAttacks.clear();
     }
 
     private void reconcilePlants(GameModel model, GameStateSnapshotPacket snap) {
@@ -76,6 +100,7 @@ public final class GameStateSnapshotApplier {
                         }
                     }
                     plantsById.put(dto.getId(), plant);
+                    lastPlantStates.put(dto.getId(), PlantState.IDLE);
                 } else {
                     Point pos = plant.getPosition();
                     if (pos == null || pos.getX() != dto.getCol() || pos.getY() != dto.getRow()) {
@@ -87,10 +112,15 @@ public final class GameStateSnapshotApplier {
                     }
                 }
                 plant.setCurrentHP(dto.getCurrentHP());
-                if (!plant.hasActiveAction()) {
-                    PlantState state = parsePlantState(dto.getState());
-                    if (state != null) {
-                        plant.setState(state);
+                PlantState prev = lastPlantStates.getOrDefault(dto.getId(), plant.getState());
+                PlantState next = parsePlantState(dto.getState());
+                if (next == PlantState.ATTACKING && prev != PlantState.ATTACKING && !plant.hasActiveAction()) {
+                    pendingPresentationAttacks.add(plant);
+                }
+                if (next != null) {
+                    lastPlantStates.put(dto.getId(), next);
+                    if (!plant.hasActiveAction()) {
+                        plant.setState(next);
                     }
                 }
             }
@@ -101,8 +131,56 @@ public final class GameStateSnapshotApplier {
             Map.Entry<String, PlantInstance> e = it.next();
             if (!seen.contains(e.getKey())) {
                 model.removePlantFromBoard(e.getValue());
+                lastPlantStates.remove(e.getKey());
                 it.remove();
             }
+        }
+    }
+
+    private static void reconcileSuns(GameModel model, GameStateSnapshotPacket snap) {
+        List<Sun> retained = new ArrayList<>(model.getActiveSuns());
+        List<Sun> suns = new ArrayList<>();
+        if (snap.getSuns() != null) {
+            for (SunSnapshotDto dto : snap.getSuns()) {
+                if (dto == null) {
+                    continue;
+                }
+                Sun sun = takeMatchingSun(retained, dto);
+                if (sun == null) {
+                    SunType type = parseSunType(dto.getType());
+                    sun = new Sun(type, dto.getValue(), dto.getX(), dto.getY());
+                }
+                applySunSnapshot(sun, dto);
+                suns.add(sun);
+            }
+        }
+        model.replaceActiveSuns(suns);
+    }
+
+    private static Sun takeMatchingSun(List<Sun> retained, SunSnapshotDto dto) {
+        for (int i = 0; i < retained.size(); i++) {
+            Sun sun = retained.get(i);
+            if (sun.getX() == dto.getX()
+                    && sun.getY() == dto.getY()
+                    && sun.getValue() == dto.getValue()
+                    && Math.abs(sun.getOffsetX() - dto.getOffsetX()) < 0.01f
+                    && Math.abs(sun.getOffsetY() - dto.getOffsetY()) < 0.01f) {
+                retained.remove(i);
+                return sun;
+            }
+        }
+        return null;
+    }
+
+    private static void applySunSnapshot(Sun sun, SunSnapshotDto dto) {
+        sun.setOffset(dto.getOffsetX(), dto.getOffsetY());
+        if (dto.getFallDuration() > 0f || dto.getFallRemaining() > 0f) {
+            sun.setFall(dto.getFallRemaining(), dto.getFallDuration());
+        } else {
+            sun.setFall(0f, 0f);
+        }
+        if (dto.isHasOrigin()) {
+            sun.setOrigin(dto.getOriginX(), dto.getOriginY());
         }
     }
 
@@ -178,6 +256,17 @@ public final class GameStateSnapshotApplier {
             }
         }
         zombie.removeDestroyedArmor();
+    }
+
+    private static SunType parseSunType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return SunType.NORMAL;
+        }
+        try {
+            return SunType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return SunType.NORMAL;
+        }
     }
 
     private static void clearCellMain(GameModel model, int row, int col) {

@@ -11,6 +11,7 @@ import model.network.packet.auth.RegisterRequestPacket;
 import model.network.packet.auth.RegisterResponsePacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.network.packet.chat.ReactionPacket;
+import model.network.packet.game.CollectSunRequestPacket;
 import model.network.packet.game.GameStateSnapshotPacket;
 import model.network.packet.game.PlacePlantRequestPacket;
 import model.network.packet.game.PlaceZombieRequestPacket;
@@ -76,6 +77,7 @@ import model.network.packet.user.UserCommandResponsePacket;
 
     @JsonSubTypes.Type(value = PlacePlantRequestPacket.class, name = "PLACE_PLANT_REQUEST"),
     @JsonSubTypes.Type(value = PlaceZombieRequestPacket.class, name = "PLACE_ZOMBIE_REQUEST"),
+    @JsonSubTypes.Type(value = CollectSunRequestPacket.class, name = "COLLECT_SUN_REQUEST"),
     @JsonSubTypes.Type(value = PlayerActionResponsePacket.class, name = "PLAYER_ACTION_RESPONSE"),
 
     @JsonSubTypes.Type(value = GameStateSnapshotPacket.class, name = "GAME_STATE_SNAPSHOT"),

@@ -93,8 +93,13 @@ public class PvZGameLoop implements GameLoop {
             return;
         }
         float scaledDelta = deltaTime * currentGameSpeed();
-        plantSystem.tick(scaledDelta);
+        sunFallSystem.tickFallingSunsPresentation(scaledDelta);
+        plantSystem.tickPresentation(scaledDelta);
         projectileSystem.tick(scaledDelta);
+    }
+
+    public void beginPresentationAttack(model.plant.instance.PlantInstance plant) {
+        plantSystem.beginPresentationAttack(plant);
     }
 
     /** Settings menu game-speed (1–3); defaults to 1x when no user is logged in. */

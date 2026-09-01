@@ -2,12 +2,15 @@ package model.network.packet.game;
 
 import model.network.dto.PlantSnapshotDto;
 import model.network.dto.ProjectileSnapshotDto;
+import model.network.dto.SunSnapshotDto;
 import model.network.dto.ZombieSnapshotDto;
 import model.network.packet.Packet;
 import model.network.packet.PacketType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class GameStateSnapshotPacket extends Packet {
     private long tick;
@@ -19,6 +22,9 @@ public class GameStateSnapshotPacket extends Packet {
     private List<ZombieSnapshotDto> zombies = new ArrayList<>();
     private List<ProjectileSnapshotDto> projectiles = new ArrayList<>();
     private List<Integer> breachedRows = new ArrayList<>();
+    private List<SunSnapshotDto> suns = new ArrayList<>();
+    private Map<String, Float> plantSeedCooldowns = new HashMap<>();
+    private float matchDuration;
     private boolean gameOver;
     private String winnerRole;           // null, "PLANT", "ZOMBIE", or "DRAW"
     private String endReason;            // "ALL_BRAINS_EATEN", "TIME_EXPIRED", "ZOMBIE_OUT_OF_SUN", etc.
@@ -75,6 +81,17 @@ public class GameStateSnapshotPacket extends Packet {
 
     public List<Integer> getBreachedRows() { return breachedRows; }
     public void setBreachedRows(List<Integer> breachedRows) { this.breachedRows = breachedRows != null ? breachedRows : new ArrayList<>(); }
+
+    public List<SunSnapshotDto> getSuns() { return suns; }
+    public void setSuns(List<SunSnapshotDto> suns) { this.suns = suns != null ? suns : new ArrayList<>(); }
+
+    public Map<String, Float> getPlantSeedCooldowns() { return plantSeedCooldowns; }
+    public void setPlantSeedCooldowns(Map<String, Float> plantSeedCooldowns) {
+        this.plantSeedCooldowns = plantSeedCooldowns != null ? plantSeedCooldowns : new HashMap<>();
+    }
+
+    public float getMatchDuration() { return matchDuration; }
+    public void setMatchDuration(float matchDuration) { this.matchDuration = matchDuration; }
 
     public boolean isGameOver() { return gameOver; }
     public void setGameOver(boolean gameOver) { this.gameOver = gameOver; }

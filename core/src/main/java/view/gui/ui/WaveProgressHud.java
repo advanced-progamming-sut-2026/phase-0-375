@@ -28,7 +28,7 @@ public final class WaveProgressHud extends WidgetGroup {
     public static final String HEAD_ID = "IMAGE_UI_HUD_INGAME_PROGRESS_METER_ZOMBIEHEAD";
 
     /** Native 768 atlas sizes. */
-    static final float BAR_W = 273f;
+    public static final float BAR_W = 273f;
     static final float BAR_H = 33f;
     static final float HEAD_W = 42f;
     static final float HEAD_H = 45f;

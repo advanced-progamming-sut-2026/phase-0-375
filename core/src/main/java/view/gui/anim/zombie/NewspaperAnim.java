@@ -1,10 +1,14 @@
 package view.gui.anim.zombie;
 
+import model.enums.ArmorType;
 import model.enums.ZombieBehaviorType;
+import model.zombie.armor.Armor;
 import model.zombie.behavior.EnrageBehavior;
 import model.zombie.instance.ZombieInstance;
 import view.gui.anim.AnimPose;
 import view.gui.assets.PamCatalog;
+
+import java.util.List;
 
 /**
  * Newspaper: {@code walk_newspaper} / {@code eat_newspaper} while the paper lives,
@@ -29,7 +33,7 @@ public final class NewspaperAnim {
         if (enrage.isDefeating()) {
             return AnimPose.once(entry.path(), "newspaper_defeat", ZombieAnimRole.EATING, null);
         }
-        if (enrage.isEnraged()) {
+        if (enrage.isEnraged() || !hasIntactNewspaper(zombie)) {
             return null;
         }
         return switch (role) {
@@ -39,5 +43,18 @@ public final class NewspaperAnim {
                     ZombieAnimAdapter.armorVisibility(zombie, entry));
             default -> null;
         };
+    }
+
+    static boolean hasIntactNewspaper(ZombieInstance zombie) {
+        List<Armor> armors = zombie.getArmors();
+        if (armors == null || armors.isEmpty()) {
+            return false;
+        }
+        for (Armor armor : armors) {
+            if (armor != null && armor.getType() == ArmorType.Newspaper && !armor.isDestroyed()) {
+                return true;
+            }
+        }
+        return false;
     }
 }
