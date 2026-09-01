@@ -8,6 +8,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import controller.GameMenuController.ChapterSummary;
 import view.gui.assets.ChapterIslandArt;
 import view.gui.assets.PvzAssets;
+import view.gui.audio.GameAudio;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -106,6 +107,7 @@ public final class ChapterCarousel extends Group {
         if (chapters.isEmpty() || delta == 0) {
             return;
         }
+        GameAudio.get().playNavClick();
         targetFocus += delta;
         selectedIndex = Math.floorMod(Math.round(targetFocus), chapters.size());
         notifySelection();
@@ -117,6 +119,9 @@ public final class ChapterCarousel extends Group {
         }
         int n = chapters.size();
         index = Math.floorMod(index, n);
+        if (index != selectedIndex) {
+            GameAudio.get().playNavClick();
+        }
         float best = index;
         // Choose unwrapped target closest to current focus for short-path lerp.
         float a = index;

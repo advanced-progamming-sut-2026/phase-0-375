@@ -20,6 +20,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import controller.NewsMenuController;
 import model.news.NewsItem;
 import pvz.skin.BorderedTable;
+import view.gui.audio.GameAudio;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -51,6 +52,7 @@ public final class NewsOverlay {
     private NewsOverlay() {}
 
     public static Table create(Skin skin, Runnable onClose) {
+        GameAudio.get().playOverlayOpen();
         NewsMenuController controller = NewsMenuController.getInstance();
 
         Table overlay = new Table();

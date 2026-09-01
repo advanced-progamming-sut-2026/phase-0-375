@@ -6,6 +6,7 @@ import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.files.FileHandle;
 import model.app.App;
 import model.user.User;
+import controller.result.CommandResult;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -23,6 +24,7 @@ public final class GameAudio {
     private Music currentMusic;
     private MusicTracks currentTrack;
     private final Map<MusicTracks, Music> cache = new EnumMap<>(MusicTracks.class);
+    private final Map<GameSfx, Sound> sfxCache = new EnumMap<>(GameSfx.class);
 
     private GameAudio() {}
 
@@ -119,6 +121,53 @@ public final class GameAudio {
         return sound.play(sfxVolume);
     }
 
+    /** Plays a catalog SFX (missing file = silent). */
+    public void playSfx(GameSfx sfx) {
+        if (sfx == null) {
+            return;
+        }
+        playSound(obtainSfx(sfx));
+    }
+
+    public void playNavClick() {
+        playSfx(GameSfx.NAV_CLICK);
+    }
+
+    public void playOverlayOpen() {
+        playSfx(GameSfx.OVERLAY_OPEN);
+    }
+
+    /** Successful shop / collection purchase (same sting as overlay open). */
+    public void playPurchaseSuccess() {
+        playSfx(GameSfx.OVERLAY_OPEN);
+    }
+
+    public void feedbackPurchase(CommandResult<?> result) {
+        if (result == null) {
+            return;
+        }
+        if (result.isSuccess()) {
+            playPurchaseSuccess();
+        } else {
+            playSfx(GameSfx.ERROR);
+        }
+    }
+
+    public static void playPlantPlaceSfx(String plantName) {
+        if (plantName == null || plantName.isBlank()) {
+            return;
+        }
+        GameSfx sfx = GameSfx.PLANT;
+        if ("Sea-shroom".equalsIgnoreCase(plantName)
+                || "Tangle Kelp".equalsIgnoreCase(plantName)
+                || "Lily Pad".equalsIgnoreCase(plantName)) {
+            sfx = GameSfx.PLANT_ON_WATER;
+        } else if ("Grave Buster".equalsIgnoreCase(plantName)) {
+            sfx = GameSfx.GRAVE_BUSTER;
+        }
+        get().playSfx(sfx);
+    }
+
     /** Disposes cached {@link Music} instances (call on app exit). */
     public void dispose() {
         stopMusic();
@@ -128,6 +177,32 @@ public final class GameAudio {
             }
         }
         cache.clear();
+        for (Sound sound : sfxCache.values()) {
+            if (sound != null) {
+                sound.dispose();
+            }
+        }
+        sfxCache.clear();
+    }
+
+    private Sound obtainSfx(GameSfx sfx) {
+        Sound cached = sfxCache.get(sfx);
+        if (cached != null) {
+            return cached;
+        }
+        FileHandle file = resolveMusicFile(sfx.relativePath);
+        if (file == null) {
+            Gdx.app.debug("GameAudio", "Missing SFX: " + sfx.relativePath);
+            return null;
+        }
+        try {
+            Sound sound = Gdx.audio.newSound(file);
+            sfxCache.put(sfx, sound);
+            return sound;
+        } catch (Exception e) {
+            Gdx.app.error("GameAudio", "Failed to load " + file.path(), e);
+            return null;
+        }
     }
 
     private Music obtain(MusicTracks track) {

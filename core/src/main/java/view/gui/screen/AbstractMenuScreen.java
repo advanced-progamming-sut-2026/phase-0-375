@@ -10,7 +10,10 @@ import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import controller.result.CommandResult;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameSfx;
 import view.gui.ui.ToastBanner;
 
 /**
@@ -149,6 +152,21 @@ public abstract class AbstractMenuScreen implements Screen {
     }
 
     protected void showToast(String message, boolean error) {
+        if (error) {
+            GameAudio.get().playSfx(GameSfx.ERROR);
+        }
         toast.show(message, error);
+    }
+
+    /** Purchase / upgrade feedback (092 or error) without double-playing error on toast. */
+    protected void showPurchaseResult(CommandResult<?> result) {
+        if (result == null) {
+            return;
+        }
+        GameAudio.get().feedbackPurchase(result);
+        String message = result.getMessage();
+        if (message != null && !message.isBlank()) {
+            toast.show(message, !result.isSuccess());
+        }
     }
 }

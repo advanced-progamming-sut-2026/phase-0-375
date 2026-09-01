@@ -14,6 +14,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import view.gui.screen.AbstractMenuScreen;
+import view.gui.audio.GameAudio;
 import pvz.skin.BorderedTable;
 
 /**
@@ -27,6 +28,7 @@ public final class ModalCard {
     private ModalCard() {}
 
     public static Table create(Skin skin, String title, Actor body, Runnable onClose) {
+        GameAudio.get().playOverlayOpen();
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
@@ -63,6 +65,7 @@ public final class ModalCard {
 
     public static Table confirm(Skin skin, String title, String message, String yesLabel,
                                 Runnable onConfirm) {
+        GameAudio.get().playOverlayOpen();
         Table overlay = new Table();
         overlay.setFillParent(true);
         overlay.setName(AbstractMenuScreen.OVERLAY_NAME);

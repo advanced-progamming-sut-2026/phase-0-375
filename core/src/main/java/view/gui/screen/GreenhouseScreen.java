@@ -178,6 +178,12 @@ public final class GreenhouseScreen extends AbstractMenuScreen {
                     return;
                 }
                 result = controller.buyPot();
+                GameAudio.get().feedbackPurchase(result);
+                if (result.getMessage() != null && !result.getMessage().isBlank()) {
+                    toast.show(result.getMessage(), !result.isSuccess());
+                }
+                refreshAll();
+                return;
             }
             case EMPTY -> result = controller.plantPot(x, y);
             case GROWING -> result = controller.grow(x, y);

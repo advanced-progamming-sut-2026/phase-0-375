@@ -68,6 +68,7 @@ public final class PauseMenuOverlay {
             Runnable onResume,
             Runnable onRestart,
             Runnable onExit) {
+        GameAudio.get().playOverlayOpen();
         ensureAtlas(textures);
 
         Table overlay = new Table();

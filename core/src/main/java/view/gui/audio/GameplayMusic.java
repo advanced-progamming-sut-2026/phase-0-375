@@ -56,6 +56,7 @@ public final class GameplayMusic {
         if (chapter == null) {
             return;
         }
+        GameAudio.get().playSfx(GameSfx.LOSE_GAME);
         GameAudio.get().play(MusicTracks.defeat(chapter), false);
     }
 

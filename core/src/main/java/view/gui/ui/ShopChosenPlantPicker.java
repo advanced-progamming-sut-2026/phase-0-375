@@ -21,6 +21,8 @@ import pvz.skin.BorderedTable;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SheetPacketPortraits;
+import view.gui.audio.GameAudio;
+import view.gui.screen.AbstractMenuScreen;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,8 +60,10 @@ public final class ShopChosenPlantPicker {
 
     public static Table open(Stage stage, Skin skin, TextureBank textures, PvzAssets assets,
                              Collection<String> plants, Consumer<String> onPick) {
+        GameAudio.get().playOverlayOpen();
         Table overlay = new Table();
         overlay.setFillParent(true);
+        overlay.setName(AbstractMenuScreen.OVERLAY_NAME);
         overlay.setBackground(new TextureRegionDrawable(whitePixel()).tint(new Color(0f, 0f, 0f, 0.55f)));
         overlay.setTouchable(Touchable.enabled);
 

@@ -52,6 +52,7 @@ public final class SettingsOverlay {
                                Runnable onResourceBarRefresh) {
         App.getInstance().setCurrentMenu(MenuType.SETTINGS);
         GameAudio.get().syncFromUser();
+        GameAudio.get().playOverlayOpen();
 
         SettingsMenuController controller = SettingsMenuController.getInstance();
         Panel panel = new Panel(skin, controller, toast, onResourceBarRefresh);

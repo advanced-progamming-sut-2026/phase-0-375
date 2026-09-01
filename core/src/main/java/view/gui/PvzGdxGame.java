@@ -1,6 +1,7 @@
 package view.gui;
 
 import com.badlogic.gdx.Game;
+import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import model.app.App;
@@ -22,6 +23,14 @@ public class PvzGdxGame extends Game {
     public Skin skin;
     public SpriteBatch batch;
     public PvzAssets assets;
+
+    @Override
+    public void setScreen(Screen screen) {
+        if (screen != null && this.screen != null && screen != this.screen) {
+            GameAudio.get().playNavClick();
+        }
+        super.setScreen(screen);
+    }
 
     @Override
     public void create() {

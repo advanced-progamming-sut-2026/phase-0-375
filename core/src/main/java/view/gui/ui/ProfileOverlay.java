@@ -21,6 +21,7 @@ import model.app.App;
 import model.enums.MenuType;
 import model.user.User;
 import pvz.skin.BorderedTable;
+import view.gui.audio.GameAudio;
 
 import java.util.function.BiConsumer;
 
@@ -55,6 +56,7 @@ public final class ProfileOverlay {
     public static Table create(Skin skin, BiConsumer<String, Boolean> toast, Runnable onClose,
                                Runnable onResourceBarRefresh) {
         App.getInstance().setCurrentMenu(MenuType.PROFILE);
+        GameAudio.get().playOverlayOpen();
 
         ProfileMenuController controller = ProfileMenuController.getInstance();
         Panel panel = new Panel(skin, controller, toast, onResourceBarRefresh);

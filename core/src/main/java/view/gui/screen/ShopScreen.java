@@ -34,6 +34,8 @@ import model.shop.Shop;
 import model.shop.ShopItem;
 import pvz.libpvz.textures.TextureBank;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameSfx;
 import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.PvzAssets;
 import view.gui.assets.SeedPacketIds;
@@ -592,6 +594,7 @@ public final class ShopScreen extends AbstractMenuScreen {
         if (plants.isEmpty()) {
             status.setText("No unlocked plants to buy packets for.");
             status.setColor(Color.SCARLET);
+            GameAudio.get().playSfx(GameSfx.ERROR);
             return;
         }
         ShopChosenPlantPicker.open(stage, skin, textures, game.assets, plants, plant ->
@@ -686,6 +689,7 @@ public final class ShopScreen extends AbstractMenuScreen {
 
     private void purchase(int id, String targetPlant, int count) {
         CommandResult<Void> result = controller.shopBuy(id, count, targetPlant);
+        GameAudio.get().feedbackPurchase(result);
         status.setText(result.getMessage());
         status.setColor(result.isSuccess() ? Color.WHITE : Color.SCARLET);
         if (result.isSuccess()) {

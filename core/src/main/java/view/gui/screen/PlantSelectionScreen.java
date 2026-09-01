@@ -114,7 +114,7 @@ public final class PlantSelectionScreen extends AbstractGameplayScreen {
                 @Override
                 public void onUpgrade(String plantName) {
                     CommandResult<Void> r = collection.upgradePlant(plantName);
-                    showToast(r.getMessage(), !r.isSuccess());
+                    showPurchaseResult(r);
                     if (r.isSuccess()) {
                         refreshPackets();
                     }

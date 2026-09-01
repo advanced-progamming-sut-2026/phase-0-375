@@ -38,6 +38,7 @@ import model.quest.QuestReward;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
 import view.gui.anim.PamClipCache;
 import view.gui.assets.AdventureHudRegions;
 import view.gui.assets.PvzAssets;
@@ -290,6 +291,7 @@ public final class QuestsScreen extends AbstractMenuScreen {
         if (tab == next) {
             return;
         }
+        GameAudio.get().playNavClick();
         tab = next;
         refresh();
     }

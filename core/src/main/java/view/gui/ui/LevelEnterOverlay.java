@@ -19,6 +19,7 @@ import com.badlogic.gdx.utils.Align;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.assets.UiRegions;
+import view.gui.audio.GameAudio;
 import view.gui.screen.AbstractMenuScreen;
 
 /**
@@ -43,6 +44,7 @@ public final class LevelEnterOverlay {
             textures.loadSync(UiRegions.ATLAS_UI_ALWAYS_LOADED);
             textures.loadSync("ATLASIMAGE_ATLAS_UI_ALWAYSLOADED_768_01");
         }
+        GameAudio.get().playOverlayOpen();
 
         Table overlay = new Table();
         overlay.setFillParent(true);

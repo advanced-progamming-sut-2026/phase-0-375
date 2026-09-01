@@ -35,6 +35,7 @@ import model.zombie.definition.Zombie;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
 import view.gui.anim.PamClipCache;
 import view.gui.anim.SpritesheetClipCache;
 import view.gui.assets.AlmanacArt;
@@ -426,6 +427,10 @@ public final class CollectionScreen extends AbstractMenuScreen {
     }
 
     private void setTab(Tab next) {
+        if (tab == next) {
+            return;
+        }
+        GameAudio.get().playNavClick();
         tab = next;
         refreshTabs();
         refreshGrid();
@@ -621,7 +626,7 @@ public final class CollectionScreen extends AbstractMenuScreen {
         if (r == null || r.getMessage() == null || r.getMessage().isBlank()) {
             return;
         }
-        showToast(r.getMessage(), !r.isSuccess());
+        toast.show(r.getMessage(), !r.isSuccess());
         toast.toFront();
     }
 

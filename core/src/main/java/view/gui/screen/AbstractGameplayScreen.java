@@ -14,10 +14,13 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.utils.viewport.ExtendViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
+import controller.result.CommandResult;
 import model.app.App;
 import model.game.core.GameModel;
 import model.game.core.PvZGameLoop;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameSfx;
 import view.gui.assets.PamPlantClipDurations;
 import view.gui.assets.PamPlantProjectileOrigins;
 import view.gui.assets.PvzAssets;
@@ -306,6 +309,20 @@ public abstract class AbstractGameplayScreen implements Screen {
     }
 
     protected void showToast(String message, boolean error) {
+        if (error) {
+            GameAudio.get().playSfx(GameSfx.ERROR);
+        }
         toast.show(message, error);
+    }
+
+    protected void showPurchaseResult(CommandResult<?> result) {
+        if (result == null) {
+            return;
+        }
+        GameAudio.get().feedbackPurchase(result);
+        String message = result.getMessage();
+        if (message != null && !message.isBlank()) {
+            toast.show(message, !result.isSuccess());
+        }
     }
 }

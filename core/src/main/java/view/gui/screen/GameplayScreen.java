@@ -51,6 +51,8 @@ import model.item.Sun;
 import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
+import view.gui.audio.GameAudio;
+import view.gui.audio.GameSfx;
 import view.gui.audio.GameplayMusic;
 import view.gui.anim.AnimScale;
 import view.gui.anim.SpritesheetClipCache;
@@ -709,7 +711,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         CommandResult<Void> result = gameplay.upgradePlant(fromType);
-        showToast(result.getMessage(), !result.isSuccess());
+        showPurchaseResult(result);
         GameModel model = App.getInstance().getCurrentGameModel();
         if (sunHud != null && model != null) {
             sunHud.setAmount(model.getSunAmount());
@@ -798,7 +800,14 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
             return;
         }
+        boolean hadBoost = boosted(plantName);
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
+        if (result.isSuccess()) {
+            GameAudio.playPlantPlaceSfx(plantName);
+            if (hadBoost) {
+                GameAudio.get().playSfx(GameSfx.PLANT_FOOD);
+            }
+        }
         showToast(result.getMessage(), !result.isSuccess());
         if (conveyorMode || bowlingMode || vaseBreakerMode) {
             refreshPackets();
@@ -884,6 +893,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         CommandResult<Void> result = gameplay.feed(cellTmp[0], cellTmp[1]);
+        if (result.isSuccess()) {
+            GameAudio.get().playSfx(GameSfx.PLANT_FOOD);
+        }
         showToast(result.getMessage(), !result.isSuccess());
     }
 
@@ -892,6 +904,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         CommandResult<Void> result = gameplay.pluck(cellTmp[0], cellTmp[1]);
+        if (result.isSuccess()) {
+            GameAudio.get().playSfx(GameSfx.SHOVEL);
+        }
         showToast(result.getMessage(), !result.isSuccess());
     }
 
@@ -992,6 +1007,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (!result.isSuccess()) {
             return false;
         }
+        GameAudio.get().playSfx(GameSfx.COLLECT_SUN);
         float destX = sunPosTmp[0];
         float destY = sunPosTmp[1];
         if (sunHud != null) {
@@ -1125,6 +1141,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (pauseMenuOpen || endSequenceActive) {
             return;
         }
+        GameAudio.get().playSfx(GameSfx.PAUSE);
         pauseMenuOpen = true;
         if (pauseButton != null) {
             pauseButton.setChecked(true);

@@ -53,6 +53,7 @@ import view.gui.assets.AlmanacZombieLabels;
 import view.gui.assets.PamCatalog;
 import view.gui.assets.PlantSpritesheetCatalog;
 import view.gui.assets.PvzAssets;
+import view.gui.audio.GameAudio;
 import view.gui.assets.SeedPacketIds;
 import view.gui.assets.ShopArt;
 import view.gui.assets.UiRegions;
@@ -255,6 +256,7 @@ public final class CollectionEntryOverlay {
         }
 
         Table overlay = dimOverlay();
+        GameAudio.get().playOverlayOpen();
         PlantPage page = new PlantPage(skin, assets, clips, textures, names, start,
             onChanged, onResult, () -> dismiss(overlay, null));
         addOverlayRoot(overlay, page.root, PLANT_MODAL_W, PLANT_OVERLAY_PAD, PLANT_BLUE_BG);
@@ -279,6 +281,7 @@ public final class CollectionEntryOverlay {
         }
 
         Table overlay = dimOverlay();
+        GameAudio.get().playOverlayOpen();
         ZombiePage page = new ZombiePage(skin, assets, clips, textures, names, start,
             () -> dismiss(overlay, null));
         addOverlayRoot(overlay, page.root, ZOMBIE_MODAL_W, ZOMBIE_OVERLAY_PAD, ZOMBIE_BLUE_BG);
@@ -614,6 +617,7 @@ public final class CollectionEntryOverlay {
             upgradeBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, Actor actor) {
                     CommandResult<Void> r = controller.upgradePlant(currentName());
+                    GameAudio.get().feedbackPurchase(r);
                     if (onResult != null) {
                         onResult.accept(r);
                     }
@@ -626,6 +630,7 @@ public final class CollectionEntryOverlay {
             buyBtn.addListener(new ChangeListener() {
                 @Override public void changed(ChangeEvent event, Actor actor) {
                     CommandResult<Void> r = controller.purchasePlant(currentName());
+                    GameAudio.get().feedbackPurchase(r);
                     if (onResult != null) {
                         onResult.accept(r);
                     }
@@ -787,6 +792,7 @@ public final class CollectionEntryOverlay {
             if (names.size() <= 1) {
                 return;
             }
+            GameAudio.get().playNavClick();
             index = (index - 1 + names.size()) % names.size();
             refresh();
         }
@@ -795,6 +801,7 @@ public final class CollectionEntryOverlay {
             if (names.size() <= 1) {
                 return;
             }
+            GameAudio.get().playNavClick();
             index = (index + 1) % names.size();
             refresh();
         }
@@ -1120,6 +1127,7 @@ public final class CollectionEntryOverlay {
             if (names.size() <= 1) {
                 return;
             }
+            GameAudio.get().playNavClick();
             index = (index - 1 + names.size()) % names.size();
             refresh();
         }
@@ -1128,6 +1136,7 @@ public final class CollectionEntryOverlay {
             if (names.size() <= 1) {
                 return;
             }
+            GameAudio.get().playNavClick();
             index = (index + 1) % names.size();
             refresh();
         }

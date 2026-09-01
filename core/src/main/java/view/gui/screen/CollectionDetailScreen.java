@@ -128,7 +128,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         upgradeBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 CommandResult<Void> r = controller.upgradePlant(entryName);
-                showToast(r.getMessage(), !r.isSuccess());
+                showPurchaseResult(r);
                 if (r.isSuccess()) {
                     resources.refresh();
                     fillContent();
@@ -139,7 +139,7 @@ public final class CollectionDetailScreen extends AbstractMenuScreen {
         buyBtn.addListener(new ChangeListener() {
             @Override public void changed(ChangeEvent event, Actor actor) {
                 CommandResult<Void> r = controller.purchasePlant(entryName);
-                showToast(r.getMessage(), !r.isSuccess());
+                showPurchaseResult(r);
                 if (r.isSuccess()) {
                     resources.refresh();
                     fillContent();
