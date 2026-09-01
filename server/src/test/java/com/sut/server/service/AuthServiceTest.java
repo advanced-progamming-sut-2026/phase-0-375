@@ -9,6 +9,7 @@ import model.network.packet.auth.LoginResponsePacket;
 import model.network.packet.auth.LogoutRequestPacket;
 import model.network.packet.auth.RegisterRequestPacket;
 import model.network.packet.auth.RegisterResponsePacket;
+import model.network.packet.auth.RegisterValidateRequestPacket;
 import model.user.PasswordHasher;
 import model.user.User;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,29 @@ class AuthServiceTest {
         packet.setSecurityQuestionNumber(1);
         packet.setSecurityAnswer("FirstSchool");
         return packet;
+    }
+
+    @Test
+    @DisplayName("Step 1 validation succeeds without creating an account")
+    void testValidateRegistrationStep1Success() {
+        RegisterValidateRequestPacket packet = new RegisterValidateRequestPacket(
+                "step1User", "StrongP@ss1", "StepOne", "step1@pvz.com", "female");
+        RegisterResponsePacket response = authService.validateRegistrationStep1(packet);
+
+        assertTrue(response.isSuccess());
+        assertFalse(userRepository.existsByUsername("step1User"));
+    }
+
+    @Test
+    @DisplayName("Step 1 validation rejects weak password without creating an account")
+    void testValidateRegistrationStep1RejectsWeakPassword() {
+        RegisterValidateRequestPacket packet = new RegisterValidateRequestPacket(
+                "step1Weak", "weak", "StepWeak", "weak@pvz.com", "male");
+        RegisterResponsePacket response = authService.validateRegistrationStep1(packet);
+
+        assertFalse(response.isSuccess());
+        assertTrue(response.getMessage().startsWith("Weak password:"));
+        assertFalse(userRepository.existsByUsername("step1Weak"));
     }
 
     @Test

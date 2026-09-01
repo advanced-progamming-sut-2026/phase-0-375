@@ -14,6 +14,7 @@ import model.network.packet.auth.LoginResponsePacket;
 import model.network.packet.auth.LogoutRequestPacket;
 import model.network.packet.auth.RegisterRequestPacket;
 import model.network.packet.auth.RegisterResponsePacket;
+import model.network.packet.auth.RegisterValidateRequestPacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.network.packet.chat.ReactionPacket;
 import model.network.packet.game.GameStateSnapshotPacket;
@@ -40,6 +41,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PacketSerializationTest {
+
+    @Test
+    @DisplayName("RegisterValidateRequestPacket roundtrip serialization")
+    void testRegisterValidatePacket() throws Exception {
+        RegisterValidateRequestPacket req = new RegisterValidateRequestPacket(
+                "crazy_dave", "StrongP@ss1", "Dave", "dave@pvz.com", "male");
+        String reqJson = NetworkJsonMapper.serialize(req);
+        Packet deserializedReq = NetworkJsonMapper.deserialize(reqJson);
+
+        assertInstanceOf(RegisterValidateRequestPacket.class, deserializedReq);
+        RegisterValidateRequestPacket typedReq = (RegisterValidateRequestPacket) deserializedReq;
+        assertEquals(PacketType.REGISTER_VALIDATE_REQUEST, typedReq.getType());
+        assertEquals("crazy_dave", typedReq.getUsername());
+        assertEquals("StrongP@ss1", typedReq.getPassword());
+        assertEquals("Dave", typedReq.getNickname());
+        assertEquals("dave@pvz.com", typedReq.getEmail());
+        assertEquals("male", typedReq.getGender());
+    }
 
     @Test
     @DisplayName("RegisterRequestPacket and RegisterResponsePacket roundtrip serialization")

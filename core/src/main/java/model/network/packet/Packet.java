@@ -9,6 +9,7 @@ import model.network.packet.auth.LoginResponsePacket;
 import model.network.packet.auth.LogoutRequestPacket;
 import model.network.packet.auth.RegisterRequestPacket;
 import model.network.packet.auth.RegisterResponsePacket;
+import model.network.packet.auth.RegisterValidateRequestPacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.network.packet.chat.ReactionPacket;
 import model.network.packet.game.CollectSunRequestPacket;
@@ -43,6 +44,7 @@ import model.network.packet.user.UserCommandResponsePacket;
 )
 @JsonSubTypes({
     @JsonSubTypes.Type(value = RegisterRequestPacket.class, name = "REGISTER_REQUEST"),
+    @JsonSubTypes.Type(value = RegisterValidateRequestPacket.class, name = "REGISTER_VALIDATE_REQUEST"),
     @JsonSubTypes.Type(value = RegisterResponsePacket.class, name = "REGISTER_RESPONSE"),
     @JsonSubTypes.Type(value = LoginRequestPacket.class, name = "LOGIN_REQUEST"),
     @JsonSubTypes.Type(value = LoginResponsePacket.class, name = "LOGIN_RESPONSE"),

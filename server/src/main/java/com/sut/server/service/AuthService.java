@@ -8,6 +8,7 @@ import model.network.packet.auth.LoginResponsePacket;
 import model.network.packet.auth.LogoutRequestPacket;
 import model.network.packet.auth.RegisterRequestPacket;
 import model.network.packet.auth.RegisterResponsePacket;
+import model.network.packet.auth.RegisterValidateRequestPacket;
 import model.network.packet.auth.SessionResumeRequestPacket;
 import model.network.packet.system.ErrorMessagePacket;
 import model.network.util.UserSanitizer;
@@ -81,6 +82,11 @@ public class AuthService {
             conn.sendPacket(response);
         });
 
+        router.registerHandler(RegisterValidateRequestPacket.class, (conn, packet) -> {
+            RegisterResponsePacket response = validateRegistrationStep1(packet);
+            conn.sendPacket(response);
+        });
+
         router.registerHandler(LoginRequestPacket.class, (conn, packet) -> {
             LoginResponsePacket response = login(packet, conn);
             conn.sendPacket(response);
@@ -99,6 +105,25 @@ public class AuthService {
     }
 
     /**
+     * Validates registration profile fields (step 1). Does not create an account.
+     */
+    public RegisterResponsePacket validateRegistrationStep1(RegisterValidateRequestPacket packet) {
+        if (packet == null) {
+            return new RegisterResponsePacket(false, "Registration request cannot be null.");
+        }
+        RegisterResponsePacket fields = validateRegistrationFields(
+                packet.getUsername(),
+                packet.getPassword(),
+                packet.getNickname(),
+                packet.getEmail(),
+                packet.getGender());
+        if (!fields.isSuccess()) {
+            return fields;
+        }
+        return new RegisterResponsePacket(true, "All fields validated. Now choose a security question.");
+    }
+
+    /**
      * Handles user registration with field validation, duplicate checks, and profile creation.
      */
     public synchronized RegisterResponsePacket register(RegisterRequestPacket packet) {
@@ -106,62 +131,24 @@ public class AuthService {
             return new RegisterResponsePacket(false, "Registration request cannot be null.");
         }
 
-        // 1. Validate Username
-        String username = packet.getUsername() != null ? packet.getUsername().trim() : "";
-        if (username.isEmpty()) {
-            return new RegisterResponsePacket(false, "Username cannot be empty.");
-        }
-        if (!USERNAME_PATTERN.matcher(username).matches()) {
-            return new RegisterResponsePacket(false, "Invalid username. Only letters, numbers, and hyphens allowed.");
-        }
-        if (userRepository.existsByUsername(username)) {
-            return new RegisterResponsePacket(false, "Username '" + username + "' is already taken.");
+        RegisterResponsePacket fields = validateRegistrationFields(
+                packet.getUsername(),
+                packet.getPasswordHash(),
+                packet.getNickname(),
+                packet.getEmail(),
+                packet.getGender());
+        if (!fields.isSuccess()) {
+            return fields;
         }
 
-        // 2. Validate Password / Password Hash
-        String rawOrHash = packet.getPasswordHash() != null ? packet.getPasswordHash().trim() : "";
-        if (rawOrHash.isEmpty()) {
-            return new RegisterResponsePacket(false, "Password cannot be empty.");
-        }
-
-        String passwordHash;
-        if (SHA256_HEX_PATTERN.matcher(rawOrHash).matches()) {
-            passwordHash = rawOrHash.toLowerCase();
-        } else {
-            String pwError = validatePasswordComplexity(rawOrHash);
-            if (pwError != null) {
-                return new RegisterResponsePacket(false, pwError);
-            }
-            passwordHash = PasswordHasher.hash(rawOrHash);
-        }
-
-        // 3. Validate Nickname
-        String nickname = packet.getNickname() != null ? packet.getNickname().trim() : "";
-        if (nickname.isEmpty()) {
-            return new RegisterResponsePacket(false, "Nickname cannot be empty.");
-        }
-        if (nickname.length() < 3 || nickname.length() > 30) {
-            return new RegisterResponsePacket(false, "Nickname must be between 3 and 30 characters.");
-        }
-
-        // 4. Validate Email
-        String email = packet.getEmail() != null ? packet.getEmail().trim() : "";
-        if (email.isEmpty()) {
-            return new RegisterResponsePacket(false, "Email cannot be empty.");
-        }
-        String emailError = validateEmailFormat(email);
-        if (emailError != null) {
-            return new RegisterResponsePacket(false, emailError);
-        }
-        if (userRepository.existsByEmail(email)) {
-            return new RegisterResponsePacket(false, "Email '" + email + "' is already in use.");
-        }
-
-        // 5. Validate Gender
-        String gender = packet.getGender() != null ? packet.getGender().trim().toLowerCase() : "";
-        if (!gender.equals("male") && !gender.equals("female")) {
-            return new RegisterResponsePacket(false, "Gender must be 'male' or 'female'.");
-        }
+        String username = packet.getUsername().trim();
+        String rawOrHash = packet.getPasswordHash().trim();
+        String passwordHash = SHA256_HEX_PATTERN.matcher(rawOrHash).matches()
+                ? rawOrHash.toLowerCase()
+                : PasswordHasher.hash(rawOrHash);
+        String nickname = packet.getNickname().trim();
+        String email = packet.getEmail().trim();
+        String gender = packet.getGender().trim().toLowerCase();
 
         // 6. Validate Security Question & Answer
         int qNum = packet.getSecurityQuestionNumber();
@@ -413,6 +400,58 @@ public class AuthService {
     // ==========================================
     // Validation Helper Functions
     // ==========================================
+
+    private RegisterResponsePacket validateRegistrationFields(String usernameRaw, String passwordRawOrHash,
+                                                              String nicknameRaw, String emailRaw, String genderRaw) {
+        String username = usernameRaw != null ? usernameRaw.trim() : "";
+        if (username.isEmpty()) {
+            return new RegisterResponsePacket(false, "Username cannot be empty.");
+        }
+        if (!USERNAME_PATTERN.matcher(username).matches()) {
+            return new RegisterResponsePacket(false, "Invalid username. Only letters, numbers, and hyphens allowed.");
+        }
+        if (userRepository.existsByUsername(username)) {
+            return new RegisterResponsePacket(false, "Username '" + username + "' is already taken.");
+        }
+
+        String rawOrHash = passwordRawOrHash != null ? passwordRawOrHash.trim() : "";
+        if (rawOrHash.isEmpty()) {
+            return new RegisterResponsePacket(false, "Password cannot be empty.");
+        }
+        if (!SHA256_HEX_PATTERN.matcher(rawOrHash).matches()) {
+            String pwError = validatePasswordComplexity(rawOrHash);
+            if (pwError != null) {
+                return new RegisterResponsePacket(false, pwError);
+            }
+        }
+
+        String nickname = nicknameRaw != null ? nicknameRaw.trim() : "";
+        if (nickname.isEmpty()) {
+            return new RegisterResponsePacket(false, "Nickname cannot be empty.");
+        }
+        if (nickname.length() < 3 || nickname.length() > 30) {
+            return new RegisterResponsePacket(false, "Nickname must be between 3 and 30 characters.");
+        }
+
+        String email = emailRaw != null ? emailRaw.trim() : "";
+        if (email.isEmpty()) {
+            return new RegisterResponsePacket(false, "Email cannot be empty.");
+        }
+        String emailError = validateEmailFormat(email);
+        if (emailError != null) {
+            return new RegisterResponsePacket(false, emailError);
+        }
+        if (userRepository.existsByEmail(email)) {
+            return new RegisterResponsePacket(false, "Email '" + email + "' is already in use.");
+        }
+
+        String gender = genderRaw != null ? genderRaw.trim().toLowerCase() : "";
+        if (!gender.equals("male") && !gender.equals("female")) {
+            return new RegisterResponsePacket(false, "Gender must be 'male' or 'female'.");
+        }
+
+        return new RegisterResponsePacket(true, "OK");
+    }
 
     private static String validatePasswordComplexity(String pw) {
         if (pw.length() < 8) return "Weak password: minimum 8 characters.";

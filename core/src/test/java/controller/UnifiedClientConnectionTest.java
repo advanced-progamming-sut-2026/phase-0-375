@@ -74,21 +74,13 @@ class UnifiedClientConnectionTest {
     }
 
     @Test
-    @DisplayName("RegisterMenuController only guards empty/mismatch fields; authority is on the server")
+    @DisplayName("RegisterMenuController only guards password confirmation locally; authority is on the server")
     void testRegisterValidation() {
         RegisterMenuController controller = RegisterMenuController.getInstance();
 
         CommandResult<Void> mismatch = controller.register("alice", "Password123!", "Different123!", "Alice", "alice@pvz.com", "female");
         assertFalse(mismatch.isSuccess());
         assertTrue(mismatch.getMessage().contains("do not match"));
-
-        CommandResult<Void> badGender = controller.register("alice", "Password123!", "Password123!", "Alice", "alice@pvz.com", "other");
-        assertFalse(badGender.isSuccess());
-        assertTrue(badGender.getMessage().contains("Gender must be 'male' or 'female'"));
-
-        CommandResult<Void> emptyEmail = controller.register("alice", "Password123!", "Password123!", "Alice", "", "female");
-        assertFalse(emptyEmail.isSuccess());
-        assertTrue(emptyEmail.getMessage().contains("Email cannot be empty"));
     }
 
     @Test

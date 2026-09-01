@@ -3,6 +3,7 @@ package model.network.packet;
 public enum PacketType {
     // Authentication
     REGISTER_REQUEST,
+    REGISTER_VALIDATE_REQUEST,
     REGISTER_RESPONSE,
     LOGIN_REQUEST,
     LOGIN_RESPONSE,

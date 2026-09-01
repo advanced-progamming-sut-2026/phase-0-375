@@ -160,6 +160,34 @@ class UnifiedClientAuthIntegrationTest {
     }
 
     @Test
+    @DisplayName("R1 Unified Auth: Step 1 server validation errors reach the client")
+    void testRegisterStep1ServerValidationErrors() {
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+            RegisterMenuController regController = RegisterMenuController.getInstance();
+
+            CommandResult<Void> weak = regController.register(
+                    "weak-" + UUID.randomUUID().toString().substring(0, 6),
+                    "weak",
+                    "weak",
+                    "WeakNick",
+                    "weak@pvz.com",
+                    "male");
+            assertFalse(weak.isSuccess(), weak.getMessage());
+            assertTrue(weak.getMessage().startsWith("Weak password:"));
+
+            CommandResult<Void> badGender = regController.register(
+                    "gender-" + UUID.randomUUID().toString().substring(0, 6),
+                    "Password123!",
+                    "Password123!",
+                    "GenderNick",
+                    "gender@pvz.com",
+                    "other");
+            assertFalse(badGender.isSuccess(), badGender.getMessage());
+            assertTrue(badGender.getMessage().contains("Gender must be 'male' or 'female'."));
+        });
+    }
+
+    @Test
     @DisplayName("R1 Unified Auth: Offline register/login must fail (no client-side user store)")
     void testOfflineAuthRejected() {
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
@@ -179,11 +207,12 @@ class UnifiedClientAuthIntegrationTest {
                     uname + "@pvz.com",
                     "male"
             );
-            assertTrue(r1.isSuccess(), "Step 1 only stashes fields: " + r1.getMessage());
+            assertFalse(r1.isSuccess(), "Offline step 1 must not succeed: " + r1.getMessage());
+            assertTrue(r1.getMessage().toLowerCase().contains("server"));
 
             CommandResult<Void> r2 = regController.pickQuestion(2, "PeaShooter", "PeaShooter");
             assertFalse(r2.isSuccess(), "Offline registration must not succeed");
-            assertTrue(r2.getMessage().toLowerCase().contains("server"));
+            assertTrue(r2.getMessage().toLowerCase().contains("server") || r2.getMessage().contains("No registration in progress"));
             assertFalse(clientLocalRepo.existsByUsername(uname));
             assertFalse(serverRepo.existsByUsername(uname));
 
