@@ -1759,7 +1759,8 @@
       "initialSun": 175,
       "maxPlantsAllowed": 8,
       "timedWarLimit": 180.0,
-      "timedWarTargetKills": 25
+      "timedWarTargetKills": 10,
+      "timedWarDecayInterval": 5.0
     },
     "necromancyTiles": [
       {
