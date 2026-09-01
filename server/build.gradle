@@ -53,6 +53,8 @@ run {
   workingDir = rootProject.projectDir.path
   standardInput = System.in
   jvmArgs += "--enable-native-access=ALL-UNNAMED"
+  systemProperty 'pvz.server.host', rootProject.findProperty('pvz.server.host') ?: '0.0.0.0'
+  systemProperty 'pvz.server.port', rootProject.findProperty('pvz.server.port') ?: '8080'
 
   // Support passing port via Gradle property: -PserverPort=9090
   if (project.hasProperty('serverPort')) {

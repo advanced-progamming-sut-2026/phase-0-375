@@ -23,8 +23,8 @@ public class App {
     private MenuType currentMenu;
     private UserRepository userRepository;
     private NetworkClient networkClient;
-    private String serverHost = NetworkClient.DEFAULT_HOST;
-    private int serverPort = NetworkClient.DEFAULT_PORT;
+    private String serverHost = hostFromSystem();
+    private int serverPort = portFromSystem();
     private Runnable onNetworkConnected;
     private final LocalSessionStore localSessionStore = new LocalSessionStore();
     /** In-memory stay-logged-in token for this process (also on disk when stay was checked). */
@@ -112,6 +112,24 @@ public class App {
     public void setServerEndpoint(String host, int port) {
         this.serverHost = (host != null && !host.isBlank()) ? host : NetworkClient.DEFAULT_HOST;
         this.serverPort = port > 0 ? port : NetworkClient.DEFAULT_PORT;
+    }
+
+    private static String hostFromSystem() {
+        String host = System.getProperty("pvz.server.host");
+        return (host != null && !host.isBlank()) ? host.trim() : NetworkClient.DEFAULT_HOST;
+    }
+
+    private static int portFromSystem() {
+        String port = System.getProperty("pvz.server.port");
+        if (port == null || port.isBlank()) {
+            return NetworkClient.DEFAULT_PORT;
+        }
+        try {
+            int parsed = Integer.parseInt(port.trim());
+            return parsed > 0 ? parsed : NetworkClient.DEFAULT_PORT;
+        } catch (NumberFormatException ignored) {
+            return NetworkClient.DEFAULT_PORT;
+        }
     }
 
     public LocalSessionStore getLocalSessionStore() {
