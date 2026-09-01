@@ -50,6 +50,7 @@ import model.plant.PlantFactory;
 import model.user.User;
 import view.gui.PvzGdxGame;
 import view.gui.anim.AnimScale;
+import view.gui.anim.PamClipCache;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
 import view.gui.ui.InviteReceivedOverlay;
@@ -88,6 +89,9 @@ import view.gui.ui.MyopointHud;
 import view.gui.ui.MyopointResultsOverlay;
 import view.gui.ui.PauseMenuOverlay;
 import view.gui.ui.PlantFoodBankHud;
+import view.gui.ui.ReactionBubbleLayout;
+import view.gui.ui.ReactionBubbleWidget;
+import view.gui.ui.ReactionPresets;
 import view.gui.ui.ReadySetPlantBanner;
 import view.gui.ui.SeedPacketActor;
 import view.gui.ui.SkinFonts;
@@ -101,6 +105,7 @@ import view.gui.ui.ZombiePacketActor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.Map;
 
 /**
@@ -177,6 +182,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private ImageButton pauseButton;
     private Table pauseOverlay;
     private InviteReceivedOverlay inviteOverlay;
+    private ReactionBubbleWidget localReactionBubble;
+    private ReactionBubbleWidget remoteReactionBubble;
+    private PamClipCache reactionPamClips;
+    private Consumer<ReactionPacket> reactionPacketHandler;
     private Cursor hiddenCursor;
     private TextureRegion plantfoodCursorRegion;
     private TextureRegion shovelCursorRegion;
@@ -514,6 +523,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             uiStage.addActor(mpTopBar);
             hudRoots.add(mpTopBar);
+            buildReactionBubbles(model);
         }
 
         lootRewardPopup = new LootRewardPopup(skin);
@@ -621,6 +631,61 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         uiStage.addActor(bottomRight);
         hudRoots.add(bottomRight);
+    }
+
+    private void buildReactionBubbles(GameModel model) {
+        if (!multiplayerMode || ReactionBubbleLayout.bubbleBackground(skin) == null) {
+            return;
+        }
+        reactionPamClips = new PamClipCache(assets.player);
+        ReactionBubbleLayout.Corner localCorner = multiplayerPlantSide
+                ? ReactionBubbleLayout.Corner.BOTTOM_LEFT
+                : ReactionBubbleLayout.Corner.BOTTOM_RIGHT;
+        ReactionBubbleLayout.Corner remoteCorner = multiplayerPlantSide
+                ? ReactionBubbleLayout.Corner.BOTTOM_RIGHT
+                : ReactionBubbleLayout.Corner.BOTTOM_LEFT;
+
+        localReactionBubble = new ReactionBubbleWidget(
+                skin, assets.textures, assets.player, reactionPamClips, localCorner, true, this::sendReaction);
+        float localPadY = multiplayerPlantSide && plantFoodHudEnabled(model)
+                ? ReactionBubbleLayout.PLANT_PAD_Y
+                : ReactionBubbleLayout.PAD_Y;
+        localReactionBubble.setPadY(localPadY);
+
+        remoteReactionBubble = new ReactionBubbleWidget(
+                skin, assets.textures, assets.player, reactionPamClips, remoteCorner, false, null);
+        remoteReactionBubble.setPadY(ReactionBubbleLayout.PAD_Y);
+
+        uiStage.addActor(remoteReactionBubble);
+        uiStage.addActor(localReactionBubble);
+        hudRoots.add(remoteReactionBubble);
+        hudRoots.add(localReactionBubble);
+        localReactionBubble.relayout(uiStage.getWidth());
+        remoteReactionBubble.relayout(uiStage.getWidth());
+        localReactionBubble.toFront();
+    }
+
+    private void sendReaction(ReactionPresets.Preset preset) {
+        if (preset == null || multiplayerClient == null || !multiplayerClient.isConnected()) {
+            return;
+        }
+        String name = multiplayerUser != null ? multiplayerUser.getUsername() : "Player";
+        localReactionBubble.playSendPreview(preset, () -> multiplayerClient.sendPacket(
+                new ReactionPacket(name, preset.type(), preset.contentId())));
+    }
+
+    private void onReactionReceived(ReactionPacket packet) {
+        if (packet == null || remoteReactionBubble == null) {
+            return;
+        }
+        if (packet.getReactionType() == ReactionType.SURRENDER) {
+            return;
+        }
+        String localName = multiplayerUser != null ? multiplayerUser.getUsername() : null;
+        if (localName != null && localName.equals(packet.getSenderUsername())) {
+            return;
+        }
+        remoteReactionBubble.showIncoming(packet);
     }
 
     private void refreshPackets() {
@@ -1362,6 +1427,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     @Override
     public void show() {
         super.show();
+        if (multiplayerMode && multiplayerClient != null) {
+            reactionPacketHandler = this::onReactionReceived;
+            multiplayerClient.registerHandler(ReactionPacket.class, reactionPacketHandler);
+        }
     }
 
     @Override
@@ -1997,6 +2066,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     @Override
     public void hide() {
+        if (multiplayerClient != null && reactionPacketHandler != null) {
+            multiplayerClient.unregisterHandler(ReactionPacket.class, reactionPacketHandler);
+            reactionPacketHandler = null;
+        }
+        if (localReactionBubble != null) {
+            localReactionBubble.dispose();
+        }
+        if (remoteReactionBubble != null) {
+            remoteReactionBubble.dispose();
+        }
         // If the player leaves gameplay while the plant-food cursor is armed,
         // restore the OS cursor so the rest of the app is usable.
         if (plantfoodMode) {
@@ -2029,6 +2108,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             conveyorHud.dispose();
             conveyorHud = null;
         }
+        localReactionBubble = null;
+        remoteReactionBubble = null;
+        reactionPamClips = null;
         restoreOsCursor();
         if (hiddenCursor != null) {
             hiddenCursor.dispose();

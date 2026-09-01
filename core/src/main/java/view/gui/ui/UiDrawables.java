@@ -1,6 +1,9 @@
 package view.gui.ui;
 
+import com.badlogic.gdx.graphics.g2d.Batch;
+import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.utils.BaseDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 
 final class UiDrawables {
@@ -26,5 +29,36 @@ final class UiDrawables {
     static Drawable tryNamed(Skin skin, String atlasName) {
         Drawable ten = tryDrawable(skin, atlasName + "_10");
         return ten != null ? ten : tryDrawable(skin, atlasName);
+    }
+
+    /** Horizontally mirrors draw only; insets stay the same (caller pads content for tail side). */
+    static Drawable mirrored(Drawable delegate) {
+        return delegate == null ? null : new MirroredDrawable(delegate);
+    }
+
+    private static final class MirroredDrawable extends BaseDrawable {
+        private final Drawable delegate;
+        private final Matrix4 saved = new Matrix4();
+        private final Matrix4 flipped = new Matrix4();
+
+        MirroredDrawable(Drawable delegate) {
+            this.delegate = delegate;
+            setMinWidth(delegate.getMinWidth());
+            setMinHeight(delegate.getMinHeight());
+            setLeftWidth(delegate.getRightWidth());
+            setRightWidth(delegate.getLeftWidth());
+            setTopHeight(delegate.getTopHeight());
+            setBottomHeight(delegate.getBottomHeight());
+        }
+
+        @Override
+        public void draw(Batch batch, float x, float y, float width, float height) {
+            // getTransformMatrix() hands back the batch's live matrix, so copy before mutating.
+            saved.set(batch.getTransformMatrix());
+            flipped.set(saved).translate(x + width, y, 0f).scale(-1f, 1f, 1f);
+            batch.setTransformMatrix(flipped);
+            delegate.draw(batch, 0f, 0f, width, height);
+            batch.setTransformMatrix(saved);
+        }
     }
 }
