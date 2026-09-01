@@ -52,6 +52,17 @@ import view.gui.PvzGdxGame;
 import view.gui.anim.AnimScale;
 import view.gui.anim.bowling.BowlingWalnutAnim;
 import view.gui.anim.vase.VaseBreakerAnim;
+import view.gui.ui.InviteReceivedOverlay;
+import model.network.client.NetworkClient;
+import model.network.enums.PlayerRole;
+import model.network.enums.ReactionType;
+import model.network.packet.InviteReceivedPacket;
+import model.network.packet.chat.ReactionPacket;
+import model.network.packet.game.GameStateSnapshotPacket;
+import model.network.packet.game.PlacePlantRequestPacket;
+import model.network.packet.game.PlaceZombieRequestPacket;
+import model.network.packet.matchmaking.MatchFoundPacket;
+import model.network.util.GameStateSnapshotApplier;
 import view.gui.assets.ZombiePacketIds;
 import view.gui.lawn.BrainLaneRenderer;
 import view.gui.assets.AdventureHudRegions;
@@ -136,8 +147,16 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private final boolean vaseBreakerMode;
     private final boolean beghouledMode;
     private final boolean iZombieMode;
+    private final boolean multiplayerMode;
+    private final boolean multiplayerPlantSide;
+    private final boolean useZombiePackets;
     private final boolean scoreMode;
     private final boolean saveOurSeedsMode;
+    private final NetworkClient multiplayerClient;
+    private final PlayerRole multiplayerRole;
+    private final User multiplayerUser;
+    private final String multiplayerOpponent;
+    private final GameStateSnapshotApplier snapshotApplier;
     private ConveyorBeltHud conveyorHud;
     private int swapFromCol = -1;
     private int swapFromRow = -1;
@@ -146,6 +165,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private boolean plantfoodMode;
     private boolean shovelMode;
     private boolean pauseMenuOpen;
+    private boolean invitePauseActive;
     private boolean endSequenceActive;
     private LoseResultsOverlay loseOverlay;
     private WinResultsOverlay winOverlay;
@@ -154,6 +174,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private ImageButton shovelButton;
     private ImageButton pauseButton;
     private Table pauseOverlay;
+    private InviteReceivedOverlay inviteOverlay;
     private Cursor hiddenCursor;
     private TextureRegion plantfoodCursorRegion;
     private TextureRegion shovelCursorRegion;
@@ -166,14 +187,32 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     private static final float PAUSE_BTN_SIZE = 70f;
 
     public GameplayScreen(PvzGdxGame game) {
+        this(game, null, null, null, null);
+    }
+
+    public GameplayScreen(
+            PvzGdxGame game,
+            NetworkClient networkClient,
+            User user,
+            MatchFoundPacket match,
+            PlayerRole role
+    ) {
         super(game);
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
+        this.multiplayerClient = networkClient;
+        this.multiplayerUser = user;
+        this.multiplayerRole = role;
+        this.multiplayerOpponent = match != null ? match.getOpponentUsername() : null;
+        this.multiplayerMode = networkClient != null && role != null;
+        this.multiplayerPlantSide = multiplayerMode && role == PlayerRole.PLANT;
+        this.snapshotApplier = multiplayerMode ? new GameStateSnapshotApplier() : null;
         lawnLayout = lawnLayout();
         bowlingMode = currentLevel() instanceof WallnutBowlingLevel;
         conveyorMode = currentLevel() instanceof ConveyorBeltLevel || bowlingMode;
         vaseBreakerMode = currentLevel() instanceof VaseBreakerLevel;
         beghouledMode = currentLevel() instanceof BeghouledLevel;
         iZombieMode = currentLevel() instanceof IZombieLevel;
+        useZombiePackets = iZombieMode && !multiplayerPlantSide;
         scoreMode = currentLevel() instanceof ScoreLevel;
         saveOurSeedsMode = currentLevel() instanceof SaveOurSeedsLevel || ProtectTileRenderer.isProtectLevel(currentLevel());
         protectTileRenderer = new ProtectTileRenderer(assets.textures);
@@ -204,6 +243,8 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (iZombieMode) {
             brainLaneRenderer = new BrainLaneRenderer(assets.textures);
             brainLaneRenderer.ensureLoaded();
+        }
+        if (useZombiePackets) {
             assets.textures.loadSync(ZombiePacketIds.ATLAS_GROUP);
             assets.textures.loadSync(ZombiePacketIds.ATLAS_PAGE);
         }
@@ -225,6 +266,11 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             setWorldInput(createWorldClickInput(lawnLayout, this::onWorldClick, this::onCellHover));
         }
         buildHud();
+        if (multiplayerMode) {
+            String roleLabel = multiplayerPlantSide ? "Plant" : "Zombie";
+            String vs = multiplayerOpponent != null ? multiplayerOpponent : "Opponent";
+            showToast(roleLabel + " vs " + vs, false);
+        }
     }
 
     private BitmapFont resolveFont() {
@@ -307,7 +353,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         left.setTouchable(Touchable.childrenOnly);
         left.top().left().pad(8f);
         packetColumn = new Table();
-        if (iZombieMode) {
+        if (useZombiePackets) {
             Table topRow = new Table();
             if (sunBank) {
                 sunHud = new SunHud(skin);
@@ -565,7 +611,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             refreshBeghouledUpgrades();
             return;
         }
-        if (iZombieMode) {
+        if (useZombiePackets) {
             refreshIZombiePackets();
             return;
         }
@@ -714,7 +760,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             }
             return;
         }
-        if (iZombieMode) {
+        if (useZombiePackets) {
             Map<String, Integer> costs = iZombieRosterCosts();
             for (Actor actor : packetColumn.getChildren()) {
                 if (!(actor instanceof ZombiePacketActor packet) || packet.zombieName() == null) {
@@ -771,6 +817,21 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
             return;
         }
+        if (multiplayerMode) {
+            if (!multiplayerPlantSide) {
+                showToast("Only the plant player can plant.", true);
+                return;
+            }
+            if (!canPlaceMultiplayerPlantAt(cellTmp[0])) {
+                showToast("Plants must be placed behind the red line.", true);
+                return;
+            }
+            if (multiplayerClient != null && multiplayerClient.isConnected()) {
+                multiplayerClient.sendPacket(new PlacePlantRequestPacket(plantName, cellTmp[1], cellTmp[0]));
+            }
+            refreshPacketChrome();
+            return;
+        }
         CommandResult<Void> result = gameplay.plant(plantName, cellTmp[0], cellTmp[1]);
         showToast(result.getMessage(), !result.isSuccess());
         if (conveyorMode || bowlingMode || vaseBreakerMode) {
@@ -786,6 +847,21 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         stageToWorld(stageX, stageY);
         if (!lawnLayout.worldToCell(worldTmp.x, worldTmp.y, cellTmp)) {
+            return;
+        }
+        if (multiplayerMode) {
+            if (multiplayerPlantSide) {
+                showToast("Only the zombie player can spawn zombies.", true);
+                return;
+            }
+            if (!canPlaceIZombieAt(cellTmp[0])) {
+                showToast("Zombies must be spawned at/right of the red line.", true);
+                return;
+            }
+            if (multiplayerClient != null && multiplayerClient.isConnected()) {
+                multiplayerClient.sendPacket(new PlaceZombieRequestPacket(zombieName, cellTmp[1], cellTmp[0]));
+            }
+            refreshPacketChrome();
             return;
         }
         CommandResult<Void> result = gameplay.placeZombie(zombieName, cellTmp[0], cellTmp[1]);
@@ -1007,10 +1083,22 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void exitToLevels() {
+        if (multiplayerMode && multiplayerClient != null && multiplayerClient.isConnected()) {
+            GameModel model = App.getInstance().getCurrentGameModel();
+            if (model != null && model.getState() == GameState.RUNNING) {
+                String name = multiplayerUser != null ? multiplayerUser.getUsername() : "Player";
+                multiplayerClient.sendPacket(new ReactionPacket(name, ReactionType.SURRENDER, "I yield"));
+            }
+        }
         flushPendingLoot();
         Level level = currentLevel();
         App.getInstance().setCurrentGameModel(null);
         App.getInstance().setCurrentGameLoop(null);
+        if (multiplayerMode) {
+            App.getInstance().setCurrentMenu(MenuType.TRAVEL_LOG);
+            game.setScreen(new QuestsScreen(game, QuestsScreen.Tab.MINI_GAMES));
+            return;
+        }
         if (scoreMode || level instanceof ScoreLevel) {
             App.getInstance().setCurrentMenu(MenuType.GAME);
             game.setScreen(new AdventureScreen(game));
@@ -1032,6 +1120,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
 
     /** After a win: load the next level in this chapter, or fall back to the map. */
     private void continueToNextLevel() {
+        if (multiplayerMode) {
+            exitToLevels();
+            return;
+        }
         Level level = currentLevel();
         if (scoreMode || level instanceof ScoreLevel) {
             exitToLevels();
@@ -1106,6 +1198,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
     }
 
     private void restartLevel() {
+        if (multiplayerMode) {
+            exitToLevels();
+            return;
+        }
         flushPendingLoot();
         Level level = currentLevel();
         if (scoreMode || level instanceof ScoreLevel) {
@@ -1177,15 +1273,53 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         game.setScreen(new GameplayScreen(game));
     }
 
+    public void openInviteOverlay(InviteReceivedPacket packet) {
+        if (endSequenceActive || packet == null || inviteOverlay != null) {
+            return;
+        }
+        invitePauseActive = true;
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (loop != null && loop.getGameState() == GameState.RUNNING) {
+            loop.pause();
+        }
+        NetworkClient client = App.getInstance().getNetworkClient();
+        inviteOverlay = new InviteReceivedOverlay(
+            game, skin, client, packet,
+            this::closeInviteOverlay
+        );
+        uiStage.addActor(inviteOverlay);
+        toast.toFront();
+    }
+
+    public void closeInviteOverlay() {
+        if (!invitePauseActive && inviteOverlay == null) {
+            return;
+        }
+        invitePauseActive = false;
+        if (inviteOverlay != null) {
+            inviteOverlay.remove();
+            inviteOverlay = null;
+        }
+        PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+        if (!pauseMenuOpen && loop != null && loop.getGameState() == GameState.PAUSED) {
+            loop.resume();
+        }
+    }
+
+    @Override
+    public void show() {
+        super.show();
+    }
+
     @Override
     protected boolean freezeWorld() {
         // Pause freezes PAM; win/lose keep lawn anims running under the dim.
-        return pauseMenuOpen;
+        return pauseMenuOpen || invitePauseActive;
     }
 
     @Override
     protected void updateLogic(float delta) {
-        if (pauseMenuOpen) {
+        if (pauseMenuOpen || invitePauseActive) {
             return;
         }
         if (endSequenceActive) {
@@ -1203,7 +1337,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             return;
         }
         GameModel model = App.getInstance().getCurrentGameModel();
-        if (isPregame()) {
+        if (multiplayerMode) {
+            applyMultiplayerSnapshot(model);
+        } else if (isPregame()) {
             entityRenderer.tickMowerIntro(delta);
         } else {
             PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
@@ -1267,6 +1403,22 @@ public final class GameplayScreen extends AbstractGameplayScreen {
             refreshPackets();
         } else {
             refreshPacketChrome();
+        }
+    }
+
+    private void applyMultiplayerSnapshot(GameModel model) {
+        if (snapshotApplier == null || multiplayerClient == null || model == null) {
+            return;
+        }
+        GameStateSnapshotPacket snap = multiplayerClient.getLatestSnapshot();
+        if (snap == null) {
+            return;
+        }
+        snapshotApplier.apply(model, snap, multiplayerRole);
+        if (snap.isGameOver() && !endSequenceActive) {
+            boolean won = multiplayerRole != null
+                    && multiplayerRole.name().equalsIgnoreCase(snap.getWinnerRole());
+            model.setGameState(won ? GameState.WON : GameState.LOST);
         }
     }
 
@@ -1398,7 +1550,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (highlight && bowlingMode && previewPlant != null && !canBowlAt(hoverCol)) {
             highlight = false;
         }
-        if (highlight && iZombieMode && previewPlant != null && !canPlaceIZombieAt(hoverCol)) {
+        if (highlight && useZombiePackets && previewPlant != null && !canPlaceIZombieAt(hoverCol)) {
+            highlight = false;
+        }
+        if (highlight && multiplayerPlantSide && previewPlant != null && !canPlaceMultiplayerPlantAt(hoverCol)) {
             highlight = false;
         }
         if (highlight) {
@@ -1409,7 +1564,7 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         }
         entityRenderer.draw(game.batch, App.getInstance().getCurrentGameModel(), delta);
         if (previewPlant != null) {
-            if (iZombieMode) {
+            if (useZombiePackets) {
                 entityRenderer.drawZombieIdle(
                     game.batch, previewPlant, worldTmp.x, worldTmp.y, previewTime, currentChapter());
             } else {
@@ -1493,6 +1648,9 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         if (model == null) {
             return true;
         }
+        if (model.getCurrentLevel() instanceof IZombieLevel) {
+            return false;
+        }
         Level level = model.getCurrentLevel();
         if (level == null || level.getConfig() == null || level.getConfig().getRules() == null) {
             return true;
@@ -1548,11 +1706,19 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         return true;
     }
 
+    private boolean canPlaceMultiplayerPlantAt(int col) {
+        Level level = currentLevel();
+        if (level instanceof IZombieLevel iZombie) {
+            return col < iZombie.redLineColumn();
+        }
+        return true;
+    }
+
     private List<String> hudPlantNames() {
         if (beghouledMode) {
             return beghouledUpgradeFromNames();
         }
-        if (iZombieMode) {
+        if (useZombiePackets) {
             return iZombieRosterNames();
         }
         if (vaseBreakerMode) {

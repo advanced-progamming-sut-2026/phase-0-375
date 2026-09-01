@@ -44,36 +44,28 @@ public class QuestReward {
         if (user == null) {
             return;
         }
-        if (coinAmount > 0) {
-            user.setCoins(user.getCoins() + coinAmount);
+        var repo = App.getInstance().getUserRepository();
+        String username = user.getUsername();
+        if (coinAmount > 0 && repo != null) {
+            repo.addCoins(username, coinAmount);
         }
-        if (gemAmount > 0) {
-            user.setGems(user.getGems() + gemAmount);
+        if (gemAmount > 0 && repo != null) {
+            repo.addGems(username, gemAmount);
         }
-        if (inventoryItem != null && !inventoryItem.isBlank() && inventoryItemAmount > 0) {
-            if (user.getSeedPackets() == null) {
-                user.setSeedPackets(new HashMap<>());
-            }
-            // generic "seed_packet" rewards go to a random unlocked plant
+        if (inventoryItem != null && !inventoryItem.isBlank() && inventoryItemAmount > 0 && repo != null) {
             String packetPlant = inventoryItem;
             if ("seed_packet".equalsIgnoreCase(inventoryItem)) {
-                packetPlant = pickRandomUnlockedPlant(user);
+                packetPlant = pickRandomUnlockedPlant(App.getInstance().getCurrentUser());
             }
             if (packetPlant != null) {
-                int current = user.getSeedPackets().getOrDefault(packetPlant, 0);
-                user.getSeedPackets().put(packetPlant, current + inventoryItemAmount);
+                repo.addSeedPackets(username, packetPlant, inventoryItemAmount);
                 lastSeedPacketPlant = packetPlant;
             }
         }
-        if (unlockableName != null && !unlockableName.isBlank()) {
-            String resolved = resolveUnlockable(unlockableName, user);
+        if (unlockableName != null && !unlockableName.isBlank() && repo != null) {
+            String resolved = resolveUnlockable(unlockableName, App.getInstance().getCurrentUser());
             if (resolved != null) {
-                if (user.getUnlockedPlants() == null) {
-                    user.setUnlockedPlants(new HashSet<>());
-                }
-                if (user.getUnlockedPlants().add(resolved)) {
-                    user.rememberNewsPublishDate(NewsFactory.plantNewsId(resolved));
-                }
+                repo.unlockPlant(username, resolved);
                 lastUnlockedPlant = resolved;
             }
         }

@@ -3,9 +3,18 @@ package controller;
 import controller.result.CommandResult;
 import model.app.App;
 import model.enums.MenuType;
+import model.network.client.NetworkClient;
+import model.network.packet.user.PasswordChangeRequestPacket;
+import model.network.packet.user.PasswordChangeResponsePacket;
+import model.network.packet.user.PasswordResetRequestPacket;
+import model.network.packet.user.PasswordResetResponsePacket;
+import model.network.packet.user.ProfileUpdateRequestPacket;
+import model.network.packet.user.ProfileUpdateResponsePacket;
 import model.user.PasswordHasher;
 import model.user.User;
-import model.user.persistance.UserRepository;
+
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 public class ProfileMenuController extends AppMenuController {
     private static ProfileMenuController instance = null;
@@ -32,84 +41,76 @@ public class ProfileMenuController extends AppMenuController {
         return App.getInstance().getCurrentUser();
     }
 
-    private UserRepository repo() {
-        return App.getInstance().getUserRepository();
+    private NetworkClient client() {
+        return App.getInstance().getNetworkClient();
     }
 
     public CommandResult<Void> changeUsername(String username) {
         if (username == null || username.trim().isEmpty())
             return CommandResult.error("Username cannot be empty.");
-
         String trimmed = username.trim();
-
+        if (user() == null)
+            return CommandResult.error("Not logged in.");
         if (trimmed.equals(user().getUsername()))
             return CommandResult.error("New username is the same as the current one.");
-
-        if (!trimmed.matches("^[a-zA-Z0-9-]+$"))
-            return CommandResult.error("Invalid username. Only letters, numbers, and hyphens allowed.");
-
-        if (repo().existsByUsername(trimmed))
-            return CommandResult.error("Username '" + trimmed + "' is already taken.");
-
-        user().setUsername(trimmed);
-        repo().flush();
-        return CommandResult.success("Username changed to '" + trimmed + "'.");
+        return sendProfileUpdate(trimmed, null, null);
     }
 
     public CommandResult<Void> changeNickname(String nickname) {
         if (nickname == null || nickname.trim().isEmpty())
             return CommandResult.error("Nickname cannot be empty.");
-
         String trimmed = nickname.trim();
-
+        if (user() == null)
+            return CommandResult.error("Not logged in.");
         if (trimmed.equals(user().getNickname()))
             return CommandResult.error("New nickname is the same as the current one.");
-
-        if (trimmed.length() < 3 || trimmed.length() > 30)
-            return CommandResult.error("Nickname must be between 3 and 30 characters.");
-
-        user().setNickname(trimmed);
-        repo().flush();
-        return CommandResult.success("Nickname changed to '" + trimmed + "'.");
+        return sendProfileUpdate(null, trimmed, null);
     }
 
     public CommandResult<Void> changeEmail(String email) {
         if (email == null || email.trim().isEmpty())
             return CommandResult.error("Email cannot be empty.");
-
         String trimmed = email.trim();
-
+        if (user() == null)
+            return CommandResult.error("Not logged in.");
         if (trimmed.equalsIgnoreCase(user().getEmail()))
             return CommandResult.error("New email is the same as the current one.");
-
-        if (repo().existsByEmail(trimmed))
-            return CommandResult.error("Email '" + trimmed + "' is already in use.");
-
-        String emailErr = validateEmail(trimmed);
-        if (emailErr != null)
-            return CommandResult.error("Invalid email: " + emailErr);
-
-        user().setEmail(trimmed);
-        repo().flush();
-        return CommandResult.success("Email changed to '" + trimmed + "'.");
+        return sendProfileUpdate(null, null, trimmed);
     }
 
     public CommandResult<Void> changePassword(String newPassword, String oldPassword) {
         if (newPassword == null || oldPassword == null)
             return CommandResult.error("Both old and new passwords are required.");
-
-        if (!PasswordHasher.verify(oldPassword, user().getPasswordHash()))
-            return CommandResult.error("Old password is incorrect.");
-
+        if (user() == null)
+            return CommandResult.error("Not logged in.");
         if (oldPassword.equals(newPassword))
             return CommandResult.error("New password must differ from the old one.");
 
-        String pwErr = validatePassword(newPassword);
-        if (pwErr != null)
-            return CommandResult.error("Weak password: " + pwErr);
+        NetworkClient client = client();
+        if (client == null || !client.isConnected()) {
+            return CommandResult.error("Cannot change password: server is unreachable.");
+        }
 
+        AtomicReference<PasswordChangeResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<PasswordChangeResponsePacket> handler = responseRef::set;
+        boolean prev = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(PasswordChangeResponsePacket.class, handler);
+        try {
+            client.sendPacket(new PasswordChangeRequestPacket(PasswordHasher.hash(oldPassword), newPassword));
+            waitFor(responseRef, client);
+        } finally {
+            client.unregisterHandler(PasswordChangeResponsePacket.class, handler);
+            client.setAutoPostToGdx(prev);
+        }
+        PasswordChangeResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot change password: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Password change failed.");
+        }
         user().setPasswordHash(PasswordHasher.hash(newPassword));
-        repo().flush();
         return CommandResult.success("Password changed successfully.");
     }
 
@@ -117,40 +118,84 @@ public class ProfileMenuController extends AppMenuController {
         return CommandResult.successWithData("Profile info retrieved.", user());
     }
 
-    // ── Validation helpers ──
-
-    private String validatePassword(String pw) {
-        if (pw.length() < 8) return "minimum 8 characters.";
-        if (!pw.matches(".*[a-z].*")) return "must include a lowercase letter.";
-        if (!pw.matches(".*[A-Z].*")) return "must include an uppercase letter.";
-        if (!pw.matches(".*\\d.*")) return "must include a digit.";
-        if (!pw.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
-            return "must include a special character.";
-        return null;
+    /** Server-side password reset (no active session required). */
+    public CommandResult<Void> resetPassword(String username, String email, String answer, String newPassword) {
+        NetworkClient client;
+        try {
+            client = App.getInstance().ensureConnected();
+        } catch (Exception e) {
+            return CommandResult.error("Cannot reset password: server is unreachable.");
+        }
+        if (client == null || !client.isConnected()) {
+            return CommandResult.error("Cannot reset password: server is unreachable.");
+        }
+        AtomicReference<PasswordResetResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<PasswordResetResponsePacket> handler = responseRef::set;
+        boolean prev = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(PasswordResetResponsePacket.class, handler);
+        try {
+            client.sendPacket(new PasswordResetRequestPacket(username, email, answer, newPassword));
+            waitFor(responseRef, client);
+        } finally {
+            client.unregisterHandler(PasswordResetResponsePacket.class, handler);
+            client.setAutoPostToGdx(prev);
+        }
+        PasswordResetResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot reset password: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Password reset failed.");
+        }
+        return CommandResult.success(resp.getMessage());
     }
 
-    private String validateEmail(String email) {
-        int at = email.indexOf('@');
-        int lastAt = email.lastIndexOf('@');
-        if (at == -1 || at != lastAt) return "must have exactly one '@'.";
+    private CommandResult<Void> sendProfileUpdate(String username, String nickname, String email) {
+        NetworkClient client = client();
+        if (client == null || !client.isConnected()) {
+            return CommandResult.error("Cannot update profile: server is unreachable.");
+        }
+        AtomicReference<ProfileUpdateResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<ProfileUpdateResponsePacket> handler = responseRef::set;
+        boolean prev = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(ProfileUpdateResponsePacket.class, handler);
+        try {
+            client.sendPacket(new ProfileUpdateRequestPacket(username, nickname, email));
+            waitFor(responseRef, client);
+        } finally {
+            client.unregisterHandler(ProfileUpdateResponsePacket.class, handler);
+            client.setAutoPostToGdx(prev);
+        }
+        ProfileUpdateResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot update profile: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Profile update failed.");
+        }
+        User updated = resp.getUser();
+        if (updated != null) {
+            User local = user();
+            if (local != null && local.getPasswordHash() != null) {
+                updated.setPasswordHash(local.getPasswordHash());
+            }
+            App.getInstance().setCurrentUser(updated);
+        }
+        return CommandResult.success(resp.getMessage() != null ? resp.getMessage() : "Profile updated.");
+    }
 
-        String local = email.substring(0, at);
-        String domain = email.substring(at + 1);
-
-        if (local.isEmpty()) return "local part cannot be empty.";
-        if (!local.matches("^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$") && local.length() > 1)
-            return "invalid local part.";
-        if (local.length() == 1 && !local.matches("[a-zA-Z0-9]"))
-            return "invalid local part.";
-        if (local.contains("..")) return "local part cannot have consecutive dots.";
-
-        if (domain.isEmpty()) return "domain cannot be empty.";
-        if (!domain.matches("^[a-zA-Z0-9][a-zA-Z0-9.-]*\\.[a-zA-Z]{2,}$"))
-            return "invalid domain.";
-        if (domain.contains("..")) return "domain cannot have consecutive dots.";
-
-        if (email.matches(".*[?><, \"';:\\\\/|\\[\\]{}()+*&^%$#!].*"))
-            return "contains forbidden characters.";
-        return null;
+    private static <T> void waitFor(AtomicReference<T> ref, NetworkClient client) {
+        long deadline = System.currentTimeMillis() + 3000;
+        while (System.currentTimeMillis() < deadline && ref.get() == null && client.isConnected()) {
+            client.pollEvents();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 }

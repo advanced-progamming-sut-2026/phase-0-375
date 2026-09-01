@@ -151,4 +151,9 @@ public abstract class AbstractMenuScreen implements Screen {
     protected void showToast(String message, boolean error) {
         toast.show(message, error);
     }
+
+    /** Stage used by overlays (invites, matchmaking). */
+    public Stage getStage() {
+        return stage;
+    }
 }

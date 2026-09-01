@@ -28,6 +28,10 @@ final class ResourceBank {
         sunAmount += amount;
     }
 
+    void setSunAmount(int amount) {
+        sunAmount = Math.max(0, amount);
+    }
+
     boolean spendSun(int amount) {
         if (sunAmount < amount) return false;
         sunAmount -= amount;
@@ -46,8 +50,7 @@ final class ResourceBank {
             persistentPlantFood--;
             User owner = App.getInstance().getCurrentUser();
             if (owner != null && owner.getPlantFoodCount() > 0) {
-                owner.setPlantFoodCount(owner.getPlantFoodCount() - 1);
-                App.getInstance().getUserRepository().flush();
+                App.getInstance().getUserRepository().usePlantFood(owner.getUsername());
             }
         }
         return true;

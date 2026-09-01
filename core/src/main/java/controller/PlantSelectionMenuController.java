@@ -154,9 +154,11 @@ public class PlantSelectionMenuController extends AppMenuController {
         if (user.getPlantBoosts() == null) {
             user.setPlantBoosts(new HashMap<>());
         }
-        user.setGems(user.getGems() - 2);
-        user.getPlantBoosts().put(type, true);
-        App.getInstance().getUserRepository().flush();
+        var repo = App.getInstance().getUserRepository();
+        if (repo == null || !repo.spendGems(user.getUsername(), 2)) {
+            return CommandResult.error("Need 2 gems, have " + user.getGems() + ".");
+        }
+        repo.storePlantBoost(user.getUsername(), type);
         return CommandResult.success("'" + type + "' boosted for this level!");
     }
 

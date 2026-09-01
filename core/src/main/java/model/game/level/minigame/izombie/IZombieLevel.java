@@ -81,6 +81,12 @@ public class IZombieLevel extends MiniGameLevel {
     @Override
     public void onStart() {
         GameModel model = App.getInstance().getCurrentGameModel();
+        if (model != null) {
+            onStart(model);
+        }
+    }
+
+    public void onStart(GameModel model) {
         if (model == null) {
             return;
         }
@@ -179,7 +185,7 @@ public class IZombieLevel extends MiniGameLevel {
     // --- Board setup ---
 
     /** Pre-plants the stage's defense exactly as configured in minigames.json. */
-    private void prePlantPlants(GameModel model) {
+    public void prePlantPlants(GameModel model) {
         for (IZombieSettings.PlantPlacement placement : settings.getPlantLayout()) {
             PlantInstance plant = PlantFactory.createInstance(placement.getPlant());
             if (plant != null) {
@@ -189,7 +195,7 @@ public class IZombieLevel extends MiniGameLevel {
     }
 
     /** Spawns one stationary sun-producing zombie per lane in the rightmost column. */
-    private void spawnSunZombies(GameModel model) {
+    public void spawnSunZombies(GameModel model) {
         int lastColumn = getConfig().getColumns() - 1;
         for (int row = 0; row < getConfig().getRows(); row++) {
             model.spawnZombieAt(settings.getSunZombie(), row, lastColumn);

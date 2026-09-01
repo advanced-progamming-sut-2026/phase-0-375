@@ -51,8 +51,8 @@ dependencies {
 def os = System.properties['os.name'].toLowerCase(Locale.ROOT)
 
 run {
-  // Project root — JsonUserRepository uses "data/users.json", and loaders fall back to
-  // FileInputStream("assets/data/..."). Liftoff default (assets/) breaks both.
+  // Project root — asset loaders fall back to FileInputStream("assets/data/...").
+  // Liftoff default (assets/) breaks that. Accounts live on the server only.
   workingDir = rootProject.projectDir.path
 // You can uncomment the next line if your IDE claims a build failure even when the app closed properly.
   //setIgnoreExitValue(true)

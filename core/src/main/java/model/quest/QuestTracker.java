@@ -7,6 +7,7 @@ import model.game.core.GameModel;
 import model.plant.definition.Plant;
 import model.plant.instance.PlantInstance;
 import model.user.User;
+import model.user.persistance.UserSync;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,7 +51,7 @@ public final class QuestTracker {
             if (status != null && Boolean.TRUE.equals(status.get(quest.getName()))) continue;
             evaluate(quest, model, won, progress);
         }
-        App.getInstance().getUserRepository().flush();
+        UserSync.persistQuestProgressFromCurrentUser();
     }
 
     /** A single quest's evaluation rule (Strategy pattern). */

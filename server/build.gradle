@@ -1,0 +1,85 @@
+plugins {
+  id 'application'
+}
+
+[compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
+eclipse.project.name = appName + '-server'
+
+application {
+  mainClass = 'com.sut.server.ServerLauncher'
+  applicationName = appName + '-server'
+}
+
+sourceSets {
+  main {
+    resources {
+      // Classpath must expose "/assets/data/..." (getResourceAsStream paths in loaders).
+      srcDirs = [rootProject.projectDir]
+      include 'assets/**'
+    }
+  }
+  test {
+    resources {
+      srcDirs = [rootProject.projectDir]
+      include 'assets/**'
+    }
+  }
+}
+
+dependencies {
+  // Shared domain logic, network packet DTOs, and simulation engine
+  implementation project(':core')
+
+  // Jackson JSON serialization & deserialization (matching $jacksonVersion in gradle.properties)
+  implementation "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+  implementation "com.fasterxml.jackson.core:jackson-core:$jacksonVersion"
+  implementation "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
+
+  // Testing: JUnit 5 Jupiter + Gradle 9 platform launcher
+  testImplementation platform("org.junit:junit-bom:$junitVersion")
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+  useJUnitPlatform()
+  testLogging {
+    events "passed", "skipped", "failed", "standardOut", "standardError"
+  }
+}
+
+run {
+  // Repo root so server/data/users.json resolves for ServerUserRepository
+  workingDir = rootProject.projectDir.path
+  standardInput = System.in
+  jvmArgs += "--enable-native-access=ALL-UNNAMED"
+
+  // Support passing port via Gradle property: -PserverPort=9090
+  if (project.hasProperty('serverPort')) {
+    args project.property('serverPort')
+  }
+}
+
+// Standalone runnable Fat JAR task for server deployment
+jar {
+  archiveFileName.set("${appName}-server-${projectVersion}.jar")
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  dependsOn configurations.runtimeClasspath
+  from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+  dependencies {
+    exclude('META-INF/INDEX.LIST', 'META-INF/maven/**')
+  }
+  manifest {
+    attributes(
+      'Main-Class': application.mainClass,
+      'Enable-Native-Access': 'ALL-UNNAMED',
+      'Multi-Release': 'true'
+    )
+  }
+}
+
+// Alias for dist / packaging
+tasks.register('dist') {
+  dependsOn 'jar'
+}

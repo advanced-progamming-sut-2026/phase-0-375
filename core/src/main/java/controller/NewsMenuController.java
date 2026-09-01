@@ -52,8 +52,7 @@ public class NewsMenuController extends AppMenuController {
             user.setReadNews(new ArrayList<>());
         }
         if (!user.getReadNews().contains(newsId)) {
-            user.getReadNews().add(newsId);
-            App.getInstance().getUserRepository().flush();
+            App.getInstance().getUserRepository().markNewsAsRead(user.getUsername(), newsId);
         }
     }
 
@@ -76,7 +75,7 @@ public class NewsMenuController extends AppMenuController {
         int after = user != null && user.getNewsPublishDates() != null
                 ? user.getNewsPublishDates().size() : 0;
         if (after > before) {
-            App.getInstance().getUserRepository().flush();
+            model.user.persistance.UserSync.flushIfLocal();
         }
         return repo;
     }

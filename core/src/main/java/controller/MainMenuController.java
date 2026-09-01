@@ -8,6 +8,8 @@ import model.game.core.PvZGameLoop;
 import model.game.level.Level;
 import model.game.score.ScoreLevelGenerator;
 
+import model.network.packet.auth.LogoutRequestPacket;
+
 import java.io.IOException;
 
 public class MainMenuController extends AppMenuController {
@@ -80,9 +82,20 @@ public class MainMenuController extends AppMenuController {
 
     public CommandResult<Void> logout() {
         App app = App.getInstance();
-        app.getCurrentUser().setStayLoggedIn(false);
-        app.getUserRepository().flush();
+        if (app.getCurrentUser() != null) {
+            String username = app.getCurrentUser().getUsername();
+            if (app.isConnected()) {
+                try {
+                    app.getNetworkClient().sendPacket(
+                            new LogoutRequestPacket(username, app.getSessionToken()));
+                } catch (Exception ignored) {}
+            }
+            app.getCurrentUser().setStayLoggedIn(false);
+        }
+        app.clearStayLoggedInToken();
+        app.disconnectNetwork();
         app.setCurrentUser(null);
+        app.setUserRepository(new model.user.persistance.NullUserRepository());
         app.setCurrentMenu(MenuType.REGISTER);
         return CommandResult.success("Logged out successfully.");
     }

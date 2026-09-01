@@ -5,7 +5,9 @@ import model.enums.PlantTags;
 import model.plant.definition.Plant;
 import model.projectile.BowlingBulb;
 import model.projectile.FumeCloud;
+import model.projectile.Pellet;
 import model.projectile.Projectile;
+import model.projectile.Splash;
 
 import java.util.Map;
 
@@ -175,6 +177,21 @@ public final class ProjectilePamPaths {
             if (mapped != null) {
                 return mapped;
             }
+        }
+        if (projectile instanceof Pellet pellet) {
+            if (pellet.isIce()) {
+                return SNOW_PEA;
+            }
+            if (pellet.isFire()) {
+                return FIRE_PEA;
+            }
+            return PEA;
+        }
+        if (projectile instanceof Splash splash) {
+            if (splash.isIce()) {
+                return WINTER_MELON;
+            }
+            return CABBAGE_PULT;
         }
         return null;
     }

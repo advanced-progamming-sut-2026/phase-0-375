@@ -292,8 +292,7 @@ final class PlantingService {
         String name = instance.getDefinition().getName();
         for (Map.Entry<String, Boolean> e : user.getPlantBoosts().entrySet()) {
             if (Boolean.TRUE.equals(e.getValue()) && e.getKey().equalsIgnoreCase(name)) {
-                e.setValue(false); // one-shot
-                App.getInstance().getUserRepository().flush();
+                App.getInstance().getUserRepository().consumePlantBoost(user.getUsername(), e.getKey());
                 instance.activatePlantFood();
                 return true;
             }

@@ -53,6 +53,11 @@ public abstract class AbstractGameplayScreen implements Screen {
     private final Vector3 unprojectTmp = new Vector3();
     private InputProcessor worldInput;
 
+    /** UI stage for overlays (invites, objectives, pause). */
+    public Stage getUiStage() {
+        return uiStage;
+    }
+
     protected AbstractGameplayScreen(PvzGdxGame game) {
         this.game = game;
         this.skin = game.skin;

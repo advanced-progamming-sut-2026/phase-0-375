@@ -119,7 +119,7 @@ public class SettingsMenuController extends AppMenuController {
     }
 
     private static void persist() {
-        App.getInstance().getUserRepository().flush();
+        model.user.persistance.UserSync.persistSettingsFromCurrentUser();
     }
 
     private static String formatSummary(User user) {

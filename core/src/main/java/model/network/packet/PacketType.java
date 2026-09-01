@@ -1,0 +1,57 @@
+package model.network.packet;
+
+public enum PacketType {
+    // Authentication
+    REGISTER_REQUEST,
+    REGISTER_RESPONSE,
+    LOGIN_REQUEST,
+    LOGIN_RESPONSE,
+    LOGOUT_REQUEST,
+    SESSION_RESUME_REQUEST,
+
+    // Profile & password
+    PROFILE_GET_REQUEST,
+    PROFILE_GET_RESPONSE,
+    PROFILE_UPDATE_REQUEST,
+    PROFILE_UPDATE_RESPONSE,
+    PASSWORD_CHANGE_REQUEST,
+    PASSWORD_CHANGE_RESPONSE,
+    PASSWORD_RESET_REQUEST,
+    PASSWORD_RESET_RESPONSE,
+
+    // Authoritative user mutations
+    USER_COMMAND_REQUEST,
+    USER_COMMAND_RESPONSE,
+
+    // Leaderboards
+    LEADERBOARD_REQUEST,
+    LEADERBOARD_RESPONSE,
+
+    // Matchmaking & Lobby
+    MATCHMAKING_REQUEST,
+    MATCHMAKING_RESPONSE,
+    MATCH_FOUND,
+    CANCEL_MATCHMAKING,
+
+    // Direct Player Invites
+    INVITE_REQUEST,
+    INVITE_RECEIVED,
+    INVITE_RESPONSE,
+    CANCEL_INVITE,
+    INVITE_STATUS,
+
+    // In-Game Player Actions
+    PLACE_PLANT_REQUEST,
+    PLACE_ZOMBIE_REQUEST,
+    PLAYER_ACTION_RESPONSE,
+
+    // State Synchronization
+    GAME_STATE_SNAPSHOT,
+
+    // Messaging & Reactions
+    REACTION,
+
+    // System & Health
+    ERROR_MESSAGE,
+    HEARTBEAT
+}
