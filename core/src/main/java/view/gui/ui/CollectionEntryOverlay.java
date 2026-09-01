@@ -89,8 +89,11 @@ public final class CollectionEntryOverlay {
     public static final Color BLUE_EDGE = new Color(0.02f, 0.06f, 0.18f, 1f);
     /** Text colors on blue fill (cream uses {@link #INK} / {@link #MUTED} / {@link #FLAVOR_YELLOW}). */
     public static final Color BLUE_INK = Color.WHITE;
-    public static final Color BLUE_MUTED = new Color(0.72f, 0.80f, 0.95f, 1f);
-    public static final Color BLUE_FLAVOR = new Color(0.95f, 0.82f, 0.35f, 1f);
+    /** Stat captions (SUN COST, TOUGHNESS, …). */
+    public static final Color BLUE_MUTED = new Color(0.75f, 0.8f, 0.95f, 1f);
+    public static final Color BLUE_FLAVOR = new Color(0.88f, 0.78f, 0.28f, 1f);
+    /** Plant Food line on blue fill. */
+    public static final Color BLUE_PF_GREEN = new Color(0.48f, 0.76f, 0.38f, 1f);
 
     // ── Zombie modal ───────────────────────────────────────────────────────
     /** Card width on the 1920-wide stage. */
@@ -440,6 +443,10 @@ public final class CollectionEntryOverlay {
         return blue ? BLUE_FLAVOR : FLAVOR_YELLOW;
     }
 
+    private static Color panelPlantFoodGreen(boolean blue) {
+        return blue ? BLUE_PF_GREEN : PF_GREEN;
+    }
+
     /** Cream BorderedTable shell (classic overlay). Content should already include pad. */
     private static Stack creamModalRoot(Table content, TextureBank textures, Runnable onClose) {
         BorderedTable card = new BorderedTable();
@@ -587,6 +594,7 @@ public final class CollectionEntryOverlay {
             Color ink = panelInk(blueBg);
             Color muted = panelMuted(blueBg);
             Color flavor = panelFlavor(blueBg);
+            Color pfGreen = panelPlantFoodGreen(blueBg);
 
             preview = new IdlePreview(assets, clips, PLANT_PAM_SCALE, PLANT_PAM_ANCHOR_Y);
             // Level/Locked sits on the cream STAT_BG preview — always dark, even on blue cards.
@@ -670,7 +678,7 @@ public final class CollectionEntryOverlay {
             rangeStat = inkLabel(skin, "medium", "", ink);
             specialStat = inkLabel(skin, "medium", "", ink);
             familyLabel = inkLabel(skin, "medium", "", ink);
-            plantFoodLabel = inkLabel(skin, "secondary", "", PF_GREEN);
+            plantFoodLabel = inkLabel(skin, "secondary", "", pfGreen);
             plantFoodLabel.setWrap(true);
             abilityLabel = inkLabel(skin, "secondary", "", muted);
             abilityLabel.setWrap(true);
@@ -1207,6 +1215,8 @@ public final class CollectionEntryOverlay {
     private static Label inkLabel(Skin skin, String style, String text, Color color) {
         Label label = whiteLabel(skin, style, text, color);
         SkinFonts.scaleLabel(label, skin, style, UI_FONT_SCALE);
+        // scaleLabel replaces the style from skin defaults — restore our ink color.
+        label.getStyle().fontColor = color.cpy();
         return label;
     }
 
