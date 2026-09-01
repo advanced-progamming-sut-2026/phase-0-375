@@ -1339,6 +1339,10 @@ public final class GameplayScreen extends AbstractGameplayScreen {
         GameModel model = App.getInstance().getCurrentGameModel();
         if (multiplayerMode) {
             applyMultiplayerSnapshot(model);
+            PvZGameLoop loop = App.getInstance().getCurrentGameLoop();
+            if (loop != null && model != null && model.getState() == GameState.RUNNING) {
+                loop.updatePresentation(delta);
+            }
         } else if (isPregame()) {
             entityRenderer.tickMowerIntro(delta);
         } else {

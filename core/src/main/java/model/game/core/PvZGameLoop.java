@@ -83,6 +83,20 @@ public class PvZGameLoop implements GameLoop {
 
     }
 
+    /**
+     * Plant shooting and projectile motion for networked display clients.
+     * Authoritative sim stays on the server; this reuses the same presentation
+     * path as single-player ({@link PamPlantProjectileOrigins}, clip-timed fire).
+     */
+    public void updatePresentation(float deltaTime) {
+        if (gameState != GameState.RUNNING) {
+            return;
+        }
+        float scaledDelta = deltaTime * currentGameSpeed();
+        plantSystem.tick(scaledDelta);
+        projectileSystem.tick(scaledDelta);
+    }
+
     /** Settings menu game-speed (1–3); defaults to 1x when no user is logged in. */
     private static float currentGameSpeed() {
         User user = App.getInstance().getCurrentUser();

@@ -5,6 +5,7 @@ import model.data.minigame.MiniGameRegistry;
 import model.enums.MenuType;
 import model.enums.MiniGameType;
 import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
 import model.game.level.minigame.MiniGameLevel;
 import model.network.client.NetworkClient;
 import model.network.enums.PlayerRole;
@@ -53,7 +54,7 @@ public final class MultiplayerMatchBootstrap {
         model.setSelectedPlants(List.copyOf(PLANT_SIDE_ROSTER));
 
         App.getInstance().setCurrentGameModel(model);
-        App.getInstance().setCurrentGameLoop(null);
+        App.getInstance().setCurrentGameLoop(new PvZGameLoop(model));
         App.getInstance().setCurrentMenu(MenuType.IN_GAME);
 
         PlayerRole role = match.getAssignedRole() != null ? match.getAssignedRole() : PlayerRole.PLANT;

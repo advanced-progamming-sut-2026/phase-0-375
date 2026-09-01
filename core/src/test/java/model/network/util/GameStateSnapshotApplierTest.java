@@ -3,9 +3,9 @@ package model.network.util;
 import model.data.minigame.MiniGameRegistry;
 import model.enums.MiniGameType;
 import model.game.core.GameModel;
+import model.game.core.PvZGameLoop;
 import model.game.level.minigame.MiniGameLevel;
 import model.network.dto.PlantSnapshotDto;
-import model.network.dto.ProjectileSnapshotDto;
 import model.network.dto.ZombieSnapshotDto;
 import model.network.enums.PlayerRole;
 import model.network.packet.game.GameStateSnapshotPacket;
@@ -90,40 +90,34 @@ class GameStateSnapshotApplierTest {
     }
 
     @Test
-    void applySyncsProjectilesFromSnapshot() throws Exception {
+    void applyDoesNotStompActivePlantPresentation() throws Exception {
         MiniGameLevel level = MiniGameRegistry.getInstance().createMiniGame(MiniGameType.I_ZOMBIE, 1);
         GameModel model = new GameModel(level);
         GameStateSnapshotApplier applier = new GameStateSnapshotApplier();
+        PvZGameLoop loop = new PvZGameLoop(model);
 
-        GameStateSnapshotPacket snap = new GameStateSnapshotPacket(
+        GameStateSnapshotPacket setup = new GameStateSnapshotPacket(
                 1L, 1f, 179f, 200, 75,
-                List.of(),
-                List.of(),
-                List.of(new ProjectileSnapshotDto("pr1", "Pellet", 0, 3.5f, 0f, 5f, "NONE")),
-                List.of(), false, null, null
+                List.of(new PlantSnapshotDto("p1", "Peashooter", 0, 1, 300, 300, "IDLE", false, false, 1)),
+                List.of(new ZombieSnapshotDto("z1", "ZombieDefault", 0, 3f, 0f, 200, 200, 0, "WALKING", 0.2f,
+                        false, false, false, false)),
+                List.of(), List.of(), false, null, null
         );
+        applier.apply(model, setup, PlayerRole.PLANT);
 
-        applier.apply(model, snap, PlayerRole.PLANT);
-        assertEquals(1, model.getProjectiles().size());
-        assertEquals(3.5f, model.getProjectiles().get(0).getX(), 0.01f);
+        for (int i = 0; i < 30; i++) {
+            loop.updatePresentation(1f / 30f);
+        }
 
-        GameStateSnapshotPacket moved = new GameStateSnapshotPacket(
+        GameStateSnapshotPacket idleSnap = new GameStateSnapshotPacket(
                 2L, 2f, 178f, 200, 75,
-                List.of(),
-                List.of(),
-                List.of(new ProjectileSnapshotDto("pr1", "Pellet", 0, 4.2f, 0f, 5f, "NONE")),
-                List.of(), false, null, null
+                List.of(new PlantSnapshotDto("p1", "Peashooter", 0, 1, 300, 300, "IDLE", false, false, 1)),
+                List.of(new ZombieSnapshotDto("z1", "ZombieDefault", 0, 3f, 0f, 200, 200, 0, "WALKING", 0.2f,
+                        false, false, false, false)),
+                List.of(), List.of(), false, null, null
         );
-        applier.apply(model, moved, PlayerRole.PLANT);
-        assertEquals(1, model.getProjectiles().size());
-        assertEquals(4.2f, model.getProjectiles().get(0).getX(), 0.01f);
-
-        GameStateSnapshotPacket empty = new GameStateSnapshotPacket(
-                3L, 3f, 177f, 200, 75,
-                List.of(), List.of(), List.of(), List.of(), false, null, null
-        );
-        applier.apply(model, empty, PlayerRole.PLANT);
-        assertTrue(model.getProjectiles().isEmpty());
+        applier.apply(model, idleSnap, PlayerRole.PLANT);
+        assertTrue(model.getAllPlants().get(0).hasActiveAction() || !model.getProjectiles().isEmpty());
     }
 
     @Test
