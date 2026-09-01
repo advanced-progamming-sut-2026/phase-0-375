@@ -60,6 +60,7 @@ public final class UserSanitizer {
         u.setDailyOfferPlant(s.getDailyOfferPlant());
         u.setDailyOfferDate(s.getDailyOfferDate());
         u.setDailyQuestRefreshDate(s.getDailyQuestRefreshDate());
+        u.setAvatarId(s.getAvatarId());
         return u;
     }
 }

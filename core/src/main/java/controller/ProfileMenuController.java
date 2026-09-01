@@ -55,7 +55,7 @@ public class ProfileMenuController extends AppMenuController {
             return CommandResult.error("Not logged in.");
         if (trimmed.equals(user().getUsername()))
             return CommandResult.error("New username is the same as the current one.");
-        return sendProfileUpdate(trimmed, null, null);
+        return sendProfileUpdate(trimmed, null, null, null);
     }
 
     public CommandResult<Void> changeNickname(String nickname) {
@@ -66,7 +66,7 @@ public class ProfileMenuController extends AppMenuController {
             return CommandResult.error("Not logged in.");
         if (trimmed.equals(user().getNickname()))
             return CommandResult.error("New nickname is the same as the current one.");
-        return sendProfileUpdate(null, trimmed, null);
+        return sendProfileUpdate(null, trimmed, null, null);
     }
 
     public CommandResult<Void> changeEmail(String email) {
@@ -77,7 +77,7 @@ public class ProfileMenuController extends AppMenuController {
             return CommandResult.error("Not logged in.");
         if (trimmed.equalsIgnoreCase(user().getEmail()))
             return CommandResult.error("New email is the same as the current one.");
-        return sendProfileUpdate(null, null, trimmed);
+        return sendProfileUpdate(null, null, trimmed, null);
     }
 
     public CommandResult<Void> changePassword(String newPassword, String oldPassword) {
@@ -130,9 +130,7 @@ public class ProfileMenuController extends AppMenuController {
         if (user().getAvatarId() == avatarId) {
             return CommandResult.error("That is already your avatar.");
         }
-        user().setAvatarId(avatarId);
-        UserSync.flushIfLocal();
-        return CommandResult.success("Avatar updated.");
+        return sendProfileUpdate(null, null, null, avatarId);
     }
 
     /** Server-side password reset (no active session required). */
@@ -168,9 +166,15 @@ public class ProfileMenuController extends AppMenuController {
         return CommandResult.success(resp.getMessage());
     }
 
-    private CommandResult<Void> sendProfileUpdate(String username, String nickname, String email) {
+    private CommandResult<Void> sendProfileUpdate(String username, String nickname, String email,
+                                                  Integer avatarId) {
         NetworkClient client = client();
         if (client == null || !client.isConnected()) {
+            if (avatarId != null && user() != null) {
+                user().setAvatarId(avatarId);
+                UserSync.flushIfLocal();
+                return CommandResult.success("Avatar updated.");
+            }
             return CommandResult.error("Cannot update profile: server is unreachable.");
         }
         AtomicReference<ProfileUpdateResponsePacket> responseRef = new AtomicReference<>(null);
@@ -179,7 +183,7 @@ public class ProfileMenuController extends AppMenuController {
         client.setAutoPostToGdx(false);
         client.registerHandler(ProfileUpdateResponsePacket.class, handler);
         try {
-            client.sendPacket(new ProfileUpdateRequestPacket(username, nickname, email));
+            client.sendPacket(new ProfileUpdateRequestPacket(username, nickname, email, avatarId));
             waitFor(responseRef, client);
         } finally {
             client.unregisterHandler(ProfileUpdateResponsePacket.class, handler);

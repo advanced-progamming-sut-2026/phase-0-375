@@ -107,6 +107,10 @@ public class UserService {
         if (emailErr != null) {
             return emailErr;
         }
+        ProfileUpdateResponsePacket avatarErr = applyAvatarChange(user, packet);
+        if (avatarErr != null) {
+            return avatarErr;
+        }
         userRepository.save(user);
         userRepository.flush();
         return new ProfileUpdateResponsePacket(true, "Profile updated.", UserSanitizer.sanitize(user));
@@ -288,6 +292,21 @@ public class UserService {
                     "Email '" + newEmail + "' is already in use.", null);
         }
         user.setEmail(newEmail);
+        return null;
+    }
+
+    private ProfileUpdateResponsePacket applyAvatarChange(User user, ProfileUpdateRequestPacket packet) {
+        Integer avatarId = packet.getAvatarId();
+        if (avatarId == null) {
+            return null;
+        }
+        if (avatarId < 1 || avatarId > 30) {
+            return new ProfileUpdateResponsePacket(false, "Invalid avatar.", null);
+        }
+        if (user.getAvatarId() == avatarId) {
+            return new ProfileUpdateResponsePacket(false, "That is already your avatar.", null);
+        }
+        user.setAvatarId(avatarId);
         return null;
     }
 
