@@ -20,6 +20,7 @@ import model.enums.LootPickupKind;
 import model.item.LootPickup;
 import model.item.PlantFoodPickup;
 import model.zombie.behavior.FlyBehavior;
+import model.zombie.behavior.SmashBehavior;
 import model.zombie.instance.ZombieInstance;
 
 import java.util.ArrayList;
@@ -396,7 +397,11 @@ public class ZombieSystem implements Tickable {
         if (zombie.hasBehavior(ZombieBehaviorType.ZOMBOSS)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.FISH)) return true;
         if (zombie.hasBehavior(ZombieBehaviorType.BUFF)) return true;
-        if (zombie.hasBehavior(ZombieBehaviorType.SMASH) && !isAllStar(zombie)) return true;
+        if (zombie.hasBehavior(ZombieBehaviorType.SMASH)) {
+            if (!isAllStar(zombie)) return true;
+            SmashBehavior smash = (SmashBehavior) zombie.getBehavior(ZombieBehaviorType.SMASH);
+            if (smash == null || !smash.hasSmashedOnce()) return true;
+        }
         if (zombie.hasBehavior(ZombieBehaviorType.TRANSFORM)) return true;
         return zombie.isFlying() || zombie.isSubmerged() || zombie.isPushing()
                 || zombie.getPushableItem() instanceof Piano

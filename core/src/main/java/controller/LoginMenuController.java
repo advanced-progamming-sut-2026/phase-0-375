@@ -6,6 +6,10 @@ import model.enums.MenuType;
 import model.network.client.NetworkClient;
 import model.network.packet.auth.LoginRequestPacket;
 import model.network.packet.auth.LoginResponsePacket;
+import model.network.packet.user.PasswordResetRequestPacket;
+import model.network.packet.user.PasswordResetResponsePacket;
+import model.network.packet.user.SecurityQuestionRequestPacket;
+import model.network.packet.user.SecurityQuestionResponsePacket;
 import model.user.PasswordHasher;
 import model.user.User;
 
@@ -83,8 +87,8 @@ public class LoginMenuController extends AppMenuController {
         return responseRef.get();
     }
 
-    private static void pollUntil(NetworkClient client,
-                                  AtomicReference<LoginResponsePacket> responseRef, long timeoutMs) {
+    private static <T> void pollUntil(NetworkClient client,
+                                      AtomicReference<T> responseRef, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline && responseRef.get() == null && client.isConnected()) {
             client.pollEvents();
@@ -128,15 +132,104 @@ public class LoginMenuController extends AppMenuController {
         return CommandResult.success("Welcome back, " + nick + "!");
     }
 
+    private String pendingForgotUsername;
+    private String pendingForgotEmail;
+    private String pendingForgotAnswer;
+
+    public void clearPendingForgotState() {
+        pendingForgotUsername = null;
+        pendingForgotEmail = null;
+        pendingForgotAnswer = null;
+    }
+
     public CommandResult<Void> forgetPassword(String username, String email) {
-        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
+        if (username == null || username.trim().isEmpty()) {
+            return CommandResult.error("Username cannot be empty.");
+        }
+        if (email == null || email.trim().isEmpty()) {
+            return CommandResult.error("Email cannot be empty.");
+        }
+        NetworkClient client = connectForLogin();
+        if (client == null) {
+            return CommandResult.error("Cannot recover password: server is unreachable.");
+        }
+        AtomicReference<SecurityQuestionResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<SecurityQuestionResponsePacket> handler = responseRef::set;
+        boolean prevAutoPost = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(SecurityQuestionResponsePacket.class, handler);
+        try {
+            boolean sent = client.sendPacket(
+                    new SecurityQuestionRequestPacket(username.trim(), email.trim()));
+            if (!sent) {
+                return CommandResult.error("Cannot recover password: failed to send request.");
+            }
+            pollUntil(client, responseRef, 3000);
+        } finally {
+            client.unregisterHandler(SecurityQuestionResponsePacket.class, handler);
+            client.setAutoPostToGdx(prevAutoPost);
+        }
+        SecurityQuestionResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot recover password: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null
+                    ? resp.getMessage() : "User not found or email mismatch.");
+        }
+        pendingForgotUsername = username.trim();
+        pendingForgotEmail = email.trim();
+        pendingForgotAnswer = null;
+        String question = resp.getQuestion() != null ? resp.getQuestion() : resp.getMessage();
+        return CommandResult.successWithData(question, null);
     }
 
     public CommandResult<Void> answer(String answer) {
-        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
+        if (pendingForgotUsername == null || pendingForgotEmail == null) {
+            return CommandResult.error("Please enter username and email first.");
+        }
+        if (answer == null || answer.trim().isEmpty()) {
+            return CommandResult.error("Security answer cannot be empty.");
+        }
+        pendingForgotAnswer = answer.trim();
+        return CommandResult.success("Answer recorded. Please enter your new password.");
     }
 
     public CommandResult<Void> resetPassword(String newPassword) {
-        return CommandResult.error("Password recovery must be handled by the server and is not available yet.");
+        if (pendingForgotUsername == null || pendingForgotEmail == null || pendingForgotAnswer == null) {
+            return CommandResult.error("Please provide username, email, and security answer first.");
+        }
+        if (newPassword == null || newPassword.isEmpty()) {
+            return CommandResult.error("Password cannot be empty.");
+        }
+        NetworkClient client = connectForLogin();
+        if (client == null) {
+            return CommandResult.error("Cannot reset password: server is unreachable.");
+        }
+        AtomicReference<PasswordResetResponsePacket> responseRef = new AtomicReference<>(null);
+        Consumer<PasswordResetResponsePacket> handler = responseRef::set;
+        boolean prevAutoPost = client.isAutoPostToGdx();
+        client.setAutoPostToGdx(false);
+        client.registerHandler(PasswordResetResponsePacket.class, handler);
+        try {
+            boolean sent = client.sendPacket(new PasswordResetRequestPacket(
+                    pendingForgotUsername, pendingForgotEmail, pendingForgotAnswer, newPassword));
+            if (!sent) {
+                return CommandResult.error("Cannot reset password: failed to send request.");
+            }
+            pollUntil(client, responseRef, 3000);
+        } finally {
+            client.unregisterHandler(PasswordResetResponsePacket.class, handler);
+            client.setAutoPostToGdx(prevAutoPost);
+        }
+        PasswordResetResponsePacket resp = responseRef.get();
+        if (resp == null) {
+            return CommandResult.error("Cannot reset password: no response from server.");
+        }
+        if (!resp.isSuccess()) {
+            return CommandResult.error(resp.getMessage() != null ? resp.getMessage() : "Password reset failed.");
+        }
+        clearPendingForgotState();
+        return CommandResult.success(resp.getMessage());
     }
 }

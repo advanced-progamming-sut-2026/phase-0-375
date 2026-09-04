@@ -7,8 +7,11 @@ import model.network.packet.user.LeaderboardRequestPacket;
 import model.network.packet.user.LeaderboardResponsePacket;
 import model.network.packet.user.PasswordChangeRequestPacket;
 import model.network.packet.user.PasswordChangeResponsePacket;
+import model.enums.SecurityQuestion;
 import model.network.packet.user.PasswordResetRequestPacket;
 import model.network.packet.user.PasswordResetResponsePacket;
+import model.network.packet.user.SecurityQuestionRequestPacket;
+import model.network.packet.user.SecurityQuestionResponsePacket;
 import model.network.packet.user.ProfileGetRequestPacket;
 import model.network.packet.user.ProfileGetResponsePacket;
 import model.network.packet.user.ProfileUpdateRequestPacket;
@@ -70,6 +73,9 @@ public class UserService {
 
         router.registerHandler(PasswordResetRequestPacket.class, (conn, packet) ->
                 conn.sendPacket(handlePasswordReset(packet)));
+
+        router.registerHandler(SecurityQuestionRequestPacket.class, (conn, packet) ->
+                conn.sendPacket(handleSecurityQuestion(packet)));
 
         router.registerHandler(UserCommandRequestPacket.class, (conn, packet) ->
                 conn.sendPacket(handleUserCommand(conn, packet)));
@@ -172,6 +178,26 @@ public class UserService {
             authService.revokeAllSessionTokens(username);
         }
         return new PasswordResetResponsePacket(true, "Password updated! Please log in.");
+    }
+
+    public SecurityQuestionResponsePacket handleSecurityQuestion(SecurityQuestionRequestPacket packet) {
+        if (packet == null || packet.getUsername() == null || packet.getUsername().isBlank()
+                || packet.getEmail() == null || packet.getEmail().isBlank()) {
+            return new SecurityQuestionResponsePacket(false, "Username and email are required.", null, 0);
+        }
+        String username = packet.getUsername().trim();
+        Optional<User> opt = userRepository.findByUsername(username);
+        if (opt.isEmpty()) {
+            return new SecurityQuestionResponsePacket(false, "Username not found.", null, 0);
+        }
+        User user = opt.get();
+        if (user.getEmail() == null || !user.getEmail().equalsIgnoreCase(packet.getEmail().trim())) {
+            return new SecurityQuestionResponsePacket(false, "Email does not match this username.", null, 0);
+        }
+        int qNum = user.getSecurityQuestionNumber();
+        SecurityQuestion sq = SecurityQuestion.fromNumber(qNum);
+        String questionText = sq != null ? sq.getText() : "Security question #" + qNum;
+        return new SecurityQuestionResponsePacket(true, questionText, questionText, qNum);
     }
 
     public UserCommandResponsePacket handleUserCommand(ClientConnectionHandler connection,

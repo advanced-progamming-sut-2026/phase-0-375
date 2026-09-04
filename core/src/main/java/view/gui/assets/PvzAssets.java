@@ -88,6 +88,12 @@ public final class PvzAssets implements Disposable {
         if (!handle.exists() || !handle.isDirectory()) {
             // Absolute FileHandle can miss WSL/Windows quirks; retry via java.io.File.
             File file = new File(path);
+            if (!file.isDirectory()) {
+                File parentCandidate = new File("..", path);
+                if (parentCandidate.isDirectory()) {
+                    file = parentCandidate;
+                }
+            }
             if (file.isDirectory()) {
                 handle = Gdx.files.absolute(file.getAbsolutePath());
             } else {

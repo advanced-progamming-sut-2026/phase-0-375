@@ -242,12 +242,15 @@ final class UserCommandApplier {
         }
         User u = opt.get();
         DailyOfferService.Snapshot offer = dailyOfferService.getToday();
-        Shop shop = Shop.getInstance(u);
-        shop.refreshDailyOffer(offer.plant(), offer.date());
-        PurchaseResult result = shop.buy(
-                packet.argInt("itemId", -1), packet.argInt("count", 1), packet.arg("plantType"));
-        if (result != PurchaseResult.SUCCESS) {
-            return "Shop purchase failed: " + result.name();
+        synchronized (Shop.class) {
+            Shop shop = Shop.getInstance(u);
+            shop.setCustomer(u);
+            shop.refreshDailyOffer(offer.plant(), offer.date());
+            PurchaseResult result = shop.buy(
+                    packet.argInt("itemId", -1), packet.argInt("count", 1), packet.arg("plantType"));
+            if (result != PurchaseResult.SUCCESS) {
+                return "Shop purchase failed: " + result.name();
+            }
         }
         userRepository.save(u);
         return null;

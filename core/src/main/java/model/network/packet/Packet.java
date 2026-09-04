@@ -29,6 +29,8 @@ import model.network.packet.user.PasswordChangeRequestPacket;
 import model.network.packet.user.PasswordChangeResponsePacket;
 import model.network.packet.user.PasswordResetRequestPacket;
 import model.network.packet.user.PasswordResetResponsePacket;
+import model.network.packet.user.SecurityQuestionRequestPacket;
+import model.network.packet.user.SecurityQuestionResponsePacket;
 import model.network.packet.user.ProfileGetRequestPacket;
 import model.network.packet.user.ProfileGetResponsePacket;
 import model.network.packet.user.ProfileUpdateRequestPacket;
@@ -59,6 +61,8 @@ import model.network.packet.user.UserCommandResponsePacket;
     @JsonSubTypes.Type(value = PasswordChangeResponsePacket.class, name = "PASSWORD_CHANGE_RESPONSE"),
     @JsonSubTypes.Type(value = PasswordResetRequestPacket.class, name = "PASSWORD_RESET_REQUEST"),
     @JsonSubTypes.Type(value = PasswordResetResponsePacket.class, name = "PASSWORD_RESET_RESPONSE"),
+    @JsonSubTypes.Type(value = SecurityQuestionRequestPacket.class, name = "SECURITY_QUESTION_REQUEST"),
+    @JsonSubTypes.Type(value = SecurityQuestionResponsePacket.class, name = "SECURITY_QUESTION_RESPONSE"),
 
     @JsonSubTypes.Type(value = UserCommandRequestPacket.class, name = "USER_COMMAND_REQUEST"),
     @JsonSubTypes.Type(value = UserCommandResponsePacket.class, name = "USER_COMMAND_RESPONSE"),

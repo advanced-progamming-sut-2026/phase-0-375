@@ -129,6 +129,10 @@ public class Shop {
     public void refreshDailyOffer(String globalPlant, String globalDate) {
         LocalDate today = LocalDate.now();
         if (dailyOffer != null && today.equals(lastRefreshDate)) {
+            if (customer != null && customer.getPurchasedDailyDeals() != null
+                    && Boolean.TRUE.equals(customer.getPurchasedDailyDeals().get(today.toString()))) {
+                dailyOffer.setPurchased(true);
+            }
             return;
         }
         if (customer == null) {
@@ -224,14 +228,16 @@ public class Shop {
         if (dailyOffer == null) {
             return PurchaseResult.NO_DAILY_OFFER;
         }
-        if (dailyOffer.isPurchased()) {
+        if (dailyOffer.isPurchased() || (customer.getPurchasedDailyDeals() != null
+                && Boolean.TRUE.equals(customer.getPurchasedDailyDeals().get(dailyOffer.getOfferDate().toString())))) {
+            dailyOffer.setPurchased(true);
             return PurchaseResult.ALREADY_PURCHASED;
         }
 
         String offerPlant = dailyOffer.getItem().getTargetPlantType();
-        String unlockedPlant = resolveUnlockedPlantName(offerPlant);
-        if (unlockedPlant == null) {
-            return PurchaseResult.PLANT_NOT_UNLOCKED;
+        String targetPlant = resolveCatalogPlantName(offerPlant);
+        if (targetPlant == null) {
+            targetPlant = offerPlant;
         }
 
         int cost = dailyOffer.getDiscountedPrice();
@@ -240,7 +246,7 @@ public class Shop {
         }
 
         customer.setCoins(customer.getCoins() - cost);
-        applySeedPacketPurchase(unlockedPlant, DAILY_OFFER_PACKET_AMOUNT);
+        applySeedPacketPurchase(targetPlant, DAILY_OFFER_PACKET_AMOUNT);
 
         dailyOffer.setPurchased(true);
         if (customer.getPurchasedDailyDeals() == null) {

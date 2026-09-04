@@ -52,6 +52,7 @@ final class LoginForgotFlow {
 
     void reset() {
         resetStep = 0;
+        controller.clearPendingForgotState();
     }
 
     ChangeListener listener(Table overlay, java.util.function.BiConsumer<String, Boolean> toast) {

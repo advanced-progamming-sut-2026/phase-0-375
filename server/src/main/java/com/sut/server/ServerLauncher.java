@@ -188,7 +188,9 @@ public class ServerLauncher {
                     break;
                 }
                 line = line.trim();
-                if (line.equalsIgnoreCase("exit") || line.equalsIgnoreCase("stop") || line.equalsIgnoreCase("quit")) {
+                if (line.equalsIgnoreCase("exit")
+                    || line.equalsIgnoreCase("stop")
+                    || line.equalsIgnoreCase("quit")) {
                     System.out.println("[Server] Stop command received from console.");
                     stop();
                     break;
@@ -238,7 +240,8 @@ public class ServerLauncher {
             System.err.println("[Server] Warning: Could not initialize PlantFactory: " + e.getMessage());
         }
         try {
-            ZombieFactory.init("/assets/data/zombies/zombies.json", "/assets/data/armor/ArmorTypeData.json");
+            ZombieFactory.init("/assets/data/zombies/zombies.json",
+                "/assets/data/armor/ArmorTypeData.json");
         } catch (Exception e) {
             System.err.println("[Server] Warning: Could not initialize ZombieFactory: " + e.getMessage());
         }

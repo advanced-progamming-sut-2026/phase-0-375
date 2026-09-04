@@ -90,6 +90,9 @@ public class ShopMenuController extends AppMenuController {
                 return CommandResult.error("Purchase failed (check funds / capacity / server).");
             }
             Shop shop = buildShop();
+            if (itemId == Shop.ITEM_ID_DAILY_OFFER && shop.getDailyOffer() != null) {
+                shop.getDailyOffer().setPurchased(true);
+            }
             ShopItem item = shop.findItemById(itemId);
             String message = "Purchase successful!";
             if (item != null && item.getItemType() == ShopItemType.POT) {
