@@ -11,24 +11,6 @@ application {
   applicationName = appName + '-server'
 }
 
-sourceSets {
-  main {
-    resources {
-      // Classpath must expose "/assets/data/..." (getResourceAsStream paths in loaders).
-      srcDirs = [rootProject.projectDir]
-      include 'assets/**'
-      exclude 'assets/remote/**'
-    }
-  }
-  test {
-    resources {
-      srcDirs = [rootProject.projectDir]
-      include 'assets/**'
-      exclude 'assets/remote/**'
-    }
-  }
-}
-
 dependencies {
   // Shared domain logic, network packet DTOs, and simulation engine
   implementation project(':core')
@@ -71,9 +53,9 @@ jar {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   dependsOn configurations.runtimeClasspath
   from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+  exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
   dependencies {
-    exclude('META-INF/INDEX.LIST', 'META-INF/maven/**')
+    exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/maven/**')
   }
   manifest {
     attributes(
@@ -89,7 +71,7 @@ shadowJar {
   archiveClassifier.set('all')
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   mergeServiceFiles()
-  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**')
+  exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**')
   manifest {
     attributes(
       'Main-Class': application.mainClass,

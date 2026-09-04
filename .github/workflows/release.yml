@@ -1,0 +1,146 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission to Gradle Wrapper
+        run: chmod +x gradlew
+
+      - name: Run Tests & Static Analysis
+        run: ./gradlew test
+
+      - name: Build Executable JARs
+        run: ./gradlew jar shadowJar
+
+      - name: Prepare Release Artifacts
+        id: prepare
+        run: |
+          # Extract version from tag or fallback to gradle.properties
+          VERSION=${GITHUB_REF_NAME:-$(grep '^projectVersion=' gradle.properties | cut -d'=' -f2)}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+          # 1. Prepare Standard Client Bundle
+          CLIENT_STD_DIR="dist/PlantsVsZombies2-client"
+          mkdir -p "$CLIENT_STD_DIR"
+          CLIENT_STD_JAR=$(ls lwjgl3/build/libs/PlantsVsZombies2-*.jar | grep -v -- '-all.jar' | head -n 1)
+          cp "$CLIENT_STD_JAR" "$CLIENT_STD_DIR/PlantsVsZombies2.jar"
+          cp -r tools "$CLIENT_STD_DIR/"
+          cp README.md "$CLIENT_STD_DIR/"
+          cp gradle.properties "$CLIENT_STD_DIR/"
+
+          # Create launch scripts for Standard Client
+          cat << 'EOF' > "$CLIENT_STD_DIR/setup_assets.bat"
+          @echo off
+          echo ===================================================
+          echo   Downloading and Installing PvZ 2 Game Assets
+          echo ===================================================
+          python tools/download_assets.py
+          python tools/download_ost.py
+          python tools/install_sfx.py
+          echo.
+          echo Asset setup complete! Run play.bat to start the game.
+          pause
+          EOF
+
+          cat << 'EOF' > "$CLIENT_STD_DIR/play.bat"
+          @echo off
+          java --enable-native-access=ALL-UNNAMED -jar PlantsVsZombies2.jar
+          EOF
+
+          cat << 'EOF' > "$CLIENT_STD_DIR/setup_assets.sh"
+          #!/usr/bin/env bash
+          echo "==================================================="
+          echo "  Downloading and Installing PvZ 2 Game Assets"
+          echo "==================================================="
+          python3 tools/download_assets.py
+          python3 tools/download_ost.py
+          python3 tools/install_sfx.py
+          echo ""
+          echo "Asset setup complete! Run ./play.sh to start the game."
+          EOF
+          chmod +x "$CLIENT_STD_DIR/setup_assets.sh"
+
+          cat << 'EOF' > "$CLIENT_STD_DIR/play.sh"
+          #!/usr/bin/env bash
+          java --enable-native-access=ALL-UNNAMED -jar PlantsVsZombies2.jar
+          EOF
+          chmod +x "$CLIENT_STD_DIR/play.sh"
+
+          cd dist
+          zip -r "PlantsVsZombies2-client-${VERSION}.zip" PlantsVsZombies2-client/
+          cd ..
+
+          # 2. Prepare Shadow Client Bundle (Optimized with merged service descriptors)
+          CLIENT_SHADOW_DIR="dist/PlantsVsZombies2-client-shadow"
+          mkdir -p "$CLIENT_SHADOW_DIR"
+          CLIENT_SHADOW_JAR=$(ls lwjgl3/build/libs/*all.jar | head -n 1)
+          cp "$CLIENT_SHADOW_JAR" "$CLIENT_SHADOW_DIR/PlantsVsZombies2.jar"
+          cp -r tools "$CLIENT_SHADOW_DIR/"
+          cp README.md "$CLIENT_SHADOW_DIR/"
+          cp gradle.properties "$CLIENT_SHADOW_DIR/"
+          cp "$CLIENT_STD_DIR/setup_assets.bat" "$CLIENT_SHADOW_DIR/"
+          cp "$CLIENT_STD_DIR/play.bat" "$CLIENT_SHADOW_DIR/"
+          cp "$CLIENT_STD_DIR/setup_assets.sh" "$CLIENT_SHADOW_DIR/"
+          cp "$CLIENT_STD_DIR/play.sh" "$CLIENT_SHADOW_DIR/"
+
+          cd dist
+          zip -r "PlantsVsZombies2-client-shadow-${VERSION}.zip" PlantsVsZombies2-client-shadow/
+          cd ..
+
+          # 3. Copy Server JARs (Standard & Shadow)
+          SERVER_STD_JAR=$(ls server/build/libs/PlantsVsZombies2-server-*.jar | grep -v -- '-all.jar' | head -n 1)
+          cp "$SERVER_STD_JAR" "dist/PlantsVsZombies2-server-${VERSION}.jar"
+
+          SERVER_SHADOW_JAR=$(ls server/build/libs/*server*all.jar | head -n 1)
+          cp "$SERVER_SHADOW_JAR" "dist/PlantsVsZombies2-server-shadow-${VERSION}.jar"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/PlantsVsZombies2-client-${{ steps.prepare.outputs.VERSION }}.zip
+            dist/PlantsVsZombies2-client-shadow-${{ steps.prepare.outputs.VERSION }}.zip
+            dist/PlantsVsZombies2-server-${{ steps.prepare.outputs.VERSION }}.jar
+            dist/PlantsVsZombies2-server-shadow-${{ steps.prepare.outputs.VERSION }}.jar
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 🎮 Plants vs. Zombies 2 Release
+
+            ### 🌻 Client Installation (Desktop GUI)
+            Choose either the **Shadow** (recommended / optimized fat JAR) or **Standard** bundle:
+            - **`PlantsVsZombies2-client-shadow-${{ steps.prepare.outputs.VERSION }}.zip`** *(Recommended)*
+            - **`PlantsVsZombies2-client-${{ steps.prepare.outputs.VERSION }}.zip`**
+
+            **Setup Steps:**
+            1. Download and extract your chosen client zip.
+            2. Run **`setup_assets.bat`** (Windows) or **`./setup_assets.sh`** (macOS / Linux) once to acquire the game textures and music.
+            3. Run **`play.bat`** / **`./play.sh`** (or `java -jar PlantsVsZombies2.jar`) to start playing!
+
+            ### 🌐 Multiplayer Server
+            - **Shadow Server JAR:** **`PlantsVsZombies2-server-shadow-${{ steps.prepare.outputs.VERSION }}.jar`** *(Recommended)*
+            - **Standard Server JAR:** **`PlantsVsZombies2-server-${{ steps.prepare.outputs.VERSION }}.jar`**
+            - Run with: `java -jar PlantsVsZombies2-server-shadow-${{ steps.prepare.outputs.VERSION }}.jar`.
