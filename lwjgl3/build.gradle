@@ -12,6 +12,7 @@ buildscript {
 }
 plugins {
   id "application"
+  id "com.gradleup.shadow"
 }
 apply plugin: 'io.github.fourlastor.construo'
 
@@ -25,6 +26,7 @@ eclipse.project.name = appName + '-lwjgl3'
 // Liftoff puts assets/ on the classpath root (so Gdx.files.internal("x") finds assets/x).
 // Core also packs assets/** for "/assets/data/..." ClassLoader paths used by JSON loaders.
 sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
+sourceSets.main.resources.exclude 'remote/**'
 
 dependencies {
   implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
@@ -85,6 +87,24 @@ jar {
     attributes 'Main-Class': application.mainClass, 'Enable-Native-Access': 'ALL-UNNAMED', 'Multi-Release': 'true'
   }
 // this last step may help on some OSes that need extra instruction to make runnable JARs.
+  doLast {
+    file(archiveFile).setExecutable(true, false)
+  }
+}
+
+shadowJar {
+  archiveBaseName.set(appName)
+  archiveClassifier.set('all')
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  mergeServiceFiles()
+  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**')
+  manifest {
+    attributes(
+      'Main-Class': application.mainClass,
+      'Enable-Native-Access': 'ALL-UNNAMED',
+      'Multi-Release': 'true'
+    )
+  }
   doLast {
     file(archiveFile).setExecutable(true, false)
   }

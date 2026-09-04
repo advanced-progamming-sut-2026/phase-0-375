@@ -12,6 +12,10 @@ buildscript {
   }
 }
 
+plugins {
+  id 'com.gradleup.shadow' version '9.6.1' apply false
+}
+
 allprojects {
   apply plugin: 'eclipse'
   apply plugin: 'idea'
@@ -64,8 +68,10 @@ configure(subprojects) {
 
     // iterate through all files inside that folder
     // convert it to a relative path
-    // and append it to the file assets.txt
-    fileTree(assetsFolder).collect { assetsFolder.relativePath(it) }.sort().each {
+    // and append it to the file assets.txt (excluding external remote assets)
+    fileTree(assetsFolder) {
+      exclude 'remote/**'
+    }.collect { assetsFolder.relativePath(it) }.sort().each {
       assetsFile.append(it + "\n")
     }
   }
@@ -89,3 +95,9 @@ subprojects {
 }
 
 eclipse.project.name = 'PlantsVsZombies2' + '-parent'
+
+tasks.register('shadowJar') {
+  group = 'build'
+  description = 'Assembles fat JARs for all subprojects using Shadow.'
+  dependsOn subprojects.collect { "${it.path}:shadowJar" }
+}

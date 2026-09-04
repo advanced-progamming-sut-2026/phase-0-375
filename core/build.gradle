@@ -1,3 +1,7 @@
+plugins {
+  id 'com.gradleup.shadow'
+}
+
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 eclipse.project.name = appName + '-core'
 
@@ -7,6 +11,7 @@ sourceSets {
       // Classpath must expose "/assets/data/..." (getResourceAsStream paths in loaders).
       srcDirs = [rootProject.projectDir]
       include 'assets/**'
+      exclude 'assets/remote/**'
     }
   }
 }
@@ -84,4 +89,17 @@ tasks.register('runTui', JavaExec) {
 
 jar {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+shadowJar {
+  archiveBaseName.set("${appName}-core")
+  archiveClassifier.set('all')
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  mergeServiceFiles()
+  manifest {
+    attributes(
+      'Main-Class': 'Main',
+      'Enable-Native-Access': 'ALL-UNNAMED'
+    )
+  }
 }
