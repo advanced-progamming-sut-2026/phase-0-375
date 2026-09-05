@@ -53,9 +53,45 @@ jar {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   dependsOn configurations.runtimeClasspath
   from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-  exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+  exclude(
+    'assets/Exports/**',
+    'assets/music/**',
+    'assets/sounds/**',
+    'assets/fonts/**',
+    'assets/npcs/**',
+    'assets/remote/**',
+    'assets/*.png',
+    'assets/*.txt',
+    'Exports/**',
+    'music/**',
+    'sounds/**',
+    'fonts/**',
+    'npcs/**',
+    'remote/**',
+    'META-INF/INDEX.LIST',
+    'META-INF/*.SF',
+    'META-INF/*.DSA',
+    'META-INF/*.RSA'
+  )
   dependencies {
-    exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/maven/**')
+    exclude(
+      'assets/Exports/**',
+      'assets/music/**',
+      'assets/sounds/**',
+      'assets/fonts/**',
+      'assets/npcs/**',
+      'assets/remote/**',
+      'assets/*.png',
+      'assets/*.txt',
+      'Exports/**',
+      'music/**',
+      'sounds/**',
+      'fonts/**',
+      'npcs/**',
+      'remote/**',
+      'META-INF/INDEX.LIST',
+      'META-INF/maven/**'
+    )
   }
   manifest {
     attributes(
@@ -71,7 +107,27 @@ shadowJar {
   archiveClassifier.set('all')
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   mergeServiceFiles()
-  exclude('assets/**', 'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**')
+  exclude(
+    'assets/Exports/**',
+    'assets/music/**',
+    'assets/sounds/**',
+    'assets/fonts/**',
+    'assets/npcs/**',
+    'assets/remote/**',
+    'assets/*.png',
+    'assets/*.txt',
+    'Exports/**',
+    'music/**',
+    'sounds/**',
+    'fonts/**',
+    'npcs/**',
+    'remote/**',
+    'META-INF/INDEX.LIST',
+    'META-INF/*.SF',
+    'META-INF/*.DSA',
+    'META-INF/*.RSA',
+    'META-INF/maven/**'
+  )
   manifest {
     attributes(
       'Main-Class': application.mainClass,
