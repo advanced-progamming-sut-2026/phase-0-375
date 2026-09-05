@@ -9,8 +9,11 @@ Local dev only — audio binaries are gitignored.
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
+import time
+import urllib.request
 from pathlib import Path
 
 ALBUM_URL = "https://downloads.khinsider.com/game-soundtracks/album/plants-vs.-zombies-2"
@@ -75,20 +78,27 @@ def _unpack_packer(packed: str, base: int, count: int, keywords: list[str]) -> s
 
 
 def _fetch_album_html() -> str:
-    result = subprocess.run(
-        [
-            "curl",
-            "-fsSL",
-            "-H",
-            "User-Agent: Mozilla/5.0",
-            ALBUM_URL,
-        ],
-        capture_output=True,
-        text=True,
+    req = urllib.request.Request(
+        ALBUM_URL,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
     )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "Failed to fetch album page")
-    return result.stdout
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        result = subprocess.run(
+            [
+                "curl",
+                "-fsSL",
+                "-H",
+                "User-Agent: Mozilla/5.0",
+                ALBUM_URL,
+            ],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Failed to fetch album page: {e}")
+        return result.stdout.decode("utf-8", errors="replace")
 
 
 def _parse_tracks(html: str) -> dict[str, str]:
@@ -131,30 +141,44 @@ def _parse_tracks(html: str) -> dict[str, str]:
 
 def _download(url: str, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [
-            "curl",
-            "-fsSL",
-            "--retry",
-            "5",
-            "--retry-delay",
-            "2",
-            "-H",
-            "User-Agent: Mozilla/5.0",
-            "-H",
-            f"Referer: {ALBUM_URL}",
-            "-o",
-            str(dest),
-            url,
-        ],
-        capture_output=True,
-        text=True,
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Referer": ALBUM_URL,
+        },
     )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or f"curl failed for {url}")
-    if dest.stat().st_size < 100_000:
-        dest.unlink(missing_ok=True)
-        raise RuntimeError(f"Download too small ({dest.stat().st_size} bytes): {url}")
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp, open(dest, "wb") as f:
+                shutil.copyfileobj(resp, f)
+            if dest.stat().st_size >= 100_000:
+                return
+            dest.unlink(missing_ok=True)
+            raise RuntimeError(f"Download too small ({dest.stat().st_size} bytes)")
+        except Exception as e:
+            if attempt == 4:
+                # Fallback to curl
+                result = subprocess.run(
+                    [
+                        "curl",
+                        "-fsSL",
+                        "--retry",
+                        "3",
+                        "-H",
+                        "User-Agent: Mozilla/5.0",
+                        "-H",
+                        f"Referer: {ALBUM_URL}",
+                        "-o",
+                        str(dest),
+                        url,
+                    ],
+                    capture_output=True,
+                )
+                if result.returncode == 0 and dest.exists() and dest.stat().st_size >= 100_000:
+                    return
+                raise RuntimeError(f"Failed to download {url}: {e}")
+            time.sleep(2)
 
 
 def main() -> int:
