@@ -242,6 +242,7 @@ Configuration files:
 
 ## 📜 License & Credits
 
+- Special thanks to **Arya Ghahremani** for recording and dubbing **Dr. Fazli**'s voice lines used in the game.
 - Original *Plants vs. Zombies* game concepts, imagery, characters, and audio are trademarks and intellectual property of **Electronic Arts** and **PopCap Games**.
 - Built with **[libGDX](https://libgdx.com/)**, **[libPVZ](https://github.com/pizpizi/libPVZ)**, **[pvz-skin](https://github.com/ahgharaghani/pvz-skin)**, and **[TenPatch](https://github.com/raeleus/TenPatch)**.
 - Educational project developed for the Computer Engineering Department, Sharif University of Technology.
