@@ -20,6 +20,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import model.data.level.NpcDialogueData;
 import pvz.libpvz.textures.TextureBank;
+import view.gui.assets.PvzAssets;
 import view.gui.audio.GameAudio;
 import view.gui.audio.GameSfx;
 
@@ -301,12 +302,7 @@ public final class NpcDialogueOverlay extends Table {
                 return fromRoot;
             }
         }
-        FileHandle local = Gdx.files.local("assets/" + imagePath);
-        if (local.exists()) {
-            return local;
-        }
-        FileHandle bare = Gdx.files.local(imagePath);
-        return bare.exists() ? bare : local;
+        return PvzAssets.resolveAsset(imagePath);
     }
 
     private BitmapFont resolveFont(String name) {

@@ -164,12 +164,10 @@ public final class ConveyorBeltHud extends WidgetGroup implements Disposable {
             f = assets.root.child(fileName);
             if (f.exists()) return f;
         }
-        FileHandle local = Gdx.files.local("assets/Exports/" + fileName);
-        if (local.exists()) return local;
-        local = Gdx.files.local("assets/" + fileName);
-        if (local.exists()) return local;
-        FileHandle abs = Gdx.files.absolute("C:/Users/ahgha/Desktop/pvz-assets/Exports/" + fileName);
-        if (abs.exists()) return abs;
+        FileHandle resolved = PvzAssets.resolveAsset("Exports/" + fileName);
+        if (resolved != null && resolved.exists()) return resolved;
+        resolved = PvzAssets.resolveAsset(fileName);
+        if (resolved != null && resolved.exists()) return resolved;
         return null;
     }
 

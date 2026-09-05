@@ -11,6 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
+import view.gui.assets.PvzAssets;
 
 /**
  * Fun hub intro: portrait flies in, spinning and scaling to a final pose.
@@ -85,8 +86,7 @@ public final class ZarrabiIntro implements Disposable {
                 return fromRoot;
             }
         }
-        FileHandle local = Gdx.files.local("assets/" + RELATIVE);
-        return local.exists() ? local : Gdx.files.local(RELATIVE);
+        return PvzAssets.resolveAsset(RELATIVE);
     }
 
     @Override

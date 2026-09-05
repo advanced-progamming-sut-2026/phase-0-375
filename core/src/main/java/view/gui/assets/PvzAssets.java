@@ -135,6 +135,63 @@ public final class PvzAssets implements Disposable {
         return props;
     }
 
+    /**
+     * Resolves an asset file handle across the local filesystem (loose assets)
+     * and the classpath / JAR resources (bundled assets like Exports and npcs).
+     */
+    public static FileHandle resolveAsset(String relativePath) {
+        if (isBlank(relativePath)) {
+            return null;
+        }
+        String clean = relativePath.trim().replace('\\', '/');
+        while (clean.startsWith("/")) {
+            clean = clean.substring(1);
+        }
+        String withAssets = clean.startsWith("assets/") ? clean : "assets/" + clean;
+        String withoutAssets = clean.startsWith("assets/") ? clean.substring("assets/".length()) : clean;
+
+        // 1. Local filesystem: assets/<path> or <path>
+        FileHandle f = Gdx.files.local(withAssets);
+        if (f.exists()) {
+            return f;
+        }
+        f = Gdx.files.local(clean);
+        if (f.exists()) {
+            return f;
+        }
+
+        // 2. LibGDX internal: checks asset directory and classpath root
+        f = Gdx.files.internal(withoutAssets);
+        if (f.exists()) {
+            return f;
+        }
+        f = Gdx.files.internal(withAssets);
+        if (f.exists()) {
+            return f;
+        }
+        f = Gdx.files.internal(clean);
+        if (f.exists()) {
+            return f;
+        }
+
+        // 3. Explicit classpath: for bundled JAR resources
+        f = Gdx.files.classpath(withoutAssets);
+        if (f.exists()) {
+            return f;
+        }
+        f = Gdx.files.classpath(withAssets);
+        if (f.exists()) {
+            return f;
+        }
+        f = Gdx.files.classpath(clean);
+        if (f.exists()) {
+            return f;
+        }
+
+        // Fallback
+        return Gdx.files.internal(withoutAssets);
+    }
+
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
     }

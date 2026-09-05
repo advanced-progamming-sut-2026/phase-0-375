@@ -23,6 +23,7 @@ import model.enums.Chapter;
 import model.user.User;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.assets.PvzAssets;
 import view.gui.ui.SkinFonts;
 
 import java.util.List;
@@ -134,8 +135,7 @@ public final class LeaderboardScreen extends AbstractMenuScreen {
                 return fromRoot;
             }
         }
-        FileHandle local = Gdx.files.local("assets/" + BG_RELATIVE);
-        return local.exists() ? local : Gdx.files.local(BG_RELATIVE);
+        return PvzAssets.resolveAsset(BG_RELATIVE);
     }
 
     private void refreshRows() {

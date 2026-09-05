@@ -53,12 +53,20 @@ public final class NpcDialogueRegistry {
         if (local.exists()) {
             return local;
         }
-        FileHandle classpath = Gdx.files.classpath("assets/data/levels/npcs.json");
-        if (classpath.exists()) {
-            return classpath;
+        FileHandle cpAssets = Gdx.files.classpath("assets/data/levels/npcs.json");
+        if (cpAssets.exists()) {
+            return cpAssets;
         }
-        FileHandle internal = Gdx.files.internal("assets/data/levels/npcs.json");
-        return internal.exists() ? internal : local;
+        FileHandle cp = Gdx.files.classpath("data/levels/npcs.json");
+        if (cp.exists()) {
+            return cp;
+        }
+        FileHandle inAssets = Gdx.files.internal("assets/data/levels/npcs.json");
+        if (inAssets.exists()) {
+            return inAssets;
+        }
+        FileHandle in = Gdx.files.internal("data/levels/npcs.json");
+        return in.exists() ? in : local;
     }
 
     public NpcDialogueData getDialogue(String chapter, int levelId) {

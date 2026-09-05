@@ -27,6 +27,7 @@ import model.enums.SecurityQuestion;
 import pvz.libpvz.textures.TextureBank;
 import pvz.skin.BorderedTable;
 import view.gui.PvzGdxGame;
+import view.gui.assets.PvzAssets;
 import view.gui.assets.UiRegions;
 import view.gui.audio.GameAudio;
 import view.gui.audio.MusicTracks;
@@ -137,8 +138,7 @@ public final class RegisterScreen extends AbstractMenuScreen {
                 return fromRoot;
             }
         }
-        FileHandle local = Gdx.files.local("assets/" + MainMenuArt.AUTH_BG_RELATIVE);
-        return local.exists() ? local : Gdx.files.local(MainMenuArt.AUTH_BG_RELATIVE);
+        return PvzAssets.resolveAsset(MainMenuArt.AUTH_BG_RELATIVE);
     }
 
     private void addLogo() {

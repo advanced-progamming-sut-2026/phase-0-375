@@ -15,6 +15,7 @@ public final class ServerEndpoint {
     public static final String RESOURCE = "/pvz-network.properties";
 
     private static volatile Properties resourceProps;
+    private static volatile Properties diskGradleProps;
 
     private ServerEndpoint() {}
 
@@ -22,6 +23,8 @@ public final class ServerEndpoint {
         String host = firstNonBlank(
                 System.getProperty("pvz.client.host"),
                 System.getProperty("pvz.server.host"),
+                fromGradleProps("pvz.client.host"),
+                fromGradleProps("pvz.server.host"),
                 resource("host"));
         return host != null ? host : NetworkClient.DEFAULT_HOST;
     }
@@ -30,6 +33,8 @@ public final class ServerEndpoint {
         String raw = firstNonBlank(
                 System.getProperty("pvz.client.port"),
                 System.getProperty("pvz.server.port"),
+                fromGradleProps("pvz.client.port"),
+                fromGradleProps("pvz.server.port"),
                 resource("port"));
         if (raw == null) {
             return NetworkClient.DEFAULT_PORT;
@@ -39,6 +44,43 @@ public final class ServerEndpoint {
             return parsed > 0 ? parsed : NetworkClient.DEFAULT_PORT;
         } catch (NumberFormatException ignored) {
             return NetworkClient.DEFAULT_PORT;
+        }
+    }
+
+    private static String fromGradleProps(String key) {
+        Properties props = loadDiskGradleProperties();
+        if (props == null) {
+            return null;
+        }
+        return firstNonBlank(props.getProperty(key));
+    }
+
+    private static Properties loadDiskGradleProperties() {
+        Properties cached = diskGradleProps;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (ServerEndpoint.class) {
+            if (diskGradleProps != null) {
+                return diskGradleProps;
+            }
+            Properties props = new Properties();
+            java.io.File[] candidates = {
+                    new java.io.File("gradle.properties"),
+                    new java.io.File("../gradle.properties"),
+            };
+            for (java.io.File file : candidates) {
+                if (!file.isFile()) {
+                    continue;
+                }
+                try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+                    props.load(in);
+                    break;
+                } catch (IOException ignored) {
+                }
+            }
+            diskGradleProps = props;
+            return props;
         }
     }
 

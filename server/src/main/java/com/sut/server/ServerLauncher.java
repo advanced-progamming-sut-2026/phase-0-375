@@ -117,6 +117,12 @@ public class ServerLauncher {
                 return Integer.parseInt(sysProp.trim());
             } catch (NumberFormatException ignored) {}
         }
+        String fromGradle = loadGradleProperties().getProperty("pvz.server.port");
+        if (fromGradle != null && !fromGradle.isBlank()) {
+            try {
+                return Integer.parseInt(fromGradle.trim());
+            } catch (NumberFormatException ignored) {}
+        }
         String envPort = System.getenv("PORT");
         if (envPort != null && !envPort.isBlank()) {
             try {
@@ -149,7 +155,29 @@ public class ServerLauncher {
         if (sysHost != null && !sysHost.isBlank()) {
             return sysHost.trim();
         }
+        String fromGradle = loadGradleProperties().getProperty("pvz.server.host");
+        if (fromGradle != null && !fromGradle.isBlank()) {
+            return fromGradle.trim();
+        }
         return DEFAULT_HOST;
+    }
+
+    private static java.util.Properties loadGradleProperties() {
+        java.util.Properties props = new java.util.Properties();
+        java.io.File[] candidates = {
+                new java.io.File("gradle.properties"),
+                new java.io.File("../gradle.properties"),
+        };
+        for (java.io.File file : candidates) {
+            if (!file.isFile()) {
+                continue;
+            }
+            try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+                props.load(in);
+                break;
+            } catch (java.io.IOException ignored) {}
+        }
+        return props;
     }
 
     /**

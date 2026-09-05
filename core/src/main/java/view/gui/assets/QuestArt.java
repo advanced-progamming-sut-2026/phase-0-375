@@ -202,7 +202,6 @@ public final class QuestArt {
                 return fromRoot;
             }
         }
-        FileHandle local = Gdx.files.local("assets/" + relative);
-        return local.exists() ? local : Gdx.files.local(relative);
+        return PvzAssets.resolveAsset(relative);
     }
 }
