@@ -24,15 +24,18 @@ application.applicationName = appName
 eclipse.project.name = appName + '-lwjgl3'
 
 // Liftoff puts assets/ on the classpath root (so Gdx.files.internal("x") finds assets/x).
-// Core also packs assets/** for "/assets/data/..." ClassLoader paths used by JSON loaders.
+// Only pack lightweight data/config — large atlases/IMAGES/music stay on disk (or assets.zip).
 sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
-sourceSets.main.resources.exclude 'remote/**'
+sourceSets.main.resources.exclude 'remote/**', 'atlases/**', 'IMAGES/**', 'images/**', 'music/**',
+        'Exports/**', 'RESOURCES.json', 'animations.json', 'assets.txt'
 
 dependencies {
   implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
   implementation "com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop"
   implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
   implementation project(':core')
+  // Embedded local server so a single client.jar can login/register on localhost.
+  implementation project(':server')
 
   if(enableGraalNative == 'true') {
     implementation "io.github.berstanio:gdx-svmhelper-backend-lwjgl3:$graalHelperVersion"
@@ -75,8 +78,15 @@ jar {
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   dependsOn configurations.runtimeClasspath
   from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
-// these "exclude" lines remove some unnecessary duplicate files in the output JAR.
-  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA')
+  // Do NOT embed the multi‑hundred‑MB art/music tree — libPVZ needs a real assets/ directory
+  // beside the JAR (or -Dpvz.assets). Keeps client.jar small for GitHub Releases.
+  exclude(
+    'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA',
+    'atlases/**', 'IMAGES/**', 'images/**', 'music/**', 'Exports/**',
+    'assets/atlases/**', 'assets/IMAGES/**', 'assets/images/**', 'assets/music/**',
+    'assets/Exports/**', 'assets/remote/**', 'RESOURCES.json', 'assets/RESOURCES.json',
+    'animations.json', 'assets/animations.json'
+  )
   dependencies {
     exclude('META-INF/INDEX.LIST', 'META-INF/maven/**')
   }
@@ -97,7 +107,13 @@ shadowJar {
   archiveClassifier.set('all')
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   mergeServiceFiles()
-  exclude('META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**')
+  exclude(
+    'META-INF/INDEX.LIST', 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**',
+    'atlases/**', 'IMAGES/**', 'images/**', 'music/**', 'Exports/**',
+    'assets/atlases/**', 'assets/IMAGES/**', 'assets/images/**', 'assets/music/**',
+    'assets/Exports/**', 'assets/remote/**', 'RESOURCES.json', 'assets/RESOURCES.json',
+    'animations.json', 'assets/animations.json'
+  )
   manifest {
     attributes(
       'Main-Class': application.mainClass,

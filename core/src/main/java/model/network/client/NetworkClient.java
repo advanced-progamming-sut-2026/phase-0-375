@@ -70,7 +70,9 @@ public class NetworkClient implements Closeable {
 
     // Thread Synchronization & Event Queue
     private final Queue<Runnable> eventQueue = new ConcurrentLinkedQueue<>();
-    private boolean autoPostToGdx = true;
+    private volatile boolean autoPostToGdx = true;
+    /** When &gt; 0, inbound packets always go to {@link #eventQueue} (safe for blocking RPC on the render thread). */
+    private final java.util.concurrent.atomic.AtomicInteger rpcMode = new java.util.concurrent.atomic.AtomicInteger(0);
 
     public NetworkClient() {
         this(DEFAULT_HOST, DEFAULT_PORT, NetworkJsonMapper.getMapper());
@@ -195,7 +197,9 @@ public class NetworkClient implements Closeable {
 
         Runnable dispatchTask = () -> dispatchToHandlers(packet);
 
-        if (autoPostToGdx && Gdx.app != null) {
+        // Never Gdx.app.postRunnable while a blocking RPC is waiting on this thread —
+        // that deadlocks the render thread and surfaces as "no response from server".
+        if (rpcMode.get() == 0 && autoPostToGdx && Gdx.app != null) {
             Gdx.app.postRunnable(dispatchTask);
         } else {
             eventQueue.offer(dispatchTask);
@@ -361,7 +365,29 @@ public class NetworkClient implements Closeable {
     }
 
     public void setAutoPostToGdx(boolean autoPostToGdx) {
+        if (this.autoPostToGdx == autoPostToGdx) {
+            return;
+        }
+        // Keep RPC mode in sync so a stale/racy autoPost flag cannot postRunnable
+        // onto the render thread while it is blocked in pollEvents().
+        if (!autoPostToGdx) {
+            rpcMode.incrementAndGet();
+        } else {
+            rpcMode.updateAndGet(v -> Math.max(0, v - 1));
+        }
         this.autoPostToGdx = autoPostToGdx;
+    }
+
+    /**
+     * Prefer this around blocking request/response calls from the LibGDX render thread.
+     * Ensures replies are queued for {@link #pollEvents()} instead of {@code Gdx.app.postRunnable}.
+     */
+    public void beginRpc() {
+        rpcMode.incrementAndGet();
+    }
+
+    public void endRpc() {
+        rpcMode.updateAndGet(v -> Math.max(0, v - 1));
     }
 
     public ObjectMapper getObjectMapper() {

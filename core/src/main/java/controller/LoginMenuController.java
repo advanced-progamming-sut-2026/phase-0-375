@@ -79,7 +79,7 @@ public class LoginMenuController extends AppMenuController {
             if (!sent) {
                 return null;
             }
-            pollUntil(client, responseRef, 3000);
+            pollUntil(client, responseRef, 8000);
         } finally {
             client.unregisterHandler(LoginResponsePacket.class, handler);
             client.setAutoPostToGdx(prevAutoPost);

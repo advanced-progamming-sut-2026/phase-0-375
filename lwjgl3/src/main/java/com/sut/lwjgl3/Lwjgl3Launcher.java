@@ -10,7 +10,20 @@ public class Lwjgl3Launcher {
     public static void main(String[] args) {
         if (StartupHelper.startNewJvmIfRequired()) return; // macOS / Windows helper
         PvzAssets.applyLauncherDefaults();
+        startLocalServerIfNeeded();
         createApplication();
+    }
+
+    /**
+     * Boots the dedicated auth/game server in-process on localhost (default 127.0.0.1:8080)
+     * so login / register work without a separate {@code server:run}.
+     */
+    private static void startLocalServerIfNeeded() {
+        String skip = System.getProperty("pvz.embed.server", "true");
+        if ("false".equalsIgnoreCase(skip) || "0".equals(skip)) {
+            return;
+        }
+        EmbeddedServer.startIfAvailable();
     }
 
     private static Lwjgl3Application createApplication() {

@@ -51,9 +51,10 @@ public final class PvzAssets implements Disposable {
             if (isBlank(System.getProperty("pvz.assets"))) {
                 String fromEnv = System.getenv("PVZ_ASSETS");
                 String fromProps = props.getProperty("pvz.assets");
+                String discovered = findDefaultAssetsDirectory();
                 String path = !isBlank(fromEnv) ? fromEnv.trim()
                         : !isBlank(fromProps) ? fromProps.trim()
-                        : null;
+                        : discovered;
                 if (path != null) {
                     System.setProperty("pvz.assets", path);
                 }
@@ -78,8 +79,12 @@ public final class PvzAssets implements Disposable {
             prop = props.getProperty("pvz.assets");
         }
         if (isBlank(prop)) {
+            prop = findDefaultAssetsDirectory();
+        }
+        if (isBlank(prop)) {
             throw new IllegalStateException(
-                    "pvz.assets is not set. Add it to gradle.properties, pass -Dpvz.assets=/path/to/pvz-assets, "
+                    "Could not find game assets. Place an extracted assets/ folder next to client.jar "
+                            + "(or in the working directory), pass -Dpvz.assets=/path/to/assets, "
                             + "or set PVZ_ASSETS.");
         }
 
@@ -111,8 +116,58 @@ public final class PvzAssets implements Disposable {
                     "No RESOURCES.json / resources.json under pvz.assets: " + handle.path());
         }
 
+        System.setProperty("pvz.assets", handle.file().getAbsolutePath());
         Gdx.app.log("PvzAssets", "Using asset root: " + handle.path());
         return handle;
+    }
+
+    /** Prefer ./assets, then assets/ beside the running JAR. */
+    private static String findDefaultAssetsDirectory() {
+        File[] candidates = {
+                new File("assets"),
+                new File(".", "assets"),
+        };
+        File jarDir = directoryOfRunningJar();
+        if (jarDir != null) {
+            candidates = new File[] {
+                    new File("assets"),
+                    new File(jarDir, "assets"),
+                    new File(jarDir.getParentFile() != null ? jarDir.getParentFile() : jarDir, "assets"),
+            };
+        }
+        for (File dir : candidates) {
+            if (dir != null && isUsableAssetsDir(dir)) {
+                return dir.getAbsolutePath();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isUsableAssetsDir(File dir) {
+        if (dir == null || !dir.isDirectory()) {
+            return false;
+        }
+        File resources = new File(dir, "RESOURCES.json");
+        if (!resources.isFile()) {
+            resources = new File(dir, "resources.json");
+        }
+        return resources.isFile();
+    }
+
+    private static File directoryOfRunningJar() {
+        try {
+            var loc = PvzAssets.class.getProtectionDomain().getCodeSource().getLocation();
+            if (loc == null) {
+                return null;
+            }
+            File code = new File(loc.toURI());
+            if (code.isFile()) {
+                return code.getParentFile();
+            }
+            return code.isDirectory() ? code : null;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     private static Properties loadGradleProperties() {

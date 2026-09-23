@@ -40,9 +40,12 @@ public class ServerLauncher {
         int port = resolvePort(args);
         String host = resolveHost(args);
         printBanner(port, host);
-        RUNNING.set(true);
         try {
-            runServer(host, port);
+            startListening(host, port);
+            System.out.println(
+                    "[Server] Type 'stop' or 'exit' to terminate, 'status' for statistics,"
+                            + " or 'help' for commands.\n");
+            handleConsoleInput();
         } catch (IOException e) {
             System.err.println("[Server] Fatal error binding server to port " + port + ": " + e.getMessage());
             e.printStackTrace();
@@ -54,7 +57,36 @@ public class ServerLauncher {
         }
     }
 
-    private static void runServer(String host, int port) throws IOException {
+    /**
+     * Starts the TCP server in-process without taking over stdin (for embedding in the desktop client).
+     * Returns {@code true} if this JVM is now listening, or if the server was already running.
+     * Returns {@code false} if the port is already in use (assumes an external server is available).
+     */
+    public static synchronized boolean startEmbedded() {
+        return startEmbedded(resolveHost(null), resolvePort(null));
+    }
+
+    public static synchronized boolean startEmbedded(String host, int port) {
+        if (RUNNING.get()) {
+            return true;
+        }
+        String bindHost = (host != null && !host.isBlank()) ? host.trim() : DEFAULT_HOST;
+        int bindPort = port > 0 ? port : DEFAULT_PORT;
+        printBanner(bindPort, bindHost);
+        try {
+            startListening(bindHost, bindPort);
+            return true;
+        } catch (IOException e) {
+            System.err.println("[Server] Embedded start skipped (port " + bindPort + "): " + e.getMessage());
+            System.err.println("[Server] Continuing — if another local server is already running, login should work.");
+            return false;
+        }
+    }
+
+    private static void startListening(String host, int port) throws IOException {
+        if (!RUNNING.compareAndSet(false, true)) {
+            return;
+        }
         initCatalogs();
         userRepository = new ServerUserRepository();
         authService = new AuthService(userRepository);
@@ -74,12 +106,14 @@ public class ServerLauncher {
             System.out.println("\n[Server] Shutdown hook invoked. Stopping server...");
             stop();
         }, "pvz-server-shutdown-hook"));
-        tcpServer.start();
+        try {
+            tcpServer.start();
+        } catch (IOException e) {
+            RUNNING.set(false);
+            tcpServer = null;
+            throw e;
+        }
         System.out.println("[Server] Dedicated TCP Server successfully started on " + host + ":" + port);
-        System.out.println(
-                "[Server] Type 'stop' or 'exit' to terminate, 'status' for statistics,"
-                        + " or 'help' for commands.\n");
-        handleConsoleInput();
     }
 
 

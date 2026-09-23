@@ -226,8 +226,9 @@ public final class GameAudio {
     }
 
     /**
-     * Resolves {@code assets/music/<relative>.(ogg|mp3|wav)}, trying {@code assets/} prefix
-     * and bare working-dir paths (same pattern as other GUI media).
+     * Resolves {@code assets/music/<relative>.(ogg|mp3|wav)}.
+     * Tries local working-dir paths first (Gradle {@code lwjgl3:run}), then classpath /
+     * JAR internals ({@code Gdx.files.internal} / {@code classpath}) for {@code client.jar}.
      */
     static FileHandle resolveMusicFile(String relativeWithoutExt) {
         if (relativeWithoutExt == null || relativeWithoutExt.isBlank()) {
@@ -238,13 +239,24 @@ public final class GameAudio {
             base = base.substring(1);
         }
         for (String ext : EXTENSIONS) {
-            FileHandle local = Gdx.files.local("assets/music/" + base + ext);
-            if (local.exists()) {
-                return local;
-            }
-            FileHandle bare = Gdx.files.local("music/" + base + ext);
-            if (bare.exists()) {
-                return bare;
+            String[] candidates = {
+                "assets/music/" + base + ext,
+                "music/" + base + ext,
+            };
+            for (String path : candidates) {
+                FileHandle local = Gdx.files.local(path);
+                if (local.exists()) {
+                    return local;
+                }
+                // Packaged client.jar: assets land on the classpath (root and/or assets/).
+                FileHandle internal = Gdx.files.internal(path);
+                if (internal.exists()) {
+                    return internal;
+                }
+                FileHandle classpath = Gdx.files.classpath(path);
+                if (classpath.exists()) {
+                    return classpath;
+                }
             }
         }
         return null;
